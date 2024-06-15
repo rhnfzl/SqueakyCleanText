@@ -3,8 +3,7 @@ from setuptools import setup, find_packages
 setup(
     name='SqueakyCleanText',
     version='0.1.0',
-    author='Your Name',
-    author_email='your.email@example.com',
+    author='Rehan Fazal',
     description='A comprehensive text cleaning and preprocessing pipeline.',
     long_description=open('README.md').read(),
     long_description_content_type='text/markdown',
@@ -12,10 +11,7 @@ setup(
     license='GPL-3.0-or-later',
     packages=find_packages(),
     install_requires=[
-        'pyarrow',
         'lingua-language-detector',
-        'numpy',
-        'pandas',
         'nltk',
         'emoji',
         'ftfy',
@@ -27,7 +23,9 @@ setup(
     extras_require={
         'dev': [
             'hypothesis',
-            'faker'
+            'faker',
+            'flake8',
+            'pytest',
         ],
     },
     classifiers=[
@@ -41,4 +39,5 @@ setup(
             'nltk_downloader=sct.scripts.download_nltk_stopwords:main'
         ],
     },
+    test_suite='tests',
 )
