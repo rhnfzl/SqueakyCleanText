@@ -1,6 +1,5 @@
 import re
 #---
-from sct.utils import resources
 from nltk.corpus import stopwords as sw
 
 class ProcessStopwords:
