@@ -121,14 +121,6 @@ strange_single_quotes = ["‘", "‛", "’", "❛", "❜", "`", "´", "‘", "�
 DOUBLE_QUOTE_REGEX = re.compile("|".join(strange_double_quotes))
 SINGLE_QUOTE_REGEX = re.compile("|".join(strange_single_quotes))
 
-DUTCH_POSTAL_CODES_REGEX = re.compile(r"\b\d{4}\s?[A-Za-z]{2}\b", flags=re.UNICODE | re.IGNORECASE)
-
-dutch_direction_province_pattern = r'\b(zuid|noord|oost|west|south|north|east)( |-| - )?(zuid|noord|oost|west|midden|south|east|north|)?( |-| - )?(holland|utrecht|gelderland|brabant|overijssel|flevoland|drenthe|friesland|groningen|limburg|zeeland|nederland|vlaanderen|benelux)\b'
-DUTCH_DIRECTION_PROVINCE_REGEX = re.compile(dutch_direction_province_pattern, flags=re.UNICODE | re.IGNORECASE)
-
-DUTCH_PROVINCE_REGEX = re.compile(r"\b(holland|utrecht|gelderland|brabant|overijssel|flevoland|drenthe|friesland|groningen|limburg|zeeland|nederland|vlaanderen|benelux)\b", flags=re.UNICODE | re.IGNORECASE)
-
-
 YEAR_REGEX = re.compile(r"\b(19|20)\d{2}\b") # Matches years from 1900 to 2099
 
 ISOLATED_LETTERS_REGEX = re.compile(r"(?:^|\s)[B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, V, W, X, Y, Z](?=\s|$)", flags=re.UNICODE | re.IGNORECASE)
