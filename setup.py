@@ -22,7 +22,6 @@ setup(
         'Unidecode',
         'beautifulsoup4',
         'transformers',
-        'scipy==1.10.1',
         'torch',
     ],
     extras_require={
