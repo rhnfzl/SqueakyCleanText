@@ -7,16 +7,10 @@ import os
     replace_with_url : special URL token, default "",
     replace_with_email : special EMAIL token, default "",
     replace_years : replace year, default "",
-    replace_postalcodes : replace postalcodes (currently support dutch postal codes), default "",
-    replace_province : replace province (currently support netherlands), default "",
-    replace_city: replace city's (currently support netherlands), default "",
-    replace_street : replace street's (currently support netherlands), default "",
     replace_with_phone_number : special PHONE token, default "",
     replace_with_number : special NUMBER token, default "",
     no_currency_symbols : if True, replace all currency symbols with the respective alphabetical ones,
     ner_process : To execute NER Process to remove the positpositional tags, PER, LOC, ORG, MISC
-    remove_custom_stop_words / check_remove_stext_custom_stop_words : remove unwanted words which is present in the text, 
-                            should be updated to custom_stopwords.csv file
     remove_isolated_letters : remove any isolated letters which doesn't add any value to the text
     remove_isolated_symbols : remove any isolated symbols which shouldn't be present in the text, usually which isn't 
                             immediatly prefixed and suffixed by letter or number
@@ -34,10 +28,6 @@ CHECK_REPLACE_HTML = True
 CHECK_REPLACE_URLS = True
 CHECK_REPLACE_EMAILS = True
 CHECK_REPLACE_YEARS = True
-CHECK_REPLACE_POSTALCODES = True
-CHECK_REPLACE_PROVINCE = True
-CHECK_REPLACE_CITY = True
-CHECK_REPLACE_STREET = True
 CHECK_REPLACE_PHONE_NUMBERS = True
 CHECK_REPLACE_NUMBERS = True
 CHECK_REPLACE_CURRENCY_SYMBOLS = True
@@ -55,10 +45,6 @@ REPLACE_WITH_URL = ""
 REPLACE_WITH_HTML = ""
 REPLACE_WITH_EMAIL = ""
 REPLACE_WITH_YEARS = ""
-REPLACE_WITH_POSTALCODES = ""
-REPLACE_WITH_PROVINCE = ""
-REPLACE_WITH_CITY = ""
-REPLACE_WITH_STREET = ""
 REPLACE_WITH_PHONE_NUMBERS = ""
 REPLACE_WITH_NUMBERS = ""
 REPLACE_WITH_CURRENCY_SYMBOLS = None
