@@ -17,58 +17,72 @@ class TextCleaner:
         self.GeneralNER = ner.GeneralNER()
     
     def process(self, text):
-        #--*
         text = str(text)
-        
-        #--*
+
+        language = None
         if config.CHECK_DETECT_LANGUAGE:
             language = str(resources.DETECTOR.detect_language_of(text)).split(".")[-1]
-        #--*
+
+        text = self.apply_normalization(text)
+        text = self.apply_replacements(text)
+        text = self.apply_ner_processing(text, language)
+        text = self.apply_special_processing(text)
+
+        if config.CHECK_STATISTICAL_MODEL_PROCESSING:
+            stext = self.apply_statistical_model_processing(text, language)
+            return text, stext, language
+        
+        return text, language
+
+    def apply_normalization(self, text):
         if config.CHECK_FIX_BAD_UNICODE:
             text = self.NormaliseText.fix_bad_unicode(text)
-
         if config.CHECK_TO_ASCII_UNICODE:
             text = self.NormaliseText.to_ascii_unicode(text)
+        return text
 
-        #--*
+    def apply_replacements(self, text):
         if config.CHECK_REPLACE_HTML:
-            text = self.ProcessContacts.replace_html(text, replace_with = config.REPLACE_WITH_HTML)
+            text = self.ProcessContacts.replace_html(text, replace_with=config.REPLACE_WITH_HTML)
         if config.CHECK_REPLACE_URLS:
-            text = self.ProcessContacts.replace_urls(text, replace_with = config.REPLACE_WITH_URL)
+            text = self.ProcessContacts.replace_urls(text, replace_with=config.REPLACE_WITH_URL)
         if config.CHECK_REPLACE_EMAILS:
-            text = self.ProcessContacts.replace_emails(text, replace_with = config.REPLACE_WITH_EMAIL)
+            text = self.ProcessContacts.replace_emails(text, replace_with=config.REPLACE_WITH_EMAIL)
         if config.CHECK_REPLACE_YEARS:
-            text = self.ProcessDateTime.replace_years(text, replace_with = config.REPLACE_WITH_YEARS)
+            text = self.ProcessDateTime.replace_years(text, replace_with=config.REPLACE_WITH_YEARS)
         if config.CHECK_REPLACE_PHONE_NUMBERS:
-            text = self.ProcessContacts.replace_phone_numbers(text, replace_with = config.REPLACE_WITH_PHONE_NUMBERS)
+            text = self.ProcessContacts.replace_phone_numbers(text, replace_with=config.REPLACE_WITH_PHONE_NUMBERS)
         if config.CHECK_REPLACE_NUMBERS:
-            text = self.ProcessContacts.replace_numbers(text, replace_with = config.REPLACE_WITH_NUMBERS)
+            text = self.ProcessContacts.replace_numbers(text, replace_with=config.REPLACE_WITH_NUMBERS)
         if config.CHECK_REPLACE_CURRENCY_SYMBOLS:
-            text = self.ProcessSpecialSymbols.replace_currency_symbols(text, replace_with = config.REPLACE_WITH_CURRENCY_SYMBOLS)
-        #--*
+            text = self.ProcessSpecialSymbols.replace_currency_symbols(text, replace_with=config.REPLACE_WITH_CURRENCY_SYMBOLS)
+        return text
+
+    def apply_ner_processing(self, text, language):
         if config.CHECK_NER_PROCESS:
             ner_words = self.GeneralNER.ner_process(text, config.POSITIONAL_TAGS, config.NER_CONFIDENCE_THRESHOLD, language)
             text = self.ProcessStopwords.remove_words_from_string(text, ner_words)
-        #--*
+        return text
+
+    def apply_special_processing(self, text):
         if config.CHECK_REMOVE_ISOLATED_LETTERS:
             text = self.ProcessSpecialSymbols.remove_isolated_letters(text)
         if config.CHECK_REMOVE_ISOLATED_SPECIAL_SYMBOLS:
             text = self.ProcessSpecialSymbols.remove_isolated_special_symbols(text)
         if config.CHECK_NORMALIZE_WHITESPACE:
             text = self.NormaliseText.normalize_whitespace(text, no_line_breaks=True)
-        #--*
-        if config.CHECK_STATISTICAL_MODEL_PROCESSING:
-            if config.CHECK_CASEFOLD:
-                stext = text.casefold() # lowercase
-            if config.CHECK_REMOVE_STOPWORDS:
-                stext = self.ProcessStopwords.remove_stopwords(stext, language)
-            if config.CHECK_REMOVE_PUNCTUATION:
-                stext = self.ProcessSpecialSymbols.remove_punctuation(stext)
-            if config.CHECK_REMOVE_ISOLATED_LETTERS:
-                stext = self.ProcessSpecialSymbols.remove_isolated_letters(stext)
-            if config.CHECK_NORMALIZE_WHITESPACE:
-                stext = self.NormaliseText.normalize_whitespace(stext)
-        #--*
-            return text, stext, language
-        else:
-            return text, language
+        return text
+
+    def apply_statistical_model_processing(self, text, language):
+        stext = text
+        if config.CHECK_CASEFOLD:
+            stext = stext.casefold()  # lowercase
+        if config.CHECK_REMOVE_STOPWORDS:
+            stext = self.ProcessStopwords.remove_stopwords(stext, language)
+        if config.CHECK_REMOVE_PUNCTUATION:
+            stext = self.ProcessSpecialSymbols.remove_punctuation(stext)
+        if config.CHECK_REMOVE_ISOLATED_LETTERS:
+            stext = self.ProcessSpecialSymbols.remove_isolated_letters(stext)
+        if config.CHECK_NORMALIZE_WHITESPACE:
+            stext = self.NormaliseText.normalize_whitespace(stext)
+        return stext
