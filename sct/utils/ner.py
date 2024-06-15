@@ -1,10 +1,9 @@
 import math
 import itertools
 from collections import defaultdict
-#---
-from sct.utils import resources
 
 import transformers
+from transformers import AutoTokenizer, AutoModelForTokenClassification, pipeline
 
 from sct.utils import constants
 transformers.logging.set_verbosity_error() 
@@ -17,23 +16,31 @@ class GeneralNER:
     
     def __init__(self):
         
+        #---- NER Models
+        TOKENIZER_EN = AutoTokenizer.from_pretrained("xlm-roberta-large-finetuned-conll03-english") # based on conll2003 dataset
+        MODEL_EN = AutoModelForTokenClassification.from_pretrained("xlm-roberta-large-finetuned-conll03-english")
+
+        TOKENIZER_NL = AutoTokenizer.from_pretrained("xlm-roberta-large-finetuned-conll02-dutch") # based on CoNLL-2002 dataset
+        MODEL_NL = AutoModelForTokenClassification.from_pretrained("xlm-roberta-large-finetuned-conll02-dutch")
+
+        WIKITOKENIZER = AutoTokenizer.from_pretrained("Babelscape/wikineural-multilingual-ner") # based on wikineural multilingual dataset
+        WIKIMODEL = AutoModelForTokenClassification.from_pretrained("Babelscape/wikineural-multilingual-ner")
+        
         # Length with buffer of 10%
-        self.len_single_sentence = [resources.TOKENIZER_EN.max_len_single_sentence, resources.TOKENIZER_NL.max_len_single_sentence, resources.WIKITOKENIZER.max_len_single_sentence]
+        self.len_single_sentence = [TOKENIZER_EN.max_len_single_sentence, TOKENIZER_NL.max_len_single_sentence, WIKITOKENIZER.max_len_single_sentence]
         self.min_token_length = math.ceil(min(self.len_single_sentence) * 0.9)
         tokenizer_indicator = self.len_single_sentence.index(min(self.len_single_sentence))
         
         if tokenizer_indicator == 0:
-            self.tokenizer = resources.TOKENIZER_EN
+            self.tokenizer = TOKENIZER_EN
         elif tokenizer_indicator == 1:
-            self.tokenizer = resources.TOKENIZER_NL
+            self.tokenizer = TOKENIZER_NL
         elif tokenizer_indicator == 2:
-            self.tokenizer = resources.WIKITOKENIZER
-    
-    def flair_ner_data(self, sentence, pos):
-        """
-        Formats flair NER (Named Entity Recognition) files.
-        """
-        return [{'entity_group': ix.tag, 'score': ix.score, 'word': ix.text, 'key': str(ix.start_position) + str(ix.end_position)} for ix in sentence.get_spans('ner') if ix.tag in pos]
+            self.tokenizer = WIKITOKENIZER
+            
+        self.nlp_en = pipeline("ner", model=MODEL_EN, tokenizer=TOKENIZER_EN, aggregation_strategy="simple")
+        self.nlp_nl = pipeline("ner", model=MODEL_NL, tokenizer=TOKENIZER_NL, aggregation_strategy="simple")
+        self.wikinlp = pipeline("ner", model=WIKIMODEL, tokenizer=WIKITOKENIZER, aggregation_strategy="simple")
 
     def ner_data(self, data, pos):
         """
@@ -87,11 +94,11 @@ class GeneralNER:
             texts = self.split_text(text, self.min_token_length, self.tokenizer)
             
         for text in texts:
-            ner_results.append(self.ner_data(resources.WIKINLP(text), positional_tags))
-            ner_results.append(self.ner_data(resources.NLP_EN(text), positional_tags))
+            ner_results.append(self.ner_data(self.wikinlp(text), positional_tags))
+            ner_results.append(self.ner_data(self.nlp_en(text), positional_tags))
 
             if language == 'DUTCH':
-                ner_results.append(self.ner_data(resources.NLP_NL(text), positional_tags))
+                ner_results.append(self.ner_data(self.nlp_en(text), positional_tags))
                 
         # flat out the list
         ner_results = list(itertools.chain.from_iterable(ner_results))

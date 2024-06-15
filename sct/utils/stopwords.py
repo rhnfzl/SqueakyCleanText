@@ -1,22 +1,26 @@
 import re
 #---
 from sct.utils import resources
+from nltk.corpus import stopwords as sw
 
 class ProcessStopwords:
     
     def __init__(self):
-        pass
+        ### stop words
+        self.STOP_WORDS_EN = sw.words('english')
+        self.STOP_WORDS_NL = sw.words('dutch')
+        self.STOP_WORDS_DE = sw.words('german')
 
     def remove_stopwords(self, text, lan):
         """
         Removes stopwords based on the language.
         """
         if lan == 'DUTCH':
-            stop_words = resources.STOP_WORDS_NL
+            stop_words = self.STOP_WORDS_NL
         elif lan == 'ENGLISH':
-            stop_words = resources.STOP_WORDS_EN
+            stop_words = self.STOP_WORDS_EN
         elif lan == 'GERMAN':
-            stop_words = resources.STOP_WORDS_DE
+            stop_words = self.STOP_WORDS_DE
 
         text = text.split()
         return " ".join([word for word in text if word not in stop_words])
