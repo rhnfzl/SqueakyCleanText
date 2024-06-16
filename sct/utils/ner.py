@@ -17,30 +17,36 @@ class GeneralNER:
     def __init__(self):
         
         #---- NER Models
-        TOKENIZER_EN = AutoTokenizer.from_pretrained("xlm-roberta-large-finetuned-conll03-english") # based on conll2003 dataset
-        MODEL_EN = AutoModelForTokenClassification.from_pretrained("xlm-roberta-large-finetuned-conll03-english")
+        TOKENIZER_EN = AutoTokenizer.from_pretrained("FacebookAI/xlm-roberta-large-finetuned-conll03-english")
+        MODEL_EN = AutoModelForTokenClassification.from_pretrained("FacebookAI/xlm-roberta-large-finetuned-conll03-english")
 
-        TOKENIZER_NL = AutoTokenizer.from_pretrained("xlm-roberta-large-finetuned-conll02-dutch") # based on CoNLL-2002 dataset
-        MODEL_NL = AutoModelForTokenClassification.from_pretrained("xlm-roberta-large-finetuned-conll02-dutch")
+        TOKENIZER_NL = AutoTokenizer.from_pretrained("FacebookAI/xlm-roberta-large-finetuned-conll02-dutch")
+        MODEL_NL = AutoModelForTokenClassification.from_pretrained("FacebookAI/xlm-roberta-large-finetuned-conll02-dutch")
+        
+        TOKENIZER_DE = AutoTokenizer.from_pretrained("FacebookAI/xlm-roberta-large-finetuned-conll03-german")
+        MODEL_DE = AutoModelForTokenClassification.from_pretrained("FacebookAI/xlm-roberta-large-finetuned-conll03-german")
+        
+        TOKENIZER_ES = AutoTokenizer.from_pretrained("FacebookAI/xlm-roberta-large-finetuned-conll02-spanish")
+        MODEL_ES = AutoModelForTokenClassification.from_pretrained("FacebookAI/xlm-roberta-large-finetuned-conll02-spanish")
 
-        WIKITOKENIZER = AutoTokenizer.from_pretrained("Babelscape/wikineural-multilingual-ner") # based on wikineural multilingual dataset
-        WIKIMODEL = AutoModelForTokenClassification.from_pretrained("Babelscape/wikineural-multilingual-ner")
+        TOKENIZER_MULTI = AutoTokenizer.from_pretrained("Babelscape/wikineural-multilingual-ner")
+        MODEL_MULTI = AutoModelForTokenClassification.from_pretrained("Babelscape/wikineural-multilingual-ner")
         
         # Length with buffer of 10%
-        self.len_single_sentence = [TOKENIZER_EN.max_len_single_sentence, TOKENIZER_NL.max_len_single_sentence, WIKITOKENIZER.max_len_single_sentence]
+        self.len_single_sentence = [TOKENIZER_EN.max_len_single_sentence, TOKENIZER_MULTI.max_len_single_sentence]
         self.min_token_length = math.ceil(min(self.len_single_sentence) * 0.9)
         tokenizer_indicator = self.len_single_sentence.index(min(self.len_single_sentence))
         
         if tokenizer_indicator == 0:
             self.tokenizer = TOKENIZER_EN
         elif tokenizer_indicator == 1:
-            self.tokenizer = TOKENIZER_NL
-        elif tokenizer_indicator == 2:
-            self.tokenizer = WIKITOKENIZER
+            self.tokenizer = TOKENIZER_MULTI
             
         self.nlp_en = pipeline("ner", model=MODEL_EN, tokenizer=TOKENIZER_EN, aggregation_strategy="simple")
         self.nlp_nl = pipeline("ner", model=MODEL_NL, tokenizer=TOKENIZER_NL, aggregation_strategy="simple")
-        self.wikinlp = pipeline("ner", model=WIKIMODEL, tokenizer=WIKITOKENIZER, aggregation_strategy="simple")
+        self.nlp_de = pipeline("ner", model=MODEL_DE, tokenizer=TOKENIZER_DE, aggregation_strategy="simple")
+        self.nlp_es = pipeline("ner", model=MODEL_ES, tokenizer=TOKENIZER_ES, aggregation_strategy="simple")
+        self.nlp_multi = pipeline("ner", model=MODEL_MULTI, tokenizer=TOKENIZER_MULTI, aggregation_strategy="simple")
 
     def ner_data(self, data, pos):
         """
@@ -94,11 +100,15 @@ class GeneralNER:
             texts = self.split_text(text, self.min_token_length, self.tokenizer)
             
         for text in texts:
-            ner_results.append(self.ner_data(self.wikinlp(text), positional_tags))
+            ner_results.append(self.ner_data(self.nlp_multi(text), positional_tags))
             ner_results.append(self.ner_data(self.nlp_en(text), positional_tags))
 
             if language == 'DUTCH':
-                ner_results.append(self.ner_data(self.nlp_en(text), positional_tags))
+                ner_results.append(self.ner_data(self.nlp_nl(text), positional_tags))
+            elif language == 'GERMAN':
+                ner_results.append(self.ner_data(self.nlp_de(text), positional_tags))
+            elif language == 'SPANISH':
+                ner_results.append(self.ner_data(self.nlp_es(text), positional_tags))
                 
         # flat out the list
         ner_results = list(itertools.chain.from_iterable(ner_results))

@@ -8,6 +8,7 @@ class ProcessStopwords:
         self.STOP_WORDS_EN = sw.words('english')
         self.STOP_WORDS_NL = sw.words('dutch')
         self.STOP_WORDS_DE = sw.words('german')
+        self.STOP_WORDS_ES = sw.words('spanish')
 
     def remove_stopwords(self, text, lan):
         """
@@ -19,6 +20,8 @@ class ProcessStopwords:
             stop_words = self.STOP_WORDS_EN
         elif lan == 'GERMAN':
             stop_words = self.STOP_WORDS_DE
+        elif lan == 'SPANISH':
+            stop_words = self.STOP_WORDS_ES
 
         text = text.split()
         return " ".join([word for word in text if word not in stop_words])
