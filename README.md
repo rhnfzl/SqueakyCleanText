@@ -16,7 +16,7 @@ SqueakyCleanText is a handy text cleaning package designed to sanitize text for 
 To install SqueakyCleanText, use the following pip command:
 
 ```sh
-pip install SqueakyCleanText==0.1.0
+pip install SqueakyCleanText
 ```
 
 ## Usage
