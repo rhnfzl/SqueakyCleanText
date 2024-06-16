@@ -30,11 +30,11 @@ from sct import sct
 sx = sct.TextCleaner()
 
 # Process the text
-result = sx.process("Hello, My name is John!")
-
+#lmtext : Text for Language Models, cmtext : Text for Classical ML, language : Language provided
+lmtext, cmtext, language = sx.process("Hello, My name is John!")
 # Output the result
-print(result)
-# Output: ('Hello, My name is', 'hello name', 'ENGLISH')
+print(lmtext, cmtext, language)
+# Hello, My name is hello name ENGLISH
 ```
 
 ## API
