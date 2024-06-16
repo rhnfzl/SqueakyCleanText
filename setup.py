@@ -7,8 +7,8 @@ setup(
     description='A comprehensive text cleaning and preprocessing pipeline.',
     long_description=open('README.md').read(),
     long_description_content_type='text/markdown',
-    url='https://github.com/yourusername/SqueakyCleanText',
-    license='GPL-3.0-or-later',
+    url='https://github.com/rhnfzl/SqueakyCleanText',
+    license='MIT',
     packages=find_packages(),
     install_requires=[
         'lingua-language-detector',
@@ -30,7 +30,7 @@ setup(
     },
     classifiers=[
         'Programming Language :: Python :: 3',
-        'License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)',
+        'License :: OSI Approved :: MIT License',
         'Operating System :: OS Independent',
     ],
     python_requires='>=3.7',
