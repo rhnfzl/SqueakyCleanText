@@ -33,6 +33,6 @@ jobs:
 
     - name: Publish to PyPI
       env:
-        TWINE_USERNAME: rhnfzl
+        TWINE_USERNAME: __token__
         TWINE_PASSWORD: ${{ secrets.SQUEAKYCLEANTEXT_API }}
       run: twine upload dist/*
