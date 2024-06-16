@@ -1,15 +1,25 @@
 
 # SqueakyCleanText
 
-SqueakyCleanText is a handy text cleaning package designed to sanitize text for classical machine learning models and language models (such as BERT, RoBERTa) without altering the meaning of the text.
+In the world of machine learning and natural language processing, clean and well-structured text data is crucial for building effective downstream models and managing token limits in language models. 
 
-## Features
+SqueakyCleanText helps achieve this by addressing common text issues.
 
-- Text sanitization for classical ML models and language models.
-- Removes unnecessary characters and normalizes text.
-- Supports Named Entity Recognition (NER).
-- Identifies the language of the text.
-- Provides cleaned text with stopwords removed.
+### Key Assumptions and Features
+- Encoding Issues: Corrects text encoding problems.
+- HTML and URLs: Removes unnecessary long HTML tags and URLs, or replace them with special tokens.
+- Contact Information: Strips emails, phone numbers, and other contact details, or replace them with special tokens.
+- Isolated Characters: Eliminates isolated letters or symbols that adds no value.
+- NER Support: Uses a soft voting ensemble technique to handle named entities like location and person names, which can be omitted if not needed.
+- Stopwords and Punctuation: For statistical models, it optimizes text by removing stopwords, special symbols, and punctuation.
+- Currency Symbols: Replaces all currency symbols with their alphabetical equivalents.
+- Whitespace Normalization: Removes unnecessary whitespace.
+
+##### Benefits for Statistical Models
+When working with statistical models, further optimization is often required, such as removing stopwords, special symbols, and punctuation. 
+SqueakyCleanText offers functionality to streamline this process, ensuring that your text data is in optimal shape for classification and other downstream tasks.
+
+By automating these text cleaning steps, SqueakyCleanText ensures your data is prepared efficiently and effectively, saving time and improving model performance.
 
 ## Installation
 
