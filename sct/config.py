@@ -1,5 +1,3 @@
-import os
-
 """
     detect_language : to detect the language automatically, but would consume more time if done on a batch
     fix_bad_unicode : if True, fix "broken" unicode such as mojibake and garbled HTML entities
