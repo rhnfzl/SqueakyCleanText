@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name='SqueakyCleanText',
-    version='0.1.2',
+    version='0.1.3',
     author='Rehan Fazal',
     description='A comprehensive text cleaning and preprocessing pipeline.',
     long_description=open('README.md').read(),
@@ -19,6 +19,7 @@ setup(
         'beautifulsoup4',
         'transformers',
         'torch',
+        'presidio_anonymizer',
     ],
     extras_require={
         'dev': [
