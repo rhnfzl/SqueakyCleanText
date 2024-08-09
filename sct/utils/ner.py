@@ -5,6 +5,9 @@ from collections import defaultdict
 import transformers
 from transformers import AutoTokenizer, AutoModelForTokenClassification, pipeline
 
+from presidio_anonymizer import AnonymizerEngine
+from presidio_anonymizer.entities import RecognizerResult
+
 from sct.utils import constants
 transformers.logging.set_verbosity_error() 
 
@@ -15,64 +18,121 @@ class GeneralNER:
     """
     
     def __init__(self):
-        
-        #---- NER Models
-        TOKENIZER_EN = AutoTokenizer.from_pretrained("FacebookAI/xlm-roberta-large-finetuned-conll03-english")
-        MODEL_EN = AutoModelForTokenClassification.from_pretrained("FacebookAI/xlm-roberta-large-finetuned-conll03-english")
+        self.anonymizer_engine = AnonymizerEngine()
 
-        TOKENIZER_NL = AutoTokenizer.from_pretrained("FacebookAI/xlm-roberta-large-finetuned-conll02-dutch")
-        MODEL_NL = AutoModelForTokenClassification.from_pretrained("FacebookAI/xlm-roberta-large-finetuned-conll02-dutch")
-        
-        TOKENIZER_DE = AutoTokenizer.from_pretrained("FacebookAI/xlm-roberta-large-finetuned-conll03-german")
-        MODEL_DE = AutoModelForTokenClassification.from_pretrained("FacebookAI/xlm-roberta-large-finetuned-conll03-german")
-        
-        TOKENIZER_ES = AutoTokenizer.from_pretrained("FacebookAI/xlm-roberta-large-finetuned-conll02-spanish")
-        MODEL_ES = AutoModelForTokenClassification.from_pretrained("FacebookAI/xlm-roberta-large-finetuned-conll02-spanish")
+        self.en_tokenizer = AutoTokenizer.from_pretrained(
+            "FacebookAI/xlm-roberta-large-finetuned-conll03-english")
+        self.en_model = AutoModelForTokenClassification.from_pretrained(
+            "FacebookAI/xlm-roberta-large-finetuned-conll03-english")
+        self.en_ner_pipeline = pipeline(
+            "ner", model=self.en_model, tokenizer=self.en_tokenizer, aggregation_strategy="simple")
 
-        TOKENIZER_MULTI = AutoTokenizer.from_pretrained("Babelscape/wikineural-multilingual-ner")
-        MODEL_MULTI = AutoModelForTokenClassification.from_pretrained("Babelscape/wikineural-multilingual-ner")
-        
-        # Length with buffer of 10%
-        self.len_single_sentence = [TOKENIZER_EN.max_len_single_sentence, TOKENIZER_MULTI.max_len_single_sentence]
-        self.min_token_length = math.ceil(min(self.len_single_sentence) * 0.9)
-        tokenizer_indicator = self.len_single_sentence.index(min(self.len_single_sentence))
-        
-        if tokenizer_indicator == 0:
-            self.tokenizer = TOKENIZER_EN
-        elif tokenizer_indicator == 1:
-            self.tokenizer = TOKENIZER_MULTI
-            
-        self.nlp_en = pipeline("ner", model=MODEL_EN, tokenizer=TOKENIZER_EN, aggregation_strategy="simple")
-        self.nlp_nl = pipeline("ner", model=MODEL_NL, tokenizer=TOKENIZER_NL, aggregation_strategy="simple")
-        self.nlp_de = pipeline("ner", model=MODEL_DE, tokenizer=TOKENIZER_DE, aggregation_strategy="simple")
-        self.nlp_es = pipeline("ner", model=MODEL_ES, tokenizer=TOKENIZER_ES, aggregation_strategy="simple")
-        self.nlp_multi = pipeline("ner", model=MODEL_MULTI, tokenizer=TOKENIZER_MULTI, aggregation_strategy="simple")
+        self.nl_tokenizer = AutoTokenizer.from_pretrained(
+            "FacebookAI/xlm-roberta-large-finetuned-conll02-dutch")
+        self.nl_model = AutoModelForTokenClassification.from_pretrained(
+            "FacebookAI/xlm-roberta-large-finetuned-conll02-dutch")
+        self.nl_ner_pipeline = pipeline(
+            "ner", model=self.nl_model, tokenizer=self.nl_tokenizer, aggregation_strategy="simple")
+
+        self.de_tokenizer = AutoTokenizer.from_pretrained(
+            "FacebookAI/xlm-roberta-large-finetuned-conll03-german")
+        self.de_model = AutoModelForTokenClassification.from_pretrained(
+            "FacebookAI/xlm-roberta-large-finetuned-conll03-german")
+        self.de_ner_pipeline = pipeline(
+            "ner", model=self.de_model, tokenizer=self.de_tokenizer, aggregation_strategy="simple")
+
+        self.es_tokenizer = AutoTokenizer.from_pretrained(
+            "FacebookAI/xlm-roberta-large-finetuned-conll02-spanish")
+        self.es_model = AutoModelForTokenClassification.from_pretrained(
+            "FacebookAI/xlm-roberta-large-finetuned-conll02-spanish")
+        self.es_ner_pipeline = pipeline(
+            "ner", model=self.es_model, tokenizer=self.es_tokenizer, aggregation_strategy="simple")
+
+        self.multi_tokenizer = AutoTokenizer.from_pretrained(
+            "Babelscape/wikineural-multilingual-ner")
+        self.multi_model = AutoModelForTokenClassification.from_pretrained(
+            "Babelscape/wikineural-multilingual-ner")
+        self.multi_ner_pipeline = pipeline(
+            "ner", model=self.multi_model, tokenizer=self.multi_tokenizer, aggregation_strategy="simple")
+
+        self.min_token_length = math.ceil(min(
+            self.en_tokenizer.max_len_single_sentence, self.multi_tokenizer.max_len_single_sentence) * 0.9)
+
+        self.tokenizer = self.en_tokenizer if self.en_tokenizer.max_len_single_sentence <= self.multi_tokenizer.max_len_single_sentence else self.multi_tokenizer
 
     def ner_data(self, data, pos):
         """
         Formats NER (Named Entity Recognition) files.
         """
-        return [{'entity_group': ix['entity_group'], 'score': ix['score'], 'word': ix['word'], 'key': str(ix['start']) + str(ix['end'])} for ix in data if ix['entity_group'] in pos]
+        return [{'entity_group': ix['entity_group'], 'score': ix['score'], 'word': ix['word'], 'key': str(ix['start']) + str(ix['end']), 'start': ix['start'], 'end': ix['end']} for ix in data if ix['entity_group'] in pos]
+
+    def filter_ner_data(self, data, keys):
+        """
+        Filters named entity recognition (NER) data based on a list of keys.
+
+        Args:
+            data (list): A list of dictionaries containing entity information.
+            keys (list): A list of keys to filter the data by.
+
+        Returns:
+            list: A list of unique entity data dictionaries with the highest score for each key.
+        """
+        unique_data = {}
+        for item in data:
+            if item['key'] in keys:
+                if item['key'] not in unique_data or item['score'] > unique_data[item['key']]['score']:
+                    unique_data[item['key']] = item
+        
+        return list(unique_data.values())
+
+    def anonymize_text(self, text, filtered_data):
+        """
+        Anonymizes a given text by replacing named entities with their corresponding type tags.
+
+        Args:
+            text (str): The input text to be anonymized.
+            filtered_data (list): A list of dictionaries containing entity information.
+
+        Returns:
+            str: The anonymized text with entity type tags.
+        """
+        analyzer_result = list()
+        for items in filtered_data:
+            if items['entity_group'] == 'PER':
+                analyzer_result.append(RecognizerResult(entity_type="PERSON", start=items['start'], end=items['end'], score=items['score']))
+            elif items['entity_group'] == 'LOC':
+                analyzer_result.append(RecognizerResult(entity_type="LOCATION", start=items['start'], end=items['end'], score=items['score']))
+            elif items['entity_group'] == 'ORG':
+                analyzer_result.append(RecognizerResult(entity_type="ORGANISATION", start=items['start'], end=items['end'], score=items['score']))
+        
+        text_length = len(text)
+        analyzer_result = [entry for entry in analyzer_result if 0 <= entry.start < text_length and 0 < entry.end <= text_length]
+        # Replace words in the text with their entity_type tags
+        return self.engine.anonymize(text=text, analyzer_results=analyzer_result)
 
     def ner_ensemble(self, ner_results, t):
         """
         Applies an ensemble method for NER.
+
+        Args:
+            ner_results (List[Dict[str, Any]]): A list of dictionaries containing the NER results.
+            t (float): The threshold value for filtering the NER results.
+
+        Returns:
+            List[Dict[str, Any]]: A sorted list of dictionaries containing the filtered NER results.
         """
         ner_keys = defaultdict(lambda: [0, 0])
-        ner_words = set()
-
         for entity in ner_results:
             ner_keys[entity['key']][0] += 1
             ner_keys[entity['key']][1] += entity['score']
 
         ner_keys = [key for key, val in ner_keys.items() if val[1] / val[0] >= t]
 
-        for entity in ner_results:
-            if entity['key'] in ner_keys:
-                ner_words.add(entity['word'])
-
-        ner_words = sorted(list(ner_words), key=len, reverse=True)
-        return ner_words
+        filter_ner_results = self.filter_ner_data(ner_results, ner_keys)
+        
+        filter_ner_results.sort(key=lambda x: x['start'])
+        
+        return filter_ner_results
     
     def ner_process(self, text, positional_tags, ner_confidence_threshold, language):
         """_summary_
@@ -86,8 +146,7 @@ class GeneralNER:
         Returns:
             list: a list of words sorted based on length for the provided positional tags which meets the threshold
         """
-        ner_results = []
-        
+        ner_clean_text = list()       
         # text length
         text_token_length = len(self.tokenizer.tokenize(text))
         
@@ -100,6 +159,7 @@ class GeneralNER:
             texts = self.split_text(text, self.min_token_length, self.tokenizer)
             
         for text in texts:
+            ner_results = []
             ner_results.append(self.ner_data(self.nlp_multi(text), positional_tags))
             ner_results.append(self.ner_data(self.nlp_en(text), positional_tags))
 
@@ -109,15 +169,27 @@ class GeneralNER:
                 ner_results.append(self.ner_data(self.nlp_de(text), positional_tags))
             elif language == 'SPANISH':
                 ner_results.append(self.ner_data(self.nlp_es(text), positional_tags))
-                
-        # flat out the list
-        ner_results = list(itertools.chain.from_iterable(ner_results))
-        ner_words = self.ner_ensemble(ner_results, ner_confidence_threshold)
-        return ner_words
-    
+            
+            # flat out the list
+            ner_results = list(itertools.chain.from_iterable(ner_results))
+            ner_results = self.ner_ensemble(ner_results, ner_confidence_threshold)
+            ner_text = self.anonymize_text(text, ner_results).text
+            ner_clean_text.append(ner_text)
+            
+        return ' '.join(ner_clean_text)
     
     def split_text(self, text, max_tokens, tokenizer):
-    
+        """
+        Splits a given text into chunks based on a maximum token limit.
+
+        Args:
+            text (str): The input text to be split.
+            max_tokens (int): The maximum number of tokens allowed in each chunk.
+            tokenizer: A tokenizer object used to tokenize the input text.
+
+        Returns:
+            list: A list of text chunks, each containing a maximum of max_tokens tokens.
+        """
         sentence_boundaries = [(m.start(), m.end()) for m in constants.SENTENCE_BOUNDARY_PATTERN.finditer(text)]
         
         chunks = []

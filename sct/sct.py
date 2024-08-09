@@ -100,8 +100,7 @@ class TextCleaner:
         return self.ProcessSpecialSymbols.replace_currency_symbols(text, replace_with=config.REPLACE_WITH_CURRENCY_SYMBOLS)
 
     def ner_process(self, text):
-        ner_words = self.GeneralNER.ner_process(text, config.POSITIONAL_TAGS, config.NER_CONFIDENCE_THRESHOLD, self.language)
-        return self.ProcessStopwords.remove_words_from_string(text, ner_words)
+        return self.GeneralNER.ner_process(text, config.POSITIONAL_TAGS, config.NER_CONFIDENCE_THRESHOLD, self.language)
 
     def remove_isolated_letters(self, text):
         return self.ProcessSpecialSymbols.remove_isolated_letters(text)
