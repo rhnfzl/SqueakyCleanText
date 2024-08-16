@@ -65,8 +65,10 @@ class TextCleaner:
         if config.CHECK_STATISTICAL_MODEL_PROCESSING:
             stext = self.statistical_model_processing(text)
             return text, stext, self.language
-        
-        return text, self.language
+        if config.CHECK_DETECT_LANGUAGE:
+            return text, self.language
+        else:
+            return text
 
     def detect_language(self, text):
         self.language = str(resources.DETECTOR.detect_language_of(text)).split(".")[-1]
