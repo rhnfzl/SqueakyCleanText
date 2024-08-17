@@ -22,7 +22,7 @@ class GeneralNER:
         
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
         
-        self.anonymizer_engine = AnonymizerEngine()
+        self.engine = AnonymizerEngine()
 
         self.en_tokenizer = AutoTokenizer.from_pretrained(
             "FacebookAI/xlm-roberta-large-finetuned-conll03-english")
