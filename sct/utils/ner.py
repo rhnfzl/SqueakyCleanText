@@ -11,6 +11,7 @@ from presidio_anonymizer.entities import RecognizerResult
 
 from sct.utils import constants
 from sct import config
+from typing import List, Dict, Any  # Add this line
 transformers.logging.set_verbosity_error() 
 
 class GeneralNER:

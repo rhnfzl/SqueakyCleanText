@@ -132,7 +132,6 @@ You can modify the package’s functionality by changing settings in the configu
     Similarly, other aspects of the configuration can be changed. Simply modify the settings before initializing TextCleaner(). Below is the full list of configurable settings:
 
     ```python
-
     from sct import sct, config
     # In case Language detection is not required as well as No NER and No Statistical Model stopwords are needed,
     # then only CHECK_DETECT_LANGUAGE will be considered False.
@@ -180,7 +179,6 @@ You can modify the package’s functionality by changing settings in the configu
     ]
     
     sx = sct.TextCleaner()
-
     ```
 
 
