@@ -181,6 +181,7 @@ You can modify the package’s functionality by changing settings in the configu
     sx = sct.TextCleaner()
     ```
 
+
 ## API
 
 ### `sct.TextCleaner`
