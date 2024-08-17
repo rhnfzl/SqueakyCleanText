@@ -49,7 +49,9 @@ POSITIONAL_TAGS = ['PER', 'LOC', 'ORG']
 NER_CONFIDENCE_THRESHOLD = 0.85
 LANGUAGE = None
 
-NER_MODELS_LIST = ["FacebookAI/xlm-roberta-large-finetuned-conll03-english", 
+# Order of the model is Important : English Model, Dutch Model, German Model, Spanish Model, MULTILINGUAL Model
+NER_MODELS_LIST = ["FacebookAI/xlm-roberta-large-finetuned-conll03-english",
               "FacebookAI/xlm-roberta-large-finetuned-conll02-dutch",
               "FacebookAI/xlm-roberta-large-finetuned-conll03-german",
               "FacebookAI/xlm-roberta-large-finetuned-conll02-spanish",
+              "Babelscape/wikineural-multilingual-ner"]
