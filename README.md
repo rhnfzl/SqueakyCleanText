@@ -132,50 +132,53 @@ You can modify the package’s functionality by changing settings in the configu
     Similarly, other aspects of the configuration can be changed. Simply modify the settings before initializing TextCleaner(). Below is the full list of configurable settings:
 
     ```python
+        from sct import sct, config
         # In case Language detection is not required as well as No NER and No Statistical Model stopwords are needed,
         # then only CHECK_DETECT_LANGUAGE will be considered False.
-        CHECK_DETECT_LANGUAGE = True
-        CHECK_FIX_BAD_UNICODE = True
-        CHECK_TO_ASCII_UNICODE = True
-        CHECK_REPLACE_HTML = True
-        CHECK_REPLACE_URLS = True
-        CHECK_REPLACE_EMAILS = True
-        CHECK_REPLACE_YEARS = True
-        CHECK_REPLACE_PHONE_NUMBERS = True
-        CHECK_REPLACE_NUMBERS = True
-        CHECK_REPLACE_CURRENCY_SYMBOLS = True
-        CHECK_NER_PROCESS = True
-        CHECK_REMOVE_ISOLATED_LETTERS = True
-        CHECK_REMOVE_ISOLATED_SPECIAL_SYMBOLS = True
-        CHECK_NORMALIZE_WHITESPACE = True
-        CHECK_STATISTICAL_MODEL_PROCESSING = True
-        CHECK_CASEFOLD = True
-        CHECK_REMOVE_STOPWORDS = True
-        CHECK_REMOVE_PUNCTUATION = True
-        CHECK_REMOVE_SCT_CUSTOM_STOP_WORDS = True
+        config.CHECK_DETECT_LANGUAGE = True
+        config.CHECK_FIX_BAD_UNICODE = True
+        config.CHECK_TO_ASCII_UNICODE = True
+        config.CHECK_REPLACE_HTML = True
+        config.CHECK_REPLACE_URLS = True
+        config.CHECK_REPLACE_EMAILS = True
+        config.CHECK_REPLACE_YEARS = True
+        config.CHECK_REPLACE_PHONE_NUMBERS = True
+        config.CHECK_REPLACE_NUMBERS = True
+        config.CHECK_REPLACE_CURRENCY_SYMBOLS = True
+        config.CHECK_NER_PROCESS = True
+        config.CHECK_REMOVE_ISOLATED_LETTERS = True
+        config.CHECK_REMOVE_ISOLATED_SPECIAL_SYMBOLS = True
+        config.CHECK_NORMALIZE_WHITESPACE = True
+        config.CHECK_STATISTICAL_MODEL_PROCESSING = True
+        config.CHECK_CASEFOLD = True
+        config.CHECK_REMOVE_STOPWORDS = True
+        config.CHECK_REMOVE_PUNCTUATION = True
+        config.CHECK_REMOVE_SCT_CUSTOM_STOP_WORDS = True
         # Tags can be replaced if needed, like if no special tags are necessary "" can be passed
-        REPLACE_WITH_URL = "<URL>"
-        REPLACE_WITH_HTML = "<HTML>"
-        REPLACE_WITH_EMAIL = "<EMAIL>"
-        REPLACE_WITH_YEARS = "<YEAR>"
-        REPLACE_WITH_PHONE_NUMBERS = "<PHONE>"
-        REPLACE_WITH_NUMBERS = "<NUMBER>"
-        REPLACE_WITH_CURRENCY_SYMBOLS = None
+        config.REPLACE_WITH_URL = "<URL>"
+        config.REPLACE_WITH_HTML = "<HTML>"
+        config.REPLACE_WITH_EMAIL = "<EMAIL>"
+        config.REPLACE_WITH_YEARS = "<YEAR>"
+        config.REPLACE_WITH_PHONE_NUMBERS = "<PHONE>"
+        config.REPLACE_WITH_NUMBERS = "<NUMBER>"
+        config.REPLACE_WITH_CURRENCY_SYMBOLS = None
         # You can remove any of the tags
-        POSITIONAL_TAGS = ['PER', 'LOC', 'ORG']
-        NER_CONFIDENCE_THRESHOLD = 0.85
+        config.POSITIONAL_TAGS = ['PER', 'LOC', 'ORG']
+        config.NER_CONFIDENCE_THRESHOLD = 0.85
         # Pass it as ENGLISH, DUTCH, GERMAN etc. if you know the language of text beforehand.
-        LANGUAGE = None
+        config.LANGUAGE = None
 
         # Order of the model is Important: English Model, Dutch Model, German Model, Spanish Model, MULTILINGUAL Model
         # All models passed need to support transformers AutoModel
-        NER_MODELS_LIST = [
+        config.NER_MODELS_LIST = [
             "FacebookAI/xlm-roberta-large-finetuned-conll03-english",
             "FacebookAI/xlm-roberta-large-finetuned-conll02-dutch",
             "FacebookAI/xlm-roberta-large-finetuned-conll03-german",
             "FacebookAI/xlm-roberta-large-finetuned-conll02-spanish",
             "Babelscape/wikineural-multilingual-ner"
         ]
+        
+        sx = sct.TextCleaner()
     ```
 
 ## API
