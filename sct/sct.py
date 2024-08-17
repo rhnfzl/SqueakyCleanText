@@ -21,7 +21,11 @@ class TextCleaner:
     
     def init_pipeline(self):
         # Initialize pipeline steps based on config
-        if config.CHECK_DETECT_LANGUAGE or config.CHECK_NER_PROCESS or config.CHECK_STATISTICAL_MODEL_PROCESSING:
+        language_config = config.LANGUAGE.lower() if config.LANGUAGE else None
+
+        if language_config and language_config in resources.LANGUAGE_NAME:
+            self.language = language_config.upper()
+        elif any([config.CHECK_DETECT_LANGUAGE, config.CHECK_NER_PROCESS, config.CHECK_REMOVE_STOPWORDS]):
             self.pipeline.append(self.detect_language)
         
         if config.CHECK_FIX_BAD_UNICODE:
