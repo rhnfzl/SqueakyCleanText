@@ -127,5 +127,4 @@ ISOLATED_LETTERS_REGEX = re.compile(r"(?:^|\s)[B, C, D, E, F, G, H, I, J, K, L, 
 
 ISOLATED_SPECIAL_SYMBOLS_REGEX = re.compile(r"(?<![a-zA-Z0-9])[:_.|><;·}@~!?+#)({,/\\\\^]+(?![a-zA-Z0-9])", flags=re.UNICODE | re.IGNORECASE)
 
-
 SENTENCE_BOUNDARY_PATTERN = re.compile('(?<=[.!?])\s+(?=[^\d])')
