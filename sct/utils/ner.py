@@ -10,6 +10,7 @@ from presidio_anonymizer import AnonymizerEngine
 from presidio_anonymizer.entities import RecognizerResult
 
 from sct.utils import constants
+from sct import config
 transformers.logging.set_verbosity_error() 
 
 class GeneralNER:
@@ -23,44 +24,48 @@ class GeneralNER:
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
 
         self.engine = AnonymizerEngine()
+        
+        if len(config.NER_MODELS_LIST) == 5:
+            english_model_name = config.NER_MODELS_LIST[0]
+            dutch_model_name = config.NER_MODELS_LIST[1]
+            german_model_name = config.NER_MODELS_LIST[2]
+            spanish_model_name = config.NER_MODELS_LIST[3]
+            multilingual_model_name = config.NER_MODELS_LIST[4]
+        else:
+            # Load models
+            model_name = ["FacebookAI/xlm-roberta-large-finetuned-conll03-english",
+                          "FacebookAI/xlm-roberta-large-finetuned-conll02-dutch",
+                        "FacebookAI/xlm-roberta-large-finetuned-conll03-german",
+                        "FacebookAI/xlm-roberta-large-finetuned-conll03-spanish",
+                        "Babelscape/wikineural-multilingual-ner"]
+            
+            english_model_name = model_name[0]
+            dutch_model_name = model_name[1]
+            german_model_name = model_name[2]
+            spanish_model_name = model_name[3]
+            multilingual_model_name = model_name[4]
+        
+        self.en_tokenizer = AutoTokenizer.from_pretrained(english_model_name)
+        self.en_model = AutoModelForTokenClassification.from_pretrained(english_model_name).to(self.device)
+        self.en_ner_pipeline = pipeline("ner", model=self.en_model, tokenizer=self.en_tokenizer, aggregation_strategy="simple")
 
-        self.en_tokenizer = AutoTokenizer.from_pretrained(
-            "FacebookAI/xlm-roberta-large-finetuned-conll03-english")
-        self.en_model = AutoModelForTokenClassification.from_pretrained(
-            "FacebookAI/xlm-roberta-large-finetuned-conll03-english").to(self.device)
-        self.en_ner_pipeline = pipeline(
-            "ner", model=self.en_model, tokenizer=self.en_tokenizer, aggregation_strategy="simple")
+        self.nl_tokenizer = AutoTokenizer.from_pretrained(dutch_model_name)
+        self.nl_model = AutoModelForTokenClassification.from_pretrained(dutch_model_name).to(self.device)
+        self.nl_ner_pipeline = pipeline("ner", model=self.nl_model, tokenizer=self.nl_tokenizer, aggregation_strategy="simple")
 
-        self.nl_tokenizer = AutoTokenizer.from_pretrained(
-            "FacebookAI/xlm-roberta-large-finetuned-conll02-dutch")
-        self.nl_model = AutoModelForTokenClassification.from_pretrained(
-            "FacebookAI/xlm-roberta-large-finetuned-conll02-dutch").to(self.device)
-        self.nl_ner_pipeline = pipeline(
-            "ner", model=self.nl_model, tokenizer=self.nl_tokenizer, aggregation_strategy="simple")
+        self.de_tokenizer = AutoTokenizer.from_pretrained(german_model_name)
+        self.de_model = AutoModelForTokenClassification.from_pretrained(german_model_name).to(self.device)
+        self.de_ner_pipeline = pipeline("ner", model=self.de_model, tokenizer=self.de_tokenizer, aggregation_strategy="simple")
 
-        self.de_tokenizer = AutoTokenizer.from_pretrained(
-            "FacebookAI/xlm-roberta-large-finetuned-conll03-german")
-        self.de_model = AutoModelForTokenClassification.from_pretrained(
-            "FacebookAI/xlm-roberta-large-finetuned-conll03-german").to(self.device)
-        self.de_ner_pipeline = pipeline(
-            "ner", model=self.de_model, tokenizer=self.de_tokenizer, aggregation_strategy="simple")
+        self.es_tokenizer = AutoTokenizer.from_pretrained(spanish_model_name)
+        self.es_model = AutoModelForTokenClassification.from_pretrained(spanish_model_name).to(self.device)
+        self.es_ner_pipeline = pipeline("ner", model=self.es_model, tokenizer=self.es_tokenizer, aggregation_strategy="simple")
 
-        self.es_tokenizer = AutoTokenizer.from_pretrained(
-            "FacebookAI/xlm-roberta-large-finetuned-conll02-spanish")
-        self.es_model = AutoModelForTokenClassification.from_pretrained(
-            "FacebookAI/xlm-roberta-large-finetuned-conll02-spanish").to(self.device)
-        self.es_ner_pipeline = pipeline(
-            "ner", model=self.es_model, tokenizer=self.es_tokenizer, aggregation_strategy="simple")
+        self.multi_tokenizer = AutoTokenizer.from_pretrained(multilingual_model_name)
+        self.multi_model = AutoModelForTokenClassification.from_pretrained(multilingual_model_name).to(self.device)
+        self.multi_ner_pipeline = pipeline("ner", model=self.multi_model, tokenizer=self.multi_tokenizer, aggregation_strategy="simple")
 
-        self.multi_tokenizer = AutoTokenizer.from_pretrained(
-            "Babelscape/wikineural-multilingual-ner")
-        self.multi_model = AutoModelForTokenClassification.from_pretrained(
-            "Babelscape/wikineural-multilingual-ner").to(self.device)
-        self.multi_ner_pipeline = pipeline(
-            "ner", model=self.multi_model, tokenizer=self.multi_tokenizer, aggregation_strategy="simple")
-
-        self.min_token_length = math.ceil(min(
-            self.en_tokenizer.max_len_single_sentence, self.multi_tokenizer.max_len_single_sentence) * 0.9)
+        self.min_token_length = math.ceil(min(self.en_tokenizer.max_len_single_sentence, self.multi_tokenizer.max_len_single_sentence) * 0.9)
 
         self.tokenizer = self.en_tokenizer if self.en_tokenizer.max_len_single_sentence <= self.multi_tokenizer.max_len_single_sentence else self.multi_tokenizer
 
