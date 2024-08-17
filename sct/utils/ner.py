@@ -36,7 +36,7 @@ class GeneralNER:
             model_name = ["FacebookAI/xlm-roberta-large-finetuned-conll03-english",
                           "FacebookAI/xlm-roberta-large-finetuned-conll02-dutch",
                         "FacebookAI/xlm-roberta-large-finetuned-conll03-german",
-                        "FacebookAI/xlm-roberta-large-finetuned-conll03-spanish",
+                        "FacebookAI/xlm-roberta-large-finetuned-conll02-spanish",
                         "Babelscape/wikineural-multilingual-ner"]
             
             english_model_name = model_name[0]
