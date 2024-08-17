@@ -166,7 +166,6 @@ class GeneralNER:
             ner_results = []
             ner_results.append(self.ner_data(self.multi_ner_pipeline(text), positional_tags))
             ner_results.append(self.ner_data(self.en_ner_pipeline(text), positional_tags))
-
             if language == 'DUTCH':
                 ner_results.append(self.ner_data(self.nl_ner_pipeline(text), positional_tags))
             elif language == 'GERMAN':
