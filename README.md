@@ -1,5 +1,7 @@
 
-# `SqueakyCleanText` [![Build Status](https://img.shields.io/github/workflow/status/rhnfzl/SqueakyCleanText/Test)](https://github.com/rhnfzl/SqueakyCleanText/actions/workflows/test.yml) [![PyPI](https://img.shields.io/pypi/v/squeakycleantext.svg)](https://pypi.org/project/squeakycleantext/) [![PyPI - Python Version](https://img.shields.io/pypi/pyversions/squeakycleantext.svg)](https://pypi.org/project/squeakycleantext/) [![PyPI - Downloads](https://img.shields.io/pypi/dm/squeakycleantext)](https://pypistats.org/packages/squeakycleantext)
+# `SqueakyCleanText` 
+
+[![Build Status](https://img.shields.io/github/workflow/status/rhnfzl/SqueakyCleanText/Test)](https://github.com/rhnfzl/SqueakyCleanText/actions/workflows/test.yml) [![PyPI](https://img.shields.io/pypi/v/squeakycleantext.svg)](https://pypi.org/project/squeakycleantext/) [![PyPI - Python Version](https://img.shields.io/pypi/pyversions/squeakycleantext.svg)](https://pypi.org/project/squeakycleantext/) [![PyPI - Downloads](https://img.shields.io/pypi/dm/squeakycleantext)](https://pypistats.org/packages/squeakycleantext)
 
 In the world of machine learning and natural language processing, clean and well-structured text data is crucial for building effective downstream models and managing token limits in language models. 
 
