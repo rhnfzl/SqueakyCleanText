@@ -11,14 +11,14 @@ setup(
     license='MIT',
     packages=find_packages(),
     install_requires=[
-        'lingua-language-detector>=2.0.0,<2.1',
+        'lingua-language-detector',
         'nltk>=3.8,<3.9',
         'emoji>=2.8,<2.9',
         'ftfy>=6.1,<6.2',
         'Unidecode>=1.3,<1.4',
         'beautifulsoup4>=4.12,<4.13',
         'transformers>=4.30,<4.31',
-        'torch>=2.0,<2.1',
+        'torch',
         'presidio_anonymizer>=2.2.355,<2.3',
     ],
     extras_require={
