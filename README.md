@@ -28,8 +28,6 @@ SqueakyCleanText offers functionality to streamline this process, ensuring that 
 Depending on sigle model for Name Entity recognition is not be ideal, as there is a high chance it might skip the entity all together. Also combining the language specific NER model makes it more specific for text and reduces the chance of missing out the entity.
 The package NER model has the chunking mechanism which helps to do the NER process even if the text is longer than the model token size.
 
-Important : Model 
-
 By automating these text cleaning steps, SqueakyCleanText ensures your data is prepared efficiently and effectively, saving time and improving model performance.
 
 ## Installation

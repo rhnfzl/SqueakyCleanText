@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name='SqueakyCleanText',
-    version='0.2.0',
+    version='0.2.1',
     author='Rehan Fazal',
     description='A comprehensive text cleaning and preprocessing pipeline.',
     long_description=open('README.md', encoding='utf-8').read(),
@@ -11,15 +11,15 @@ setup(
     license='MIT',
     packages=find_packages(),
     install_requires=[
-        'lingua-language-detector',
-        'nltk>=3.8,<3.9',
-        'emoji>=2.8,<2.9',
-        'ftfy>=6.1,<6.2',
-        'Unidecode>=1.3,<1.4',
-        'beautifulsoup4>=4.12,<4.13',
-        'transformers>=4.30,<4.31',
-        'torch',
-        'presidio_anonymizer>=2.2.355,<2.3',
+        'lingua-language-detector>=2.0.0',
+        'nltk>=3.8',
+        'emoji>=2.8',
+        'ftfy>=6.1',
+        'Unidecode>=1.3',
+        'beautifulsoup4>=4.12',
+        'transformers>=4.30',
+        'torch>=2.0.0',
+        'presidio_anonymizer>=2.2.355',
     ],
     extras_require={
         'dev': [
