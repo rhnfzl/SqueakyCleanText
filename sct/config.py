@@ -53,4 +53,3 @@ NER_MODELS_LIST = ["FacebookAI/xlm-roberta-large-finetuned-conll03-english",
               "FacebookAI/xlm-roberta-large-finetuned-conll02-dutch",
               "FacebookAI/xlm-roberta-large-finetuned-conll03-german",
               "FacebookAI/xlm-roberta-large-finetuned-conll02-spanish",
-              "Babelscape/wikineural-multilingual-ner"]
