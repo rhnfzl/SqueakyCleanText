@@ -21,7 +21,7 @@ class TextCleaner:
     
     def init_pipeline(self):
         # Initialize pipeline steps based on config
-        if config.CHECK_DETECT_LANGUAGE:
+        if config.CHECK_DETECT_LANGUAGE or config.CHECK_NER_PROCESS or config.CHECK_STATISTICAL_MODEL_PROCESSING:
             self.pipeline.append(self.detect_language)
         
         if config.CHECK_FIX_BAD_UNICODE:
@@ -58,14 +58,12 @@ class TextCleaner:
         text = str(text)
         
         for step in self.pipeline:
-            # print(f"Before {step.__name__}: {text}")  # Debug print
             text = step(text)
-            # print(f"After {step.__name__}: {text}")  # Debug print
             
         if config.CHECK_STATISTICAL_MODEL_PROCESSING:
             stext = self.statistical_model_processing(text)
             return text, stext, self.language
-        if config.CHECK_DETECT_LANGUAGE:
+        elif config.CHECK_DETECT_LANGUAGE:
             return text, self.language
         else:
             return text

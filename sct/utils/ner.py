@@ -1,4 +1,5 @@
 import math
+import torch
 import itertools
 from collections import defaultdict
 
@@ -18,40 +19,43 @@ class GeneralNER:
     """
     
     def __init__(self):
+        
+        self.device = "cuda" if torch.cuda.is_available() else "cpu"
+        
         self.anonymizer_engine = AnonymizerEngine()
 
         self.en_tokenizer = AutoTokenizer.from_pretrained(
             "FacebookAI/xlm-roberta-large-finetuned-conll03-english")
         self.en_model = AutoModelForTokenClassification.from_pretrained(
-            "FacebookAI/xlm-roberta-large-finetuned-conll03-english")
+            "FacebookAI/xlm-roberta-large-finetuned-conll03-english").to(self.device)
         self.en_ner_pipeline = pipeline(
             "ner", model=self.en_model, tokenizer=self.en_tokenizer, aggregation_strategy="simple")
 
         self.nl_tokenizer = AutoTokenizer.from_pretrained(
             "FacebookAI/xlm-roberta-large-finetuned-conll02-dutch")
         self.nl_model = AutoModelForTokenClassification.from_pretrained(
-            "FacebookAI/xlm-roberta-large-finetuned-conll02-dutch")
+            "FacebookAI/xlm-roberta-large-finetuned-conll02-dutch").to(self.device)
         self.nl_ner_pipeline = pipeline(
             "ner", model=self.nl_model, tokenizer=self.nl_tokenizer, aggregation_strategy="simple")
 
         self.de_tokenizer = AutoTokenizer.from_pretrained(
             "FacebookAI/xlm-roberta-large-finetuned-conll03-german")
         self.de_model = AutoModelForTokenClassification.from_pretrained(
-            "FacebookAI/xlm-roberta-large-finetuned-conll03-german")
+            "FacebookAI/xlm-roberta-large-finetuned-conll03-german").to(self.device)
         self.de_ner_pipeline = pipeline(
             "ner", model=self.de_model, tokenizer=self.de_tokenizer, aggregation_strategy="simple")
 
         self.es_tokenizer = AutoTokenizer.from_pretrained(
             "FacebookAI/xlm-roberta-large-finetuned-conll02-spanish")
         self.es_model = AutoModelForTokenClassification.from_pretrained(
-            "FacebookAI/xlm-roberta-large-finetuned-conll02-spanish")
+            "FacebookAI/xlm-roberta-large-finetuned-conll02-spanish").to(self.device)
         self.es_ner_pipeline = pipeline(
             "ner", model=self.es_model, tokenizer=self.es_tokenizer, aggregation_strategy="simple")
 
         self.multi_tokenizer = AutoTokenizer.from_pretrained(
             "Babelscape/wikineural-multilingual-ner")
         self.multi_model = AutoModelForTokenClassification.from_pretrained(
-            "Babelscape/wikineural-multilingual-ner")
+            "Babelscape/wikineural-multilingual-ner").to(self.device)
         self.multi_ner_pipeline = pipeline(
             "ner", model=self.multi_model, tokenizer=self.multi_tokenizer, aggregation_strategy="simple")
 
@@ -160,15 +164,15 @@ class GeneralNER:
             
         for text in texts:
             ner_results = []
-            ner_results.append(self.ner_data(self.nlp_multi(text), positional_tags))
-            ner_results.append(self.ner_data(self.nlp_en(text), positional_tags))
+            ner_results.append(self.ner_data(self.multi_ner_pipeline(text), positional_tags))
+            ner_results.append(self.ner_data(self.en_ner_pipeline(text), positional_tags))
 
             if language == 'DUTCH':
-                ner_results.append(self.ner_data(self.nlp_nl(text), positional_tags))
+                ner_results.append(self.ner_data(self.nl_ner_pipeline(text), positional_tags))
             elif language == 'GERMAN':
-                ner_results.append(self.ner_data(self.nlp_de(text), positional_tags))
+                ner_results.append(self.ner_data(self.de_ner_pipeline(text), positional_tags))
             elif language == 'SPANISH':
-                ner_results.append(self.ner_data(self.nlp_es(text), positional_tags))
+                ner_results.append(self.ner_data(self.es_ner_pipeline(text), positional_tags))
             
             # flat out the list
             ner_results = list(itertools.chain.from_iterable(ner_results))
