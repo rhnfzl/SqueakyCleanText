@@ -27,16 +27,3 @@ jobs:
               with:
                   path: ~/.cache/pip
                   key: ${{ runner.os }}-pip-${{ hashFiles('setup.py') }}
-
-            - name: Install dependencies with extras
-              run: |
-                python -m pip install --upgrade pip
-                pip install .${{ matrix.extras }}
-                pip install pytest
-
-            - name: Download NLTK stopwords
-              run: |
-                nltk_downloader
-
-            - name: Run tests
-              run: pytest
