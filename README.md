@@ -1,7 +1,6 @@
-
 # `SqueakyCleanText` 
 
-[![Build Status](https://img.shields.io/github/workflow/status/rhnfzl/SqueakyCleanText/Test)](https://github.com/rhnfzl/SqueakyCleanText/actions/workflows/test.yml) [![PyPI](https://img.shields.io/pypi/v/squeakycleantext.svg)](https://pypi.org/project/squeakycleantext/) [![PyPI - Python Version](https://img.shields.io/pypi/pyversions/squeakycleantext.svg)](https://pypi.org/project/squeakycleantext/) [![PyPI - Downloads](https://img.shields.io/pypi/dm/squeakycleantext)](https://pypistats.org/packages/squeakycleantext)
+[![PyPI](https://img.shields.io/pypi/v/squeakycleantext.svg)](https://pypi.org/project/squeakycleantext/) [![PyPI - Python Version](https://img.shields.io/pypi/pyversions/squeakycleantext.svg)](https://pypi.org/project/squeakycleantext/) [![PyPI - Downloads](https://img.shields.io/pypi/dm/squeakycleantext)](https://pypistats.org/packages/squeakycleantext)
 
 In the world of machine learning and natural language processing, clean and well-structured text data is crucial for building effective downstream models and managing token limits in language models. 
 
@@ -44,7 +43,15 @@ pip install SqueakyCleanText
 
 Few examples, how to use the SqueakyCleanText package:
 
+Examples:
+```python
+english_text = "Hey John Doe, wanna grab some coffee at Starbucks on 5th Avenue? I'm feeling a bit tired after last night's party at Jane's place. BTW, I can't make it to the meeting at 10:00 AM. LOL! Call me at +1-555-123-4567 or email me at john.doe@example.com. Check out this cool website: https://www.example.com."
+
+dutch_text = "Hé Jan Jansen, wil je wat koffie halen bij Starbucks op de 5e Avenue? Ik voel me een beetje moe na het feest van gisteravond bij Annes huis. Btw, ik kan niet naar de vergadering om 10:00 uur. LOL! Bel me op +31-6-1234-5678 of mail me op jan.jansen@voorbeeld.com. Kijk eens naar deze coole website: https://www.voorbeeld.com."
+```
+
 - Uisng in it's default config settings:
+
 ```python
 # first time import will take bit of time, so please have patience
 from sct import sct
@@ -53,12 +60,51 @@ from sct import sct
 sx = sct.TextCleaner()
 
 # Process the text
-#lmtext : Text for Language Models; cmtext : Text for Classical/Statistical ML, language : Processed text language
+#lmtext : Text for Language Models;
+# cmtext : Text for Classical/Statistical ML;
+# language : Processed text language
 
-lmtext, cmtext, language = sx.process("Hello, My name is John!")
+#### --- English Text
+lmtext, cmtext, language = sx.process(english_text)
+print(f"Language Model Text : {lmtext}")
+print(f"Statistical Model Text : {cmtext}")
+print(f"Language of the Text : {language}")
+
 # Output the result
-print(lmtext, cmtext, language)
-# Hello, My name is hello name ENGLISH
+# Language Model Text : Hey <PERSON> wanna grab some coffee at Starbucks on <LOCATION> I'm feeling a bit tired after last night's party at <PERSON>'s place. BTW, can't make it to the meeting at <NUMBER><NUMBER> AM. LOL! Call me at <PHONE> or email me at <EMAIL> Check out this cool website: <URL>
+# Statistical Model Text : hey person wanna grab coffee starbucks location im feeling bit tired last nights party persons place btw cant make meeting numbernumber am lol call phone email email check cool website url
+# Language of the Text : ENGLISH
+
+#### --- Dutch Text
+lmtext, cmtext, language = sx.process(dutch_text)
+print(f"Language Model Text : {lmtext}")
+print(f"Statistical Model Text : {cmtext}")
+print(f"Language of the Text : {language}")
+
+# Output the result
+# Language Model Text : He <PERSON> wil je wat koffie halen bij <ORGANISATION> op de <LOCATION> Ik voel me een beetje moe na het feest van gisteravond bij Annes huis. Btw, ik kan niet naar de vergadering om <NUMBER><NUMBER> uur. LOL! Bel me op <NUMBER><NUMBER><PHONE> of mail me op <EMAIL> Kijk eens naar deze coole website: <URL>
+# Statistical Model Text : he person koffie halen organisation location voel beetje moe feest gisteravond annes huis btw vergadering numbernumber uur lol bel numbernumberphone mail email kijk coole website url
+# Language of the Text : DUTCH
+```
+
+- Uisng the package any of the functionality, lets take NER as an example
+
+```python
+
+from sct import sct, config
+
+config.CHECK_NER_PROCESS = False
+sx = sct.TextCleaner()
+
+lmtext, cmtext, language = sx.process(english_text)
+print(f"Language Model Text : {lmtext}")
+print(f"Statistical Model Text : {cmtext}")
+print(f"Language of the Text : {language}")
+
+# Output the result
+Language Model Text : Hey John Doe, wanna grab some coffee at Starbucks on 5th Avenue? I'm feeling a bit tired after last night's party at Jane's place. BTW, can't make it to the meeting at <NUMBER><NUMBER> AM. LOL! Call me at <PHONE> or email me at <EMAIL> Check out this cool website: <URL>
+Statistical Model Text : hey john doe wanna grab coffee starbucks 5th avenue im feeling bit tired last nights party janes place btw cant make meeting numbernumber am lol call phone email email check cool website url
+Language of the Text : ENGLISH
 ```
 
 ## API
@@ -74,8 +120,8 @@ Processes the input text and returns a tuple containing:
 
 ## TODO
 
-- Add the ability to change the NER models from the config file, supporting AutoModel and AutoTokenizer.
-- Expand language support for stopwords.
+- Add the ability to change the NER models from the config file, which AutoModel and AutoTokenizer.
+- Expand language support for stopwords to more European Languages.
 
 ## Contributing
 
