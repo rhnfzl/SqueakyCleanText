@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name='SqueakyCleanText',
-    version='0.2.5',
+    version='0.2.6',
     author='Rehan Fazal',
     description='A comprehensive text cleaning and preprocessing pipeline.',
     long_description=open('README.md', encoding='utf-8').read(),
