@@ -6,83 +6,45 @@ class ProcessContacts:
     def __init__(self):
         pass
     
-    def replace_urls(self, input_text: str, replacement: str = "<URL>") -> str:
+    def replace_urls(self, text, replace_with="<URL>"):
         """
-        Replace all URLs in the given input text with the specified replacement string.
-
-        Args:
-            input_text (str): The input text to be processed.
-            replacement (str, optional): The string to replace URLs with. Defaults to "<URL>".
-
-        Returns:
-            str: The processed text with all URLs replaced.
+        Replace all URLs in ``text`` str with ``replace_with`` str.
         """
-        return constants.URL_REGEX.sub(replacement, input_text)
+        # matches = constants.URL_REGEX.finditer(text)
+        # result = text
+        # # Iterate through matches in reverse order (to avoid index issues)
+        # for match in reversed(list(matches)):
+        # # Check if the matched substring contains non-ASCII characters
+        #     if not any(ord(char) > 127 for char in match.group()):
+        #         result = text[:match.start()] + replace_with + text[match.end():]
+        return constants.URL_REGEX.sub(replace_with, text)
 
-    def replace_html(self, text: str, replacement: str = "<HTML>") -> str:
+    def replace_html(self, text, replace_with="<HTML>"):
         """
-        Replaces all HTML tags in the given text with the specified replacement string.
-
-        Args:
-            text (str): The input text to be processed.
-            replacement (str, optional): The string to replace HTML tags with. Defaults to "<HTML>".
-
-        Returns:
-            str: The processed text with all HTML tags replaced.
+        Replace all html tags in ``text`` str with ``replace_with`` str.
         """
         try:
-            # Use BeautifulSoup to parse the HTML and extract the text
-            cleaned_text = BeautifulSoup(text, 'html.parser').get_text()
+            soup = BeautifulSoup(text, 'html.parser')
+            text = soup.get_text()
         except:
-            # If BeautifulSoup fails, use the HTML_REGEX to remove HTML tags
-            cleaned_text = constants.HTML_REGEX.sub(replacement, text)
+            text = constants.HTML_REGEX.sub(replace_with, text)
         
-        return cleaned_text
+        return text
     
-    def replace_emails(self, input_text: str, replacement: str = "<EMAIL>") -> str:
+    def replace_emails(self, text, replace_with="<EMAIL>"):
         """
-        Replace all email addresses in the input text with the specified replacement string.
-
-        Args:
-            input_text (str): The text to be processed.
-            replacement (str, optional): The string to replace email addresses with. Defaults to "<EMAIL>".
-
-        Returns:
-            str: The processed text with all email addresses replaced.
+        Replace all emails in ``text`` str with ``replace_with`` str.
         """
-        # Use the pre-compiled regular expression to find all email patterns in the text
-        # and replace them with the specified replacement string
-        return constants.EMAIL_REGEX.sub(replacement, input_text)
+        return constants.EMAIL_REGEX.sub(replace_with, text)
 
-    def replace_phone_numbers(self, input_text: str, replacement: str = "<PHONE>") -> str:
+    def replace_phone_numbers(self, text, replace_with="<PHONE>"):
         """
-        Replaces all occurrences of phone numbers in the input text with a
-        specified replacement string.
-
-        Args:
-            input_text (str): The text to be processed.
-            replacement (str, optional): The string to replace the phone numbers with.
-                Defaults to "<PHONE>".
-
-        Returns:
-            str: The modified text with phone numbers replaced.
+        Replace all phone numbers in ``text`` str with ``replace_with`` str.
         """
-        # Use the pre-compiled regular expression to find all phone number patterns
-        # in the text and replace them with the specified replacement string
-        return constants.PHONE_REGEX.sub(replacement, input_text)
+        return constants.PHONE_REGEX.sub(replace_with, text)
 
-    def replace_numbers(self, input_text: str, replacement: str = "<NUMBER>") -> str:
+    def replace_numbers(self, text, replace_with="<NUMBER>"):
         """
-        Replace all numbers in the input text with a specified replacement string.
-
-        Args:
-            input_text (str): The input text.
-            replacement (str, optional): The string to replace the numbers with.
-                Defaults to "<NUMBER>".
-
-        Returns:
-            str: The modified text with numbers replaced.
+        Replace all numbers in ``text`` str with ``replace_with`` str.
         """
-        # Use the pre-compiled regular expression to find all number patterns
-        # in the text and replace them with the specified replacement string
-        return constants.NUMBERS_REGEX.sub(replacement, input_text)
+        return constants.NUMBERS_REGEX.sub(replace_with, text)
