@@ -1,6 +1,6 @@
 # `SqueakyCleanText` 
 
-[![PyPI](https://img.shields.io/pypi/v/squeakycleantext.svg)](https://pypi.org/project/squeakycleantext/) [![PyPI - Python Version](https://img.shields.io/pypi/pyversions/squeakycleantext.svg)](https://pypi.org/project/squeakycleantext/) [![PyPI - Downloads](https://img.shields.io/pypi/dm/squeakycleantext)](https://pypistats.org/packages/squeakycleantext)
+[![PyPI](https://img.shields.io/pypi/v/squeakycleantext.svg)](https://pypi.org/project/squeakycleantext/) [![PyPI - Downloads](https://img.shields.io/pypi/dm/squeakycleantext)](https://pypistats.org/packages/squeakycleantext)
 
 In the world of machine learning and natural language processing, clean and well-structured text data is crucial for building effective downstream models and managing token limits in language models. 
 
@@ -16,6 +16,7 @@ SqueakyCleanText helps achieve this by addressing common text issues by doing mo
 - Currency Symbols: Replaces all currency symbols with their alphabetical equivalents.
 - Whitespace Normalization: Removes unnecessary whitespace.
 - Detects the language of processed text if needed in downstream task.
+- Supports English, Dutch, German and Spanish language.
 - Provides text for both Lnaguage model processing and Statistical model processing.
 
 ##### Benefits for Statistical Models
@@ -117,11 +118,6 @@ Processes the input text and returns a tuple containing:
 - Cleaned text with punctuation and unnecessary characters removed.
 - Cleaned text with stopwords removed.
 - Detected language of the text.
-
-## TODO
-
-- Add the ability to change the NER models from the config file, which AutoModel and AutoTokenizer.
-- Expand language support for stopwords to more European Languages.
 
 ## Contributing
 
