@@ -19,6 +19,8 @@ SqueakyCleanText simplifies the process by automatically addressing common text 
 - Supports English, Dutch, German, and Spanish languages.
 - Provides text formatted for both Language Model processing and Statistical Model processing.
 
+![Default Flow of cleaning Text](resources/sct_flow.png)
+
 ##### Benefits for Statistical Models
 When working with statistical models, further optimization is often required, such as removing stopwords, special symbols, and punctuation. 
 SqueakyCleanText streamlines this process, ensuring your text data is in optimal shape for classification and other downstream tasks.
