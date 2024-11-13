@@ -65,12 +65,13 @@ class TextCleanerTest(unittest.TestCase):
         try:
             with timeout(1200):  # 20 minute timeout
                 config.CHECK_NER_PROCESS = False
+                # Initialize all the processing classes
                 cls.ProcessContacts = contact.ProcessContacts()
                 cls.ProcessDateTime = datetime.ProcessDateTime()
                 cls.ProcessSpecialSymbols = special.ProcessSpecialSymbols()
                 cls.NormaliseText = normtext.NormaliseText()
                 cls.ProcessStopwords = stopwords.ProcessStopwords()
-                cls.fake = Faker()
+                cls.fake = Faker()  # Initialize Faker
                 
                 # Override default models with smaller model for testing
                 test_models = ["dslim/bert-base-NER"] * 5  # Same small model for all languages
@@ -99,8 +100,15 @@ class TextCleanerTest(unittest.TestCase):
             raise
 
     def setUp(self):
+        """Set up test fixtures before each test method."""
         config.CHECK_NER_PROCESS = True
-        # Use the class-level NER instance instead of creating a new one
+        # Copy class-level attributes to instance level
+        self.ProcessContacts = self.__class__.ProcessContacts
+        self.ProcessDateTime = self.__class__.ProcessDateTime
+        self.ProcessSpecialSymbols = self.__class__.ProcessSpecialSymbols
+        self.NormaliseText = self.__class__.NormaliseText
+        self.ProcessStopwords = self.__class__.ProcessStopwords
+        self.fake = self.__class__.fake
         self.ner = self.__class__.ner
 
     @settings(deadline=None)
