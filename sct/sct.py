@@ -34,7 +34,6 @@ class TextCleaner:
             self.pipeline.append(self.fix_bad_unicode)
         if config.CHECK_TO_ASCII_UNICODE:
             self.pipeline.append(self.to_ascii_unicode)
-        
         if config.CHECK_REPLACE_HTML:
             self.pipeline.append(self.replace_html)
         if config.CHECK_REPLACE_URLS:
