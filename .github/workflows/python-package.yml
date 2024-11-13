@@ -26,12 +26,21 @@ jobs:
       with:
         python-version: ${{ matrix.python-version }}
 
+    - name: Check initial disk usage
+      run: df -h
+
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install -e .
-        if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
-        pip install hypothesis faker flake8 pytest
+        pip install -e . --no-cache-dir
+        if [ -f requirements.txt ]; then pip install -r requirements.txt --no-cache-dir; fi
+        pip install hypothesis faker flake8 pytest --no-cache-dir
+
+    - name: Clean up pip cache
+      run: pip cache purge
+
+    - name: Check disk usage after install
+      run: df -h
 
     - name: Download NLTK stopwords
       run: |
