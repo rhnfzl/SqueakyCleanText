@@ -165,7 +165,6 @@ class TextCleanerTest(unittest.TestCase):
         self.assertEqual(clean_url, fkw)
         
     @requires_ner
-    @settings(deadline=None)
     def test_ner_process_basic(self):
         """Test basic NER processing with known entities."""
         text = "John Smith works at Microsoft in New York."
