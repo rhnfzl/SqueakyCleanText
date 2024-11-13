@@ -19,7 +19,6 @@ jobs:
       uses: actions/setup-python@v3
       with:
         python-version: ${{ matrix.python-version }}
-
     - name: Check initial disk usage
       run: df -h
 
