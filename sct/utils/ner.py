@@ -2,6 +2,9 @@ import math
 import torch
 import itertools
 from collections import defaultdict
+import logging
+from typing import List, Dict, Any, Optional, Tuple
+from pathlib import Path
 
 import transformers
 from transformers import AutoTokenizer, AutoModelForTokenClassification, pipeline
@@ -11,8 +14,15 @@ from presidio_anonymizer.entities import RecognizerResult
 
 from sct.utils import constants
 from sct import config
-from typing import List, Dict, Any  # Add this line
+from sct.config import NER_MODELS_LIST
+
 transformers.logging.set_verbosity_error() 
+
+logger = logging.getLogger(__name__)
+
+class ModelLoadError(Exception):
+    """Raised when model loading fails"""
+    pass
 
 class GeneralNER:
     
@@ -20,55 +30,89 @@ class GeneralNER:
     To tag [PER, LOC, ORG, MISC] postional tags using ensemble technique
     """
     
-    def __init__(self):
+    def __init__(self, cache_dir: Optional[Path] = None, device: str = None):
+        """Initialize NER models.
         
-        self.device = "cuda" if torch.cuda.is_available() else "cpu"
-
-        self.engine = AnonymizerEngine()
+        Args:
+            cache_dir: Optional directory for caching models
+            device: Device to use for inference ('cuda' or 'cpu'). If None, will auto-detect.
+        """
+        self.device = device or ("cuda" if torch.cuda.is_available() else "cpu")
+        logger.info(f"Using device: {self.device}")
         
-        if len(config.NER_MODELS_LIST) == 5:
-            english_model_name = config.NER_MODELS_LIST[0]
-            dutch_model_name = config.NER_MODELS_LIST[1]
-            german_model_name = config.NER_MODELS_LIST[2]
-            spanish_model_name = config.NER_MODELS_LIST[3]
-            multilingual_model_name = config.NER_MODELS_LIST[4]
-        else:
-            # Load models
-            model_name = ["FacebookAI/xlm-roberta-large-finetuned-conll03-english",
-                          "FacebookAI/xlm-roberta-large-finetuned-conll02-dutch",
-                        "FacebookAI/xlm-roberta-large-finetuned-conll03-german",
-                        "FacebookAI/xlm-roberta-large-finetuned-conll02-spanish",
-                        "Babelscape/wikineural-multilingual-ner"]
+        # Default model names as fallback
+        DEFAULT_MODELS = [
+            "FacebookAI/xlm-roberta-large-finetuned-conll03-english",
+            "FacebookAI/xlm-roberta-large-finetuned-conll02-dutch",
+            "FacebookAI/xlm-roberta-large-finetuned-conll03-german", 
+            "FacebookAI/xlm-roberta-large-finetuned-conll02-spanish",
+            "Babelscape/wikineural-multilingual-ner"
+        ]
+        
+        try:
+            self.engine = AnonymizerEngine()
             
-            english_model_name = model_name[0]
-            dutch_model_name = model_name[1]
-            german_model_name = model_name[2]
-            spanish_model_name = model_name[3]
-            multilingual_model_name = model_name[4]
-        
-        self.en_tokenizer = AutoTokenizer.from_pretrained(english_model_name)
-        self.en_model = AutoModelForTokenClassification.from_pretrained(english_model_name).to(self.device)
-        self.en_ner_pipeline = pipeline("ner", model=self.en_model, tokenizer=self.en_tokenizer, aggregation_strategy="simple")
+            # Use config if valid, otherwise fallback to defaults
+            if len(NER_MODELS_LIST) == 5:
+                model_names = NER_MODELS_LIST
+                logger.info("Using models from config")
+            else:
+                model_names = DEFAULT_MODELS
+                logger.warning("Invalid config model list, using default models")
+            
+            cache_args = {"cache_dir": str(cache_dir)} if cache_dir else {}
+            self._load_models(model_names, cache_args)
+            
+            # Set tokenizer properties
+            self.min_token_length = math.ceil(min(
+                self.en_tokenizer.max_len_single_sentence,
+                self.multi_tokenizer.max_len_single_sentence
+            ) * 0.9)
+            
+            self.tokenizer = self.en_tokenizer if (
+                self.en_tokenizer.max_len_single_sentence <= 
+                self.multi_tokenizer.max_len_single_sentence
+            ) else self.multi_tokenizer
+                
+        except Exception as e:
+            logger.error(f"Failed to initialize NER: {e}")
+            raise ModelLoadError(f"NER initialization failed: {e}")
 
-        self.nl_tokenizer = AutoTokenizer.from_pretrained(dutch_model_name)
-        self.nl_model = AutoModelForTokenClassification.from_pretrained(dutch_model_name).to(self.device)
-        self.nl_ner_pipeline = pipeline("ner", model=self.nl_model, tokenizer=self.nl_tokenizer, aggregation_strategy="simple")
-
-        self.de_tokenizer = AutoTokenizer.from_pretrained(german_model_name)
-        self.de_model = AutoModelForTokenClassification.from_pretrained(german_model_name).to(self.device)
-        self.de_ner_pipeline = pipeline("ner", model=self.de_model, tokenizer=self.de_tokenizer, aggregation_strategy="simple")
-
-        self.es_tokenizer = AutoTokenizer.from_pretrained(spanish_model_name)
-        self.es_model = AutoModelForTokenClassification.from_pretrained(spanish_model_name).to(self.device)
-        self.es_ner_pipeline = pipeline("ner", model=self.es_model, tokenizer=self.es_tokenizer, aggregation_strategy="simple")
-
-        self.multi_tokenizer = AutoTokenizer.from_pretrained(multilingual_model_name)
-        self.multi_model = AutoModelForTokenClassification.from_pretrained(multilingual_model_name).to(self.device)
-        self.multi_ner_pipeline = pipeline("ner", model=self.multi_model, tokenizer=self.multi_tokenizer, aggregation_strategy="simple")
-
-        self.min_token_length = math.ceil(min(self.en_tokenizer.max_len_single_sentence, self.multi_tokenizer.max_len_single_sentence) * 0.9)
-
-        self.tokenizer = self.en_tokenizer if self.en_tokenizer.max_len_single_sentence <= self.multi_tokenizer.max_len_single_sentence else self.multi_tokenizer
+    def _load_models(self, model_names: List[str], cache_args: Dict[str, str]) -> None:
+        """Load NER models with caching support."""
+        try:
+            # Load models sequentially with proper error handling
+            for i, model_name in enumerate(model_names):
+                logger.info(f"Loading model {model_name}")
+                if i == 0:  # English
+                    self.en_tokenizer = AutoTokenizer.from_pretrained(model_name, **cache_args)
+                    self.en_model = AutoModelForTokenClassification.from_pretrained(model_name, **cache_args).to(self.device)
+                    self.en_ner_pipeline = pipeline("ner", model=self.en_model, tokenizer=self.en_tokenizer, 
+                                                  aggregation_strategy="simple", device=self.device)
+                elif i == 1:  # Dutch
+                    self.nl_tokenizer = AutoTokenizer.from_pretrained(model_name, **cache_args)
+                    self.nl_model = AutoModelForTokenClassification.from_pretrained(model_name, **cache_args).to(self.device)
+                    self.nl_ner_pipeline = pipeline("ner", model=self.nl_model, tokenizer=self.nl_tokenizer,
+                                                  aggregation_strategy="simple", device=self.device)
+                elif i == 2:  # German
+                    self.de_tokenizer = AutoTokenizer.from_pretrained(model_name, **cache_args)
+                    self.de_model = AutoModelForTokenClassification.from_pretrained(model_name, **cache_args).to(self.device)
+                    self.de_ner_pipeline = pipeline("ner", model=self.de_model, tokenizer=self.de_tokenizer,
+                                                  aggregation_strategy="simple", device=self.device)
+                elif i == 3:  # Spanish
+                    self.es_tokenizer = AutoTokenizer.from_pretrained(model_name, **cache_args)
+                    self.es_model = AutoModelForTokenClassification.from_pretrained(model_name, **cache_args).to(self.device)
+                    self.es_ner_pipeline = pipeline("ner", model=self.es_model, tokenizer=self.es_tokenizer,
+                                                  aggregation_strategy="simple", device=self.device)
+                elif i == 4:  # Multilingual
+                    self.multi_tokenizer = AutoTokenizer.from_pretrained(model_name, **cache_args)
+                    self.multi_model = AutoModelForTokenClassification.from_pretrained(model_name, **cache_args).to(self.device)
+                    self.multi_ner_pipeline = pipeline("ner", model=self.multi_model, tokenizer=self.multi_tokenizer,
+                                                     aggregation_strategy="simple", device=self.device)
+                
+        except Exception as e:
+            logger.error(f"Failed to load model {model_name}: {e}")
+            raise ModelLoadError(f"Model loading failed: {e}")
 
     def ner_data(self, data, pos):
         """
@@ -96,28 +140,28 @@ class GeneralNER:
         return list(unique_data.values())
 
     def anonymize_text(self, text, filtered_data):
-        """
-        Anonymizes a given text by replacing named entities with their corresponding type tags.
-
-        Args:
-            text (str): The input text to be anonymized.
-            filtered_data (list): A list of dictionaries containing entity information.
-
-        Returns:
-            str: The anonymized text with entity type tags.
-        """
-        analyzer_result = list()
+        """Anonymizes text while preserving whitespace."""
+        analyzer_result = []
         for items in filtered_data:
             if items['entity_group'] == 'PER':
-                analyzer_result.append(RecognizerResult(entity_type="PERSON", start=items['start'], end=items['end'], score=items['score']))
+                analyzer_result.append(RecognizerResult(
+                    entity_type="PERSON", 
+                    start=items['start'], 
+                    end=items['end'],
+                    score=items['score']
+                ))
             elif items['entity_group'] == 'LOC':
                 analyzer_result.append(RecognizerResult(entity_type="LOCATION", start=items['start'], end=items['end'], score=items['score']))
             elif items['entity_group'] == 'ORG':
                 analyzer_result.append(RecognizerResult(entity_type="ORGANISATION", start=items['start'], end=items['end'], score=items['score']))
         
         text_length = len(text)
-        analyzer_result = [entry for entry in analyzer_result if 0 <= entry.start < text_length and 0 < entry.end <= text_length]
-        # Replace words in the text with their entity_type tags
+        analyzer_result = [
+            entry for entry in analyzer_result 
+            if 0 <= entry.start < text_length and 0 < entry.end <= text_length
+        ]
+        
+        # Return the text property from the anonymizer result
         return self.engine.anonymize(text=text, analyzer_results=analyzer_result)
 
     def ner_ensemble(self, ner_results, t):
@@ -144,85 +188,123 @@ class GeneralNER:
         
         return filter_ner_results
     
-    def ner_process(self, text, positional_tags, ner_confidence_threshold, language):
-        """_summary_
-            Executes NER Process to remove the positional tags, PER, LOC, ORG, MISC.
-        Args:
-            text (string): text from which postional tags need to be recognised
-            positional_tags (list): pass tags as ['PER', 'LOC'] (default), also supports 'ORG', 'MISC'
-            ner_confidence_threshold (int): NER Confidence
-            language (string): language model which need to be used, currently supports ENGLISH, DUTCH
-
-        Returns:
-            list: a list of words sorted based on length for the provided positional tags which meets the threshold
-        """
-        ner_clean_text = list()       
-        # text length
-        text_token_length = len(self.tokenizer.tokenize(text))
+    @torch.no_grad()
+    def ner_process(
+        self, 
+        text: str,
+        positional_tags: List[str] = None,
+        ner_confidence_threshold: float = None,
+        language: str = None
+    ) -> str:
+        """Process text with NER models."""
+        if not positional_tags:
+            raise ValueError("Must provide at least one positional tag")
         
-        # parts it need to get split
-        num_parts = math.ceil(text_token_length/self.min_token_length)
+        ner_confidence_threshold = ner_confidence_threshold or 0.85
         
-        if num_parts == 0:
-            texts = [text]
-        else:
-            texts = self.split_text(text, self.min_token_length, self.tokenizer)
-            
-        for text in texts:
+        # Split long text into chunks
+        texts = self.split_text(text, self.min_token_length, self.tokenizer)
+        ner_clean_text = []
+        
+        for text_chunk in texts:
             ner_results = []
-            ner_results.append(self.ner_data(self.multi_ner_pipeline(text), positional_tags))
-            ner_results.append(self.ner_data(self.en_ner_pipeline(text), positional_tags))
+            
+            # First try language-specific pipeline if specified
             if language == 'DUTCH':
-                ner_results.append(self.ner_data(self.nl_ner_pipeline(text), positional_tags))
+                ner_results.extend(self.ner_data(self.nl_ner_pipeline(text_chunk), positional_tags))
             elif language == 'GERMAN':
-                ner_results.append(self.ner_data(self.de_ner_pipeline(text), positional_tags))
+                ner_results.extend(self.ner_data(self.de_ner_pipeline(text_chunk), positional_tags))
             elif language == 'SPANISH':
-                ner_results.append(self.ner_data(self.es_ner_pipeline(text), positional_tags))
+                ner_results.extend(self.ner_data(self.es_ner_pipeline(text_chunk), positional_tags))
+            else:
+                # For English or unspecified, try English first then multilingual
+                en_results = self.ner_data(self.en_ner_pipeline(text_chunk), positional_tags)
+                if en_results:  # If English model finds entities, use those
+                    ner_results.extend(en_results)
+                else:  # Otherwise try multilingual model
+                    ner_results.extend(self.ner_data(self.multi_ner_pipeline(text_chunk), positional_tags))
             
-            # flat out the list
-            ner_results = list(itertools.chain.from_iterable(ner_results))
-            ner_results = self.ner_ensemble(ner_results, ner_confidence_threshold)
-            ner_text = self.anonymize_text(text, ner_results).text
+            # Apply confidence threshold before filtering
+            confident_results = [r for r in ner_results if r['score'] >= ner_confidence_threshold]
+            
+            if confident_results:
+                # Get unique entities with highest confidence
+                keys = list(set(item['key'] for item in confident_results))
+                filtered_data = self.filter_ner_data(confident_results, keys)
+                
+                # Anonymize text
+                ner_text = self.anonymize_text(text_chunk, filtered_data).text
+            else:
+                # If no entities meet the confidence threshold, return original text
+                ner_text = text_chunk
+            
             ner_clean_text.append(ner_text)
-            
+        
         return ' '.join(ner_clean_text)
     
-    def split_text(self, text, max_tokens, tokenizer):
-        """
-        Splits a given text into chunks based on a maximum token limit.
-
-        Args:
-            text (str): The input text to be split.
-            max_tokens (int): The maximum number of tokens allowed in each chunk.
-            tokenizer: A tokenizer object used to tokenize the input text.
-
-        Returns:
-            list: A list of text chunks, each containing a maximum of max_tokens tokens.
-        """
-        sentence_boundaries = [(m.start(), m.end()) for m in constants.SENTENCE_BOUNDARY_PATTERN.finditer(text)]
+    def split_text(self, text: str, max_tokens: int, tokenizer) -> List[str]:
+        """Split text into chunks optimized for model processing."""
+        # Cache tokenizer results
+        tokenized_text = tokenizer(text, return_offsets_mapping=True)
         
         chunks = []
         current_chunk = []
-        current_token_count = 0
-        current_position = 0
-    
-        for boundary_start, boundary_end in sentence_boundaries:
-            sentence = text[current_position:boundary_start+1]
-            current_position = boundary_end
-    
-            token_count = len(tokenizer(sentence)["input_ids"])
-    
-            if current_token_count + token_count <= max_tokens:
-                current_chunk.append(sentence)
-                current_token_count += token_count
-            else:
-                chunks.append(''.join(current_chunk))
-                current_chunk = [sentence]
-                current_token_count = token_count
-    
-        # Append the last sentence
-        last_sentence = text[current_position:]
-        current_chunk.append(last_sentence)
-        chunks.append(''.join(current_chunk))
-    
+        current_tokens = 0
+        last_end = 0
+        
+        for start, end in tokenized_text.offset_mapping:
+            if current_tokens >= max_tokens:
+                chunks.append(text[last_end:start])
+                current_chunk = []
+                current_tokens = 0
+                last_end = start
+                
+            current_chunk.append(text[start:end])
+            current_tokens += 1
+            
+        if current_chunk:
+            chunks.append(text[last_end:])
+            
         return chunks
+
+    def process_batch(
+        self, 
+        texts: List[str], 
+        batch_size: int = 8,
+        positional_tags: List[str] = None,
+        ner_confidence_threshold: float = None,
+        language: str = None
+    ) -> List[str]:
+        """Process multiple texts efficiently in batches.
+        
+        Args:
+            texts: List of input texts
+            batch_size: Number of texts to process simultaneously
+            positional_tags: List of entity types to detect
+            ner_confidence_threshold: Minimum confidence score for entity detection
+            language: Language of the input texts
+            
+        Returns:
+            List of processed texts with entities anonymized
+        """
+        results = []
+        for i in range(0, len(texts), batch_size):
+            batch = texts[i:i + batch_size]
+            batch_results = [
+                self.ner_process(
+                    text,
+                    positional_tags=positional_tags,
+                    ner_confidence_threshold=ner_confidence_threshold,
+                    language=language
+                ) for text in batch
+            ]
+            results.extend(batch_results)
+        return results
+
+    def __del__(self):
+        """Cleanup GPU memory when object is destroyed."""
+        if hasattr(self, 'device') and self.device == 'cuda':
+            try:
+                torch.cuda.empty_cache()
+            except Exception as e:
+                logger.warning(f"Failed to clear CUDA cache: {e}")

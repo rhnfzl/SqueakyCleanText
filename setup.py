@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name='SqueakyCleanText',
-    version='0.2.6',
+    version='0.3.0',
     author='Rehan Fazal',
     description='A comprehensive text cleaning and preprocessing pipeline.',
     long_description=open('README.md', encoding='utf-8').read(),
@@ -27,6 +27,7 @@ setup(
             'faker==20.1.0',
             'flake8==6.1.0',
             'pytest==7.5.0',
+            'timeout-decorator==0.5.0',
         ],
         'test': [
             'coverage==7.3.1',
@@ -35,8 +36,6 @@ setup(
     },
     classifiers=[
         'Programming Language :: Python :: 3',
-        'Programming Language :: Python :: 3.8',
-        'Programming Language :: Python :: 3.9',
         'Programming Language :: Python :: 3.10',
         'Programming Language :: Python :: 3.11',
         'Programming Language :: Python :: 3.12',
@@ -45,7 +44,7 @@ setup(
         'Topic :: Software Development :: Libraries',
         'Topic :: Text Processing',
     ],
-    python_requires='>=3.8',
+    python_requires='>=3.10',
     entry_points={
         'console_scripts': [
             'nltk_downloader=sct.scripts.download_nltk_stopwords:main'
