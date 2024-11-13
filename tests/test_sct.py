@@ -60,6 +60,13 @@ class TextCleanerTest(unittest.TestCase):
     def setUpClass(cls):
         if os.getenv('GITHUB_ACTIONS'):
             cls.ner = None
+            # Initialize empty processing classes for GitHub Actions
+            cls.ProcessContacts = None
+            cls.ProcessDateTime = None
+            cls.ProcessSpecialSymbols = None
+            cls.NormaliseText = None
+            cls.ProcessStopwords = None
+            cls.fake = None
             return
             
         try:
@@ -102,6 +109,9 @@ class TextCleanerTest(unittest.TestCase):
     def setUp(self):
         """Set up test fixtures before each test method."""
         config.CHECK_NER_PROCESS = True
+        if os.getenv('GITHUB_ACTIONS'):
+            self.skipTest("Skipping test in GitHub Actions")
+        
         # Copy class-level attributes to instance level
         self.ProcessContacts = self.__class__.ProcessContacts
         self.ProcessDateTime = self.__class__.ProcessDateTime
