@@ -15,10 +15,13 @@ import signal
 from contextlib import contextmanager
 from sct.sct import TextCleaner
 from sct.utils import ner
+import os
 
 def requires_ner(func):
     @wraps(func)
     def wrapper(self, *args, **kwargs):
+        if os.getenv('GITHUB_ACTIONS'):
+            self.skipTest("Skipping NER tests in GitHub Actions")
         if not hasattr(self.ner, 'en_model'):
             self.skipTest("NER models not properly loaded")
         return func(self, *args, **kwargs)
@@ -55,6 +58,10 @@ class TextCleanerTest(unittest.TestCase):
     
     @classmethod
     def setUpClass(cls):
+        if os.getenv('GITHUB_ACTIONS'):
+            cls.ner = None
+            return
+            
         try:
             with timeout(1200):  # 20 minute timeout
                 config.CHECK_NER_PROCESS = False
@@ -158,7 +165,6 @@ class TextCleanerTest(unittest.TestCase):
         self.assertEqual(clean_url, fkw)
         
     @requires_ner
-    @settings(deadline=None)
     def test_ner_process_basic(self):
         """Test basic NER processing with known entities."""
         text = "John Smith works at Microsoft in New York."
