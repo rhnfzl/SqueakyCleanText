@@ -77,19 +77,27 @@ pip install SqueakyCleanText
 ## Usage
 
 ### Basic Usage
+
 ```python
-from sct import sct
+from sct import sct, config
 
 # Initialize the TextCleaner
-sx = sct.TextCleaner()
+cleaner = sct.TextCleaner()
 
-# Process single text
-text = "Hey John Doe, email me at john.doe@example.com"
-lm_text, stat_text, language = sx.process(text)
+# Input text
+text = "Contact John Doe at john.doe@company.com. Meeting on 2023-10-01."
 
-# Process multiple texts efficiently
-texts = ["Text 1", "Text 2", "Text 3"]
-results = sx.process_batch(texts, batch_size=2)
+# Process the text
+lm_text, stat_text, lang = cleaner.process(text)
+
+print(f"Language Model format:    {lm_text}")
+# Output: "Contact <PERSON> at <EMAIL>. Meeting on <DATE>."
+
+print(f"Statistical Model format: {stat_text}")
+# Output: "contact meeting"
+
+print(f"Detected Language: {lang}")
+# Output: "ENGLISH"
 ```
 
 ### Advanced Configuration
@@ -111,6 +119,39 @@ config.LANGUAGE = "ENGLISH"  # Options: ENGLISH, DUTCH, GERMAN, SPANISH
 
 # Initialize with custom settings
 sx = sct.TextCleaner()
+```
+
+
+### Batch Processing with Custom Configuration**
+
+```python
+from sct import sct, config
+
+# Customize configuration
+config.CHECK_REMOVE_STOPWORDS = True
+config.CHECK_REMOVE_PUNCTUATION = True
+config.CHECK_NER_PROCESS = True
+config.POSITIONAL_TAGS = ['PERSON', 'ORG', 'LOC']
+config.NER_CONFIDENCE_THRESHOLD = 0.90
+
+# Initialize the TextCleaner with custom config
+cleaner = sct.TextCleaner()
+
+# Sample texts
+texts = [
+    "Email maria.garcia@example.es for more info.",  # Spanish
+    "Besuchen Sie uns im Büro in Berlin.",           # German
+    "Voor vragen, bel +31 20 123 4567.",             # Dutch
+]
+
+# Process texts in batch
+results = cleaner.process_batch(texts, batch_size=2)
+
+for lm_text, stat_text, lang in results:
+    print(f"Language: {lang}")
+    print(f"LM Format:    {lm_text}")
+    print(f"Stat Format:  {stat_text}")
+    print("-" * 40)
 ```
 
 ## API
