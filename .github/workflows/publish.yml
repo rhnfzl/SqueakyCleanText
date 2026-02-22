@@ -18,18 +18,17 @@ jobs:
     - uses: actions/checkout@v4
 
     - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v3
+      uses: actions/setup-python@v5
       with:
         python-version: ${{ matrix.python-version }}
+
     - name: Check initial disk usage
       run: df -h
 
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install -e . --no-cache-dir
-        if [ -f requirements.txt ]; then pip install -r requirements.txt --no-cache-dir; fi
-        pip install hypothesis faker flake8 pytest --no-cache-dir
+        pip install -e ".[dev,test]" --no-cache-dir
 
     - name: Clean up pip cache
       run: pip cache purge
@@ -37,13 +36,9 @@ jobs:
     - name: Check disk usage after install
       run: df -h
 
-    - name: Download NLTK stopwords
-      run: |
-        python -m nltk.downloader stopwords
-
     - name: Test with pytest
       run: |
-        pytest
+        pytest tests/ -v
 
   publish:
     needs: test
@@ -53,17 +48,17 @@ jobs:
     - uses: actions/checkout@v4
 
     - name: Set up Python
-      uses: actions/setup-python@v3
+      uses: actions/setup-python@v5
       with:
-        python-version: '3.10'  # Use stable version for publishing
+        python-version: '3.12'
 
-    - name: Install dependencies
+    - name: Install build tools
       run: |
         python -m pip install --upgrade pip
-        pip install setuptools wheel twine
+        pip install build twine
 
     - name: Build the package
-      run: python setup.py sdist bdist_wheel
+      run: python -m build
 
     - name: Publish to PyPI
       env:

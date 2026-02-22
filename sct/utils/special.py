@@ -3,6 +3,19 @@ import string
 #---
 from sct.utils import constants
 
+# Pre-compile punctuation regex at module level (avoids recompilation per call)
+_PUNCTUATION_CHARS = re.escape(string.punctuation)
+_PUNCTUATION_REGEX = re.compile('[' + _PUNCTUATION_CHARS + ']')
+
+# Pre-compile bracket/brace regexes
+_BRACKET_CONTENT_REGEX = re.compile(r'\[[^\]]+\]')
+_BRACE_CONTENT_REGEX = re.compile(r'\{[^}]+\}')
+_ISOLATED_QUOTES_REGEX = re.compile(
+    r"(?<![a-zA-Z0-9])['\"\-*%](?![a-zA-Z0-9])",
+    flags=re.UNICODE | re.IGNORECASE,
+)
+
+
 class ProcessSpecialSymbols:
     
     def __init__(self):
@@ -34,17 +47,24 @@ class ProcessSpecialSymbols:
         
         return cleaned_text
 
-    def remove_isolated_special_symbols(self, text):
+    def remove_isolated_special_symbols(self, text, remove_brackets=True, remove_braces=True):
         """
         Removes any isolated symbols which shouldn't be present in the text.
+        
+        Args:
+            text: Input text.
+            remove_brackets: If True, remove [...] content (image/file references).
+            remove_braces: If True, remove {...} content (HTML links/templates).
         """
-        cleaned_text = re.sub(r'\[[^\]]+\]', '', text) # to remove [] content, usianlly they are image or file loc text
-        cleaned_text = re.sub(r'\{[^}]+\}', '', cleaned_text) # to remove {}} content, usianlly they are html links
+        cleaned_text = text
+        if remove_brackets:
+            cleaned_text = _BRACKET_CONTENT_REGEX.sub('', cleaned_text)
+        if remove_braces:
+            cleaned_text = _BRACE_CONTENT_REGEX.sub('', cleaned_text)
         cleaned_text = constants.ISOLATED_SPECIAL_SYMBOLS_REGEX.sub('', cleaned_text)
-        cleaned_text = re.sub(r"(?<![a-zA-Z0-9])['\"\-*%](?![a-zA-Z0-9])", '', cleaned_text, flags=re.UNICODE | re.IGNORECASE)
+        cleaned_text = _ISOLATED_QUOTES_REGEX.sub('', cleaned_text)
         
         return cleaned_text
     
     def remove_punctuation(self, text):
-        chars = re.escape(string.punctuation)
-        return re.sub('['+chars+']', '',text)
+        return _PUNCTUATION_REGEX.sub('', text)

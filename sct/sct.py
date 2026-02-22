@@ -1,167 +1,254 @@
 """
-This code provides a comprehensive text cleaning and preprocessing pipeline. 
-It includes functions to normalize, remove personal information and clean text data, 
-which is crucial for natural language processing tasks.
+Comprehensive text cleaning and preprocessing pipeline.
 """
+import logging
+import os
+import threading
+from concurrent.futures import ThreadPoolExecutor
+from typing import List, Tuple, Optional
+
 from sct import config
+from sct.config import TextCleanerConfig, _config_from_module_globals
 from sct.utils import contact, datetime, ner, normtext, resources, special, stopwords
-from typing import List, Any
+
+logger = logging.getLogger(__name__)
+
+# Thread-local storage for passing detected language to pipeline steps
+# that need it (e.g. fuzzy date replacement).  Each thread running
+# _process_single sets its own value, so there is no cross-thread leaking.
+_thread_ctx = threading.local()
+
 
 class TextCleaner:
     
-    def __init__(self):
+    def __init__(self, cfg: Optional[TextCleanerConfig] = None):
+        """Initialize the text cleaning pipeline.
+        
+        Args:
+            cfg: Immutable configuration. If None, reads from module-level
+                 config variables (backward compatible).
+        """
+        self.cfg = cfg or _config_from_module_globals()
+        
         self.ProcessContacts = contact.ProcessContacts()
         self.ProcessDateTime = datetime.ProcessDateTime()
         self.ProcessSpecialSymbols = special.ProcessSpecialSymbols()
         self.NormaliseText = normtext.NormaliseText()
         self.ProcessStopwords = stopwords.ProcessStopwords()
-        self.GeneralNER = ner.GeneralNER()
-        self.pipeline = []
-        self.language = None
-        self.batch_size = 8  # Default batch size for NER
-        self.init_pipeline()
+        
+        if self.cfg.check_ner_process:
+            self.GeneralNER = ner.GeneralNER(
+                model_names=list(self.cfg.ner_models_list)
+            )
+        else:
+            self.GeneralNER = None
+        
+        self.batch_size = 8
+        self._pipeline = []
+        self._init_pipeline()
     
-    def init_pipeline(self):
-        # Initialize pipeline steps based on config
-        language_config = config.LANGUAGE.lower() if config.LANGUAGE else None
+    def _init_pipeline(self):
+        """Build the pipeline steps list based on config."""
+        cfg = self.cfg
+        
+        if cfg.check_fix_bad_unicode:
+            self._pipeline.append(self._fix_bad_unicode)
+        if cfg.check_to_ascii_unicode:
+            self._pipeline.append(self._to_ascii_unicode)
+        if cfg.check_remove_emoji:
+            self._pipeline.append(self._remove_emoji)
+        if cfg.check_replace_html:
+            self._pipeline.append(self._replace_html)
+        if cfg.check_replace_urls:
+            self._pipeline.append(self._replace_urls)
+        if cfg.check_replace_emails:
+            self._pipeline.append(self._replace_emails)
+        if cfg.check_replace_dates:
+            self._pipeline.append(self._replace_dates)
+        if cfg.check_fuzzy_replace_dates:
+            self._pipeline.append(self._fuzzy_replace_dates)
+        if cfg.check_replace_years:
+            self._pipeline.append(self._replace_years)
+        if cfg.check_replace_phone_numbers:
+            self._pipeline.append(self._replace_phone_numbers)
+        if cfg.check_replace_numbers:
+            self._pipeline.append(self._replace_numbers)
+        if cfg.check_replace_currency_symbols:
+            self._pipeline.append(self._replace_currency_symbols)
+        if cfg.check_remove_isolated_letters:
+            self._pipeline.append(self._remove_isolated_letters)
+        if cfg.check_remove_isolated_special_symbols:
+            self._pipeline.append(self._remove_isolated_special_symbols)
+        if cfg.check_normalize_whitespace:
+            self._pipeline.append(self._normalize_whitespace)
 
-        if language_config and language_config in resources.LANGUAGE_NAME:
-            self.language = language_config.upper()
-        elif any([config.CHECK_DETECT_LANGUAGE, config.CHECK_NER_PROCESS, config.CHECK_REMOVE_STOPWORDS]):
-            self.pipeline.append(self.detect_language)
+    def _detect_language(self, text: str) -> Optional[str]:
+        """Detect language as a pure function (no instance mutation)."""
+        language_config = self.cfg.language
+        if language_config:
+            lc = language_config.lower()
+            if lc in resources.LANGUAGE_NAME:
+                return language_config.upper()
         
-        if config.CHECK_FIX_BAD_UNICODE:
-            self.pipeline.append(self.fix_bad_unicode)
-        if config.CHECK_TO_ASCII_UNICODE:
-            self.pipeline.append(self.to_ascii_unicode)
-        if config.CHECK_REPLACE_HTML:
-            self.pipeline.append(self.replace_html)
-        if config.CHECK_REPLACE_URLS:
-            self.pipeline.append(self.replace_urls)
-        if config.CHECK_REPLACE_EMAILS:
-            self.pipeline.append(self.replace_emails)
-        if config.CHECK_REPLACE_YEARS:
-            self.pipeline.append(self.replace_years)
-        if config.CHECK_REPLACE_PHONE_NUMBERS:
-            self.pipeline.append(self.replace_phone_numbers)
-        if config.CHECK_REPLACE_NUMBERS:
-            self.pipeline.append(self.replace_numbers)
-        if config.CHECK_REPLACE_CURRENCY_SYMBOLS:
-            self.pipeline.append(self.replace_currency_symbols)
+        if any([self.cfg.check_detect_language, self.cfg.check_ner_process,
+                self.cfg.check_remove_stopwords]):
+            return str(resources.DETECTOR.detect_language_of(text)).split(".")[-1]
         
-        if config.CHECK_NER_PROCESS:
-            self.pipeline.append(self.ner_process)
+        return None
+
+    def _process_single(self, text: str) -> Tuple[str, Optional[str], Optional[str]]:
+        """Process a single text through the entire pipeline.
         
-        if config.CHECK_REMOVE_ISOLATED_LETTERS:
-            self.pipeline.append(self.remove_isolated_letters)
-        if config.CHECK_REMOVE_ISOLATED_SPECIAL_SYMBOLS:
-            self.pipeline.append(self.remove_isolated_special_symbols)
-        if config.CHECK_NORMALIZE_WHITESPACE:
-            self.pipeline.append(self.normalize_whitespace)
-    
-    def process_batch(self, texts: List[str], batch_size: int = None) -> List[Any]:
-        """Process multiple texts efficiently in batches."""
+        Returns:
+            Always a 3-tuple: (lm_text, stat_text_or_None, language_or_None)
+        """
+        # Detect language (pure function, thread-safe)
+        language = self._detect_language(text)
+        
+        current_text = text
+
+        # Store language in thread-local so pipeline steps can access it
+        _thread_ctx.language = language
+
+        # Apply non-NER pipeline steps
+        for step in self._pipeline:
+            current_text = step(current_text)
+
+        # NER processing
+        if self.cfg.check_ner_process and self.GeneralNER is not None:
+            current_text = self.GeneralNER.ner_process(
+                current_text,
+                positional_tags=list(self.cfg.positional_tags),
+                ner_confidence_threshold=self.cfg.ner_confidence_threshold,
+                language=language,
+            )
+        
+        # Statistical model processing (always returns stext, even if None)
+        stext = None
+        if self.cfg.check_statistical_model_processing:
+            stext = self._statistical_model_processing(current_text, language)
+        
+        return (current_text, stext, language)
+
+    def process_batch(self, texts: List[str], batch_size: int = None) -> List[Tuple[str, Optional[str], Optional[str]]]:
+        """Process multiple texts.
+        
+        Returns:
+            List of 3-tuples: (lm_text, stat_text_or_None, language_or_None)
+        """
         if not texts:
             return []
-            
-        results = []
-        batch_size = batch_size or self.batch_size
         
-        for text in texts:
-            # Validate input type and content
+        results = [None] * len(texts)
+        to_process = []
+        
+        for i, text in enumerate(texts):
             if not isinstance(text, str):
                 raise ValueError(f"Input must be string, got {type(text)}")
-            
-            # Handle empty text case
             if not text or text.isspace():
-                results.append(("", "", None))
-                continue
-            
-            current_text = text  # No need for str() conversion now
-            
-            # Reset language for each text
-            self.language = None
-            
-            # Apply non-NER pipeline steps
-            for step in [s for s in self.pipeline if s != self.ner_process]:
-                current_text = step(current_text)
-            
-            # Batch NER processing if enabled
-            if config.CHECK_NER_PROCESS:
-                current_text = self.GeneralNER.ner_process(
-                    current_text,
-                    positional_tags=config.POSITIONAL_TAGS,
-                    ner_confidence_threshold=config.NER_CONFIDENCE_THRESHOLD,
-                    language=self.language
-                )
-            
-            # Format results
-            if config.CHECK_STATISTICAL_MODEL_PROCESSING:
-                stext = self.statistical_model_processing(current_text)
-                results.append((current_text, stext, self.language))
-            elif config.CHECK_DETECT_LANGUAGE:
-                results.append((current_text, self.language))
+                results[i] = ("", "", None)
             else:
-                results.append(current_text)
-                
+                to_process.append((i, text))
+        
+        if not to_process:
+            return results
+
+        # Parallel processing: each text goes through the full pipeline independently.
+        # PyTorch releases the GIL during C++ tensor ops, so threads achieve real
+        # concurrency for the NER inference bottleneck.
+        max_workers = min(len(to_process), os.cpu_count() or 4)
+        if max_workers > 1:
+            with ThreadPoolExecutor(max_workers=max_workers) as executor:
+                futures = {
+                    executor.submit(self._process_single, text): i
+                    for i, text in to_process
+                }
+                for future in futures:
+                    results[futures[future]] = future.result()
+        else:
+            for i, text in to_process:
+                results[i] = self._process_single(text)
+
         return results
 
-    def process(self, text: str) -> Any:
-        """Process a single text. Maintains backward compatibility."""
+    def process(self, text: str) -> Tuple[str, Optional[str], Optional[str]]:
+        """Process a single text. Maintains backward compatibility.
+        
+        Returns:
+            3-tuple: (lm_text, stat_text_or_None, language_or_None)
+        """
         return self.process_batch([text])[0]
 
-    def detect_language(self, text):
-        self.language = str(resources.DETECTOR.detect_language_of(text)).split(".")[-1]
-        return text
-
-    def fix_bad_unicode(self, text):
+    # --- Pipeline step methods (private, used by _init_pipeline) ---
+    
+    def _fix_bad_unicode(self, text):
         return self.NormaliseText.fix_bad_unicode(text)
 
-    def to_ascii_unicode(self, text):
+    def _to_ascii_unicode(self, text):
         return self.NormaliseText.to_ascii_unicode(text)
 
-    def replace_html(self, text):
-        return self.ProcessContacts.replace_html(text, replace_with=config.REPLACE_WITH_HTML)
+    def _remove_emoji(self, text):
+        return self.NormaliseText.remove_emoji(text)
 
-    def replace_urls(self, text):
-        return self.ProcessContacts.replace_urls(text, replace_with=config.REPLACE_WITH_URL)
+    def _replace_html(self, text):
+        return self.ProcessContacts.replace_html(text, replace_with=self.cfg.replace_with_html)
 
-    def replace_emails(self, text):
-        return self.ProcessContacts.replace_emails(text, replace_with=config.REPLACE_WITH_EMAIL)
+    def _replace_urls(self, text):
+        return self.ProcessContacts.replace_urls(text, replace_with=self.cfg.replace_with_url)
 
-    def replace_years(self, text):
-        return self.ProcessDateTime.replace_years(text, replace_with=config.REPLACE_WITH_YEARS)
+    def _replace_emails(self, text):
+        return self.ProcessContacts.replace_emails(text, replace_with=self.cfg.replace_with_email)
 
-    def replace_phone_numbers(self, text):
-        return self.ProcessContacts.replace_phone_numbers(text, replace_with=config.REPLACE_WITH_PHONE_NUMBERS)
+    def _replace_dates(self, text):
+        return self.ProcessDateTime.replace_dates(text, replace_with=self.cfg.replace_with_dates)
 
-    def replace_numbers(self, text):
-        return self.ProcessContacts.replace_numbers(text, replace_with=config.REPLACE_WITH_NUMBERS)
+    def _fuzzy_replace_dates(self, text):
+        return self.ProcessDateTime.fuzzy_replace_dates(
+            text,
+            replace_with=self.cfg.replace_with_dates,
+            score_cutoff=self.cfg.fuzzy_date_score_cutoff,
+            language=getattr(_thread_ctx, 'language', 'ENGLISH'),
+        )
 
-    def replace_currency_symbols(self, text):
-        return self.ProcessSpecialSymbols.replace_currency_symbols(text, replace_with=config.REPLACE_WITH_CURRENCY_SYMBOLS)
+    def _replace_years(self, text):
+        return self.ProcessDateTime.replace_years(text, replace_with=self.cfg.replace_with_years)
 
-    def ner_process(self, text):
-        return self.GeneralNER.ner_process(text, config.POSITIONAL_TAGS, config.NER_CONFIDENCE_THRESHOLD, self.language)
+    def _replace_phone_numbers(self, text):
+        return self.ProcessContacts.replace_phone_numbers(text, replace_with=self.cfg.replace_with_phone_numbers)
 
-    def remove_isolated_letters(self, text):
+    def _replace_numbers(self, text):
+        return self.ProcessContacts.replace_numbers(text, replace_with=self.cfg.replace_with_numbers)
+
+    def _replace_currency_symbols(self, text):
+        return self.ProcessSpecialSymbols.replace_currency_symbols(text, replace_with=self.cfg.replace_with_currency_symbols)
+
+    def _remove_isolated_letters(self, text):
         return self.ProcessSpecialSymbols.remove_isolated_letters(text)
 
-    def remove_isolated_special_symbols(self, text):
-        return self.ProcessSpecialSymbols.remove_isolated_special_symbols(text)
+    def _remove_isolated_special_symbols(self, text):
+        return self.ProcessSpecialSymbols.remove_isolated_special_symbols(
+            text,
+            remove_brackets=self.cfg.check_remove_bracket_content,
+            remove_braces=self.cfg.check_remove_brace_content,
+        )
 
-    def normalize_whitespace(self, text):
+    def _normalize_whitespace(self, text):
         return self.NormaliseText.normalize_whitespace(text, no_line_breaks=True)
 
-    def statistical_model_processing(self, text):
-        if config.CHECK_CASEFOLD:
-            stext = text.casefold()  # lowercase
-        if config.CHECK_REMOVE_STOPWORDS:
-            stext = self.ProcessStopwords.remove_stopwords(stext, self.language)
-        if config.CHECK_REMOVE_PUNCTUATION:
+    def _statistical_model_processing(self, text: str, language: Optional[str]) -> str:
+        """Generate statistical model text (lowercase, no stopwords, no punctuation)."""
+        stext = text
+        if self.cfg.check_smart_casefold:
+            stop_words = self.ProcessStopwords.get_stop_words(language)
+            stext = self.NormaliseText.smart_casefold(stext, stop_words=stop_words)
+        elif self.cfg.check_casefold:
+            stext = stext.casefold()
+        if self.cfg.check_remove_stopwords:
+            stext = self.ProcessStopwords.remove_stopwords(stext, language)
+        if self.cfg.check_remove_punctuation:
             stext = self.ProcessSpecialSymbols.remove_punctuation(stext)
-        if config.CHECK_REMOVE_ISOLATED_LETTERS:
+        if self.cfg.check_remove_isolated_letters:
             stext = self.ProcessSpecialSymbols.remove_isolated_letters(stext)
-        if config.CHECK_NORMALIZE_WHITESPACE:
+        if self.cfg.check_normalize_whitespace:
             stext = self.NormaliseText.normalize_whitespace(stext)
         return stext

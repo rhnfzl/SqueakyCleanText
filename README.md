@@ -5,13 +5,13 @@
 [![PyPI](https://img.shields.io/pypi/v/squeakycleantext.svg)](https://pypi.org/project/squeakycleantext/)
 [![PyPI - Downloads](https://img.shields.io/pypi/dm/squeakycleantext)](https://pypistats.org/packages/squeakycleantext)
 [![Python package](https://github.com/rhnfzl/SqueakyCleanText/actions/workflows/python-package.yml/badge.svg)](https://github.com/rhnfzl/SqueakyCleanText/actions/workflows/python-package.yml)
-[![Python Versions](https://img.shields.io/badge/Python-3.10%20|%203.11%20|%203.12-blue)](https://pypi.org/project/squeakycleantext/)
+[![Python Versions](https://img.shields.io/badge/Python-3.10%20|%203.11%20|%203.12%20|%203.13-blue)](https://pypi.org/project/squeakycleantext/)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 A comprehensive text cleaning and preprocessing pipeline for machine learning and NLP tasks.
 </div>
 
-In the world of machine learning and natural language processing, clean and well-structured text data is crucial for building effective downstream models and managing token limits in language models. 
+In the world of machine learning and natural language processing, clean and well-structured text data is crucial for building effective downstream models and managing token limits in language models.
 
 SqueakyCleanText simplifies the process by automatically addressing common text issues, ensuring your data is clean and well-structured with minimal effort on your part.
 
@@ -23,15 +23,17 @@ SqueakyCleanText simplifies the process by automatically addressing common text 
   - Multi-language support (English, Dutch, German, Spanish)
   - Ensemble voting technique for improved accuracy
   - Configurable confidence thresholds
-  - Efficient batch processing
+  - Lazy model loading (models load on demand per language)
   - Automatic text chunking for long documents
   - GPU acceleration support
 - **Text Normalization**:
   - Removes isolated letters and symbols
   - Normalizes whitespace
   - Handles currency symbols
-  - Year detection and replacement
+  - Date and year detection and replacement
   - Number standardization
+  - Configurable emoji removal
+  - Configurable bracket/brace content removal
 - **Language Support**:
   - Automatic language detection
   - Language-specific NER models
@@ -79,10 +81,10 @@ pip install SqueakyCleanText
 ### Basic Usage
 
 ```python
-from sct import sct, config
+from sct import TextCleaner
 
 # Initialize the TextCleaner
-cleaner = sct.TextCleaner()
+cleaner = TextCleaner()
 
 # Input text
 text = "Contact John Doe at john.doe@company.com. Meeting on 2023-10-01."
@@ -91,7 +93,7 @@ text = "Contact John Doe at john.doe@company.com. Meeting on 2023-10-01."
 lm_text, stat_text, lang = cleaner.process(text)
 
 print(f"Language Model format:    {lm_text}")
-# Output: "Contact <PERSON> at <EMAIL>. Meeting on <DATE>."
+# Output: "Contact <PERSON> at <EMAIL>. Meeting on <YEAR>."
 
 print(f"Statistical Model format: {stat_text}")
 # Output: "contact meeting"
@@ -100,42 +102,58 @@ print(f"Detected Language: {lang}")
 # Output: "ENGLISH"
 ```
 
-### Advanced Configuration
+### Using TextCleanerConfig
+
+```python
+from sct import TextCleaner, TextCleanerConfig
+
+# Create an immutable configuration
+cfg = TextCleanerConfig(
+    check_ner_process=True,
+    ner_confidence_threshold=0.85,
+    positional_tags=('PER', 'LOC', 'ORG', 'MISC'),
+    replace_with_url="<URL>",
+    replace_with_email="<EMAIL>",
+    replace_with_phone_numbers="<PHONE>",
+    language="ENGLISH",  # Skip auto-detection
+)
+
+# Initialize with config
+cleaner = TextCleaner(cfg=cfg)
+```
+
+### Legacy Configuration (backward compatible)
+
 ```python
 from sct import sct, config
 
-# Customize NER settings
+# Customize settings via module-level variables
 config.CHECK_NER_PROCESS = True
 config.NER_CONFIDENCE_THRESHOLD = 0.85
 config.POSITIONAL_TAGS = ['PER', 'LOC', 'ORG']
-
-# Customize replacement tokens
 config.REPLACE_WITH_URL = "<URL>"
 config.REPLACE_WITH_EMAIL = "<EMAIL>"
-config.REPLACE_WITH_PHONE_NUMBERS = "<PHONE>"
+config.LANGUAGE = "ENGLISH"
 
-# Set known language (skips detection)
-config.LANGUAGE = "ENGLISH"  # Options: ENGLISH, DUTCH, GERMAN, SPANISH
-
-# Initialize with custom settings
-sx = sct.TextCleaner()
+# Initialize (reads from module-level config)
+cleaner = sct.TextCleaner()
 ```
 
 
-### Batch Processing with Custom Configuration**
+### Batch Processing
 
 ```python
-from sct import sct, config
+from sct import TextCleaner, TextCleanerConfig
 
-# Customize configuration
-config.CHECK_REMOVE_STOPWORDS = True
-config.CHECK_REMOVE_PUNCTUATION = True
-config.CHECK_NER_PROCESS = True
-config.POSITIONAL_TAGS = ['PERSON', 'ORG', 'LOC']
-config.NER_CONFIDENCE_THRESHOLD = 0.90
+cfg = TextCleanerConfig(
+    check_remove_stopwords=True,
+    check_remove_punctuation=True,
+    check_ner_process=True,
+    positional_tags=('PER', 'ORG', 'LOC'),
+    ner_confidence_threshold=0.90,
+)
 
-# Initialize the TextCleaner with custom config
-cleaner = sct.TextCleaner()
+cleaner = TextCleaner(cfg=cfg)
 
 # Sample texts
 texts = [
@@ -156,14 +174,18 @@ for lm_text, stat_text, lang in results:
 
 ## API
 
-### `sct.TextCleaner`
+### `TextCleaner`
 
-#### `process(text: str) -> Tuple[str, str, str]`
+#### `process(text: str) -> Tuple[str, Optional[str], Optional[str]]`
 
 Processes the input text and returns a tuple containing:
-    - Cleaned text formatted for language models.
-    - Cleaned text formatted for statistical models (stopwords removed).
-    - Detected language of the text.
+  - Cleaned text formatted for language models.
+  - Cleaned text formatted for statistical models (`None` if `check_statistical_model_processing` is `False`).
+  - Detected language of the text (`None` if language detection is disabled).
+
+#### `process_batch(texts: List[str], batch_size: int = None) -> List[Tuple[str, Optional[str], Optional[str]]]`
+
+Processes multiple texts. Each result follows the same format as `process()`.
 
 ## Contributing
 

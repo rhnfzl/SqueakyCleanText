@@ -1,16 +1,22 @@
-ftfy==6.1.1
-nltk>=3.8.1
-emoji==2.8.0
+# Runtime dependencies
+ftfy>=6.1
+stop-words>=2018.7.23
+emoji>=2.8
 torch>=2.0.0
-Unidecode==1.3.6
-transformers>=4.30.0
-beautifulsoup4==4.12.2
-presidio_anonymizer>=2.2.0
+Unidecode>=1.3
+transformers>=4.30
+beautifulsoup4>=4.12
+presidio_anonymizer>=2.2.355
 lingua-language-detector>=2.0.2
-hypothesis==6.82.7
-faker==20.1.0
-flake8==6.1.0
-pytest==8.3.3
-coverage==7.3.1
-pytest-cov==4.1.0
-timeout-decorator==0.5.0
+
+# Optional: fuzzy date detection
+rapidfuzz>=3.0
+
+# Development dependencies
+hypothesis>=6.82
+faker>=20.0
+ruff>=0.4
+pytest>=8.0
+pytest-timeout>=2.2
+coverage>=7.3
+pytest-cov>=4.1

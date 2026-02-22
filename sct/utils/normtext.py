@@ -1,14 +1,15 @@
+import logging
+import re
 from ftfy import fix_text
 from unidecode import unidecode
-from emoji import demojize, emojize
-#---
+from emoji import demojize, emojize, replace_emoji
 from sct.utils import constants
 
+logger = logging.getLogger(__name__)
 
 class NormaliseText:
     
     def __init__(self):
-        
         pass
     
     def fix_bad_unicode(self, text, normalization="NFC"):
@@ -16,49 +17,66 @@ class NormaliseText:
         Fix unicode text that's "broken" using `ftfy <http://ftfy.readthedocs.org/>`_;
         this includes mojibake, HTML entities and other code cruft,
         and non-standard forms for display purposes.
-        Args:
-            text (str): raw text
-            normalization ({'NFC', 'NFKC', 'NFD', 'NFKD'}): if 'NFC',
-                combines characters and diacritics written using separate code points,
-                e.g. converting "e" plus an acute accent modifier into "é"; unicode
-                can be converted to NFC form without any change in its meaning!
-                if 'NFKC', additional normalizations are applied that can change
-                the meanings of characters, e.g. ellipsis characters will be replaced
-                with three periods
         """
-        # trying to fix backslash-replaced strings (via https://stackoverflow.com/a/57192592/4028896)
         try:
             text = text.encode("latin", "backslashreplace").decode("unicode-escape")
-        except:
-            pass
+        except (UnicodeDecodeError, UnicodeEncodeError):
+            logger.debug("Unicode escape decoding failed, using original text", exc_info=True)
 
         return fix_text(text, normalization=normalization)
 
     def fix_strange_quotes(self, text):
-        """
-        Replace strange quotes, i.e., 〞with a single quote ' or a double quote " if it fits better.
-        """
+        """Replace strange quotes with standard single/double quotes."""
         text = constants.SINGLE_QUOTE_REGEX.sub("'", text)
         text = constants.DOUBLE_QUOTE_REGEX.sub('"', text)
         return text
 
     def to_ascii_unicode(self, text, no_emoji=True):
         """
-        Try to represent unicode data in ascii characters similar to what a human
-        with a US keyboard would choose.
-        Works great for languages of Western origin, worse the farther the language
-        gets from Latin-based alphabets. It's based on hand-tuned character mappings
-        that also contain ascii approximations for symbols and non-Latin alphabets.
+        Convert non-ASCII characters into their closest ASCII equivalents.
         """
-        # normalize quotes before since this improves transliteration quality
         text = self.fix_strange_quotes(text)
 
         if not no_emoji:
             text = demojize(text, use_aliases=True)
 
         text = unidecode(text)
-
         return text
+
+    def remove_emoji(self, text):
+        """Remove all emoji characters from text."""
+        return replace_emoji(text, replace='')
+
+    @staticmethod
+    def _has_camelcase(text: str) -> bool:
+        """Detect lowercase-to-uppercase transition (e.g., GraphQL, DevOps)."""
+        return bool(re.search(r'[a-z][A-Z]', text))
+
+    def smart_casefold(self, text: str, stop_words: set = None) -> str:
+        """Case-fold text while preserving abbreviations and camelCase.
+
+        Per-token rules (applied in order):
+        1. If token is a stopword (case-insensitive) -> casefold
+        2. If token is all-uppercase -> preserve (abbreviation/acronym)
+        3. If token has a lowercase-to-uppercase transition -> preserve (compound term)
+        4. Otherwise -> casefold
+        """
+        tokens = text.split()
+        stop_words = stop_words or set()
+        result = []
+        for token in tokens:
+            alpha = ''.join(c for c in token if c.isalpha())
+            if not alpha:
+                result.append(token.casefold())
+            elif alpha.casefold() in stop_words:
+                result.append(token.casefold())
+            elif alpha.isupper():
+                result.append(token)
+            elif self._has_camelcase(token):
+                result.append(token)
+            else:
+                result.append(token.casefold())
+        return ' '.join(result)
 
     def normalize_whitespace(self, text, strip_lines=True, no_line_breaks=False, keep_two_line_breaks=False):
         """
