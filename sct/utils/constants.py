@@ -4,6 +4,7 @@ Constant symbols and compiled RegExs used for cleaning.
 
 import re
 import string
+import regex
 
 CURRENCIES = {
     "$": "USD",
@@ -100,10 +101,11 @@ SINGLE_QUOTE_REGEX = re.compile("|".join(strange_single_quotes))
 YEAR_REGEX = re.compile(r"\b(19|20)\d{2}\b")
 
 # ---------------------------------------------------------------------------
-# Multilingual month name vocabulary (EN, NL, DE, ES)
+# Multilingual month name vocabulary (EN, NL, DE, ES, FR, PT, IT)
 # Used by DATE_REGEX (exact match) and fuzzy_replace_dates (RapidFuzz).
 # Keys are canonical lowercase forms; values are frozensets of language codes
-# (some month names are shared across languages, e.g. "juni" is NL and DE).
+# (some month names are shared across languages, e.g. "juni" is NL and DE,
+# "agosto" is ES/PT/IT, "marzo" is ES/IT, "novembre" is FR/IT).
 # ---------------------------------------------------------------------------
 MONTH_NAMES_MULTILINGUAL = {
     # English
@@ -130,13 +132,38 @@ MONTH_NAMES_MULTILINGUAL = {
     "mär": frozenset({"de"}), "mrz": frozenset({"de"}), "dez": frozenset({"de"}),
     # Spanish
     "enero": frozenset({"es"}), "febrero": frozenset({"es"}),
-    "marzo": frozenset({"es"}), "abril": frozenset({"es"}),
+    "marzo": frozenset({"es", "it"}), "abril": frozenset({"es", "pt"}),
     "mayo": frozenset({"es"}), "junio": frozenset({"es"}),
-    "julio": frozenset({"es"}), "agosto": frozenset({"es"}),
+    "julio": frozenset({"es"}), "agosto": frozenset({"es", "pt", "it"}),
     "septiembre": frozenset({"es"}), "octubre": frozenset({"es"}),
     "noviembre": frozenset({"es"}), "diciembre": frozenset({"es"}),
     "ene": frozenset({"es"}), "abr": frozenset({"es"}),
     "ago": frozenset({"es"}), "dic": frozenset({"es"}),
+    # French
+    "janvier": frozenset({"fr"}), "février": frozenset({"fr"}),
+    "mars": frozenset({"fr"}), "avril": frozenset({"fr"}),
+    "juin": frozenset({"fr"}), "juillet": frozenset({"fr"}),
+    "août": frozenset({"fr"}), "septembre": frozenset({"fr"}),
+    "octobre": frozenset({"fr"}), "novembre": frozenset({"fr", "it"}),
+    "décembre": frozenset({"fr"}),
+    "fév": frozenset({"fr"}), "avr": frozenset({"fr"}),
+    "aoû": frozenset({"fr"}), "déc": frozenset({"fr"}),
+    # Portuguese
+    "janeiro": frozenset({"pt"}), "fevereiro": frozenset({"pt"}),
+    "março": frozenset({"pt"}), "maio": frozenset({"pt"}),
+    "junho": frozenset({"pt"}), "julho": frozenset({"pt"}),
+    "setembro": frozenset({"pt"}), "outubro": frozenset({"pt"}),
+    "novembro": frozenset({"pt"}), "dezembro": frozenset({"pt"}),
+    "set": frozenset({"pt"}), "out": frozenset({"pt"}),
+    # Italian
+    "gennaio": frozenset({"it"}), "febbraio": frozenset({"it"}),
+    "aprile": frozenset({"it"}), "maggio": frozenset({"it"}),
+    "giugno": frozenset({"it"}), "luglio": frozenset({"it"}),
+    "settembre": frozenset({"it"}), "ottobre": frozenset({"it"}),
+    "dicembre": frozenset({"it"}),
+    "gen": frozenset({"it"}), "mag": frozenset({"it"}),
+    "giu": frozenset({"it"}), "lug": frozenset({"it"}),
+    "ott": frozenset({"it"}),
 }
 
 # Flat set for quick membership check (lowercase)
@@ -158,6 +185,9 @@ _LANG_TO_VOCAB = {
     "DUTCH": "nl",
     "GERMAN": "de",
     "SPANISH": "es",
+    "FRENCH": "fr",
+    "PORTUGUESE": "pt",
+    "ITALIAN": "it",
 }
 
 # Per-language fuzzy vocabulary (full names only, len > 4)
@@ -302,8 +332,17 @@ ISOLATED_QUOTES_REGEX = re.compile(
 # Pre-compiled punctuation pattern (was re-compiled on every call in special.py)
 PUNCTUATION_REGEX = re.compile('[' + re.escape(string.punctuation) + ']')
 
-# Sentence boundary pattern for NER text splitting (legacy, kept for backward compat)
-SENTENCE_BOUNDARY_PATTERN = re.compile(r'(?<=[.!?])\s+(?=[^\d])')
+# Sentence boundary pattern for NER text splitting
+# Used by ner.py split_text() as preferred split point before CHUNK_DELIMITERS.
+# Uses the `regex` library (drop-in for `re`) to support variable-length lookbehind.
+# (?<![A-Z][a-z]{0,3}\.) — do NOT split after abbreviation (Dr., Mr., Ltd., Corp.)
+#                           [A-Z][a-z]{0,3}\. covers: "Dr.", "Mr.", "Ltd.", "U." etc.
+# (?<=[.!?])              — must follow sentence-ending punctuation
+# \s+                     — one or more whitespace
+# (?=[A-Z])               — must be followed by uppercase (sentence start)
+SENTENCE_BOUNDARY_PATTERN = regex.compile(
+    r"(?<![A-Z][a-z]{0,3}\.)(?<=[.!?])\s+(?=[A-Z])"
+)
 
 # Ordered delimiter hierarchy for text chunking (inspired by semchunk).
 # Tried from coarsest to finest; first delimiter that produces a split wins.

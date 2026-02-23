@@ -7,6 +7,7 @@ byte-identical entity span and label output.
 
 import json
 import logging
+from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
 import numpy as np
@@ -252,6 +253,7 @@ def load_onnx_ner_model(
     model_name: str,
     device: str = 'cpu',
     cache_dir: Optional[str] = None,
+    quantize: bool = False,
 ) -> Tuple[ONNXNERPipeline, TokenizerWrapper]:
     """Download and load an ONNX NER model from HuggingFace Hub.
 
@@ -263,6 +265,11 @@ def load_onnx_ner_model(
         ``"cpu"`` or ``"cuda"``.
     cache_dir : str, optional
         Local directory for caching downloaded files.
+    quantize : bool
+        If ``True``, apply INT8 dynamic quantization to the model weights before
+        loading.  The quantized model is cached next to the original
+        (``model_quantized.onnx``) so quantization only runs once per model.
+        Reduces model size ~4× with a small accuracy trade-off.  Default: ``False``.
 
     Returns
     -------
@@ -309,6 +316,17 @@ def load_onnx_ner_model(
     # Load tokenizer
     tokenizer = Tokenizer.from_file(tokenizer_path)
     wrapper = TokenizerWrapper(tokenizer, model_max_length=model_max_length)
+
+    # Optional INT8 dynamic quantization
+    if quantize:
+        from onnxruntime.quantization import QuantType, quantize_dynamic  # noqa: PLC0415
+        _qcache = Path(cache_dir) if cache_dir else Path.home() / ".cache" / "sct_quantized"
+        quantized_path = _qcache / model_name.replace("/", "__") / "model_quantized.onnx"
+        quantized_path.parent.mkdir(parents=True, exist_ok=True)
+        if not quantized_path.exists():
+            logger.info("Quantizing model to INT8: %s", quantized_path)
+            quantize_dynamic(model_path, str(quantized_path), weight_type=QuantType.QInt8)
+        model_path = str(quantized_path)
 
     # Create ONNX session with appropriate providers
     providers = []

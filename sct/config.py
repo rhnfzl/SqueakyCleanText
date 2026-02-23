@@ -29,6 +29,10 @@ DEFAULT_NER_MODELS: dict[str, str] = {
     'DUTCH': 'rhnfzl/xlm-roberta-large-conll02-dutch-onnx',
     'GERMAN': 'rhnfzl/xlm-roberta-large-conll03-german-onnx',
     'SPANISH': 'rhnfzl/xlm-roberta-large-conll02-spanish-onnx',
+    # FR/PT/IT: no dedicated ONNX model available; map to MULTILINGUAL fallback
+    'FRENCH': 'rhnfzl/wikineural-multilingual-ner-onnx',
+    'PORTUGUESE': 'rhnfzl/wikineural-multilingual-ner-onnx',
+    'ITALIAN': 'rhnfzl/wikineural-multilingual-ner-onnx',
     'MULTILINGUAL': 'rhnfzl/wikineural-multilingual-ner-onnx',
 }
 
@@ -37,8 +41,25 @@ DEFAULT_TORCH_NER_MODELS: dict[str, str] = {
     'DUTCH': 'FacebookAI/xlm-roberta-large-finetuned-conll02-dutch',
     'GERMAN': 'FacebookAI/xlm-roberta-large-finetuned-conll03-german',
     'SPANISH': 'FacebookAI/xlm-roberta-large-finetuned-conll02-spanish',
+    # FR/PT/IT: no dedicated Torch model available; map to MULTILINGUAL fallback
+    'FRENCH': 'Babelscape/wikineural-multilingual-ner',
+    'PORTUGUESE': 'Babelscape/wikineural-multilingual-ner',
+    'ITALIAN': 'Babelscape/wikineural-multilingual-ner',
     'MULTILINGUAL': 'Babelscape/wikineural-multilingual-ner',
 }
+
+# NER ensemble: ordered model keys to run per input language.
+# Keys must exist in the resolved ner_models dict.
+# EN/NL/DE/ES get a 3-model ensemble (lang-specific + English CoNLL + Multilingual).
+# All other languages (FR, PT, IT, etc.) fall back to NER_ENSEMBLE_DEFAULT_KEYS.
+DEFAULT_NER_ENSEMBLE: dict[str, tuple] = {
+    'ENGLISH': ('ENGLISH', 'MULTILINGUAL'),
+    'DUTCH':   ('DUTCH',   'ENGLISH', 'MULTILINGUAL'),
+    'GERMAN':  ('GERMAN',  'ENGLISH', 'MULTILINGUAL'),
+    'SPANISH': ('SPANISH', 'ENGLISH', 'MULTILINGUAL'),
+}
+# Fallback for any language not in DEFAULT_NER_ENSEMBLE (FR, PT, IT, etc.)
+NER_ENSEMBLE_DEFAULT_KEYS: tuple = ('MULTILINGUAL', 'ENGLISH')
 
 
 @dataclass(frozen=True)
@@ -100,6 +121,7 @@ class TextCleanerConfig:
     # NER settings
     positional_tags: Tuple[str, ...] = ('PER', 'LOC', 'ORG', 'MISC')
     ner_confidence_threshold: float = 0.85
+    ner_batch_size: int = 8
     language: Optional[str] = None
 
     # NER backend selection
@@ -110,6 +132,16 @@ class TextCleanerConfig:
     # ENGLISH and MULTILINGUAL are always required (loaded eagerly).
     # Missing keys are filled from DEFAULT_NER_MODELS.
     ner_models: Optional[Mapping[str, str]] = None
+
+    # Ensemble routing: maps each input language to an ordered tuple of model keys
+    # to run. Keys must exist in the resolved ner_models dict.
+    # If None, DEFAULT_NER_ENSEMBLE is used (with NER_ENSEMBLE_DEFAULT_KEYS fallback).
+    ner_ensemble: Optional[Mapping[str, Tuple[str, ...]]] = None
+
+    # Fallback keys for any language not listed in ner_ensemble (e.g. FR, PT, IT).
+    # If None, NER_ENSEMBLE_DEFAULT_KEYS is used. Pass an empty tuple to skip
+    # ensemble inference for unmapped languages.
+    ner_ensemble_default_keys: Optional[Tuple[str, ...]] = None
 
     # Deprecated: positional tuple (English, Dutch, German, Spanish, Multilingual).
     # Use ner_models dict instead. Kept for backward compatibility.
@@ -131,6 +163,10 @@ class TextCleanerConfig:
     gliner_label_map: Optional[Mapping[str, str]] = None
     gliner_threshold: float = 0.4
 
+    # Plugin: user-provided pipeline steps, each callable (text: str) -> str.
+    # Appended after all built-in steps in _init_pipeline().
+    custom_pipeline_steps: Tuple = ()
+
     # Language extensibility — extend Lingua detection, stopwords, dates, NER
     extra_languages: Tuple[str, ...] = ()
     custom_stopwords: Optional[Mapping[str, frozenset]] = None
@@ -145,12 +181,25 @@ class TextCleanerConfig:
             object.__setattr__(self, 'positional_tags', tuple(self.positional_tags))
         if isinstance(self.ner_models_list, list):
             object.__setattr__(self, 'ner_models_list', tuple(self.ner_models_list))
+        if isinstance(self.custom_pipeline_steps, list):
+            object.__setattr__(self, 'custom_pipeline_steps', tuple(self.custom_pipeline_steps))
+        for step in self.custom_pipeline_steps:
+            if not callable(step):
+                raise ValueError(
+                    f"custom_pipeline_steps must contain callables, got: {type(step)!r}"
+                )
 
         # --- NER backend validation ---
         if self.ner_backend not in VALID_NER_BACKENDS:
             raise ValueError(
                 f"ner_backend must be one of {sorted(VALID_NER_BACKENDS)}, "
                 f"got: {self.ner_backend!r}"
+            )
+
+        # ner_batch_size must be positive
+        if self.ner_batch_size <= 0:
+            raise ValueError(
+                f"ner_batch_size must be >= 1, got {self.ner_batch_size}"
             )
 
         # GLiNER fields required for gliner/ensemble backends
@@ -204,6 +253,12 @@ class TextCleanerConfig:
             )
         else:
             # No dict provided — derive from ner_models_list (may be default or custom)
+            import warnings
+            warnings.warn(
+                "ner_models_list is deprecated. Use ner_models dict instead.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
             models_dict = dict(zip(LANG_KEYS, self.ner_models_list))
             object.__setattr__(self, 'ner_models', MappingProxyType(models_dict))
 
