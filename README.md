@@ -20,12 +20,14 @@ SqueakyCleanText simplifies the process by automatically addressing common text 
 - **Named Entity Recognition (NER)**:
   - Multi-backend: ONNX (default, torch-free), PyTorch, GLiNER, and ensemble modes
   - Zero-shot custom entities via GLiNER (e.g., PRODUCT, EVENT, SKILL)
-  - Multi-language support (English, Dutch, German, Spanish)
+  - Multi-language support (English, Dutch, German, Spanish, French, Portuguese, Italian)
   - Ensemble voting across backends for improved accuracy
   - Configurable confidence thresholds
   - Lazy model loading (models load on demand per language)
-  - Automatic text chunking for long documents
+  - Shared ONNX sessions across same-model languages (~600 MB RAM saved)
+  - Automatic text chunking for long documents (CJK/Arabic safe)
   - GPU acceleration support (CUDA for ONNX and PyTorch)
+  - Model warm-up API to pre-load on startup
 - **Text Normalization**:
   - Corrects text encoding problems and handles bad Unicode characters
   - Removes or replaces HTML tags and URLs with configurable tokens
@@ -40,7 +42,7 @@ SqueakyCleanText simplifies the process by automatically addressing common text 
   - Smart case folding (preserves NER tokens like `<PERSON>`)
 - **Language Support**:
   - Automatic language detection (English, Dutch, German, Spanish)
-  - Language-specific NER models
+  - Language-specific NER models; French, Portuguese, Italian via multilingual model
   - Language-aware stopword removal
   - Extensible: add custom languages with stopwords, month names, and NER models
 - **Dual Output Formats**:
@@ -49,7 +51,9 @@ SqueakyCleanText simplifies the process by automatically addressing common text 
 - **Performance**:
   - ONNX Runtime inference (torch-free base install, ~3-5x faster than PyTorch)
   - Thread-parallel batch processing via `ThreadPoolExecutor`
+  - Async batch processing (`aprocess_batch`) for FastAPI / aiohttp
   - Lazy model loading (only loads models as needed)
+  - Shared ONNX sessions for same-model languages (saves ~600 MB for FR/PT/IT)
   - Memory-efficient processing of large texts
   - GPU acceleration (CUDA) for both ONNX and PyTorch backends
 
@@ -261,7 +265,8 @@ SqueakyCleanText supports five NER backends, selectable via the `ner_backend` co
 | Dutch | [`rhnfzl/xlm-roberta-large-conll02-dutch-onnx`](https://huggingface.co/rhnfzl/xlm-roberta-large-conll02-dutch-onnx) |
 | German | [`rhnfzl/xlm-roberta-large-conll03-german-onnx`](https://huggingface.co/rhnfzl/xlm-roberta-large-conll03-german-onnx) |
 | Spanish | [`rhnfzl/xlm-roberta-large-conll02-spanish-onnx`](https://huggingface.co/rhnfzl/xlm-roberta-large-conll02-spanish-onnx) |
-| Multilingual | [`rhnfzl/wikineural-multilingual-ner-onnx`](https://huggingface.co/rhnfzl/wikineural-multilingual-ner-onnx) |
+| French / Portuguese / Italian | [`rhnfzl/wikineural-multilingual-ner-onnx`](https://huggingface.co/rhnfzl/wikineural-multilingual-ner-onnx) (shared session) |
+| Multilingual (fallback) | [`rhnfzl/wikineural-multilingual-ner-onnx`](https://huggingface.co/rhnfzl/wikineural-multilingual-ner-onnx) |
 
 ### GLiNER Label Mapping
 
@@ -291,6 +296,28 @@ Processes the input text and returns a tuple containing:
 #### `process_batch(texts: List[str], batch_size: int = None) -> List[Tuple[str, Optional[str], Optional[str]]]`
 
 Processes multiple texts using thread-parallel execution. Each result follows the same format as `process()`.
+
+#### `aprocess_batch(texts: List[str], batch_size: int = None) -> List[Tuple[str, Optional[str], Optional[str]]]`
+
+Async version of `process_batch` for use with asyncio-based frameworks (FastAPI, aiohttp). Runs the batch in a thread-pool executor so it does not block the event loop:
+
+```python
+from sct import TextCleaner
+
+cleaner = TextCleaner()
+
+# In an async context (FastAPI route, aiohttp handler, etc.)
+results = await cleaner.aprocess_batch(texts)
+```
+
+#### `warmup(languages: Optional[List[str]] = None) -> None`
+
+Pre-loads NER models to avoid first-request latency. Call once during application startup:
+
+```python
+cleaner = TextCleaner()
+cleaner.warmup(['ENGLISH', 'DUTCH'])  # or warmup() for all supported languages
+```
 
 ### `TextCleanerConfig`
 
@@ -354,6 +381,7 @@ new_cfg = dataclasses.replace(cfg, check_ner_process=False)
 | `ner_backend` | `'onnx'` | Backend: `onnx`, `torch`, `gliner`, `ensemble_onnx`, `ensemble_torch` |
 | `positional_tags` | `('PER', 'LOC', 'ORG', 'MISC')` | Entity types to recognize |
 | `ner_confidence_threshold` | `0.85` | Minimum confidence score |
+| `ner_batch_size` | `8` | Inference batch size (must be >= 1) |
 | `ner_models` | `None` | Language-keyed dict of ONNX model repo IDs |
 | `torch_ner_models` | `None` | Language-keyed dict of PyTorch model repo IDs |
 | `gliner_model` | `None` | GLiNER model ID (required for gliner/ensemble backends) |
@@ -362,6 +390,7 @@ new_cfg = dataclasses.replace(cfg, check_ner_process=False)
 | `gliner_label_map` | `None` | Maps GLiNER labels to NER tags |
 | `gliner_threshold` | `0.4` | GLiNER confidence threshold |
 | `fuzzy_date_score_cutoff` | `85` | Fuzzy matching threshold (0-100) for misspelled months |
+| `custom_pipeline_steps` | `()` | Tuple of `(text: str) -> str` callables appended after all built-in steps |
 
 **Language settings**:
 
@@ -408,6 +437,31 @@ Input Text
 ```
 
 Each step is toggled by a `TextCleanerConfig` field. The pipeline is built once at initialization — disabled steps are skipped entirely (zero overhead).
+
+## What's New in v0.5.0
+
+Quality, performance, and API improvements:
+
+**Async & API**
+- `aprocess_batch()` — async batch processing for FastAPI / aiohttp (uses `get_running_loop`, Python 3.12+ compatible)
+- `warmup(languages)` — public method to pre-load NER models at startup
+- `custom_pipeline_steps` config field — plug in arbitrary `(text: str) -> str` callables after the built-in pipeline
+
+**Language Support**
+- French, Portuguese, Italian now supported out of the box via the multilingual ONNX model
+- ONNX sessions are shared across same-model languages (FR/PT/IT → one session, ~600 MB saved)
+
+**Performance & Thread Safety**
+- Per-model inference locks replace the coarse per-language lock — true concurrent inference across different language models
+- `split_text()` is now lock-free (HF fast tokenizer is thread-safe)
+- Conservative `chars/token` ratio (2×) in `_simple_chunk` prevents context-window overflow for CJK and Arabic texts
+
+**Correctness**
+- `SENTENCE_BOUNDARY_PATTERN` upgraded to the `regex` library with an abbreviation guard — "Dr. Smith", "Mr. Jones", "U.S. Army" no longer cause false splits during NER chunking
+- `ner_batch_size=0` and `ner_batch_size=-1` now raise `ValueError` immediately instead of silently producing empty results
+- Quantized ONNX models are cached to `~/.cache/sct_quantized/` instead of the read-only HuggingFace Hub cache directory
+
+---
 
 ## What's New in v0.4.5
 
