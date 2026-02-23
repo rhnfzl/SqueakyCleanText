@@ -1,32 +1,23 @@
 import math
-import torch
+import gc
 import threading
 from collections import defaultdict
 import logging
-from typing import List, Optional
+from typing import Dict, List, Optional, Union
 from pathlib import Path
 
-import transformers
-from transformers import AutoTokenizer, AutoModelForTokenClassification, pipeline
+import onnxruntime as ort
 
 from presidio_anonymizer import AnonymizerEngine
 from presidio_anonymizer.entities import RecognizerResult
 
 from sct.utils import constants
-from sct import config
+from sct.utils.onnx_pipeline import load_onnx_ner_model
+from sct.config import DEFAULT_NER_MODELS, LANG_KEYS
 
-transformers.logging.set_verbosity_error()
+ort.set_default_logger_severity(3)  # Silence ONNX Runtime warnings
 
 logger = logging.getLogger(__name__)
-
-# Data-driven language-to-model mapping
-LANG_MODEL_MAP = {
-    'ENGLISH': 0,
-    'DUTCH': 1,
-    'GERMAN': 2,
-    'SPANISH': 3,
-    'MULTILINGUAL': 4,
-}
 
 # Entity group to Presidio entity type mapping
 ENTITY_TYPE_MAP = {
@@ -43,44 +34,110 @@ class ModelLoadError(Exception):
 
 
 class GeneralNER:
-    """NER processor with lazy model loading and ensemble voting."""
+    """NER processor with lazy model loading, multi-backend support, and ensemble voting.
+
+    Backends:
+        onnx           — ONNX Runtime (default, torch-free)
+        torch          — PyTorch/Transformers pipeline
+        gliner         — GLiNER zero-shot NER with custom entity labels
+        ensemble_onnx  — ONNX + GLiNER combined via ensemble voting
+        ensemble_torch — Torch + GLiNER combined via ensemble voting
+    """
 
     def __init__(self, cache_dir: Optional[Path] = None, device: str = None,
-                 model_names: Optional[List[str]] = None):
+                 model_names: Optional[Union[Dict[str, str], List[str]]] = None,
+                 ner_backend: str = 'onnx',
+                 gliner_config: Optional[Dict] = None,
+                 torch_model_names: Optional[Dict[str, str]] = None):
         """Initialize NER processor.
 
         Args:
             cache_dir: Optional directory for caching models
             device: Device for inference ('cuda' or 'cpu'). Auto-detects if None.
-            model_names: Optional list of model names. Uses config if None.
+            model_names: Language-keyed dict of ONNX model repo IDs (preferred),
+                or positional list for backward compat. Uses DEFAULT_NER_MODELS if None.
+            ner_backend: Backend selection ('onnx', 'torch', 'gliner',
+                'ensemble_onnx', 'ensemble_torch').
+            gliner_config: Dict with keys: model, variant, labels, threshold, label_map.
+                Required when ner_backend involves GLiNER.
+            torch_model_names: Language-keyed dict of PyTorch model repo IDs.
+                Required when ner_backend involves torch.
         """
-        self.device = device or ("cuda" if torch.cuda.is_available() else "cpu")
-        logger.info(f"Using device: {self.device}")
+        self._ner_backend = ner_backend
+        self._gliner_pipe = None
+
+        # Device detection
+        if device:
+            self.device = device
+        elif ner_backend in ('torch', 'ensemble_torch'):
+            try:
+                import torch  # noqa: S404
+                self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
+            except ImportError:
+                self.device = 'cpu'
+        elif 'CUDAExecutionProvider' in ort.get_available_providers():
+            self.device = 'cuda'
+        else:
+            self.device = 'cpu'
+        logger.info("Using device: %s (backend: %s)", self.device, ner_backend)
 
         self.engine = AnonymizerEngine()
         self._cache_args = {"cache_dir": str(cache_dir)} if cache_dir else {}
 
-        # Build model mapping from config or provided list
-        if model_names is not None:
-            self._model_names = list(model_names)
-        else:
-            self._model_names = list(config.NER_MODELS_LIST)
-
-        # Lazy-loaded pipelines, tokenizers, and models (keyed by language)
-        self._pipelines = {}
-        self._tokenizers = {}
-        self._models = {}
+        # Common state for all backends
+        self._pipelines: Dict = {}
+        self._tokenizers: Dict = {}
         self._load_lock = threading.Lock()
-        # HF fast tokenizers use Rust RefCell internally — not safe for
-        # concurrent pipeline calls. Serialize inference across threads.
+        # Serialize inference across threads (tokenizers Rust internals, model access)
         self._inference_lock = threading.Lock()
 
-        # Eagerly load English + multilingual to compute min_token_length
-        # (needed for split_text before first ner_process call)
-        self._ensure_loaded('ENGLISH')
-        self._ensure_loaded('MULTILINGUAL')
+        # --- Backend-specific initialization ---
 
-        # Set tokenizer properties from loaded models
+        if ner_backend in ('onnx', 'ensemble_onnx'):
+            # ONNX backend: build model mapping from dict, list, or defaults
+            if model_names is None:
+                self._model_names = dict(DEFAULT_NER_MODELS)
+            elif isinstance(model_names, dict):
+                self._model_names = dict(model_names)
+            else:
+                self._model_names = dict(zip(LANG_KEYS, model_names))
+
+            self._ensure_loaded('ENGLISH')
+            self._ensure_loaded('MULTILINGUAL')
+            self._init_tokenizer_props()
+
+        elif ner_backend in ('torch', 'ensemble_torch'):
+            # Torch backend
+            if torch_model_names is None:
+                from sct.config import DEFAULT_TORCH_NER_MODELS
+                self._model_names = dict(DEFAULT_TORCH_NER_MODELS)
+            else:
+                self._model_names = dict(torch_model_names)
+
+            self._ensure_loaded('ENGLISH')
+            self._ensure_loaded('MULTILINGUAL')
+            self._init_tokenizer_props()
+
+        elif ner_backend == 'gliner':
+            # GLiNER-only: no token-classification models needed
+            self._model_names = {}
+            self.min_token_length = None
+            self.tokenizer = None
+
+        # --- GLiNER pipeline (for gliner/ensemble modes) ---
+        if ner_backend in ('gliner', 'ensemble_onnx', 'ensemble_torch') and gliner_config:
+            from sct.utils.gliner_adapter import GLiNERAdapter
+            self._gliner_pipe = GLiNERAdapter(
+                model_id=gliner_config['model'],
+                variant=gliner_config.get('variant', 'gliner'),
+                labels=gliner_config.get('labels'),
+                threshold=gliner_config.get('threshold', 0.4),
+                label_map=gliner_config.get('label_map'),
+                device=self.device,
+            )
+
+    def _init_tokenizer_props(self):
+        """Set min_token_length and tokenizer from loaded ENGLISH/MULTILINGUAL models."""
         en_tok = self._tokenizers['ENGLISH']
         multi_tok = self._tokenizers['MULTILINGUAL']
         self.min_token_length = math.ceil(min(
@@ -93,36 +150,44 @@ class GeneralNER:
         ) else multi_tok
 
     def _get_model_name(self, lang_key: str) -> str:
-        """Get model name for a language using data-driven mapping."""
-        idx = LANG_MODEL_MAP.get(lang_key)
-        if idx is None or idx >= len(self._model_names):
+        """Get model name for a language via direct dict lookup."""
+        model = self._model_names.get(lang_key)
+        if model is None:
             raise ModelLoadError(f"No model configured for language: {lang_key}")
-        return self._model_names[idx]
+        return model
 
     def _ensure_loaded(self, lang_key: str) -> None:
-        """Lazily load a model and pipeline for the given language."""
+        """Lazily load a model and pipeline for the given language.
+
+        Dispatches to the appropriate loader based on the active backend.
+        """
         if lang_key in self._pipelines:
             return
         with self._load_lock:
             if lang_key in self._pipelines:
                 return
             model_name = self._get_model_name(lang_key)
-            logger.info(f"Loading model for {lang_key}: {model_name}")
+            logger.info("Loading model for %s: %s", lang_key, model_name)
             try:
-                tokenizer = AutoTokenizer.from_pretrained(model_name, **self._cache_args)
-                model = AutoModelForTokenClassification.from_pretrained(
-                    model_name, **self._cache_args
-                ).to(self.device)
-                ner_pipeline = pipeline(
-                    "ner", model=model, tokenizer=tokenizer,
-                    aggregation_strategy="simple", device=self.device
-                )
-                self._tokenizers[lang_key] = tokenizer
-                self._models[lang_key] = model
-                self._pipelines[lang_key] = ner_pipeline
+                if self._ner_backend in ('torch', 'ensemble_torch'):
+                    from sct.utils.torch_pipeline import load_torch_ner_model
+                    pipeline_obj, tok = load_torch_ner_model(
+                        model_name, device=self.device,
+                        cache_dir=self._cache_args.get("cache_dir"),
+                    )
+                else:
+                    pipeline_obj, tok = load_onnx_ner_model(
+                        model_name,
+                        device=self.device,
+                        cache_dir=self._cache_args.get("cache_dir"),
+                    )
+                self._pipelines[lang_key] = pipeline_obj
+                self._tokenizers[lang_key] = tok
             except Exception as e:
-                logger.error(f"Failed to load model for {lang_key}: {e}")
-                raise ModelLoadError(f"Model loading failed for {lang_key}: {e}")
+                logger.error("Failed to load model for %s: %s", lang_key, e)
+                raise ModelLoadError(
+                    f"Model loading failed for {lang_key} ({model_name}): {e}"
+                )
 
     def _get_pipeline(self, lang_key: str):
         """Get the NER pipeline for a language, loading it if needed."""
@@ -153,25 +218,39 @@ class GeneralNER:
         return list(unique_data.values())
 
     def anonymize_text(self, text, filtered_data):
-        """Anonymize text, replacing detected entities with type tokens."""
-        analyzer_result = []
-        for items in filtered_data:
-            entity_type = ENTITY_TYPE_MAP.get(items['entity_group'])
-            if entity_type:
-                analyzer_result.append(RecognizerResult(
-                    entity_type=entity_type,
-                    start=items['start'],
-                    end=items['end'],
-                    score=items['score'],
-                ))
+        """Anonymize text. Uses Presidio for standard tags, direct replacement for custom."""
+        has_custom = any(
+            items['entity_group'] not in ENTITY_TYPE_MAP
+            for items in filtered_data
+        )
 
-        text_length = len(text)
-        analyzer_result = [
-            entry for entry in analyzer_result
-            if 0 <= entry.start < text_length and 0 < entry.end <= text_length
-        ]
+        if has_custom:
+            # Mixed labels: right-to-left string replacement (preserves offsets)
+            sorted_data = sorted(filtered_data, key=lambda x: x['start'], reverse=True)
+            for items in sorted_data:
+                tag = ENTITY_TYPE_MAP.get(items['entity_group'], items['entity_group'])
+                text = text[:items['start']] + f"<{tag}>" + text[items['end']:]
+            return type('AnonymizeResult', (), {'text': text})()
+        else:
+            # Standard entities only: use Presidio (existing behavior)
+            analyzer_result = []
+            for items in filtered_data:
+                entity_type = ENTITY_TYPE_MAP.get(items['entity_group'])
+                if entity_type:
+                    analyzer_result.append(RecognizerResult(
+                        entity_type=entity_type,
+                        start=items['start'],
+                        end=items['end'],
+                        score=items['score'],
+                    ))
 
-        return self.engine.anonymize(text=text, analyzer_results=analyzer_result)
+            text_length = len(text)
+            analyzer_result = [
+                entry for entry in analyzer_result
+                if 0 <= entry.start < text_length and 0 < entry.end <= text_length
+            ]
+
+            return self.engine.anonymize(text=text, analyzer_results=analyzer_result)
 
     def ner_ensemble(self, ner_results, t):
         """Apply ensemble voting across multiple model results.
@@ -192,7 +271,47 @@ class GeneralNER:
         filter_ner_results.sort(key=lambda x: x['start'])
         return filter_ner_results
 
-    @torch.no_grad()
+    def _simple_chunk(self, text: str, max_chars: int = 1500) -> List[str]:
+        """Split text at sentence boundaries by character count.
+
+        Used for GLiNER-only mode where no ONNX/torch tokenizer is available.
+        """
+        if len(text) <= max_chars:
+            return [text]
+
+        for delimiter in constants.CHUNK_DELIMITERS:
+            pieces = [p for p in delimiter.split(text) if p]
+            if len(pieces) <= 1:
+                continue
+            chunks = []
+            current = pieces[0]
+            for piece in pieces[1:]:
+                merged = current + ' ' + piece
+                if len(merged) <= max_chars:
+                    current = merged
+                else:
+                    if current:
+                        chunks.append(current)
+                    current = piece
+            if current:
+                chunks.append(current)
+            return chunks
+
+        # Last resort: split on whitespace
+        words = text.split()
+        chunks: List[str] = []
+        current = ''
+        for word in words:
+            test = (current + ' ' + word).strip()
+            if len(test) > max_chars and current:
+                chunks.append(current)
+                current = word
+            else:
+                current = test
+        if current:
+            chunks.append(current)
+        return chunks or [text]
+
     def ner_process(
         self,
         text: str,
@@ -200,48 +319,66 @@ class GeneralNER:
         ner_confidence_threshold: float = None,
         language: str = None
     ) -> str:
-        """Process text with NER models using batched inference and ensemble voting.
+        """Process text with NER models using the configured backend.
 
-        1. Split text into chunks (sentence-aware)
-        2. Batch ALL chunks through language-specific pipeline (1 forward pass)
-        3. Batch ALL chunks through multilingual pipeline (1 forward pass)
-        4. Per-chunk: combine results, ensemble vote, anonymize
+        Routes to ONNX, Torch, GLiNER, or ensemble depending on self._ner_backend.
         """
         if not positional_tags:
             raise ValueError("Must provide at least one positional tag")
 
         ner_confidence_threshold = ner_confidence_threshold or 0.85
 
-        # Select language-specific pipeline
-        lang_key = language if language in LANG_MODEL_MAP and language != 'MULTILINGUAL' else 'ENGLISH'
-        lang_pipe = self._get_pipeline(lang_key)
-        multi_pipe = self._get_pipeline('MULTILINGUAL')
+        # --- Chunking ---
+        if self.tokenizer is not None:
+            with self._inference_lock:
+                chunks = self.split_text(text, self.min_token_length, self.tokenizer)
+        else:
+            chunks = self._simple_chunk(text, max_chars=1500)
 
-        # Serialized via lock — HF fast tokenizers use Rust RefCell internally,
-        # so both tokenization (split_text) and pipeline inference must be
-        # protected from concurrent access.
+        if not chunks:
+            return text
+
+        # --- Inference + ensemble per chunk ---
         with self._inference_lock:
-            chunks = self.split_text(text, self.min_token_length, self.tokenizer)
-            if not chunks:
-                return text
-            lang_batch = lang_pipe(chunks)
-            multi_batch = multi_pipe(chunks)
+            ner_clean_text = []
+            for chunk in chunks:
+                ner_results = []
 
-        # Per-chunk: combine results, ensemble vote, anonymize
-        ner_clean_text = []
-        for i, chunk in enumerate(chunks):
-            ner_results = []
-            ner_results.extend(self.ner_data(lang_batch[i], positional_tags))
-            ner_results.extend(self.ner_data(multi_batch[i], positional_tags))
+                # Primary backend: ONNX or Torch (lang-specific + multilingual)
+                if self._ner_backend in ('onnx', 'torch', 'ensemble_onnx', 'ensemble_torch'):
+                    lang_key = (language if language in self._model_names
+                                and language != 'MULTILINGUAL' else 'MULTILINGUAL')
+                    lang_batch = self._get_pipeline(lang_key)([chunk])
+                    multi_batch = self._get_pipeline('MULTILINGUAL')([chunk])
+                    ner_results.extend(self.ner_data(lang_batch[0], positional_tags))
+                    ner_results.extend(self.ner_data(multi_batch[0], positional_tags))
 
-            ensemble_results = self.ner_ensemble(ner_results, ner_confidence_threshold)
+                # GLiNER backend
+                if self._ner_backend in ('gliner', 'ensemble_onnx', 'ensemble_torch') \
+                        and self._gliner_pipe:
+                    gliner_batch = self._gliner_pipe([chunk])
+                    if self._ner_backend == 'gliner':
+                        # GLiNER-only: include all mapped entity types
+                        all_tags = set(positional_tags)
+                        all_tags.update(self._gliner_pipe.label_map.values())
+                        all_tags.update(
+                            label.upper() for label in self._gliner_pipe.labels
+                            if label not in self._gliner_pipe.label_map
+                        )
+                        ner_results.extend(self.ner_data(gliner_batch[0], all_tags))
+                    else:
+                        # Ensemble: filter to positional_tags only
+                        ner_results.extend(self.ner_data(gliner_batch[0], positional_tags))
 
-            if ensemble_results:
-                ner_text = self.anonymize_text(chunk, ensemble_results).text
-            else:
-                ner_text = chunk
+                # Ensemble vote + anonymize
+                ensemble_results = self.ner_ensemble(ner_results, ner_confidence_threshold)
 
-            ner_clean_text.append(ner_text)
+                if ensemble_results:
+                    ner_text = self.anonymize_text(chunk, ensemble_results).text
+                else:
+                    ner_text = chunk
+
+                ner_clean_text.append(ner_text)
 
         return ' '.join(ner_clean_text)
 
@@ -346,9 +483,9 @@ class GeneralNER:
         return results
 
     def __del__(self):
-        """Cleanup GPU memory when object is destroyed."""
-        if hasattr(self, 'device') and self.device == 'cuda':
-            try:
-                torch.cuda.empty_cache()
-            except Exception as e:
-                logger.warning(f"Failed to clear CUDA cache: {e}")
+        """Cleanup resources."""
+        if hasattr(self, '_ner_backend') and self._ner_backend in ('torch', 'ensemble_torch'):
+            for pipe in self._pipelines.values():
+                if hasattr(pipe, 'cleanup'):
+                    pipe.cleanup()
+        gc.collect()

@@ -4,16 +4,15 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "SqueakyCleanText"
-version = "0.4.1"
+version = "0.4.5"
 description = "A comprehensive text cleaning and preprocessing pipeline."
 readme = "README.md"
 license = {text = "MIT"}
 authors = [{name = "Rehan Fazal"}]
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 keywords = ["text cleaning", "text preprocessing", "NLP", "natural language processing"]
 classifiers = [
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
@@ -24,13 +23,15 @@ classifiers = [
 ]
 dependencies = [
     "lingua-language-detector>=2.0.2",
-    "stop-words>=2018.7.23",
+    "stop-words>=2025.11.4",
     "emoji>=2.8",
     "ftfy>=6.1",
     "Unidecode>=1.3",
     "beautifulsoup4>=4.12",
-    "transformers>=4.30",
-    "torch>=2.0.0",
+    "onnxruntime>=1.24.1",
+    "tokenizers>=0.22.0",
+    "huggingface-hub>=1.4.0",
+    "numpy>=2.0.0",
     "presidio_anonymizer>=2.2.355",
 ]
 
@@ -38,8 +39,27 @@ dependencies = [
 Homepage = "https://github.com/rhnfzl/SqueakyCleanText"
 
 [project.optional-dependencies]
+gpu = [
+    "onnxruntime-gpu>=1.24.1",
+]
 fuzzy = [
     "rapidfuzz>=3.0",
+]
+torch = [
+    "torch>=2.0.0",
+    "transformers>=4.30",
+]
+gliner = [
+    "gliner>=1.0",
+]
+gliner2 = [
+    "gliner2>=0.0.1",
+]
+all-ner = [
+    "torch>=2.0.0",
+    "transformers>=4.30",
+    "gliner>=1.0",
+    "gliner2>=0.0.1",
 ]
 dev = [
     "hypothesis>=6.82",
