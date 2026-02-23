@@ -13,7 +13,7 @@ from presidio_anonymizer.entities import RecognizerResult
 
 from sct.utils import constants
 from sct.utils.onnx_pipeline import load_onnx_ner_model
-from sct.config import DEFAULT_NER_MODELS, LANG_KEYS
+from sct.config import DEFAULT_NER_MODELS, DEFAULT_NER_ENSEMBLE, NER_ENSEMBLE_DEFAULT_KEYS, LANG_KEYS
 
 ort.set_default_logger_severity(3)  # Silence ONNX Runtime warnings
 
@@ -48,7 +48,10 @@ class GeneralNER:
                  model_names: Optional[Union[Dict[str, str], List[str]]] = None,
                  ner_backend: str = 'onnx',
                  gliner_config: Optional[Dict] = None,
-                 torch_model_names: Optional[Dict[str, str]] = None):
+                 torch_model_names: Optional[Dict[str, str]] = None,
+                 ner_batch_size: int = 8,
+                 ensemble_models: Optional[Dict] = None,
+                 ensemble_default_keys: Optional[tuple] = None):
         """Initialize NER processor.
 
         Args:
@@ -64,7 +67,10 @@ class GeneralNER:
                 Required when ner_backend involves torch.
         """
         self._ner_backend = ner_backend
+        self._ner_batch_size = ner_batch_size
         self._gliner_pipe = None
+        self._ensemble_models: Dict[str, tuple] = ensemble_models if ensemble_models is not None else DEFAULT_NER_ENSEMBLE
+        self._ensemble_default_keys: tuple = ensemble_default_keys if ensemble_default_keys is not None else NER_ENSEMBLE_DEFAULT_KEYS
 
         # Device detection
         if device:
@@ -88,8 +94,9 @@ class GeneralNER:
         self._pipelines: Dict = {}
         self._tokenizers: Dict = {}
         self._load_lock = threading.Lock()
-        # Serialize inference across threads (tokenizers Rust internals, model access)
-        self._inference_lock = threading.Lock()
+        # Per-model inference locks: enables parallel NER across different languages
+        self._inference_locks: Dict[str, threading.Lock] = {}
+        self._locks_lock = threading.Lock()  # Guards creation of per-model locks
 
         # --- Backend-specific initialization ---
 
@@ -149,6 +156,22 @@ class GeneralNER:
             en_tok.max_len_single_sentence <= multi_tok.max_len_single_sentence
         ) else multi_tok
 
+    def _get_lock(self, lang_key: str) -> threading.Lock:
+        """Get or create a per-model inference lock (double-checked locking)."""
+        if lang_key not in self._inference_locks:
+            with self._locks_lock:
+                if lang_key not in self._inference_locks:
+                    self._inference_locks[lang_key] = threading.Lock()
+        return self._inference_locks[lang_key]
+
+    def _get_ensemble_keys(self, language: str) -> tuple:
+        """Return ordered model keys to run for the given language."""
+        return self._ensemble_models.get(language, self._ensemble_default_keys)
+
+    def load_language(self, lang_key: str) -> None:
+        """Pre-load NER model for the given language key (stable public API)."""
+        self._ensure_loaded(lang_key)
+
     def _get_model_name(self, lang_key: str) -> str:
         """Get model name for a language via direct dict lookup."""
         model = self._model_names.get(lang_key)
@@ -168,6 +191,20 @@ class GeneralNER:
                 return
             model_name = self._get_model_name(lang_key)
             logger.info("Loading model for %s: %s", lang_key, model_name)
+            # Reuse existing pipeline/tokenizer if another key already loaded this model
+            shared_pipe = next(
+                (p for k, p in self._pipelines.items()
+                 if self._model_names.get(k) == model_name), None
+            )
+            if shared_pipe is not None:
+                self._pipelines[lang_key] = shared_pipe
+                shared_tok = next(
+                    (t for k, t in self._tokenizers.items()
+                     if self._model_names.get(k) == model_name), None
+                )
+                if shared_tok is not None:
+                    self._tokenizers[lang_key] = shared_tok
+                return
             try:
                 if self._ner_backend in ('torch', 'ensemble_torch'):
                     from sct.utils.torch_pipeline import load_torch_ner_model
@@ -271,11 +308,13 @@ class GeneralNER:
         filter_ner_results.sort(key=lambda x: x['start'])
         return filter_ner_results
 
-    def _simple_chunk(self, text: str, max_chars: int = 1500) -> List[str]:
-        """Split text at sentence boundaries by character count.
+    def _simple_chunk(self, text: str, max_tokens: int = 384) -> List[str]:
+        """Split text into token-aware chunks for GLiNER.
 
         Used for GLiNER-only mode where no ONNX/torch tokenizer is available.
+        Estimates token count at ~4 chars/token (safe average for European scripts).
         """
+        max_chars = max_tokens * 2  # conservative: CJK=1, Arabic=2-3, Latin=4 chars/token
         if len(text) <= max_chars:
             return [text]
 
@@ -328,57 +367,58 @@ class GeneralNER:
 
         ner_confidence_threshold = ner_confidence_threshold or 0.85
 
-        # --- Chunking ---
+        # --- Chunking --- (lock-free: HF fast tokenizer Rust backend is thread-safe)
         if self.tokenizer is not None:
-            with self._inference_lock:
-                chunks = self.split_text(text, self.min_token_length, self.tokenizer)
+            chunks = self.split_text(text, self.min_token_length, self.tokenizer)
         else:
-            chunks = self._simple_chunk(text, max_chars=1500)
+            chunks = self._simple_chunk(text)
 
         if not chunks:
             return text
 
         # --- Inference + ensemble per chunk ---
-        with self._inference_lock:
-            ner_clean_text = []
-            for chunk in chunks:
-                ner_results = []
+        ner_clean_text = []
+        for chunk in chunks:
+            ner_results = []
 
-                # Primary backend: ONNX or Torch (lang-specific + multilingual)
-                if self._ner_backend in ('onnx', 'torch', 'ensemble_onnx', 'ensemble_torch'):
-                    lang_key = (language if language in self._model_names
-                                and language != 'MULTILINGUAL' else 'MULTILINGUAL')
-                    lang_batch = self._get_pipeline(lang_key)([chunk])
-                    multi_batch = self._get_pipeline('MULTILINGUAL')([chunk])
-                    ner_results.extend(self.ner_data(lang_batch[0], positional_tags))
-                    ner_results.extend(self.ner_data(multi_batch[0], positional_tags))
+            # Primary backend: ONNX or Torch — run each key in the ensemble
+            if self._ner_backend in ('onnx', 'torch', 'ensemble_onnx', 'ensemble_torch'):
+                for key in self._get_ensemble_keys(language or 'MULTILINGUAL'):
+                    self._ensure_loaded(key)
+                    model_name = self._model_names.get(key, key)
+                    model_lock = self._get_lock(model_name)
+                    with model_lock:
+                        batch = self._get_pipeline(key)([chunk])
+                    ner_results.extend(self.ner_data(batch[0], positional_tags))
 
-                # GLiNER backend
-                if self._ner_backend in ('gliner', 'ensemble_onnx', 'ensemble_torch') \
-                        and self._gliner_pipe:
+            # GLiNER backend
+            if self._ner_backend in ('gliner', 'ensemble_onnx', 'ensemble_torch') \
+                    and self._gliner_pipe:
+                gliner_lock = self._get_lock('gliner')
+                with gliner_lock:
                     gliner_batch = self._gliner_pipe([chunk])
-                    if self._ner_backend == 'gliner':
-                        # GLiNER-only: include all mapped entity types
-                        all_tags = set(positional_tags)
-                        all_tags.update(self._gliner_pipe.label_map.values())
-                        all_tags.update(
-                            label.upper() for label in self._gliner_pipe.labels
-                            if label not in self._gliner_pipe.label_map
-                        )
-                        ner_results.extend(self.ner_data(gliner_batch[0], all_tags))
-                    else:
-                        # Ensemble: filter to positional_tags only
-                        ner_results.extend(self.ner_data(gliner_batch[0], positional_tags))
-
-                # Ensemble vote + anonymize
-                ensemble_results = self.ner_ensemble(ner_results, ner_confidence_threshold)
-
-                if ensemble_results:
-                    ner_text = self.anonymize_text(chunk, ensemble_results).text
+                if self._ner_backend == 'gliner':
+                    # GLiNER-only: include all mapped entity types
+                    all_tags = set(positional_tags)
+                    all_tags.update(self._gliner_pipe.label_map.values())
+                    all_tags.update(
+                        label.upper() for label in self._gliner_pipe.labels
+                        if label not in self._gliner_pipe.label_map
+                    )
+                    ner_results.extend(self.ner_data(gliner_batch[0], all_tags))
                 else:
-                    ner_text = chunk
+                    # Ensemble: filter to positional_tags only
+                    ner_results.extend(self.ner_data(gliner_batch[0], positional_tags))
 
-                ner_clean_text.append(ner_text)
+            # Ensemble vote + anonymize
+            ensemble_results = self.ner_ensemble(ner_results, ner_confidence_threshold)
+
+            if ensemble_results:
+                ner_text = self.anonymize_text(chunk, ensemble_results).text
+            else:
+                ner_text = chunk
+
+            ner_clean_text.append(ner_text)
 
         return ' '.join(ner_clean_text)
 
@@ -412,13 +452,26 @@ class GeneralNER:
     def split_text(self, text: str, max_tokens: int, tokenizer) -> List[str]:
         """Split text into token-bounded chunks using a delimiter hierarchy.
 
-        Tries delimiters from coarsest (paragraph breaks) to finest (whitespace).
-        For each delimiter level, splits oversized text, greedily merges small
-        adjacent pieces, and recurses on any chunk that still exceeds the limit.
-        Falls back to character-level splitting via token offsets as last resort.
+        Tries sentence boundaries first (preferred: respects sentence integrity),
+        then falls back to CHUNK_DELIMITERS from coarsest (paragraph) to finest
+        (whitespace). Recurses on oversized chunks. Falls back to character-level
+        splitting via token offsets as last resort.
         """
         if self._token_count(text, tokenizer) <= max_tokens:
             return [text]
+
+        # Prefer sentence-boundary splits to avoid fragmenting entities mid-sentence
+        sentence_pieces = constants.SENTENCE_BOUNDARY_PATTERN.split(text)
+        sentence_pieces = [p for p in sentence_pieces if p]
+        if len(sentence_pieces) > 1:
+            merged = self._merge_pieces(sentence_pieces, max_tokens, tokenizer)
+            result = []
+            for chunk in merged:
+                if self._token_count(chunk, tokenizer) > max_tokens:
+                    result.extend(self.split_text(chunk, max_tokens, tokenizer))
+                else:
+                    result.append(chunk)
+            return result
 
         # Try each delimiter in priority order
         for delimiter in constants.CHUNK_DELIMITERS:
@@ -462,12 +515,13 @@ class GeneralNER:
     def process_batch(
         self,
         texts: List[str],
-        batch_size: int = 8,
+        batch_size: int = None,
         positional_tags: List[str] = None,
         ner_confidence_threshold: float = None,
         language: str = None
     ) -> List[str]:
         """Process multiple texts in batches."""
+        batch_size = batch_size if batch_size is not None else self._ner_batch_size
         results = []
         for i in range(0, len(texts), batch_size):
             batch = texts[i:i + batch_size]
@@ -484,8 +538,10 @@ class GeneralNER:
 
     def __del__(self):
         """Cleanup resources."""
-        if hasattr(self, '_ner_backend') and self._ner_backend in ('torch', 'ensemble_torch'):
+        if hasattr(self, '_pipelines'):
             for pipe in self._pipelines.values():
                 if hasattr(pipe, 'cleanup'):
-                    pipe.cleanup()
+                    pipe.cleanup()  # torch
+                elif hasattr(pipe, '_session'):
+                    del pipe._session  # ONNX
         gc.collect()

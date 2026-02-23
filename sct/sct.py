@@ -1,9 +1,9 @@
 """
 Comprehensive text cleaning and preprocessing pipeline.
 """
+import asyncio
 import logging
 import os
-import threading
 from concurrent.futures import ThreadPoolExecutor
 from typing import List, Tuple, Optional
 
@@ -11,12 +11,6 @@ from sct.config import TextCleanerConfig, _config_from_module_globals
 from sct.utils import constants, contact, datetime, ner, normtext, resources, special, stopwords
 
 logger = logging.getLogger(__name__)
-
-# Thread-local storage for passing detected language to pipeline steps
-# that need it (e.g. fuzzy date replacement).  Each thread running
-# _process_single sets its own value, so there is no cross-thread leaking.
-_thread_ctx = threading.local()
-
 
 class TextCleaner:
 
@@ -84,16 +78,25 @@ class TextCleaner:
                 ner_backend=self.cfg.ner_backend,
                 gliner_config=gliner_config,
                 torch_model_names=torch_model_names,
+                ner_batch_size=self.cfg.ner_batch_size,
+                ensemble_models=dict(self.cfg.ner_ensemble) if self.cfg.ner_ensemble is not None else None,
+                ensemble_default_keys=tuple(self.cfg.ner_ensemble_default_keys) if self.cfg.ner_ensemble_default_keys is not None else None,
             )
         else:
             self.GeneralNER = None
 
         self.batch_size = 8
         self._pipeline = []
+        self._post_fuzzy_pipeline = []
         self._init_pipeline()
 
     def _init_pipeline(self):
-        """Build the pipeline steps list based on config."""
+        """Build the pipeline steps lists based on config.
+
+        Steps that require language context (fuzzy date replacement) are split
+        into pre- and post-fuzzy lists.  _process_single calls them in order:
+        self._pipeline → fuzzy (explicit, with ctx) → self._post_fuzzy_pipeline.
+        """
         cfg = self.cfg
 
         if cfg.check_fix_bad_unicode:
@@ -110,22 +113,25 @@ class TextCleaner:
             self._pipeline.append(self._replace_emails)
         if cfg.check_replace_dates:
             self._pipeline.append(self._replace_dates)
-        if cfg.check_fuzzy_replace_dates:
-            self._pipeline.append(self._fuzzy_replace_dates)
+        # fuzzy_replace_dates runs here (between replace_dates and replace_years)
+        # but is called explicitly in _process_single with language context.
         if cfg.check_replace_years:
-            self._pipeline.append(self._replace_years)
+            self._post_fuzzy_pipeline.append(self._replace_years)
         if cfg.check_replace_phone_numbers:
-            self._pipeline.append(self._replace_phone_numbers)
+            self._post_fuzzy_pipeline.append(self._replace_phone_numbers)
         if cfg.check_replace_numbers:
-            self._pipeline.append(self._replace_numbers)
+            self._post_fuzzy_pipeline.append(self._replace_numbers)
         if cfg.check_replace_currency_symbols:
-            self._pipeline.append(self._replace_currency_symbols)
+            self._post_fuzzy_pipeline.append(self._replace_currency_symbols)
         if cfg.check_remove_isolated_letters:
-            self._pipeline.append(self._remove_isolated_letters)
+            self._post_fuzzy_pipeline.append(self._remove_isolated_letters)
         if cfg.check_remove_isolated_special_symbols:
-            self._pipeline.append(self._remove_isolated_special_symbols)
+            self._post_fuzzy_pipeline.append(self._remove_isolated_special_symbols)
         if cfg.check_normalize_whitespace:
-            self._pipeline.append(self._normalize_whitespace)
+            self._post_fuzzy_pipeline.append(self._normalize_whitespace)
+        # User-provided custom steps — appended after all built-in steps
+        for step_fn in cfg.custom_pipeline_steps:
+            self._post_fuzzy_pipeline.append(step_fn)
 
     def _detect_language(self, text: str) -> Optional[str]:
         """Detect language as a pure function (no instance mutation)."""
@@ -151,13 +157,28 @@ class TextCleaner:
         # Detect language (pure function, thread-safe)
         language = self._detect_language(text)
 
+        # Pass language explicitly through pipeline context dict
+        ctx = {"language": language}
+
         current_text = text
 
-        # Store language in thread-local so pipeline steps can access it
-        _thread_ctx.language = language
-
-        # Apply non-NER pipeline steps
+        # Pre-fuzzy pipeline steps (unicode fix → html → urls → emails → dates)
         for step in self._pipeline:
+            current_text = step(current_text)
+
+        # Fuzzy date replacement — requires language context, called explicitly
+        # to avoid thread-local; positioned between replace_dates and replace_years.
+        if self.cfg.check_fuzzy_replace_dates:
+            lang = ctx.get("language")
+            current_text = self.ProcessDateTime.fuzzy_replace_dates(
+                current_text,
+                replace_with=self.cfg.replace_with_dates,
+                score_cutoff=self.cfg.fuzzy_date_score_cutoff,
+                language=lang,
+            )
+
+        # Post-fuzzy pipeline steps (years → phones → numbers → symbols → whitespace)
+        for step in self._post_fuzzy_pipeline:
             current_text = step(current_text)
 
         # NER processing
@@ -217,6 +238,30 @@ class TextCleaner:
 
         return results
 
+    async def aprocess_batch(self, texts: List[str], batch_size: int = None) -> List[Tuple[str, Optional[str], Optional[str]]]:
+        """Async version of process_batch for use with asyncio-based frameworks (FastAPI, aiohttp).
+
+        Runs process_batch in a thread-pool executor so it doesn't block the event loop.
+        """
+        loop = asyncio.get_running_loop()
+        return await loop.run_in_executor(None, self.process_batch, texts, batch_size)
+
+    def warmup(self, languages: Optional[List[str]] = None) -> None:
+        """Pre-load NER models to avoid first-request latency.
+
+        Args:
+            languages: Language names to pre-load (e.g. ``['ENGLISH', 'DUTCH']``).
+                       If ``None``, pre-loads models for all supported languages.
+        """
+        if not self.cfg.check_ner_process or self.GeneralNER is None:
+            return
+        langs = languages or list(self.cfg.supported_languages)
+        for lang in langs:
+            try:
+                self.GeneralNER.load_language(lang)
+            except Exception as e:
+                logger.warning("warmup: skipping %s: %s", lang, e)
+
     def process(self, text: str) -> Tuple[str, Optional[str], Optional[str]]:
         """Process a single text. Maintains backward compatibility.
 
@@ -248,12 +293,12 @@ class TextCleaner:
     def _replace_dates(self, text):
         return self.ProcessDateTime.replace_dates(text, replace_with=self.cfg.replace_with_dates)
 
-    def _fuzzy_replace_dates(self, text):
+    def _fuzzy_replace_dates(self, text, language=None):
         return self.ProcessDateTime.fuzzy_replace_dates(
             text,
             replace_with=self.cfg.replace_with_dates,
             score_cutoff=self.cfg.fuzzy_date_score_cutoff,
-            language=getattr(_thread_ctx, 'language', 'ENGLISH'),
+            language=language,
         )
 
     def _replace_years(self, text):

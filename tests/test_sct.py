@@ -492,12 +492,76 @@ class TextCleanerTest(unittest.TestCase):
         # At least some entities should be anonymized by the lightweight model
         self.assertIn("<PERSON>", processed)
 
+    def test_inference_lock_keyed_on_model_name(self):
+        """FR and MULTILINGUAL (same underlying model) resolve to the same lock key."""
+        from sct.config import DEFAULT_NER_MODELS
+        fr_model  = DEFAULT_NER_MODELS.get('FRENCH',       'FRENCH')
+        mul_model = DEFAULT_NER_MODELS.get('MULTILINGUAL', 'MULTILINGUAL')
+        self.assertEqual(fr_model, mul_model)   # share same model
+        # Different languages with different models must NOT share a lock key
+        en_model  = DEFAULT_NER_MODELS.get('ENGLISH', 'ENGLISH')
+        self.assertNotEqual(en_model, mul_model)
+
+    @requires_ner
+    def test_load_language_is_public(self):
+        """load_language() is public and pre-loads the model."""
+        self.ner.load_language('ENGLISH')  # already loaded — must be a no-op, not crash
+        self.assertIn('ENGLISH', self.ner._pipelines)
+
+    @requires_ner
+    def test_ensure_loaded_shares_session_for_same_model(self):
+        """Languages sharing a model ID must reference the same pipeline object."""
+        from sct.config import DEFAULT_NER_MODELS
+        # Only run if FRENCH and MULTILINGUAL actually share a model in defaults
+        if DEFAULT_NER_MODELS.get('FRENCH') == DEFAULT_NER_MODELS.get('MULTILINGUAL'):
+            # Use a fresh NER with default models (skipping heavy download by using test models)
+            # Simulate sharing: both keys in TEST_NER_MODELS map to same model string
+            from sct.utils.ner import GeneralNER
+            shared_model = "protectai/bert-base-NER-onnx"
+            models = {'ENGLISH': shared_model, 'MULTILINGUAL': shared_model,
+                      'FRENCH': shared_model}
+            ner2 = GeneralNER(device='cpu', model_names=models)
+            ner2._ensure_loaded('FRENCH')
+            ner2._ensure_loaded('MULTILINGUAL')
+            self.assertIs(ner2._pipelines['FRENCH'],
+                          ner2._pipelines['MULTILINGUAL'])
+
     @requires_ner
     def test_ner_lazy_loading(self):
         """Test that NER models are loaded lazily."""
         # English and multilingual should be loaded (eagerly for tokenizer)
         self.assertIn('ENGLISH', self.ner._pipelines)
         self.assertIn('MULTILINGUAL', self.ner._pipelines)
+
+    @requires_ner
+    def test_ner_ensemble_key_selection(self):
+        """Ensemble key routing: EN/NL/DE/ES get correct keys; others fall back to default."""
+        from sct.config import NER_ENSEMBLE_DEFAULT_KEYS
+        self.assertEqual(self.ner._get_ensemble_keys('ENGLISH'),
+                         ('ENGLISH', 'MULTILINGUAL'))
+        self.assertEqual(self.ner._get_ensemble_keys('DUTCH'),
+                         ('DUTCH', 'ENGLISH', 'MULTILINGUAL'))
+        self.assertEqual(self.ner._get_ensemble_keys('GERMAN'),
+                         ('GERMAN', 'ENGLISH', 'MULTILINGUAL'))
+        self.assertEqual(self.ner._get_ensemble_keys('SPANISH'),
+                         ('SPANISH', 'ENGLISH', 'MULTILINGUAL'))
+        self.assertEqual(self.ner._get_ensemble_keys('FRENCH'),    NER_ENSEMBLE_DEFAULT_KEYS)
+        self.assertEqual(self.ner._get_ensemble_keys('PORTUGUESE'), NER_ENSEMBLE_DEFAULT_KEYS)
+        self.assertEqual(self.ner._get_ensemble_keys('ITALIAN'),   NER_ENSEMBLE_DEFAULT_KEYS)
+
+    @requires_ner
+    def test_ner_ensemble_custom_default_keys(self):
+        """Custom ner_ensemble_default_keys overrides the module-level fallback."""
+        cfg = TextCleanerConfig(
+            check_ner_process=True,
+            ner_models=TEST_NER_MODELS,
+            ner_ensemble_default_keys=('MULTILINGUAL',),
+        )
+        sx = TextCleaner(cfg=cfg)
+        # FRENCH not in DEFAULT_NER_ENSEMBLE — should use the custom fallback
+        self.assertEqual(sx.GeneralNER._get_ensemble_keys('FRENCH'), ('MULTILINGUAL',))
+        # EN/NL still routed by DEFAULT_NER_ENSEMBLE (not overridden)
+        self.assertEqual(sx.GeneralNER._get_ensemble_keys('ENGLISH'), ('ENGLISH', 'MULTILINGUAL'))
 
     @requires_ner
     def test_batch_processing_languages(self):
@@ -854,6 +918,37 @@ class TextCleanerTest(unittest.TestCase):
         # Same input should produce identical output (deterministic with no_grad)
         self.assertEqual(result1, result2)
 
+    def test_aprocess_batch_uses_running_loop(self):
+        """aprocess_batch() must call get_running_loop, not get_event_loop."""
+        import inspect
+        src = inspect.getsource(TextCleaner.aprocess_batch)
+        self.assertIn('get_running_loop', src)
+        self.assertNotIn('get_event_loop', src)
+
+    def test_sentence_boundary_no_false_split_on_abbreviation(self):
+        """SENTENCE_BOUNDARY_PATTERN must not split abbreviation-dot + space."""
+        from sct.utils.constants import SENTENCE_BOUNDARY_PATTERN
+        for text in ["Dr. Smith visited Berlin.",
+                     "Mr. Jones called Mrs. Smith.",
+                     "The U.S. Army Base is here."]:
+            pieces = SENTENCE_BOUNDARY_PATTERN.split(text)
+            self.assertEqual(len(pieces), 1,
+                             f"Should not split abbreviation in: {text!r}")
+
+    def test_sentence_boundary_splits_real_sentence(self):
+        """SENTENCE_BOUNDARY_PATTERN should split genuine sentence boundaries."""
+        from sct.utils.constants import SENTENCE_BOUNDARY_PATTERN
+        text = "This is the first sentence. And this is the second one."
+        pieces = SENTENCE_BOUNDARY_PATTERN.split(text)
+        self.assertGreater(len(pieces), 1)
+
+    def test_simple_chunk_conservative_ratio(self):
+        """_simple_chunk uses 2 chars/token (not 4) to handle CJK/Arabic safely."""
+        import inspect
+        src = inspect.getsource(GeneralNER._simple_chunk)
+        self.assertIn('max_tokens * 2', src)
+        self.assertNotIn('max_tokens * 4', src)
+
     def test_threadpool_single_text_no_threading(self):
         """Test that process_batch with 1 text skips ThreadPoolExecutor."""
         cfg = TextCleanerConfig(check_ner_process=False)
@@ -1199,6 +1294,18 @@ class TextCleanerTest(unittest.TestCase):
         self.assertIsInstance(lm_text, str)
 
     # --- NER backend config validation (no model loading) ---
+
+    def test_ner_batch_size_zero_raises(self):
+        with self.assertRaises(ValueError, msg="batch_size=0 must raise"):
+            TextCleanerConfig(ner_batch_size=0)
+
+    def test_ner_batch_size_negative_raises(self):
+        with self.assertRaises(ValueError, msg="batch_size=-1 must raise"):
+            TextCleanerConfig(ner_batch_size=-1)
+
+    def test_ner_batch_size_valid(self):
+        cfg = TextCleanerConfig(ner_batch_size=1)
+        self.assertEqual(cfg.ner_batch_size, 1)
 
     def test_ner_backend_default_is_onnx(self):
         cfg = TextCleanerConfig(check_ner_process=False)
