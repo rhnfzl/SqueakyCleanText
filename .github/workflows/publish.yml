@@ -2,8 +2,8 @@ name: Publish Python Package
 
 on:
   push:
-    branches:
-      - main
+    tags:
+      - 'v*'
 
 jobs:
   test:
@@ -66,4 +66,4 @@ jobs:
       env:
         TWINE_USERNAME: __token__
         TWINE_PASSWORD: ${{ secrets.SQUEAKYCLEANTEXT_API }}
-      run: twine upload dist/*
+      run: twine upload --skip-existing dist/*
