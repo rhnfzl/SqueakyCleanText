@@ -173,6 +173,80 @@ _MONTH_ALTERNATION = '|'.join(
     sorted(_MONTH_NAMES_SET, key=len, reverse=True)
 )
 
+
+# ---------------------------------------------------------------------------
+# Factory functions for building per-instance month/date/fuzzy data.
+# Used by TextCleaner to support custom languages via TextCleanerConfig.
+# Module-level constants above remain the defaults.
+# ---------------------------------------------------------------------------
+
+def build_month_names_dict(extra_month_names=None):
+    """Build month-name lookup dict, merging defaults + custom names.
+
+    Args:
+        extra_month_names: dict mapping language ISO code -> tuple of month names
+                          e.g. {'pl': ('styczen', 'luty', ...)}
+    Returns:
+        dict mapping lowercase month name -> frozenset of ISO codes
+    """
+    result = dict(MONTH_NAMES_MULTILINGUAL)  # copy defaults
+    if extra_month_names:
+        for iso_code, names in extra_month_names.items():
+            for name in names:
+                key = name.lower()
+                if key in result:
+                    result[key] = result[key] | frozenset({iso_code})
+                else:
+                    result[key] = frozenset({iso_code})
+    return result
+
+
+def build_date_regex(month_names_dict=None):
+    """Build DATE_REGEX from a month-names dict.
+
+    Args:
+        month_names_dict: output of build_month_names_dict().
+                         Uses module-level MONTH_NAMES_MULTILINGUAL if None.
+    Returns:
+        Compiled regex pattern
+    """
+    names = month_names_dict or MONTH_NAMES_MULTILINGUAL
+    alt = '|'.join(sorted(names.keys(), key=len, reverse=True))
+    return re.compile(
+        r'\b(?:'
+        r'\d{4}-\d{2}-\d{2}(?:T\d{2}:\d{2}(?::\d{2})?(?:\.\d+)?(?:Z|[+-]\d{2}:?\d{2})?)?'
+        r'|'
+        r'\d{1,2}[/.-]\d{1,2}[/.-]\d{4}'
+        r'|'
+        r'(?:' + alt + r')'
+        r'\.?\s+\d{1,2}(?:st|nd|rd|th)?,?\s+\d{4}'
+        r'|'
+        r'\d{1,2}\.?\s+(?:de\s+)?(?:' + alt + r')'
+        r'(?:\s+de)?\s+\d{4}'
+        r')\b',
+        flags=re.IGNORECASE,
+    )
+
+
+def build_fuzzy_vocabulary(month_names_dict=None, lang_to_vocab=None):
+    """Build fuzzy month vocabulary (full names only, len > 4).
+
+    Returns:
+        (all_vocab_tuple, by_lang_dict)
+    """
+    names = month_names_dict or MONTH_NAMES_MULTILINGUAL
+    lvocab = lang_to_vocab or _LANG_TO_VOCAB
+
+    all_vocab = tuple(name for name in names if len(name) > 4)
+
+    by_lang = {}
+    for lang_name, lang_code in lvocab.items():
+        by_lang[lang_name] = tuple(
+            name for name, langs in names.items()
+            if lang_code in langs and len(name) > 4
+        )
+    return all_vocab, by_lang
+
 # Date patterns: ISO 8601, common formats, multilingual month names
 DATE_REGEX = re.compile(
     r'\b(?:'

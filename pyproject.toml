@@ -24,13 +24,15 @@ classifiers = [
 ]
 dependencies = [
     "lingua-language-detector>=2.0.2",
-    "stop-words>=2018.7.23",
+    "stop-words>=2025.11.4",
     "emoji>=2.8",
     "ftfy>=6.1",
     "Unidecode>=1.3",
     "beautifulsoup4>=4.12",
-    "transformers>=4.30",
-    "torch>=2.0.0",
+    "onnxruntime>=1.24.1",
+    "tokenizers>=0.22.0",
+    "huggingface-hub>=1.4.0",
+    "numpy>=2.0.0",
     "presidio_anonymizer>=2.2.355",
 ]
 
@@ -38,8 +40,27 @@ dependencies = [
 Homepage = "https://github.com/rhnfzl/SqueakyCleanText"
 
 [project.optional-dependencies]
+gpu = [
+    "onnxruntime-gpu>=1.24.1",
+]
 fuzzy = [
     "rapidfuzz>=3.0",
+]
+torch = [
+    "torch>=2.0.0",
+    "transformers>=4.30",
+]
+gliner = [
+    "gliner>=1.0",
+]
+gliner2 = [
+    "gliner2>=0.0.1",
+]
+all-ner = [
+    "torch>=2.0.0",
+    "transformers>=4.30",
+    "gliner>=1.0",
+    "gliner2>=0.0.1",
 ]
 dev = [
     "hypothesis>=6.82",

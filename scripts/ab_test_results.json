@@ -1,0 +1,479 @@
+{
+  "accuracy": {
+    "total_texts": 195,
+    "exact_match": 171,
+    "exact_match_pct": 87.69,
+    "label_match": 171,
+    "label_match_pct": 87.69,
+    "entity_count_torch": 476,
+    "entity_count_onnx": 442,
+    "score_diff_mean": 1.5458101190626102e-07,
+    "score_diff_max": 3.6656856536865234e-06,
+    "score_diff_median": 2.384185793236071e-08,
+    "per_category": {
+      "Persons": {
+        "total": 40,
+        "exact": 33,
+        "label": 33,
+        "pct": "82.5%"
+      },
+      "Organizations": {
+        "total": 30,
+        "exact": 29,
+        "label": 29,
+        "pct": "96.7%"
+      },
+      "Locations": {
+        "total": 30,
+        "exact": 28,
+        "label": 28,
+        "pct": "93.3%"
+      },
+      "Multi-entity": {
+        "total": 30,
+        "exact": 25,
+        "label": 25,
+        "pct": "83.3%"
+      },
+      "German": {
+        "total": 15,
+        "exact": 14,
+        "label": 14,
+        "pct": "93.3%"
+      },
+      "Dutch": {
+        "total": 15,
+        "exact": 12,
+        "label": 12,
+        "pct": "80.0%"
+      },
+      "Spanish": {
+        "total": 15,
+        "exact": 14,
+        "label": 14,
+        "pct": "93.3%"
+      },
+      "Edge cases": {
+        "total": 20,
+        "exact": 16,
+        "label": 16,
+        "pct": "80.0%"
+      }
+    }
+  },
+  "speed": {
+    "torch": {
+      "total_texts": 50,
+      "runs": 5,
+      "mean_total_s": 1.6666920915828087,
+      "std_total_s": 0.031011035766164624,
+      "min_total_s": 1.6367599999648519,
+      "max_total_s": 1.7103719159495085,
+      "mean_per_text_ms": 33.33384183165617,
+      "p50_per_text_ms": 33.04659666027874,
+      "texts_per_second": 29.99954235849074
+    },
+    "onnx": {
+      "total_texts": 50,
+      "runs": 5,
+      "mean_total_s": 0.643130316818133,
+      "std_total_s": 0.04443516638948013,
+      "min_total_s": 0.5984532500151545,
+      "max_total_s": 0.7055292919976637,
+      "mean_per_text_ms": 12.86260633636266,
+      "p50_per_text_ms": 12.737963340478018,
+      "texts_per_second": 77.74474113951496
+    },
+    "speedup": 2.592,
+    "torch_timings": [
+      1.7103719159495085,
+      1.6367599999648519,
+      1.6523298330139369,
+      1.687449499964714,
+      1.6465492090210319
+    ],
+    "onnx_timings": [
+      0.6368981670239009,
+      0.6065356670296751,
+      0.5984532500151545,
+      0.7055292919976637,
+      0.6682352080242708
+    ]
+  },
+  "mismatches": [
+    {
+      "index": 9,
+      "category": "Persons",
+      "text": "Mahatma Gandhi led India's independence movement.",
+      "torch_ents": "[(PER, 'Ma', 0.9996), (PER, '##hat', 0.7491), (PER, '##ma Gandhi', 0.9793), (LOC, 'India', 0.9998)]",
+      "onnx_ents": "[(PER, 'Mahatma Gandhi', 0.9268), (LOC, 'India', 0.9998)]",
+      "torch_only": [
+        "('PER', 0, 2)",
+        "('PER', 5, 14)",
+        "('PER', 2, 5)"
+      ],
+      "onnx_only": [
+        "('PER', 0, 14)"
+      ],
+      "max_score_diff": 0.0
+    },
+    {
+      "index": 12,
+      "category": "Persons",
+      "text": "Oprah Winfrey became one of the most influential media personalities.",
+      "torch_ents": "[(PER, 'Op', 0.9986), (PER, '##rah Winfrey', 0.8852)]",
+      "onnx_ents": "[(PER, 'Oprah Winfrey', 0.9135)]",
+      "torch_only": [
+        "('PER', 2, 13)",
+        "('PER', 0, 2)"
+      ],
+      "onnx_only": [
+        "('PER', 0, 13)"
+      ],
+      "max_score_diff": null
+    },
+    {
+      "index": 19,
+      "category": "Persons",
+      "text": "Cristiano Ronaldo scored his 800th career goal.",
+      "torch_ents": "[(PER, 'C', 0.9993), (PER, '##rist', 0.9948), (PER, '##iano Ronaldo', 0.8895)]",
+      "onnx_ents": "[(PER, 'Cristiano Ronaldo', 0.9325)]",
+      "torch_only": [
+        "('PER', 5, 17)",
+        "('PER', 0, 1)",
+        "('PER', 1, 5)"
+      ],
+      "onnx_only": [
+        "('PER', 0, 17)"
+      ],
+      "max_score_diff": null
+    },
+    {
+      "index": 24,
+      "category": "Persons",
+      "text": "Usain Bolt holds the world record in the 100 meters.",
+      "torch_ents": "[(PER, 'Us', 0.9997), (PER, '##ain Bolt', 0.9977)]",
+      "onnx_ents": "[(PER, 'Usain Bolt', 0.9982)]",
+      "torch_only": [
+        "('PER', 0, 2)",
+        "('PER', 2, 10)"
+      ],
+      "onnx_only": [
+        "('PER', 0, 10)"
+      ],
+      "max_score_diff": null
+    },
+    {
+      "index": 29,
+      "category": "Persons",
+      "text": "Frida Kahlo became an icon of Mexican culture.",
+      "torch_ents": "[(PER, 'Fr', 0.9991), (PER, '##ida Kahlo', 0.9342), (MISC, 'Mexican', 0.9997)]",
+      "onnx_ents": "[(PER, 'Frida Kahlo', 0.9472), (MISC, 'Mexican', 0.9997)]",
+      "torch_only": [
+        "('PER', 0, 2)",
+        "('PER', 2, 11)"
+      ],
+      "onnx_only": [
+        "('PER', 0, 11)"
+      ],
+      "max_score_diff": 0.0
+    },
+    {
+      "index": 37,
+      "category": "Persons",
+      "text": "Greta Thunberg led a global climate change movement.",
+      "torch_ents": "[(PER, 'G', 0.9995), (PER, '##reta Thunberg', 0.9506)]",
+      "onnx_ents": "[(PER, 'Greta Thunberg', 0.9604)]",
+      "torch_only": [
+        "('PER', 0, 1)",
+        "('PER', 1, 14)"
+      ],
+      "onnx_only": [
+        "('PER', 0, 14)"
+      ],
+      "max_score_diff": null
+    },
+    {
+      "index": 39,
+      "category": "Persons",
+      "text": "Satya Nadella transformed Microsoft's cloud business strategy.",
+      "torch_ents": "[(PER, 'Sa', 0.9996), (PER, '##tya Nadell', 0.8970), (ORG, 'Microsoft', 0.9989)]",
+      "onnx_ents": "[(PER, 'Satya Nadell', 0.9175), (ORG, 'Microsoft', 0.9989)]",
+      "torch_only": [
+        "('PER', 2, 12)",
+        "('PER', 0, 2)"
+      ],
+      "onnx_only": [
+        "('PER', 0, 12)"
+      ],
+      "max_score_diff": 0.0
+    },
+    {
+      "index": 66,
+      "category": "Organizations",
+      "text": "Pfizer and BioNTech developed the mRNA vaccine.",
+      "torch_ents": "[(ORG, 'Pfizer', 0.8797), (ORG, 'B', 0.9981), (ORG, '##ioNTech', 0.9978)]",
+      "onnx_ents": "[(ORG, 'Pfizer', 0.8797), (ORG, 'BioNTech', 0.9979)]",
+      "torch_only": [
+        "('ORG', 11, 12)",
+        "('ORG', 12, 19)"
+      ],
+      "onnx_only": [
+        "('ORG', 11, 19)"
+      ],
+      "max_score_diff": 2.384185791015625e-07
+    },
+    {
+      "index": 73,
+      "category": "Locations",
+      "text": "The Eiffel Tower in Paris attracts millions of visitors.",
+      "torch_ents": "[(LOC, 'E', 0.9946), (LOC, '##iff', 0.6891), (LOC, '##el Tower', 0.9594), (LOC, 'Paris', 0.9997)]",
+      "onnx_ents": "[(LOC, 'Eiffel Tower', 0.9006), (LOC, 'Paris', 0.9997)]",
+      "torch_only": [
+        "('LOC', 8, 16)",
+        "('LOC', 4, 5)",
+        "('LOC', 5, 8)"
+      ],
+      "onnx_only": [
+        "('LOC', 4, 16)"
+      ],
+      "max_score_diff": 0.0
+    },
+    {
+      "index": 74,
+      "category": "Locations",
+      "text": "Mount Everest is the highest peak in the Himalayas.",
+      "torch_ents": "[(LOC, 'Mount Everest', 0.6880), (LOC, 'Him', 0.9882), (LOC, '##alaya', 0.8282)]",
+      "onnx_ents": "[(LOC, 'Mount Everest', 0.6880), (LOC, 'Himalaya', 0.9082)]",
+      "torch_only": [
+        "('LOC', 44, 49)",
+        "('LOC', 41, 44)"
+      ],
+      "onnx_only": [
+        "('LOC', 41, 49)"
+      ],
+      "max_score_diff": 6.705522537231445e-07
+    },
+    {
+      "index": 109,
+      "category": "Multi-entity",
+      "text": "President Biden addressed Congress in Washington about NATO commitments.",
+      "torch_ents": "[(PER, 'B', 0.9995), (PER, '##iden', 0.9930), (ORG, 'Congress', 0.9987), (LOC, 'Washington', 0.9996), (ORG, 'NATO', 0.9919)]",
+      "onnx_ents": "[(PER, 'Biden', 0.9963), (ORG, 'Congress', 0.9987), (LOC, 'Washington', 0.9996), (ORG, 'NATO', 0.9919)]",
+      "torch_only": [
+        "('PER', 11, 15)",
+        "('PER', 10, 11)"
+      ],
+      "onnx_only": [
+        "('PER', 10, 15)"
+      ],
+      "max_score_diff": 0.0
+    },
+    {
+      "index": 116,
+      "category": "Multi-entity",
+      "text": "Rishi Sunak became Prime Minister of the United Kingdom.",
+      "torch_ents": "[(PER, 'R', 0.9997), (PER, '##ishi Sunak', 0.9762), (LOC, 'United Kingdom', 0.9995)]",
+      "onnx_ents": "[(PER, 'Rishi Sunak', 0.9821), (LOC, 'United Kingdom', 0.9995)]",
+      "torch_only": [
+        "('PER', 0, 1)",
+        "('PER', 1, 11)"
+      ],
+      "onnx_only": [
+        "('PER', 0, 11)"
+      ],
+      "max_score_diff": 2.9802322387695312e-08
+    },
+    {
+      "index": 117,
+      "category": "Multi-entity",
+      "text": "Volodymyr Zelensky addressed the European Council in Strasbourg.",
+      "torch_ents": "[(PER, 'Vol', 0.9997), (PER, '##odymyr Zelensky', 0.9574), (ORG, 'European Council', 0.9993), (LOC, 'Strasbourg', 0.9968)]",
+      "onnx_ents": "[(PER, 'Volodymyr Zelensky', 0.9634), (ORG, 'European Council', 0.9993), (LOC, 'Strasbourg', 0.9968)]",
+      "torch_only": [
+        "('PER', 3, 18)",
+        "('PER', 0, 3)"
+      ],
+      "onnx_only": [
+        "('PER', 0, 18)"
+      ],
+      "max_score_diff": 0.0
+    },
+    {
+      "index": 120,
+      "category": "Multi-entity",
+      "text": "Sam Altman's OpenAI released ChatGPT from their office in San Francisco.",
+      "torch_ents": "[(PER, 'Sam Altman', 0.9991), (ORG, 'OpenAI', 0.9984), (MISC, 'Cha', 0.7192), (MISC, '##GP', 0.7602), (ORG, '##T', 0.3803), (LOC, 'San Francisco', 0.9992)]",
+      "onnx_ents": "[(PER, 'Sam Altman', 0.9991), (ORG, 'OpenAI', 0.9984), (MISC, 'ChatGP', 0.7397), (ORG, 'T', 0.3803), (LOC, 'San Francisco', 0.9992)]",
+      "torch_only": [
+        "('MISC', 29, 32)",
+        "('MISC', 33, 35)"
+      ],
+      "onnx_only": [
+        "('MISC', 29, 35)"
+      ],
+      "max_score_diff": 8.940696716308594e-07
+    },
+    {
+      "index": 122,
+      "category": "Multi-entity",
+      "text": "Satya Nadella and Sam Altman discussed AI strategy at Microsoft's headquarters in Redmond.",
+      "torch_ents": "[(PER, 'Sa', 0.9997), (PER, '##tya Nadella', 0.9384), (PER, 'Sam Altman', 0.9984), (MISC, 'AI', 0.9935), (ORG, 'Microsoft', 0.9979), (LOC, 'Redmond', 0.9646)]",
+      "onnx_ents": "[(PER, 'Satya Nadella', 0.9486), (PER, 'Sam Altman', 0.9984), (MISC, 'AI', 0.9935), (ORG, 'Microsoft', 0.9979), (LOC, 'Redmond', 0.9646)]",
+      "torch_only": [
+        "('PER', 2, 13)",
+        "('PER', 0, 2)"
+      ],
+      "onnx_only": [
+        "('PER', 0, 13)"
+      ],
+      "max_score_diff": 2.9802322387695312e-08
+    },
+    {
+      "index": 143,
+      "category": "German",
+      "text": "Martin Luther begann die Reformation in Wittenberg.",
+      "torch_ents": "[(PER, 'Martin Luther', 0.9982), (MISC, 'Reformation', 0.9260), (LOC, 'W', 0.9991), (LOC, '##ittenberg', 0.7892)]",
+      "onnx_ents": "[(PER, 'Martin Luther', 0.9982), (MISC, 'Reformation', 0.9260), (LOC, 'Wittenberg', 0.8592)]",
+      "torch_only": [
+        "('LOC', 41, 50)",
+        "('LOC', 40, 41)"
+      ],
+      "onnx_only": [
+        "('LOC', 40, 50)"
+      ],
+      "max_score_diff": 7.152557373046875e-07
+    },
+    {
+      "index": 147,
+      "category": "Dutch",
+      "text": "Rembrandt van Rijn schilderde de Nachtwacht in Amsterdam.",
+      "torch_ents": "[(PER, 'Re', 0.9959), (PER, '##mb', 0.9756), (PER, '##randt van Rijn', 0.8785), (PER, '##erd', 0.9869), (PER, '##e de Nachtwa', 0.9003), (LOC, 'Amsterdam', 0.9985)]",
+      "onnx_ents": "[(PER, 'Rembrandt van Rijn', 0.9053), (PER, 'erde de Nachtwa', 0.9148), (LOC, 'Amsterdam', 0.9985)]",
+      "torch_only": [
+        "('PER', 25, 28)",
+        "('PER', 28, 40)",
+        "('PER', 4, 18)",
+        "('PER', 0, 2)",
+        "('PER', 2, 4)"
+      ],
+      "onnx_only": [
+        "('PER', 0, 18)",
+        "('PER', 25, 40)"
+      ],
+      "max_score_diff": 0.0
+    },
+    {
+      "index": 151,
+      "category": "Dutch",
+      "text": "Vincent van Gogh werd geboren in Zundert en woonde in Arles.",
+      "torch_ents": "[(PER, 'Vincent van Gogh', 0.9885), (LOC, 'Zundert', 0.5287), (LOC, 'A', 0.9966), (LOC, '##rles', 0.9941)]",
+      "onnx_ents": "[(PER, 'Vincent van Gogh', 0.9885), (LOC, 'Zundert', 0.5287), (LOC, 'Arles', 0.9949)]",
+      "torch_only": [
+        "('LOC', 54, 55)",
+        "('LOC', 55, 59)"
+      ],
+      "onnx_only": [
+        "('LOC', 54, 59)"
+      ],
+      "max_score_diff": 1.1821587880822548e-06
+    },
+    {
+      "index": 156,
+      "category": "Dutch",
+      "text": "Het Mauritshuis in Den Haag toont werken van Vermeer.",
+      "torch_ents": "[(PER, 'He', 0.9579), (PER, '##t Mauritshuis', 0.9492), (LOC, 'Den Haag', 0.9114), (LOC, 'Vermee', 0.3474)]",
+      "onnx_ents": "[(PER, 'Het Mauritshuis', 0.9505), (LOC, 'Den Haag', 0.9114), (LOC, 'Vermee', 0.3474)]",
+      "torch_only": [
+        "('PER', 0, 2)",
+        "('PER', 2, 15)"
+      ],
+      "onnx_only": [
+        "('PER', 0, 15)"
+      ],
+      "max_score_diff": 7.549921671179405e-07
+    },
+    {
+      "index": 171,
+      "category": "Spanish",
+      "text": "Frida Kahlo y Diego Rivera vivieron en Ciudad de M\u00e9xico.",
+      "torch_ents": "[(PER, 'Fr', 0.9971), (PER, '##ida Kahlo', 0.9692), (PER, 'Diego Rivera', 0.9967), (LOC, 'Ciudad de M\u00e9xico', 0.9875)]",
+      "onnx_ents": "[(PER, 'Frida Kahlo', 0.9747), (PER, 'Diego Rivera', 0.9967), (LOC, 'Ciudad de M\u00e9xico', 0.9875)]",
+      "torch_only": [
+        "('PER', 0, 2)",
+        "('PER', 2, 11)"
+      ],
+      "onnx_only": [
+        "('PER', 0, 11)"
+      ],
+      "max_score_diff": 3.1789143883909077e-07
+    },
+    {
+      "index": 185,
+      "category": "Edge cases",
+      "text": "Tchaikovsky composed the Nutcracker ballet.",
+      "torch_ents": "[(PER, 'T', 0.9989), (PER, '##cha', 0.8734), (PER, '##iko', 0.9876), (PER, '##vsky', 0.6072), (MISC, 'Nutcracker', 0.9619)]",
+      "onnx_ents": "[(PER, 'Tchaikovsky', 0.8668), (MISC, 'Nutcracker', 0.9619)]",
+      "torch_only": [
+        "('PER', 7, 11)",
+        "('PER', 1, 4)",
+        "('PER', 0, 1)",
+        "('PER', 4, 7)"
+      ],
+      "onnx_only": [
+        "('PER', 0, 11)"
+      ],
+      "max_score_diff": 8.940696716308594e-08
+    },
+    {
+      "index": 186,
+      "category": "Edge cases",
+      "text": "Dostoevsky wrote Crime and Punishment.",
+      "torch_ents": "[(PER, 'Do', 0.9992), (PER, '##sto', 0.9831), (PER, '##ev', 0.5027), (PER, '##sky', 0.8873), (MISC, 'Crime and P', 0.9939), (MISC, '##shment', 0.7812)]",
+      "onnx_ents": "[(PER, 'Dostoevsky', 0.8431), (MISC, 'Crime and P', 0.9939), (MISC, 'shment', 0.7812)]",
+      "torch_only": [
+        "('PER', 5, 7)",
+        "('PER', 0, 2)",
+        "('PER', 7, 10)",
+        "('PER', 2, 5)"
+      ],
+      "onnx_only": [
+        "('PER', 0, 10)"
+      ],
+      "max_score_diff": 1.4603137969970703e-06
+    },
+    {
+      "index": 189,
+      "category": "Edge cases",
+      "text": "M\u00fcller and G\u00fcnther work at B\u00f6hringer Ingelheim in D\u00fcsseldorf.",
+      "torch_ents": "[(PER, 'M\u00fcller', 0.9972), (PER, 'G\u00fc', 0.8316), (PER, '##her', 0.8463), (ORG, 'B', 0.9882), (ORG, '##\u00f6hringer Ingelheim', 0.8594), (LOC, 'D\u00fcsseldorf', 0.9954)]",
+      "onnx_ents": "[(PER, 'M\u00fcller', 0.9972), (PER, 'G\u00fc', 0.8316), (PER, 'her', 0.8463), (ORG, 'B\u00f6hringer Ingelheim', 0.8778), (LOC, 'D\u00fcsseldorf', 0.9954)]",
+      "torch_only": [
+        "('ORG', 28, 46)",
+        "('ORG', 27, 28)"
+      ],
+      "onnx_only": [
+        "('ORG', 27, 46)"
+      ],
+      "max_score_diff": 8.344650268554688e-07
+    },
+    {
+      "index": 192,
+      "category": "Edge cases",
+      "text": "U.N. Secretary-General met with E.U. officials.",
+      "torch_ents": "[(ORG, 'U', 0.9961), (ORG, 'N', 0.9918), (ORG, 'E', 0.9615), (ORG, 'U', 0.9932)]",
+      "onnx_ents": "[(ORG, 'U.N', 0.9940), (ORG, 'E.U', 0.9774)]",
+      "torch_only": [
+        "('ORG', 2, 3)",
+        "('ORG', 0, 1)",
+        "('ORG', 32, 33)",
+        "('ORG', 34, 35)"
+      ],
+      "onnx_only": [
+        "('ORG', 0, 3)",
+        "('ORG', 32, 35)"
+      ],
+      "max_score_diff": null
+    }
+  ]
+}

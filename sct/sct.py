@@ -8,7 +8,7 @@ from concurrent.futures import ThreadPoolExecutor
 from typing import List, Tuple, Optional
 
 from sct.config import TextCleanerConfig, _config_from_module_globals
-from sct.utils import contact, datetime, ner, normtext, resources, special, stopwords
+from sct.utils import constants, contact, datetime, ner, normtext, resources, special, stopwords
 
 logger = logging.getLogger(__name__)
 
@@ -29,15 +29,61 @@ class TextCleaner:
         """
         self.cfg = cfg or _config_from_module_globals()
 
+        # Instance-scoped language detector
+        self._detector = resources.build_detector(self.cfg.supported_languages)
+
+        # Instance-scoped stopwords (with custom override support)
+        self.ProcessStopwords = stopwords.ProcessStopwords(
+            supported_languages=self.cfg.supported_languages,
+            custom_stopwords=dict(self.cfg.custom_stopwords) if self.cfg.custom_stopwords else None,
+        )
+
+        # Instance-scoped datetime (with custom month names -> per-instance regex)
+        if self.cfg.custom_month_names:
+            extra = {}
+            for lang, names in self.cfg.custom_month_names.items():
+                extra[resources.language_to_iso(lang)] = names
+            mn_dict = constants.build_month_names_dict(extra)
+            date_regex = constants.build_date_regex(mn_dict)
+            fuzzy_all, fuzzy_by_lang = constants.build_fuzzy_vocabulary(
+                mn_dict,
+                {**constants._LANG_TO_VOCAB,
+                 **{lang: resources.language_to_iso(lang) for lang in self.cfg.custom_month_names}},
+            )
+            self.ProcessDateTime = datetime.ProcessDateTime(
+                date_regex=date_regex,
+                fuzzy_vocabulary=fuzzy_all,
+                fuzzy_vocabulary_by_lang=fuzzy_by_lang,
+            )
+        else:
+            self.ProcessDateTime = datetime.ProcessDateTime()
+
         self.ProcessContacts = contact.ProcessContacts()
-        self.ProcessDateTime = datetime.ProcessDateTime()
         self.ProcessSpecialSymbols = special.ProcessSpecialSymbols()
         self.NormaliseText = normtext.NormaliseText()
-        self.ProcessStopwords = stopwords.ProcessStopwords()
 
         if self.cfg.check_ner_process:
+            # Build GLiNER config dict (if needed)
+            gliner_config = None
+            if self.cfg.ner_backend in ('gliner', 'ensemble_onnx', 'ensemble_torch'):
+                gliner_config = {
+                    'model': self.cfg.gliner_model,
+                    'variant': self.cfg.gliner_variant,
+                    'labels': self.cfg.gliner_labels,
+                    'threshold': self.cfg.gliner_threshold,
+                    'label_map': dict(self.cfg.gliner_label_map) if self.cfg.gliner_label_map else None,
+                }
+
+            # Determine torch model names (if needed)
+            torch_model_names = None
+            if self.cfg.ner_backend in ('torch', 'ensemble_torch'):
+                torch_model_names = dict(self.cfg.torch_ner_models) if self.cfg.torch_ner_models else None
+
             self.GeneralNER = ner.GeneralNER(
-                model_names=dict(self.cfg.ner_models)
+                model_names=dict(self.cfg.ner_models),
+                ner_backend=self.cfg.ner_backend,
+                gliner_config=gliner_config,
+                torch_model_names=torch_model_names,
             )
         else:
             self.GeneralNER = None
@@ -85,13 +131,14 @@ class TextCleaner:
         """Detect language as a pure function (no instance mutation)."""
         language_config = self.cfg.language
         if language_config:
-            lc = language_config.lower()
-            if lc in resources.LANGUAGE_NAME:
+            if language_config.upper() in self.cfg.supported_languages:
                 return language_config.upper()
 
         if any([self.cfg.check_detect_language, self.cfg.check_ner_process,
                 self.cfg.check_remove_stopwords]):
-            return str(resources.DETECTOR.detect_language_of(text)).split(".")[-1]
+            detected = self._detector.detect_language_of(text)
+            if detected is not None:
+                return detected.name
 
         return None
 

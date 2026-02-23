@@ -3,8 +3,17 @@ from sct.utils import constants
 
 class ProcessDateTime:
 
-    def __init__(self):
-        pass
+    def __init__(self, date_regex=None, fuzzy_vocabulary=None,
+                 fuzzy_vocabulary_by_lang=None):
+        """
+        Args:
+            date_regex: Compiled regex for date matching. Defaults to constants.DATE_REGEX.
+            fuzzy_vocabulary: Tuple of full month names for fuzzy matching.
+            fuzzy_vocabulary_by_lang: Dict mapping language -> tuple of month names.
+        """
+        self._date_regex = date_regex or constants.DATE_REGEX
+        self._fuzzy_vocabulary = fuzzy_vocabulary or constants.FUZZY_MONTH_VOCABULARY
+        self._fuzzy_vocabulary_by_lang = fuzzy_vocabulary_by_lang or constants.FUZZY_MONTH_VOCABULARY_BY_LANG
 
     def replace_years(self, text, replace_with="<YEAR>"):
         """
@@ -19,10 +28,10 @@ class ProcessDateTime:
         Replaces common date formats in the text with a special token.
 
         Supports ISO 8601, DD/MM/YYYY, MM-DD-YYYY, and multilingual month-name
-        formats (EN, NL, DE, ES).
+        formats (EN, NL, DE, ES + any custom month names).
         Should be called before replace_years to avoid partial matches.
         """
-        cleaned_string = constants.DATE_REGEX.sub(replace_with, text)
+        cleaned_string = self._date_regex.sub(replace_with, text)
 
         return cleaned_string
 
@@ -62,14 +71,14 @@ class ProcessDateTime:
             )
 
         # Select vocabulary based on detected language
-        if language and language in constants.FUZZY_MONTH_VOCABULARY_BY_LANG:
+        if language and language in self._fuzzy_vocabulary_by_lang:
             # Use detected language + English fallback (deduplicated via set)
-            lang_names = set(constants.FUZZY_MONTH_VOCABULARY_BY_LANG[language])
+            lang_names = set(self._fuzzy_vocabulary_by_lang[language])
             if language != "ENGLISH":
-                lang_names.update(constants.FUZZY_MONTH_VOCABULARY_BY_LANG.get("ENGLISH", ()))
+                lang_names.update(self._fuzzy_vocabulary_by_lang.get("ENGLISH", ()))
             choices = tuple(lang_names)
         else:
-            choices = constants.FUZZY_MONTH_VOCABULARY
+            choices = self._fuzzy_vocabulary
 
         def _is_fuzzy_month(word):
             """Check if word fuzzy-matches any known month name."""

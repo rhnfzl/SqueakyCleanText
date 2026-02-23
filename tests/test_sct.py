@@ -7,6 +7,8 @@ from faker import Faker
 from sct import config
 from sct.config import LANG_KEYS, TextCleanerConfig
 from sct.utils import contact, datetime, special, normtext, stopwords, constants
+from sct.utils.constants import build_month_names_dict, build_date_regex
+from sct.utils.stopwords import ProcessStopwords
 from sct.utils.ner import GeneralNER
 from unittest.mock import patch
 from functools import wraps
@@ -1099,6 +1101,224 @@ class TextCleanerTest(unittest.TestCase):
         # Unknown language falls back to English
         fallback = self.ProcessStopwords.get_stop_words("KLINGON")
         self.assertEqual(fallback, en)
+
+    # --- Language extensibility tests ---
+
+    def test_extra_languages_valid(self):
+        """POLISH is a valid Lingua language."""
+        cfg = TextCleanerConfig(check_ner_process=False, extra_languages=('POLISH',))
+        self.assertIn('POLISH', cfg.supported_languages)
+        # Default 4 still present
+        self.assertIn('ENGLISH', cfg.supported_languages)
+        self.assertIn('DUTCH', cfg.supported_languages)
+
+    def test_extra_languages_invalid(self):
+        """KLINGON is not a valid Lingua language."""
+        with self.assertRaises(ValueError) as ctx:
+            TextCleanerConfig(check_ner_process=False, extra_languages=('KLINGON',))
+        self.assertIn("Unknown language", str(ctx.exception))
+
+    def test_supported_languages_union(self):
+        """supported_languages is union of defaults + extra + ner_models + custom keys."""
+        cfg = TextCleanerConfig(
+            check_ner_process=False,
+            extra_languages=('POLISH',),
+            ner_models={'ENGLISH': 'x', 'MULTILINGUAL': 'y', 'FRENCH': 'z'},
+            custom_stopwords={'ITALIAN': frozenset({'di', 'il'})},
+        )
+        expected = {'ENGLISH', 'DUTCH', 'GERMAN', 'SPANISH', 'POLISH', 'FRENCH', 'ITALIAN'}
+        self.assertTrue(expected.issubset(cfg.supported_languages))
+        # MULTILINGUAL is a model, not a spoken language
+        self.assertNotIn('MULTILINGUAL', cfg.supported_languages)
+
+    def test_language_pin_validation(self):
+        """language must be in supported set."""
+        with self.assertRaises(ValueError):
+            TextCleanerConfig(check_ner_process=False, language='POLISH')
+        # This should work when POLISH is in supported set:
+        cfg = TextCleanerConfig(
+            check_ner_process=False, language='POLISH', extra_languages=('POLISH',)
+        )
+        self.assertEqual(cfg.language, 'POLISH')
+
+    def test_default_backward_compat(self):
+        """Default TextCleanerConfig() has same supported_languages as before."""
+        cfg = TextCleanerConfig(check_ner_process=False)
+        self.assertEqual(
+            cfg.supported_languages,
+            frozenset({'ENGLISH', 'DUTCH', 'GERMAN', 'SPANISH'}),
+        )
+
+    def test_custom_stopwords_replace(self):
+        """Custom stopwords replace auto-detected ones."""
+        custom = frozenset({'custom1', 'custom2'})
+        sw = ProcessStopwords(
+            supported_languages=frozenset({'ENGLISH'}),
+            custom_stopwords={'ENGLISH': custom},
+        )
+        self.assertEqual(sw.get_stop_words('ENGLISH'), custom)
+
+    def test_auto_stopwords_via_iso(self):
+        """Polish stopwords auto-load from stop-words package."""
+        sw = ProcessStopwords(supported_languages=frozenset({'ENGLISH', 'POLISH'}))
+        polish_sw = sw.get_stop_words('POLISH')
+        self.assertGreater(len(polish_sw), 0)  # stop-words has Polish
+
+    def test_custom_month_names_in_date_regex(self):
+        """Custom month names are included in date regex."""
+        mn = build_month_names_dict({'pl': ('styczen', 'luty')})
+        regex = build_date_regex(mn)
+        self.assertIsNotNone(regex.search("15 styczen 2025"))
+
+    def test_custom_month_names_pipeline(self):
+        """Custom month names work in full pipeline."""
+        cfg = TextCleanerConfig(
+            check_ner_process=False,
+            check_replace_dates=True,
+            extra_languages=('POLISH',),
+            custom_month_names={
+                'POLISH': ('styczen', 'luty', 'marzec', 'kwiecien', 'maj', 'czerwiec',
+                           'lipiec', 'sierpien', 'wrzesien', 'pazdziernik', 'listopad', 'grudzien'),
+            },
+        )
+        cleaner = TextCleaner(cfg=cfg)
+        lm_text, _, _ = cleaner.process("Spotkanie 15 styczen 2025 w biurze")
+        self.assertIn("<DATE>", lm_text)
+        self.assertNotIn("styczen", lm_text)
+
+    def test_full_pipeline_with_extra_language(self):
+        """Full pipeline with extra_languages works end-to-end."""
+        cfg = TextCleanerConfig(
+            check_ner_process=False,
+            extra_languages=('POLISH',),
+        )
+        cleaner = TextCleaner(cfg=cfg)
+        result = cleaner.process("To jest test tekstu")
+        self.assertEqual(len(result), 3)
+        lm_text, stat_text, lang = result
+        self.assertIsInstance(lm_text, str)
+
+    # --- NER backend config validation (no model loading) ---
+
+    def test_ner_backend_default_is_onnx(self):
+        cfg = TextCleanerConfig(check_ner_process=False)
+        self.assertEqual(cfg.ner_backend, 'onnx')
+
+    def test_ner_backend_invalid_raises(self):
+        with self.assertRaises(ValueError):
+            TextCleanerConfig(check_ner_process=False, ner_backend='invalid')
+
+    def test_ner_backend_torch_valid(self):
+        cfg = TextCleanerConfig(check_ner_process=False, ner_backend='torch')
+        self.assertEqual(cfg.ner_backend, 'torch')
+        self.assertIsNotNone(cfg.torch_ner_models)  # defaults filled
+
+    def test_ner_backend_gliner_requires_model(self):
+        with self.assertRaises(ValueError):
+            TextCleanerConfig(check_ner_process=False, ner_backend='gliner')
+
+    def test_ner_backend_gliner_valid(self):
+        cfg = TextCleanerConfig(
+            check_ner_process=False,
+            ner_backend='gliner',
+            gliner_model='urchade/gliner_large-v2.1',
+            gliner_labels=('person', 'org'),
+            gliner_label_map={'person': 'PER', 'org': 'ORG'},
+        )
+        self.assertEqual(cfg.gliner_model, 'urchade/gliner_large-v2.1')
+        self.assertEqual(cfg.gliner_labels, ('person', 'org'))
+
+    def test_ner_backend_gliner_variant_invalid(self):
+        with self.assertRaises(ValueError):
+            TextCleanerConfig(
+                check_ner_process=False,
+                ner_backend='gliner', gliner_model='x', gliner_variant='v3',
+            )
+
+    def test_ner_backend_ensemble_onnx_requires_gliner(self):
+        with self.assertRaises(ValueError):
+            TextCleanerConfig(check_ner_process=False, ner_backend='ensemble_onnx')
+
+    def test_ner_backend_ensemble_onnx_valid(self):
+        cfg = TextCleanerConfig(
+            check_ner_process=False,
+            ner_backend='ensemble_onnx',
+            gliner_model='urchade/gliner_large-v2.1',
+        )
+        self.assertEqual(cfg.ner_backend, 'ensemble_onnx')
+
+    def test_ner_backend_ensemble_torch_valid(self):
+        cfg = TextCleanerConfig(
+            check_ner_process=False,
+            ner_backend='ensemble_torch',
+            gliner_model='urchade/gliner_large-v2.1',
+        )
+        self.assertEqual(cfg.ner_backend, 'ensemble_torch')
+        self.assertIsNotNone(cfg.torch_ner_models)
+
+    def test_gliner_label_map_frozen(self):
+        cfg = TextCleanerConfig(
+            check_ner_process=False,
+            ner_backend='gliner', gliner_model='x',
+            gliner_label_map={'person': 'PER'},
+        )
+        with self.assertRaises(TypeError):
+            cfg.gliner_label_map['new'] = 'val'
+
+    def test_torch_ner_models_requires_english_multilingual(self):
+        with self.assertRaises(ValueError):
+            TextCleanerConfig(
+                check_ner_process=False,
+                ner_backend='torch',
+                torch_ner_models={'ENGLISH': 'x'},  # Missing MULTILINGUAL
+            )
+
+    def test_torch_ner_models_fills_defaults(self):
+        cfg = TextCleanerConfig(
+            check_ner_process=False,
+            ner_backend='torch',
+            torch_ner_models={'ENGLISH': 'custom-en', 'MULTILINGUAL': 'custom-ml'},
+        )
+        self.assertEqual(cfg.torch_ner_models['ENGLISH'], 'custom-en')
+        self.assertIn('DUTCH', cfg.torch_ner_models)  # filled from defaults
+
+    # --- GLiNER adapter unit tests (no model loading) ---
+
+    def test_gliner_adapter_map_label(self):
+        from sct.utils.gliner_adapter import GLiNERAdapter
+        adapter = GLiNERAdapter.__new__(GLiNERAdapter)
+        adapter.label_map = {'person': 'PER', 'org': 'ORG'}
+        self.assertEqual(adapter._map_label('person'), 'PER')
+        self.assertEqual(adapter._map_label('org'), 'ORG')
+        self.assertEqual(adapter._map_label('product'), 'PRODUCT')  # unmapped -> uppercase
+
+    # --- anonymize_text custom label tests ---
+
+    @requires_ner
+    def test_anonymize_custom_labels_direct_replacement(self):
+        """Custom entity labels bypass Presidio and use direct string replacement."""
+        filtered = [
+            {'entity_group': 'PRODUCT', 'score': 0.9, 'word': 'iPhone',
+             'key': '10:16', 'start': 10, 'end': 16},
+        ]
+        text = "I bought iPhone today"
+        result = self.ner.anonymize_text(text, filtered)
+        self.assertIn('<PRODUCT>', result.text)
+        self.assertNotIn('iPhone', result.text)
+
+    @requires_ner
+    def test_anonymize_mixed_labels(self):
+        """Mix of standard and custom labels uses direct replacement for all."""
+        filtered = [
+            {'entity_group': 'PER', 'score': 0.9, 'word': 'John',
+             'key': '0:4', 'start': 0, 'end': 4},
+            {'entity_group': 'PRODUCT', 'score': 0.8, 'word': 'iPad',
+             'key': '15:19', 'start': 15, 'end': 19},
+        ]
+        text = "John bought an iPad today"
+        result = self.ner.anonymize_text(text, filtered)
+        self.assertIn('<PERSON>', result.text)
+        self.assertIn('<PRODUCT>', result.text)
 
     @classmethod
     def tearDownClass(cls):

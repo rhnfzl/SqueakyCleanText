@@ -16,36 +16,42 @@ In the world of machine learning and natural language processing, clean and well
 SqueakyCleanText simplifies the process by automatically addressing common text issues, ensuring your data is clean and well-structured with minimal effort on your part.
 
 ### Key Features
-- **Encoding Issues**: Corrects text encoding problems and handles bad Unicode characters.
-- **HTML and URLs**: Removes or replaces HTML tags and URLs with configurable tokens.
-- **Contact Information**: Handles emails, phone numbers, and other contact details with customizable replacement tokens.
+
 - **Named Entity Recognition (NER)**:
+  - Multi-backend: ONNX (default, torch-free), PyTorch, GLiNER, and ensemble modes
+  - Zero-shot custom entities via GLiNER (e.g., PRODUCT, EVENT, SKILL)
   - Multi-language support (English, Dutch, German, Spanish)
-  - Ensemble voting technique for improved accuracy
+  - Ensemble voting across backends for improved accuracy
   - Configurable confidence thresholds
   - Lazy model loading (models load on demand per language)
   - Automatic text chunking for long documents
-  - GPU acceleration support
+  - GPU acceleration support (CUDA for ONNX and PyTorch)
 - **Text Normalization**:
-  - Removes isolated letters and symbols
-  - Normalizes whitespace
-  - Handles currency symbols
-  - Date and year detection and replacement
-  - Number standardization
+  - Corrects text encoding problems and handles bad Unicode characters
+  - Removes or replaces HTML tags and URLs with configurable tokens
+  - Handles emails, phone numbers, and other contact details
+  - Multilingual date detection and replacement (ISO 8601, month names, common formats)
+  - Fuzzy date matching for misspelled months (requires `[fuzzy]` extra)
+  - Year and number standardization
   - Configurable emoji removal
   - Configurable bracket/brace content removal
+  - Removes isolated letters and symbols
+  - Normalizes whitespace and handles currency symbols
+  - Smart case folding (preserves NER tokens like `<PERSON>`)
 - **Language Support**:
-  - Automatic language detection
+  - Automatic language detection (English, Dutch, German, Spanish)
   - Language-specific NER models
   - Language-aware stopword removal
+  - Extensible: add custom languages with stopwords, month names, and NER models
 - **Dual Output Formats**:
   - Language Model format (preserves structure with tokens)
   - Statistical Model format (optimized for classical ML)
-- **Performance Optimization**:
-  - Batch processing support
-  - Configurable batch sizes
+- **Performance**:
+  - ONNX Runtime inference (torch-free base install, ~3-5x faster than PyTorch)
+  - Thread-parallel batch processing via `ThreadPoolExecutor`
+  - Lazy model loading (only loads models as needed)
   - Memory-efficient processing of large texts
-  - GPU memory management
+  - GPU acceleration (CUDA) for both ONNX and PyTorch backends
 
 ![Default Flow of cleaning Text](resources/sct_flow.png)
 
@@ -75,6 +81,22 @@ SqueakyCleanText simplifies the process by automatically addressing common text 
 ```sh
 pip install SqueakyCleanText
 ```
+
+The base install uses **ONNX Runtime** for NER inference — no PyTorch or Transformers required.
+
+### Optional Extras
+
+| Extra | Command | What it adds |
+|-------|---------|--------------|
+| GPU | `pip install SqueakyCleanText[gpu]` | CUDA-accelerated ONNX inference |
+| Fuzzy dates | `pip install SqueakyCleanText[fuzzy]` | Fuzzy month name matching ([rapidfuzz](https://github.com/rapidfuzz/RapidFuzz)) |
+| PyTorch NER | `pip install SqueakyCleanText[torch]` | PyTorch/Transformers NER backend |
+| GLiNER | `pip install SqueakyCleanText[gliner]` | [GLiNER](https://github.com/urchade/GLiNER) zero-shot NER |
+| GLiNER2 | `pip install SqueakyCleanText[gliner2]` | [GLiNER2](https://github.com/Knowledgator/GLiNER) (knowledgator) backend |
+| All NER | `pip install SqueakyCleanText[all-ner]` | All NER backends combined |
+| Development | `pip install SqueakyCleanText[dev]` | Testing and linting tools |
+
+You can combine extras: `pip install SqueakyCleanText[gpu,fuzzy,gliner]`
 
 ## Usage
 
@@ -122,23 +144,48 @@ cfg = TextCleanerConfig(
 cleaner = TextCleaner(cfg=cfg)
 ```
 
-### Legacy Configuration (backward compatible)
+### GLiNER: Zero-Shot Custom NER
+
+Use [GLiNER](https://github.com/urchade/GLiNER) to recognize any entity type without retraining:
 
 ```python
-from sct import sct, config
+from sct import TextCleaner, TextCleanerConfig
 
-# Customize settings via module-level variables
-config.CHECK_NER_PROCESS = True
-config.NER_CONFIDENCE_THRESHOLD = 0.85
-config.POSITIONAL_TAGS = ['PER', 'LOC', 'ORG']
-config.REPLACE_WITH_URL = "<URL>"
-config.REPLACE_WITH_EMAIL = "<EMAIL>"
-config.LANGUAGE = "ENGLISH"
+cfg = TextCleanerConfig(
+    ner_backend='gliner',
+    gliner_model='urchade/gliner_large-v2.1',
+    gliner_labels=('person', 'organization', 'location', 'product', 'event'),
+    gliner_label_map={
+        'person': 'PER', 'organization': 'ORG', 'location': 'LOC',
+        # 'product' and 'event' are unmapped — they become <PRODUCT>, <EVENT> tokens
+    },
+    gliner_threshold=0.4,
+)
 
-# Initialize (reads from module-level config)
-cleaner = sct.TextCleaner()
+cleaner = TextCleaner(cfg=cfg)
+lm_text, stat_text, lang = cleaner.process(
+    "John bought an iPhone at the Apple Store in Berlin during CES 2025."
+)
+# lm_text: "<PERSON> bought an <PRODUCT> at the <ORGANISATION> in <LOCATION> during <EVENT>."
 ```
 
+### Ensemble NER
+
+Combine ONNX/Torch models with GLiNER for improved recall via ensemble voting:
+
+```python
+from sct import TextCleaner, TextCleanerConfig
+
+cfg = TextCleanerConfig(
+    ner_backend='ensemble_onnx',  # or 'ensemble_torch'
+    gliner_model='urchade/gliner_large-v2.1',
+    gliner_labels=('person', 'organization', 'location'),
+    gliner_label_map={'person': 'PER', 'organization': 'ORG', 'location': 'LOC'},
+)
+
+cleaner = TextCleaner(cfg=cfg)
+lm_text, stat_text, lang = cleaner.process("Angela Merkel visited the Bundestag in Berlin.")
+```
 
 ### Batch Processing
 
@@ -162,7 +209,7 @@ texts = [
     "Voor vragen, bel +31 20 123 4567.",             # Dutch
 ]
 
-# Process texts in batch
+# Process texts in batch (uses ThreadPoolExecutor for parallel processing)
 results = cleaner.process_batch(texts, batch_size=2)
 
 for lm_text, stat_text, lang in results:
@@ -170,6 +217,64 @@ for lm_text, stat_text, lang in results:
     print(f"LM Format:    {lm_text}")
     print(f"Stat Format:  {stat_text}")
     print("-" * 40)
+```
+
+<details>
+<summary>Legacy Configuration (backward compatible)</summary>
+
+```python
+from sct import sct, config
+
+# Customize settings via module-level variables
+config.CHECK_NER_PROCESS = True
+config.NER_CONFIDENCE_THRESHOLD = 0.85
+config.POSITIONAL_TAGS = ['PER', 'LOC', 'ORG']
+config.REPLACE_WITH_URL = "<URL>"
+config.REPLACE_WITH_EMAIL = "<EMAIL>"
+config.LANGUAGE = "ENGLISH"
+
+# Initialize (reads from module-level config)
+cleaner = sct.TextCleaner()
+```
+
+> **Note**: The legacy module-level configuration is not thread-safe. For concurrent processing, use `TextCleanerConfig` instead.
+
+</details>
+
+## NER Backends
+
+SqueakyCleanText supports five NER backends, selectable via the `ner_backend` config field:
+
+| Backend | Description | Dependencies | Best for |
+|---------|-------------|-------------|----------|
+| `onnx` (default) | ONNX Runtime inference with quantized XLM-RoBERTa models | Base install | Production — fast, torch-free |
+| `torch` | PyTorch/Transformers pipeline with full XLM-RoBERTa models | `[torch]` extra | Compatibility with existing PyTorch workflows |
+| `gliner` | GLiNER zero-shot NER with custom entity labels | `[gliner]` or `[gliner2]` extra | Custom entity types (PRODUCT, SKILL, EVENT, etc.) |
+| `ensemble_onnx` | ONNX + GLiNER ensemble voting | `[gliner]` extra | Maximum recall with custom entities |
+| `ensemble_torch` | Torch + GLiNER ensemble voting | `[torch,gliner]` extra | Maximum recall with PyTorch |
+
+### Default NER Models (ONNX)
+
+| Language | Model |
+|----------|-------|
+| English | [`rhnfzl/xlm-roberta-large-conll03-english-onnx`](https://huggingface.co/rhnfzl/xlm-roberta-large-conll03-english-onnx) |
+| Dutch | [`rhnfzl/xlm-roberta-large-conll02-dutch-onnx`](https://huggingface.co/rhnfzl/xlm-roberta-large-conll02-dutch-onnx) |
+| German | [`rhnfzl/xlm-roberta-large-conll03-german-onnx`](https://huggingface.co/rhnfzl/xlm-roberta-large-conll03-german-onnx) |
+| Spanish | [`rhnfzl/xlm-roberta-large-conll02-spanish-onnx`](https://huggingface.co/rhnfzl/xlm-roberta-large-conll02-spanish-onnx) |
+| Multilingual | [`rhnfzl/wikineural-multilingual-ner-onnx`](https://huggingface.co/rhnfzl/wikineural-multilingual-ner-onnx) |
+
+### GLiNER Label Mapping
+
+GLiNER uses lowercase free-text labels (e.g., `'person'`, `'product'`). To map them to standard NER tags used by the anonymizer, use `gliner_label_map`:
+
+```python
+gliner_label_map={
+    'person': 'PER',          # → <PERSON>
+    'organization': 'ORG',    # → <ORGANISATION>
+    'location': 'LOC',        # → <LOCATION>
+}
+# Unmapped labels are uppercased automatically:
+# 'product' → <PRODUCT>, 'event' → <EVENT>, 'skill' → <SKILL>
 ```
 
 ## API
@@ -185,7 +290,161 @@ Processes the input text and returns a tuple containing:
 
 #### `process_batch(texts: List[str], batch_size: int = None) -> List[Tuple[str, Optional[str], Optional[str]]]`
 
-Processes multiple texts. Each result follows the same format as `process()`.
+Processes multiple texts using thread-parallel execution. Each result follows the same format as `process()`.
+
+### `TextCleanerConfig`
+
+Immutable (frozen) dataclass. Create modified copies with `dataclasses.replace()`:
+
+```python
+import dataclasses
+new_cfg = dataclasses.replace(cfg, check_ner_process=False)
+```
+
+<details>
+<summary>Full configuration reference</summary>
+
+**Pipeline toggles** (all `bool`, default shown):
+
+| Field | Default | Description |
+|-------|---------|-------------|
+| `check_detect_language` | `True` | Auto-detect language |
+| `check_fix_bad_unicode` | `True` | Fix encoding issues via ftfy |
+| `check_to_ascii_unicode` | `True` | Transliterate to ASCII |
+| `check_replace_html` | `True` | Strip/replace HTML tags |
+| `check_replace_urls` | `True` | Replace URLs with token |
+| `check_replace_emails` | `True` | Replace emails with token |
+| `check_replace_years` | `True` | Replace years (1900-2099) |
+| `check_replace_dates` | `False` | Replace full dates (ISO 8601, month names) |
+| `check_fuzzy_replace_dates` | `False` | Fuzzy match misspelled months (requires `[fuzzy]`) |
+| `check_replace_phone_numbers` | `True` | Replace phone numbers |
+| `check_replace_numbers` | `True` | Replace standalone numbers |
+| `check_replace_currency_symbols` | `True` | Replace currency symbols |
+| `check_ner_process` | `True` | Run NER entity recognition |
+| `check_remove_isolated_letters` | `True` | Remove single letters |
+| `check_remove_isolated_special_symbols` | `True` | Remove isolated symbols |
+| `check_remove_bracket_content` | `True` | Remove `[...]` content |
+| `check_remove_brace_content` | `True` | Remove `{...}` content |
+| `check_normalize_whitespace` | `True` | Normalize whitespace |
+| `check_statistical_model_processing` | `True` | Generate stat model output |
+| `check_casefold` | `True` | Lowercase stat output |
+| `check_smart_casefold` | `False` | Lowercase but preserve NER tokens |
+| `check_remove_stopwords` | `True` | Remove stopwords from stat output |
+| `check_remove_punctuation` | `True` | Remove punctuation from stat output |
+| `check_remove_stext_custom_stop_words` | `True` | Remove custom stop words from stat output |
+| `check_remove_emoji` | `False` | Remove emoji characters |
+
+**Replacement tokens** (all `str`):
+
+| Field | Default |
+|-------|---------|
+| `replace_with_url` | `"<URL>"` |
+| `replace_with_html` | `"<HTML>"` |
+| `replace_with_email` | `"<EMAIL>"` |
+| `replace_with_years` | `"<YEAR>"` |
+| `replace_with_dates` | `"<DATE>"` |
+| `replace_with_phone_numbers` | `"<PHONE>"` |
+| `replace_with_numbers` | `"<NUMBER>"` |
+| `replace_with_currency_symbols` | `None` |
+
+**NER settings**:
+
+| Field | Default | Description |
+|-------|---------|-------------|
+| `ner_backend` | `'onnx'` | Backend: `onnx`, `torch`, `gliner`, `ensemble_onnx`, `ensemble_torch` |
+| `positional_tags` | `('PER', 'LOC', 'ORG', 'MISC')` | Entity types to recognize |
+| `ner_confidence_threshold` | `0.85` | Minimum confidence score |
+| `ner_models` | `None` | Language-keyed dict of ONNX model repo IDs |
+| `torch_ner_models` | `None` | Language-keyed dict of PyTorch model repo IDs |
+| `gliner_model` | `None` | GLiNER model ID (required for gliner/ensemble backends) |
+| `gliner_variant` | `'gliner'` | `'gliner'` or `'gliner2'` |
+| `gliner_labels` | `('person', 'organization', 'location')` | GLiNER entity labels |
+| `gliner_label_map` | `None` | Maps GLiNER labels to NER tags |
+| `gliner_threshold` | `0.4` | GLiNER confidence threshold |
+| `fuzzy_date_score_cutoff` | `85` | Fuzzy matching threshold (0-100) for misspelled months |
+
+**Language settings**:
+
+| Field | Default | Description |
+|-------|---------|-------------|
+| `language` | `None` | Pin language (skip detection) |
+| `extra_languages` | `()` | Additional language names for detection |
+| `custom_stopwords` | `None` | `{LANG: frozenset({...})}` custom stopword sets |
+| `custom_month_names` | `None` | `{LANG: ('Jan', 'Feb', ...)}` for date detection |
+
+</details>
+
+## Architecture
+
+SqueakyCleanText processes text through a configurable pipeline of sequential steps:
+
+```
+Input Text
+  │
+  ├─ Fix Unicode (ftfy)
+  ├─ ASCII transliteration (unidecode)
+  ├─ Emoji removal
+  ├─ HTML replacement
+  ├─ URL / Email / Phone replacement
+  ├─ Date & Year replacement
+  ├─ Number & Currency replacement
+  ├─ Isolated letter/symbol removal
+  ├─ Whitespace normalization
+  │
+  ├─ NER Processing (ONNX / Torch / GLiNER / Ensemble)
+  │   ├─ Language detection (Lingua)
+  │   ├─ Text chunking (token-bounded)
+  │   ├─ Entity recognition (per-chunk)
+  │   ├─ Ensemble voting (cross-model)
+  │   └─ Entity anonymization (Presidio)
+  │
+  └─ Statistical Model Output
+      ├─ Case folding
+      ├─ Stopword removal
+      └─ Punctuation removal
+
+  ▼
+(lm_text, stat_text, language)
+```
+
+Each step is toggled by a `TextCleanerConfig` field. The pipeline is built once at initialization — disabled steps are skipped entirely (zero overhead).
+
+## What's New in v0.4.5
+
+Major release with architectural overhaul since v0.3.0:
+
+**Architecture**
+- Frozen `TextCleanerConfig` dataclass replaces global mutable config (thread-safe, per-instance)
+- ONNX-first NER inference — torch-free base install (~400MB models vs ~7GB)
+- Thread-parallel batch processing via `ThreadPoolExecutor` (ONNX releases the GIL)
+
+**NER**
+- 5 backends: `onnx`, `torch`, `gliner`, `ensemble_onnx`, `ensemble_torch`
+- GLiNER zero-shot NER for custom entity types (PRODUCT, EVENT, SKILL, etc.)
+- Ensemble voting across backends for improved recall
+- Lazy per-language model loading (only loads models when needed)
+- Language-keyed model dict replaces fragile positional tuple
+- ONNX-quantized models hosted on [HuggingFace Hub](https://huggingface.co/rhnfzl)
+
+**Text Processing**
+- Multilingual date detection (ISO 8601, European formats, month names in EN/NL/DE/ES)
+- Fuzzy date matching for misspelled months (via rapidfuzz, empirically calibrated threshold)
+- Configurable emoji removal
+- Configurable bracket/brace content removal
+- Smart case folding (preserves NER replacement tokens)
+- Custom stopwords and month names per language
+
+**Dependencies**
+- `stop-words` package replaces NLTK (50KB bundled vs 30MB download)
+- PyTorch/Transformers moved to optional `[torch]` extra
+- New optional extras: `[gpu]`, `[fuzzy]`, `[gliner]`, `[gliner2]`, `[all-ner]`
+- Migrated from `setup.py` to `pyproject.toml` (PEP 517)
+
+**Quality**
+- Python 3.13 support
+- `ruff` linter (replaces flake8)
+- hypothesis-based property testing with pytest-timeout
+- Collision-safe NER entity keys
 
 ## Contributing
 

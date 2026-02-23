@@ -20,6 +20,9 @@ from typing import Mapping, Optional, Tuple
 
 LANG_KEYS = ('ENGLISH', 'DUTCH', 'GERMAN', 'SPANISH', 'MULTILINGUAL')
 REQUIRED_NER_KEYS = frozenset({'ENGLISH', 'MULTILINGUAL'})
+DEFAULT_LANGUAGES = frozenset({'ENGLISH', 'DUTCH', 'GERMAN', 'SPANISH'})
+
+VALID_NER_BACKENDS = frozenset({'onnx', 'torch', 'gliner', 'ensemble_onnx', 'ensemble_torch'})
 
 DEFAULT_NER_MODELS: dict[str, str] = {
     'ENGLISH': 'rhnfzl/xlm-roberta-large-conll03-english-onnx',
@@ -27,6 +30,14 @@ DEFAULT_NER_MODELS: dict[str, str] = {
     'GERMAN': 'rhnfzl/xlm-roberta-large-conll03-german-onnx',
     'SPANISH': 'rhnfzl/xlm-roberta-large-conll02-spanish-onnx',
     'MULTILINGUAL': 'rhnfzl/wikineural-multilingual-ner-onnx',
+}
+
+DEFAULT_TORCH_NER_MODELS: dict[str, str] = {
+    'ENGLISH': 'FacebookAI/xlm-roberta-large-finetuned-conll03-english',
+    'DUTCH': 'FacebookAI/xlm-roberta-large-finetuned-conll02-dutch',
+    'GERMAN': 'FacebookAI/xlm-roberta-large-finetuned-conll03-german',
+    'SPANISH': 'FacebookAI/xlm-roberta-large-finetuned-conll02-spanish',
+    'MULTILINGUAL': 'Babelscape/wikineural-multilingual-ner',
 }
 
 
@@ -91,6 +102,9 @@ class TextCleanerConfig:
     ner_confidence_threshold: float = 0.85
     language: Optional[str] = None
 
+    # NER backend selection
+    ner_backend: str = 'onnx'  # 'onnx' | 'torch' | 'gliner' | 'ensemble_onnx' | 'ensemble_torch'
+
     # Preferred: language-keyed dict of HuggingFace ONNX model repo IDs.
     # Models must have model.onnx, config.json, tokenizer.json on Hub.
     # ENGLISH and MULTILINGUAL are always required (loaded eagerly).
@@ -107,12 +121,70 @@ class TextCleanerConfig:
         "rhnfzl/wikineural-multilingual-ner-onnx",
     )
 
+    # Torch backend models (only used when ner_backend is 'torch' or 'ensemble_torch')
+    torch_ner_models: Optional[Mapping[str, str]] = None
+
+    # GLiNER settings (only used when ner_backend contains 'gliner' or 'ensemble')
+    gliner_model: Optional[str] = None
+    gliner_variant: str = 'gliner'  # 'gliner' or 'gliner2'
+    gliner_labels: Tuple[str, ...] = ('person', 'organization', 'location')
+    gliner_label_map: Optional[Mapping[str, str]] = None
+    gliner_threshold: float = 0.4
+
+    # Language extensibility — extend Lingua detection, stopwords, dates, NER
+    extra_languages: Tuple[str, ...] = ()
+    custom_stopwords: Optional[Mapping[str, frozenset]] = None
+    custom_month_names: Optional[Mapping[str, Tuple[str, ...]]] = None
+
+    # Computed at __post_init__ — union of all language sources
+    supported_languages: frozenset = frozenset()
+
     def __post_init__(self):
         # Convert mutable collections to immutable for frozen safety
         if isinstance(self.positional_tags, list):
             object.__setattr__(self, 'positional_tags', tuple(self.positional_tags))
         if isinstance(self.ner_models_list, list):
             object.__setattr__(self, 'ner_models_list', tuple(self.ner_models_list))
+
+        # --- NER backend validation ---
+        if self.ner_backend not in VALID_NER_BACKENDS:
+            raise ValueError(
+                f"ner_backend must be one of {sorted(VALID_NER_BACKENDS)}, "
+                f"got: {self.ner_backend!r}"
+            )
+
+        # GLiNER fields required for gliner/ensemble backends
+        needs_gliner = self.ner_backend in ('gliner', 'ensemble_onnx', 'ensemble_torch')
+        if needs_gliner:
+            if not self.gliner_model:
+                raise ValueError(
+                    f"gliner_model is required when ner_backend='{self.ner_backend}'. "
+                    f"Provide a HuggingFace model ID (e.g. 'urchade/gliner_large-v2.1')."
+                )
+            if self.gliner_variant not in ('gliner', 'gliner2'):
+                raise ValueError(
+                    f"gliner_variant must be 'gliner' or 'gliner2', "
+                    f"got: {self.gliner_variant!r}"
+                )
+
+        # Freeze gliner_label_map
+        if self.gliner_label_map is not None:
+            object.__setattr__(self, 'gliner_label_map',
+                               MappingProxyType(dict(self.gliner_label_map)))
+
+        # Reconcile torch_ner_models
+        if self.torch_ner_models is not None:
+            missing = REQUIRED_NER_KEYS - set(self.torch_ner_models)
+            if missing:
+                raise ValueError(
+                    f"torch_ner_models must include {sorted(REQUIRED_NER_KEYS)}, "
+                    f"missing: {sorted(missing)}"
+                )
+            merged = {**DEFAULT_TORCH_NER_MODELS, **self.torch_ner_models}
+            object.__setattr__(self, 'torch_ner_models', MappingProxyType(merged))
+        elif self.ner_backend in ('torch', 'ensemble_torch'):
+            object.__setattr__(self, 'torch_ner_models',
+                               MappingProxyType(dict(DEFAULT_TORCH_NER_MODELS)))
 
         # Reconcile ner_models (dict, preferred) and ner_models_list (tuple, deprecated).
         # After this block, both fields are guaranteed populated.
@@ -134,6 +206,52 @@ class TextCleanerConfig:
             # No dict provided — derive from ner_models_list (may be default or custom)
             models_dict = dict(zip(LANG_KEYS, self.ner_models_list))
             object.__setattr__(self, 'ner_models', MappingProxyType(models_dict))
+
+        # --- Language validation and supported_languages computation ---
+        from sct.utils.resources import validate_language_name
+
+        # Coerce extra_languages to tuple
+        if isinstance(self.extra_languages, list):
+            object.__setattr__(self, 'extra_languages', tuple(self.extra_languages))
+
+        # Validate extra_languages
+        for lang in self.extra_languages:
+            validate_language_name(lang)
+
+        # Validate and freeze custom_stopwords
+        if self.custom_stopwords:
+            for lang in self.custom_stopwords:
+                validate_language_name(lang)
+            object.__setattr__(self, 'custom_stopwords',
+                               MappingProxyType(dict(self.custom_stopwords)))
+
+        # Validate and freeze custom_month_names
+        if self.custom_month_names:
+            for lang in self.custom_month_names:
+                validate_language_name(lang)
+            object.__setattr__(self, 'custom_month_names',
+                               MappingProxyType({k: tuple(v) for k, v in self.custom_month_names.items()}))
+
+        # Compute supported_languages: union of all sources
+        langs = set(DEFAULT_LANGUAGES)
+        langs.update(self.extra_languages)
+        # Add ner_models keys (minus MULTILINGUAL — it's a model, not a spoken language)
+        if self.ner_models:
+            langs.update(k for k in self.ner_models if k != 'MULTILINGUAL')
+        if self.custom_stopwords:
+            langs.update(self.custom_stopwords.keys())
+        if self.custom_month_names:
+            langs.update(self.custom_month_names.keys())
+        object.__setattr__(self, 'supported_languages', frozenset(langs))
+
+        # Validate language pin against supported set
+        if self.language:
+            upper = self.language.upper()
+            if upper not in self.supported_languages:
+                raise ValueError(
+                    f"language='{self.language}' not in supported languages: "
+                    f"{sorted(self.supported_languages)}"
+                )
 
 
 def _config_from_module_globals() -> TextCleanerConfig:
@@ -181,6 +299,9 @@ def _config_from_module_globals() -> TextCleanerConfig:
         ner_confidence_threshold=m.NER_CONFIDENCE_THRESHOLD,
         language=m.LANGUAGE,
         ner_models=dict(zip(LANG_KEYS, m.NER_MODELS_LIST)),
+        extra_languages=(),
+        custom_stopwords=None,
+        custom_month_names=None,
     )
 
 
