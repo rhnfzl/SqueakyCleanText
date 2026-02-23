@@ -5,10 +5,10 @@ from bs4 import BeautifulSoup
 logger = logging.getLogger(__name__)
 
 class ProcessContacts:
-    
+
     def __init__(self):
         pass
-    
+
     def replace_urls(self, text, replace_with="<URL>"):
         """Replace all URLs in ``text`` str with ``replace_with`` str."""
         return constants.URL_REGEX.sub(replace_with, text)
@@ -22,7 +22,7 @@ class ProcessContacts:
             logger.debug("HTML parsing failed, falling back to regex", exc_info=True)
             text = constants.HTML_REGEX.sub(replace_with, text)
         return text
-    
+
     def replace_emails(self, text, replace_with="<EMAIL>"):
         """Replace all emails in ``text`` str with ``replace_with`` str."""
         return constants.EMAIL_REGEX.sub(replace_with, text)

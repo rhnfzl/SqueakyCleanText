@@ -7,7 +7,6 @@ import threading
 from concurrent.futures import ThreadPoolExecutor
 from typing import List, Tuple, Optional
 
-from sct import config
 from sct.config import TextCleanerConfig, _config_from_module_globals
 from sct.utils import contact, datetime, ner, normtext, resources, special, stopwords
 
@@ -20,37 +19,37 @@ _thread_ctx = threading.local()
 
 
 class TextCleaner:
-    
+
     def __init__(self, cfg: Optional[TextCleanerConfig] = None):
         """Initialize the text cleaning pipeline.
-        
+
         Args:
             cfg: Immutable configuration. If None, reads from module-level
                  config variables (backward compatible).
         """
         self.cfg = cfg or _config_from_module_globals()
-        
+
         self.ProcessContacts = contact.ProcessContacts()
         self.ProcessDateTime = datetime.ProcessDateTime()
         self.ProcessSpecialSymbols = special.ProcessSpecialSymbols()
         self.NormaliseText = normtext.NormaliseText()
         self.ProcessStopwords = stopwords.ProcessStopwords()
-        
+
         if self.cfg.check_ner_process:
             self.GeneralNER = ner.GeneralNER(
                 model_names=list(self.cfg.ner_models_list)
             )
         else:
             self.GeneralNER = None
-        
+
         self.batch_size = 8
         self._pipeline = []
         self._init_pipeline()
-    
+
     def _init_pipeline(self):
         """Build the pipeline steps list based on config."""
         cfg = self.cfg
-        
+
         if cfg.check_fix_bad_unicode:
             self._pipeline.append(self._fix_bad_unicode)
         if cfg.check_to_ascii_unicode:
@@ -89,22 +88,22 @@ class TextCleaner:
             lc = language_config.lower()
             if lc in resources.LANGUAGE_NAME:
                 return language_config.upper()
-        
+
         if any([self.cfg.check_detect_language, self.cfg.check_ner_process,
                 self.cfg.check_remove_stopwords]):
             return str(resources.DETECTOR.detect_language_of(text)).split(".")[-1]
-        
+
         return None
 
     def _process_single(self, text: str) -> Tuple[str, Optional[str], Optional[str]]:
         """Process a single text through the entire pipeline.
-        
+
         Returns:
             Always a 3-tuple: (lm_text, stat_text_or_None, language_or_None)
         """
         # Detect language (pure function, thread-safe)
         language = self._detect_language(text)
-        
+
         current_text = text
 
         # Store language in thread-local so pipeline steps can access it
@@ -122,26 +121,26 @@ class TextCleaner:
                 ner_confidence_threshold=self.cfg.ner_confidence_threshold,
                 language=language,
             )
-        
+
         # Statistical model processing (always returns stext, even if None)
         stext = None
         if self.cfg.check_statistical_model_processing:
             stext = self._statistical_model_processing(current_text, language)
-        
+
         return (current_text, stext, language)
 
     def process_batch(self, texts: List[str], batch_size: int = None) -> List[Tuple[str, Optional[str], Optional[str]]]:
         """Process multiple texts.
-        
+
         Returns:
             List of 3-tuples: (lm_text, stat_text_or_None, language_or_None)
         """
         if not texts:
             return []
-        
+
         results = [None] * len(texts)
         to_process = []
-        
+
         for i, text in enumerate(texts):
             if not isinstance(text, str):
                 raise ValueError(f"Input must be string, got {type(text)}")
@@ -149,7 +148,7 @@ class TextCleaner:
                 results[i] = ("", "", None)
             else:
                 to_process.append((i, text))
-        
+
         if not to_process:
             return results
 
@@ -173,14 +172,14 @@ class TextCleaner:
 
     def process(self, text: str) -> Tuple[str, Optional[str], Optional[str]]:
         """Process a single text. Maintains backward compatibility.
-        
+
         Returns:
             3-tuple: (lm_text, stat_text_or_None, language_or_None)
         """
         return self.process_batch([text])[0]
 
     # --- Pipeline step methods (private, used by _init_pipeline) ---
-    
+
     def _fix_bad_unicode(self, text):
         return self.NormaliseText.fix_bad_unicode(text)
 

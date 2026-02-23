@@ -36,6 +36,10 @@ jobs:
     - name: Check disk usage after install
       run: df -h
 
+    - name: Lint with ruff
+      run: |
+        ruff check sct/ tests/
+
     - name: Test with pytest
       run: |
         pytest tests/ -v

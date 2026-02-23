@@ -2,16 +2,16 @@ import logging
 import re
 from ftfy import fix_text
 from unidecode import unidecode
-from emoji import demojize, emojize, replace_emoji
+from emoji import demojize, replace_emoji
 from sct.utils import constants
 
 logger = logging.getLogger(__name__)
 
 class NormaliseText:
-    
+
     def __init__(self):
         pass
-    
+
     def fix_bad_unicode(self, text, normalization="NFC"):
         """
         Fix unicode text that's "broken" using `ftfy <http://ftfy.readthedocs.org/>`_;

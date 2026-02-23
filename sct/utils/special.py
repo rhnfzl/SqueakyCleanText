@@ -17,10 +17,10 @@ _ISOLATED_QUOTES_REGEX = re.compile(
 
 
 class ProcessSpecialSymbols:
-    
+
     def __init__(self):
         pass
-    
+
     def replace_currency_symbols(self, text, replace_with="<CUR>"):
         """
         Replace currency symbols in ``text`` str with string specified by ``replace_with`` str.
@@ -37,20 +37,20 @@ class ProcessSpecialSymbols:
             return text
         else:
             return constants.CURRENCY_REGEX.sub(replace_with, text)
-        
-        
+
+
     def remove_isolated_letters(self, text):
         """
         Removes any isolated letters which doesn't add any value to the text.
         """
         cleaned_text = constants.ISOLATED_LETTERS_REGEX.sub('', text)
-        
+
         return cleaned_text
 
     def remove_isolated_special_symbols(self, text, remove_brackets=True, remove_braces=True):
         """
         Removes any isolated symbols which shouldn't be present in the text.
-        
+
         Args:
             text: Input text.
             remove_brackets: If True, remove [...] content (image/file references).
@@ -63,8 +63,8 @@ class ProcessSpecialSymbols:
             cleaned_text = _BRACE_CONTENT_REGEX.sub('', cleaned_text)
         cleaned_text = constants.ISOLATED_SPECIAL_SYMBOLS_REGEX.sub('', cleaned_text)
         cleaned_text = _ISOLATED_QUOTES_REGEX.sub('', cleaned_text)
-        
+
         return cleaned_text
-    
+
     def remove_punctuation(self, text):
         return _PUNCTUATION_REGEX.sub('', text)

@@ -3,7 +3,7 @@ import torch
 import threading
 from collections import defaultdict
 import logging
-from typing import List, Dict, Any, Optional, Tuple
+from typing import List, Optional
 from pathlib import Path
 
 import transformers
@@ -44,11 +44,11 @@ class ModelLoadError(Exception):
 
 class GeneralNER:
     """NER processor with lazy model loading and ensemble voting."""
-    
+
     def __init__(self, cache_dir: Optional[Path] = None, device: str = None,
                  model_names: Optional[List[str]] = None):
         """Initialize NER processor.
-        
+
         Args:
             cache_dir: Optional directory for caching models
             device: Device for inference ('cuda' or 'cpu'). Auto-detects if None.
@@ -56,16 +56,16 @@ class GeneralNER:
         """
         self.device = device or ("cuda" if torch.cuda.is_available() else "cpu")
         logger.info(f"Using device: {self.device}")
-        
+
         self.engine = AnonymizerEngine()
         self._cache_args = {"cache_dir": str(cache_dir)} if cache_dir else {}
-        
+
         # Build model mapping from config or provided list
         if model_names is not None:
             self._model_names = list(model_names)
         else:
             self._model_names = list(config.NER_MODELS_LIST)
-        
+
         # Lazy-loaded pipelines, tokenizers, and models (keyed by language)
         self._pipelines = {}
         self._tokenizers = {}
@@ -74,12 +74,12 @@ class GeneralNER:
         # HF fast tokenizers use Rust RefCell internally — not safe for
         # concurrent pipeline calls. Serialize inference across threads.
         self._inference_lock = threading.Lock()
-        
+
         # Eagerly load English + multilingual to compute min_token_length
         # (needed for split_text before first ner_process call)
         self._ensure_loaded('ENGLISH')
         self._ensure_loaded('MULTILINGUAL')
-        
+
         # Set tokenizer properties from loaded models
         en_tok = self._tokenizers['ENGLISH']
         multi_tok = self._tokenizers['MULTILINGUAL']
@@ -87,7 +87,7 @@ class GeneralNER:
             en_tok.max_len_single_sentence,
             multi_tok.max_len_single_sentence
         ) * 0.9)
-        
+
         self.tokenizer = en_tok if (
             en_tok.max_len_single_sentence <= multi_tok.max_len_single_sentence
         ) else multi_tok
@@ -164,24 +164,24 @@ class GeneralNER:
                     end=items['end'],
                     score=items['score'],
                 ))
-        
+
         text_length = len(text)
         analyzer_result = [
             entry for entry in analyzer_result
             if 0 <= entry.start < text_length and 0 < entry.end <= text_length
         ]
-        
+
         return self.engine.anonymize(text=text, analyzer_results=analyzer_result)
 
     def ner_ensemble(self, ner_results, t):
         """Apply ensemble voting across multiple model results.
-        
+
         Groups entities by position key, averages their confidence scores,
         and filters by threshold. Returns the highest-scoring entity per position.
         """
         if not ner_results:
             return []
-        
+
         ner_keys = defaultdict(lambda: [0, 0])
         for entity in ner_results:
             ner_keys[entity['key']][0] += 1
@@ -191,7 +191,7 @@ class GeneralNER:
         filter_ner_results = self.filter_ner_data(ner_results, passing_keys)
         filter_ner_results.sort(key=lambda x: x['start'])
         return filter_ner_results
-    
+
     @torch.no_grad()
     def ner_process(
         self,
@@ -244,7 +244,7 @@ class GeneralNER:
             ner_clean_text.append(ner_text)
 
         return ' '.join(ner_clean_text)
-    
+
     def _token_count(self, text: str, tokenizer) -> int:
         """Count tokens in text."""
         return len(tokenizer(text).input_ids)
@@ -323,8 +323,8 @@ class GeneralNER:
         return chunks
 
     def process_batch(
-        self, 
-        texts: List[str], 
+        self,
+        texts: List[str],
         batch_size: int = 8,
         positional_tags: List[str] = None,
         ner_confidence_threshold: float = None,

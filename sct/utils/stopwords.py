@@ -11,7 +11,7 @@ _LANG_TO_ISO = {
 
 
 class ProcessStopwords:
-    
+
     def __init__(self):
         # Use sets for O(1) membership testing (was O(n) with lists)
         self.STOP_WORDS_EN = set(get_stop_words('en'))
@@ -32,7 +32,7 @@ class ProcessStopwords:
 
     def remove_stopwords(self, text, lan):
         """Remove stopwords based on the detected language.
-        
+
         Falls back to English stopwords for unknown languages.
         """
         stop_words = self._lang_map.get(lan, self.STOP_WORDS_EN)

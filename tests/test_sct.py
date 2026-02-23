@@ -1,8 +1,5 @@
 import unittest
-import random
 import string
-import os
-import sys
 from hypothesis import given, settings
 from hypothesis.strategies import text, from_regex
 from faker import Faker
@@ -14,7 +11,6 @@ import torch
 from unittest.mock import patch
 from functools import wraps
 from sct.sct import TextCleaner
-from sct.utils import ner
 
 
 def requires_ner(func):
@@ -407,9 +403,9 @@ class TextCleanerTest(unittest.TestCase):
             "SPANISH": ("Pablo vive en Madrid.", "Pablo", "Madrid"),
             "DUTCH": ("Willem woont in Amsterdam.", "Willem", "Amsterdam"),
         }
-        for lang, (text, person, location) in tests.items():
+        for lang, (input_text, person, location) in tests.items():
             processed = self.ner.ner_process(
-                text,
+                input_text,
                 positional_tags=['PER', 'LOC'],
                 ner_confidence_threshold=0.85,
                 language=lang,
@@ -883,8 +879,8 @@ class TextCleanerTest(unittest.TestCase):
             ("Am 3. März 2023 begann das Projekt", "3. März 2023"),
             ("Dezember 25, 2024 ist Weihnachten", "Dezember 25, 2024"),
         ]
-        for text, date_str in cases:
-            result = dt.replace_dates(text, "<DATE>")
+        for input_text, date_str in cases:
+            result = dt.replace_dates(input_text, "<DATE>")
             self.assertIn("<DATE>", result, f"Failed to detect German date: {date_str}")
             self.assertNotIn(date_str, result)
 
@@ -896,8 +892,8 @@ class TextCleanerTest(unittest.TestCase):
             ("Op 3 maart 2023 begon het project", "3 maart 2023"),
             ("Oktober 10, 2024 is de deadline", "Oktober 10, 2024"),
         ]
-        for text, date_str in cases:
-            result = dt.replace_dates(text, "<DATE>")
+        for input_text, date_str in cases:
+            result = dt.replace_dates(input_text, "<DATE>")
             self.assertIn("<DATE>", result, f"Failed to detect Dutch date: {date_str}")
 
     def test_date_regex_spanish(self):
@@ -908,8 +904,8 @@ class TextCleanerTest(unittest.TestCase):
             ("El 3 de marzo de 2023 comenzó el proyecto", "3 de marzo de 2023"),
             ("Diciembre 25, 2024 es Navidad", "Diciembre 25, 2024"),
         ]
-        for text, date_str in cases:
-            result = dt.replace_dates(text, "<DATE>")
+        for input_text, date_str in cases:
+            result = dt.replace_dates(input_text, "<DATE>")
             self.assertIn("<DATE>", result, f"Failed to detect Spanish date: {date_str}")
 
     def test_date_regex_day_first_format(self):
@@ -930,9 +926,9 @@ class TextCleanerTest(unittest.TestCase):
             "Due by Septmber 30, 2024",
             "Starting Novmber 1, 2025",
         ]
-        for text in cases:
-            result = dt.fuzzy_replace_dates(text, "<DATE>", score_cutoff=85)
-            self.assertIn("<DATE>", result, f"Fuzzy failed for: {text}")
+        for input_text in cases:
+            result = dt.fuzzy_replace_dates(input_text, "<DATE>", score_cutoff=85)
+            self.assertIn("<DATE>", result, f"Fuzzy failed for: {input_text}")
 
     def test_fuzzy_replace_dates_misspelled_multilingual(self):
         """Test fuzzy detection of misspelled non-English month names."""
@@ -941,9 +937,9 @@ class TextCleanerTest(unittest.TestCase):
             ("15 de enro de 2024", "Spanish 'enero' misspelled"),
             ("15 Febuari 2024", "Dutch 'februari' misspelled"),
         ]
-        for text, description in cases:
-            result = dt.fuzzy_replace_dates(text, "<DATE>", score_cutoff=80)
-            self.assertIn("<DATE>", result, f"Fuzzy failed for {description}: {text}")
+        for input_text, description in cases:
+            result = dt.fuzzy_replace_dates(input_text, "<DATE>", score_cutoff=80)
+            self.assertIn("<DATE>", result, f"Fuzzy failed for {description}: {input_text}")
 
     def test_fuzzy_replace_dates_no_false_positive(self):
         """Test that fuzzy detection doesn't replace non-date patterns."""
@@ -954,9 +950,9 @@ class TextCleanerTest(unittest.TestCase):
             "Meeting with the major at noon",
             "This is a jungle out there",
         ]
-        for text in texts:
-            result = dt.fuzzy_replace_dates(text, "<DATE>", score_cutoff=85)
-            self.assertEqual(text, result, f"False positive for: {text}")
+        for input_text in texts:
+            result = dt.fuzzy_replace_dates(input_text, "<DATE>", score_cutoff=85)
+            self.assertEqual(input_text, result, f"False positive for: {input_text}")
 
     def test_fuzzy_replace_dates_after_exact_regex(self):
         """Test fuzzy pass only catches what regex missed."""
