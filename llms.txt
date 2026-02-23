@@ -1,0 +1,116 @@
+# SqueakyCleanText
+
+> Production-ready text preprocessing and PII anonymization pipeline for Python 3.11+.
+> Removes noise (URLs, emails, phone numbers, stopwords), detects language automatically,
+> and runs ensemble NER (ONNX/PyTorch/GLiNER) for entity anonymization.
+> Published on PyPI as `squeakycleantext`.
+
+## Quick Start
+
+```
+pip install squeakycleantext
+```
+
+```python
+from sct import TextCleaner, TextCleanerConfig
+
+cleaner = TextCleaner(cfg=TextCleanerConfig(check_ner_process=True))
+lm_text, stat_text, lang = cleaner.process("Contact John at john@acme.com or +1-555-123-4567.")
+# lm_text:   "Contact <PERSON> at <EMAIL> or <PHONE>."
+# stat_text: "contact"
+# lang:      "ENGLISH"
+```
+
+## API Surface
+
+- `TextCleaner(cfg=TextCleanerConfig(...))` — main pipeline class
+- `cleaner.process(text: str) -> (lm_text, stat_text, language)`
+- `cleaner.process_batch(texts: List[str]) -> List[tuple]` — thread-parallel
+- `cleaner.aprocess_batch(texts) -> List[tuple]` — async (FastAPI/aiohttp)
+- `cleaner.warmup(languages=None)` — pre-load NER models at startup
+
+## TextCleanerConfig — Key Fields
+
+```
+check_ner_process=True              # NER entity anonymization
+check_replace_urls=True             # Replace URLs with <URL>
+check_replace_emails=True           # Replace emails with <EMAIL>
+check_replace_phone_numbers=True    # Replace phones with <PHONE>
+check_replace_dates=False           # Replace dates with <DATE>
+check_fuzzy_replace_dates=False     # Fuzzy misspelled month matching (requires [fuzzy])
+check_remove_stopwords=True         # Language-aware stopword removal
+check_remove_punctuation=True       # Punctuation removal (stat output)
+check_remove_emoji=False            # Remove emoji characters
+check_statistical_model_processing=True  # Generate stat_text output
+
+ner_backend='onnx'                  # 'onnx'|'torch'|'gliner'|'ensemble_onnx'|'ensemble_torch'
+ner_confidence_threshold=0.85       # Min confidence for entity tagging
+ner_batch_size=8                    # Inference batch size (must be >= 1)
+positional_tags=('PER','LOC','ORG','MISC')
+
+language=None                       # Pin language (e.g. 'ENGLISH') or None for auto-detect
+extra_languages=()                  # Add languages: 'FRENCH', 'PORTUGUESE', 'ITALIAN'
+custom_stopwords=None               # {LANG: frozenset({...})}
+custom_pipeline_steps=()            # Tuple of (text: str) -> str callables
+```
+
+## NER Backends
+
+```
+onnx (default) — ONNX Runtime, torch-free, ~3-5x faster than PyTorch — base install
+torch          — PyTorch/Transformers pipeline — pip install squeakycleantext[torch]
+gliner         — Zero-shot custom entities (PRODUCT, EVENT, SKILL) — pip install squeakycleantext[gliner]
+ensemble_onnx  — ONNX + GLiNER voting — pip install squeakycleantext[gliner]
+ensemble_torch — Torch + GLiNER voting — pip install squeakycleantext[torch,gliner]
+```
+
+## Supported Languages
+
+```
+English                        — rhnfzl/xlm-roberta-large-conll03-english-onnx
+Dutch                          — rhnfzl/xlm-roberta-large-conll02-dutch-onnx
+German                         — rhnfzl/xlm-roberta-large-conll03-german-onnx
+Spanish                        — rhnfzl/xlm-roberta-large-conll02-spanish-onnx
+French / Portuguese / Italian  — rhnfzl/wikineural-multilingual-ner-onnx (shared ONNX session)
+```
+
+## Common Q&A
+
+**Q: How do I anonymize PII in text?**
+A: Set `check_ner_process=True` (default). Returns entities replaced with `<PERSON>`, `<ORGANISATION>`, `<LOCATION>`.
+
+**Q: How do I process texts in a FastAPI route without blocking the event loop?**
+A: Use: `results = await cleaner.aprocess_batch(texts)`
+
+**Q: How do I pre-load models to avoid first-request latency?**
+A: Call `cleaner.warmup(['ENGLISH', 'DUTCH'])` during application startup.
+
+**Q: How do I add French/Portuguese/Italian support?**
+A: Pass `extra_languages=('FRENCH',)` in `TextCleanerConfig`. NER and detection both route via the multilingual model automatically.
+
+**Q: Can I add custom text transformation steps?**
+A: Yes — `custom_pipeline_steps=(my_fn,)` where `my_fn` accepts and returns `str`. Steps run after all built-in steps.
+
+**Q: What's the difference between lm_text and stat_text?**
+A: `lm_text` preserves sentence structure with replacement tokens (for LLM fine-tuning/inference). `stat_text` is lowercased, stopword-free, no punctuation (for TF-IDF, embeddings, classical ML).
+
+## Key Source Files
+
+```
+sct/sct.py               — TextCleaner orchestrator, pipeline assembly
+sct/config.py            — TextCleanerConfig frozen dataclass, all defaults
+sct/utils/ner.py         — GeneralNER: ensemble NER, lazy loading, ONNX session sharing
+sct/utils/onnx_pipeline.py — ONNXNERPipeline: ONNX inference, BIO aggregation
+sct/utils/constants.py   — Pre-compiled regexes (URL, email, phone, date, currency, etc.)
+sct/utils/stopwords.py   — Language-aware stopword removal (O(1) set lookup)
+sct/utils/resources.py   — Lingua language detector (lazy singleton)
+tests/test_sct.py        — Full test suite (hypothesis, faker, pytest-timeout)
+```
+
+## Resources
+
+- GitHub:   https://github.com/rhnfzl/SqueakyCleanText
+- PyPI:     https://pypi.org/project/squeakycleantext/
+- Issues:   https://github.com/rhnfzl/SqueakyCleanText/issues
+- Releases: https://github.com/rhnfzl/SqueakyCleanText/releases
+- License:  MIT (Rehan Fazal, 2024)

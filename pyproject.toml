@@ -5,21 +5,31 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "SqueakyCleanText"
 version = "0.5.0"
-description = "A comprehensive text cleaning and preprocessing pipeline."
+description = "Text preprocessing & PII anonymization pipeline for NLP/ML: ONNX NER ensemble, language detection, stopword removal, and configurable token replacement."
 readme = "README.md"
 license = {text = "MIT"}
 authors = [{name = "Rehan Fazal"}]
 requires-python = ">=3.11"
-keywords = ["text cleaning", "text preprocessing", "NLP", "natural language processing"]
+keywords = [
+    "text cleaning", "text preprocessing", "NLP", "natural language processing",
+    "named entity recognition", "NER", "anonymization", "PII removal",
+    "data cleaning", "machine learning", "ONNX", "language detection",
+]
 classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Scientific/Engineering :: Information Analysis",
+    "Topic :: Text Processing :: Linguistic",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Natural Language :: English",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
-    "Topic :: Software Development :: Libraries",
-    "Topic :: Text Processing",
 ]
 dependencies = [
     "lingua-language-detector>=2.0.2",
@@ -38,6 +48,9 @@ dependencies = [
 
 [project.urls]
 Homepage = "https://github.com/rhnfzl/SqueakyCleanText"
+Repository = "https://github.com/rhnfzl/SqueakyCleanText"
+Issues = "https://github.com/rhnfzl/SqueakyCleanText/issues"
+Changelog = "https://github.com/rhnfzl/SqueakyCleanText/releases"
 
 [project.optional-dependencies]
 gpu = [
