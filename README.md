@@ -11,9 +11,11 @@
 A comprehensive text cleaning and preprocessing pipeline for machine learning and NLP tasks.
 </div>
 
+> **Using an AI coding assistant?** This repo includes an [`llms.txt`](./llms.txt) with the full API surface, config reference, and Q&A — optimised for Claude, Cursor, Copilot, and ChatGPT.
+
 In the world of machine learning and natural language processing, clean and well-structured text data is crucial for building effective downstream models and managing token limits in language models.
 
-SqueakyCleanText simplifies the process by automatically addressing common text issues, ensuring your data is clean and well-structured with minimal effort on your part.
+SqueakyCleanText simplifies the process by automatically addressing common text issues — removing PII, anonymizing named entities (persons, organisations, locations), and ensuring your data is clean and well-structured for language models and classical ML pipelines with minimal effort on your part.
 
 ### Key Features
 
