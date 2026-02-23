@@ -1,16 +1,20 @@
+import gc
 import unittest
 import string
 from hypothesis import given, settings
 from hypothesis.strategies import text, from_regex
 from faker import Faker
 from sct import config
-from sct.config import TextCleanerConfig
+from sct.config import LANG_KEYS, TextCleanerConfig
 from sct.utils import contact, datetime, special, normtext, stopwords, constants
 from sct.utils.ner import GeneralNER
-import torch
 from unittest.mock import patch
 from functools import wraps
 from sct.sct import TextCleaner
+
+
+# Lightweight ONNX test model for all languages (never use production 7GB models in tests)
+TEST_NER_MODELS = {k: "protectai/bert-base-NER-onnx" for k in LANG_KEYS}
 
 
 def requires_ner(func):
@@ -47,11 +51,10 @@ class TextCleanerTest(unittest.TestCase):
         cls.ProcessStopwords = stopwords.ProcessStopwords()
         cls.fake = Faker()
 
-        # Always use lightweight test model — never download production models (7GB)
+        # Always use lightweight ONNX test model — never download production models
         cls.ner = None
-        test_models = ["dslim/bert-base-NER"] * 5
         try:
-            cls.ner = GeneralNER(device='cpu', model_names=test_models)
+            cls.ner = GeneralNER(device='cpu', model_names=TEST_NER_MODELS)
             cls.ner.ner_process(
                 "Test sentence.",
                 positional_tags=['PER', 'ORG', 'LOC'],
@@ -183,6 +186,65 @@ class TextCleanerTest(unittest.TestCase):
         """Test that list args are coerced to tuples in frozen dataclass."""
         cfg = TextCleanerConfig(positional_tags=['PER', 'LOC'])
         self.assertIsInstance(cfg.positional_tags, tuple)
+
+    # --- NER model config dict tests ---
+
+    def test_ner_models_dict_acceptance(self):
+        """Test that ner_models dict is accepted and populates both fields."""
+        from types import MappingProxyType
+        models = {
+            'ENGLISH': 'test/english-onnx',
+            'MULTILINGUAL': 'test/multi-onnx',
+        }
+        cfg = TextCleanerConfig(ner_models=models)
+        # Dict should be frozen
+        self.assertIsInstance(cfg.ner_models, MappingProxyType)
+        self.assertEqual(cfg.ner_models['ENGLISH'], 'test/english-onnx')
+        self.assertEqual(cfg.ner_models['MULTILINGUAL'], 'test/multi-onnx')
+        # Missing keys filled from defaults
+        self.assertIn('DUTCH', cfg.ner_models)
+        self.assertIn('GERMAN', cfg.ner_models)
+        self.assertIn('SPANISH', cfg.ner_models)
+        # ner_models_list also populated
+        self.assertIsInstance(cfg.ner_models_list, tuple)
+        self.assertEqual(len(cfg.ner_models_list), 5)
+
+    def test_ner_models_frozen(self):
+        """Test that ner_models dict is immutable (MappingProxyType)."""
+        cfg = TextCleanerConfig()
+        with self.assertRaises(TypeError):
+            cfg.ner_models['ENGLISH'] = 'new-model'
+
+    def test_ner_models_required_keys_validation(self):
+        """Test that missing ENGLISH or MULTILINGUAL raises ValueError."""
+        with self.assertRaises(ValueError) as ctx:
+            TextCleanerConfig(ner_models={'DUTCH': 'test/dutch-onnx'})
+        self.assertIn('ENGLISH', str(ctx.exception))
+        self.assertIn('MULTILINGUAL', str(ctx.exception))
+
+    def test_ner_models_backward_compat_tuple(self):
+        """Test that old ner_models_list tuple API still works."""
+        from types import MappingProxyType
+        models = ("m1", "m2", "m3", "m4", "m5")
+        cfg = TextCleanerConfig(ner_models_list=models)
+        # Should auto-derive ner_models dict
+        self.assertIsInstance(cfg.ner_models, MappingProxyType)
+        self.assertEqual(cfg.ner_models['ENGLISH'], 'm1')
+        self.assertEqual(cfg.ner_models['MULTILINGUAL'], 'm5')
+        # Original tuple preserved
+        self.assertEqual(cfg.ner_models_list, models)
+
+    def test_ner_models_dict_priority_over_list(self):
+        """Test that ner_models takes priority when both are provided."""
+        cfg = TextCleanerConfig(
+            ner_models={'ENGLISH': 'dict-model', 'MULTILINGUAL': 'dict-multi'},
+            ner_models_list=("list1", "list2", "list3", "list4", "list5"),
+        )
+        # Dict should win
+        self.assertEqual(cfg.ner_models['ENGLISH'], 'dict-model')
+        self.assertEqual(cfg.ner_models['MULTILINGUAL'], 'dict-multi')
+        # ner_models_list re-derived from merged dict
+        self.assertEqual(cfg.ner_models_list[0], 'dict-model')
 
     # --- Special symbols tests ---
 
@@ -441,7 +503,7 @@ class TextCleanerTest(unittest.TestCase):
         config.CHECK_NER_PROCESS = True
         cfg = TextCleanerConfig(
             check_ner_process=True,
-            ner_models_list=("dslim/bert-base-NER",) * 5,
+            ner_models=TEST_NER_MODELS,
         )
         sx = TextCleaner(cfg=cfg)
 
@@ -468,7 +530,7 @@ class TextCleanerTest(unittest.TestCase):
         """Test end-to-end text cleaning following the pipeline."""
         cfg = TextCleanerConfig(
             check_ner_process=True,
-            ner_models_list=("dslim/bert-base-NER",) * 5,
+            ner_models=TEST_NER_MODELS,
         )
         sx = TextCleaner(cfg=cfg)
         lm_text, stat_text, lang = sx.process(TEST_TEXT)
@@ -529,7 +591,7 @@ class TextCleanerTest(unittest.TestCase):
         """
         cfg = TextCleanerConfig(
             check_ner_process=True,
-            ner_models_list=("dslim/bert-base-NER",) * 5,
+            ner_models=TEST_NER_MODELS,
         )
 
         texts = [
@@ -1042,9 +1104,6 @@ class TextCleanerTest(unittest.TestCase):
     def tearDownClass(cls):
         if hasattr(cls, 'ner') and cls.ner is not None:
             del cls.ner
-        if torch.cuda.is_available():
-            torch.cuda.empty_cache()
-        import gc
         gc.collect()
 
 

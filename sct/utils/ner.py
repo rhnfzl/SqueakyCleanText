@@ -1,32 +1,23 @@
 import math
-import torch
+import gc
 import threading
 from collections import defaultdict
 import logging
-from typing import List, Optional
+from typing import Dict, List, Optional, Union
 from pathlib import Path
 
-import transformers
-from transformers import AutoTokenizer, AutoModelForTokenClassification, pipeline
+import onnxruntime as ort
 
 from presidio_anonymizer import AnonymizerEngine
 from presidio_anonymizer.entities import RecognizerResult
 
 from sct.utils import constants
-from sct import config
+from sct.utils.onnx_pipeline import load_onnx_ner_model
+from sct.config import DEFAULT_NER_MODELS, LANG_KEYS
 
-transformers.logging.set_verbosity_error()
+ort.set_default_logger_severity(3)  # Silence ONNX Runtime warnings
 
 logger = logging.getLogger(__name__)
-
-# Data-driven language-to-model mapping
-LANG_MODEL_MAP = {
-    'ENGLISH': 0,
-    'DUTCH': 1,
-    'GERMAN': 2,
-    'SPANISH': 3,
-    'MULTILINGUAL': 4,
-}
 
 # Entity group to Presidio entity type mapping
 ENTITY_TYPE_MAP = {
@@ -46,33 +37,42 @@ class GeneralNER:
     """NER processor with lazy model loading and ensemble voting."""
 
     def __init__(self, cache_dir: Optional[Path] = None, device: str = None,
-                 model_names: Optional[List[str]] = None):
+                 model_names: Optional[Union[Dict[str, str], List[str]]] = None):
         """Initialize NER processor.
 
         Args:
             cache_dir: Optional directory for caching models
             device: Device for inference ('cuda' or 'cpu'). Auto-detects if None.
-            model_names: Optional list of model names. Uses config if None.
+            model_names: Language-keyed dict of ONNX model repo IDs (preferred),
+                or positional list for backward compat. Uses DEFAULT_NER_MODELS if None.
         """
-        self.device = device or ("cuda" if torch.cuda.is_available() else "cpu")
+        if device:
+            self.device = device
+        elif 'CUDAExecutionProvider' in ort.get_available_providers():
+            self.device = 'cuda'
+        else:
+            self.device = 'cpu'
         logger.info(f"Using device: {self.device}")
 
         self.engine = AnonymizerEngine()
         self._cache_args = {"cache_dir": str(cache_dir)} if cache_dir else {}
 
-        # Build model mapping from config or provided list
-        if model_names is not None:
-            self._model_names = list(model_names)
+        # Build model mapping: dict (preferred), list (legacy), or defaults
+        if model_names is None:
+            self._model_names = dict(DEFAULT_NER_MODELS)
+        elif isinstance(model_names, dict):
+            self._model_names = dict(model_names)
         else:
-            self._model_names = list(config.NER_MODELS_LIST)
+            # Legacy list path — convert via LANG_KEYS ordering
+            self._model_names = dict(zip(LANG_KEYS, model_names))
 
-        # Lazy-loaded pipelines, tokenizers, and models (keyed by language)
+        # Lazy-loaded pipelines and tokenizers (keyed by language)
         self._pipelines = {}
         self._tokenizers = {}
-        self._models = {}
         self._load_lock = threading.Lock()
-        # HF fast tokenizers use Rust RefCell internally — not safe for
-        # concurrent pipeline calls. Serialize inference across threads.
+        # ONNX Runtime sessions are thread-safe for inference, but the
+        # tokenizers library uses Rust internals that may not be safe for
+        # concurrent encoding.  Serialize inference across threads.
         self._inference_lock = threading.Lock()
 
         # Eagerly load English + multilingual to compute min_token_length
@@ -93,11 +93,11 @@ class GeneralNER:
         ) else multi_tok
 
     def _get_model_name(self, lang_key: str) -> str:
-        """Get model name for a language using data-driven mapping."""
-        idx = LANG_MODEL_MAP.get(lang_key)
-        if idx is None or idx >= len(self._model_names):
+        """Get model name for a language via direct dict lookup."""
+        model = self._model_names.get(lang_key)
+        if model is None:
             raise ModelLoadError(f"No model configured for language: {lang_key}")
-        return self._model_names[idx]
+        return model
 
     def _ensure_loaded(self, lang_key: str) -> None:
         """Lazily load a model and pipeline for the given language."""
@@ -109,20 +109,20 @@ class GeneralNER:
             model_name = self._get_model_name(lang_key)
             logger.info(f"Loading model for {lang_key}: {model_name}")
             try:
-                tokenizer = AutoTokenizer.from_pretrained(model_name, **self._cache_args)
-                model = AutoModelForTokenClassification.from_pretrained(
-                    model_name, **self._cache_args
-                ).to(self.device)
-                ner_pipeline = pipeline(
-                    "ner", model=model, tokenizer=tokenizer,
-                    aggregation_strategy="simple", device=self.device
+                onnx_pipeline, tokenizer_wrapper = load_onnx_ner_model(
+                    model_name,
+                    device=self.device,
+                    cache_dir=self._cache_args.get("cache_dir"),
                 )
-                self._tokenizers[lang_key] = tokenizer
-                self._models[lang_key] = model
-                self._pipelines[lang_key] = ner_pipeline
+                self._tokenizers[lang_key] = tokenizer_wrapper
+                self._pipelines[lang_key] = onnx_pipeline
             except Exception as e:
                 logger.error(f"Failed to load model for {lang_key}: {e}")
-                raise ModelLoadError(f"Model loading failed for {lang_key}: {e}")
+                raise ModelLoadError(
+                    f"Model loading failed for {lang_key} ({model_name}): {e}. "
+                    f"Ensure the model is in ONNX format with model.onnx, "
+                    f"config.json, and tokenizer.json on HuggingFace Hub."
+                )
 
     def _get_pipeline(self, lang_key: str):
         """Get the NER pipeline for a language, loading it if needed."""
@@ -192,7 +192,6 @@ class GeneralNER:
         filter_ner_results.sort(key=lambda x: x['start'])
         return filter_ner_results
 
-    @torch.no_grad()
     def ner_process(
         self,
         text: str,
@@ -213,11 +212,11 @@ class GeneralNER:
         ner_confidence_threshold = ner_confidence_threshold or 0.85
 
         # Select language-specific pipeline
-        lang_key = language if language in LANG_MODEL_MAP and language != 'MULTILINGUAL' else 'ENGLISH'
+        lang_key = language if language in self._model_names and language != 'MULTILINGUAL' else 'ENGLISH'
         lang_pipe = self._get_pipeline(lang_key)
         multi_pipe = self._get_pipeline('MULTILINGUAL')
 
-        # Serialized via lock — HF fast tokenizers use Rust RefCell internally,
+        # Serialized via lock — tokenizers library uses Rust internals,
         # so both tokenization (split_text) and pipeline inference must be
         # protected from concurrent access.
         with self._inference_lock:
@@ -346,9 +345,5 @@ class GeneralNER:
         return results
 
     def __del__(self):
-        """Cleanup GPU memory when object is destroyed."""
-        if hasattr(self, 'device') and self.device == 'cuda':
-            try:
-                torch.cuda.empty_cache()
-            except Exception as e:
-                logger.warning(f"Failed to clear CUDA cache: {e}")
+        """Cleanup when object is destroyed."""
+        gc.collect()

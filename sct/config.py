@@ -14,7 +14,20 @@ Legacy API (backward compatible):
 
 import sys
 from dataclasses import dataclass
-from typing import Optional, Tuple
+from types import MappingProxyType
+from typing import Mapping, Optional, Tuple
+
+
+LANG_KEYS = ('ENGLISH', 'DUTCH', 'GERMAN', 'SPANISH', 'MULTILINGUAL')
+REQUIRED_NER_KEYS = frozenset({'ENGLISH', 'MULTILINGUAL'})
+
+DEFAULT_NER_MODELS: dict[str, str] = {
+    'ENGLISH': 'rhnfzl/xlm-roberta-large-conll03-english-onnx',
+    'DUTCH': 'rhnfzl/xlm-roberta-large-conll02-dutch-onnx',
+    'GERMAN': 'rhnfzl/xlm-roberta-large-conll03-german-onnx',
+    'SPANISH': 'rhnfzl/xlm-roberta-large-conll02-spanish-onnx',
+    'MULTILINGUAL': 'rhnfzl/wikineural-multilingual-ner-onnx',
+}
 
 
 @dataclass(frozen=True)
@@ -78,13 +91,20 @@ class TextCleanerConfig:
     ner_confidence_threshold: float = 0.85
     language: Optional[str] = None
 
-    # Order matters: English, Dutch, German, Spanish, Multilingual
+    # Preferred: language-keyed dict of HuggingFace ONNX model repo IDs.
+    # Models must have model.onnx, config.json, tokenizer.json on Hub.
+    # ENGLISH and MULTILINGUAL are always required (loaded eagerly).
+    # Missing keys are filled from DEFAULT_NER_MODELS.
+    ner_models: Optional[Mapping[str, str]] = None
+
+    # Deprecated: positional tuple (English, Dutch, German, Spanish, Multilingual).
+    # Use ner_models dict instead. Kept for backward compatibility.
     ner_models_list: Tuple[str, ...] = (
-        "FacebookAI/xlm-roberta-large-finetuned-conll03-english",
-        "FacebookAI/xlm-roberta-large-finetuned-conll02-dutch",
-        "FacebookAI/xlm-roberta-large-finetuned-conll03-german",
-        "FacebookAI/xlm-roberta-large-finetuned-conll02-spanish",
-        "Babelscape/wikineural-multilingual-ner",
+        "rhnfzl/xlm-roberta-large-conll03-english-onnx",
+        "rhnfzl/xlm-roberta-large-conll02-dutch-onnx",
+        "rhnfzl/xlm-roberta-large-conll03-german-onnx",
+        "rhnfzl/xlm-roberta-large-conll02-spanish-onnx",
+        "rhnfzl/wikineural-multilingual-ner-onnx",
     )
 
     def __post_init__(self):
@@ -93,6 +113,27 @@ class TextCleanerConfig:
             object.__setattr__(self, 'positional_tags', tuple(self.positional_tags))
         if isinstance(self.ner_models_list, list):
             object.__setattr__(self, 'ner_models_list', tuple(self.ner_models_list))
+
+        # Reconcile ner_models (dict, preferred) and ner_models_list (tuple, deprecated).
+        # After this block, both fields are guaranteed populated.
+        if self.ner_models is not None:
+            # Dict API used — validate required keys, fill defaults, freeze
+            missing = REQUIRED_NER_KEYS - set(self.ner_models)
+            if missing:
+                raise ValueError(
+                    f"ner_models must include {sorted(REQUIRED_NER_KEYS)}, "
+                    f"missing: {sorted(missing)}"
+                )
+            merged = {**DEFAULT_NER_MODELS, **self.ner_models}
+            object.__setattr__(self, 'ner_models', MappingProxyType(merged))
+            object.__setattr__(
+                self, 'ner_models_list',
+                tuple(merged[k] for k in LANG_KEYS),
+            )
+        else:
+            # No dict provided — derive from ner_models_list (may be default or custom)
+            models_dict = dict(zip(LANG_KEYS, self.ner_models_list))
+            object.__setattr__(self, 'ner_models', MappingProxyType(models_dict))
 
 
 def _config_from_module_globals() -> TextCleanerConfig:
@@ -139,7 +180,7 @@ def _config_from_module_globals() -> TextCleanerConfig:
         positional_tags=tuple(m.POSITIONAL_TAGS),
         ner_confidence_threshold=m.NER_CONFIDENCE_THRESHOLD,
         language=m.LANGUAGE,
-        ner_models_list=tuple(m.NER_MODELS_LIST),
+        ner_models=dict(zip(LANG_KEYS, m.NER_MODELS_LIST)),
     )
 
 
@@ -189,9 +230,9 @@ LANGUAGE = None
 
 # Order: English, Dutch, German, Spanish, Multilingual
 NER_MODELS_LIST = [
-    "FacebookAI/xlm-roberta-large-finetuned-conll03-english",
-    "FacebookAI/xlm-roberta-large-finetuned-conll02-dutch",
-    "FacebookAI/xlm-roberta-large-finetuned-conll03-german",
-    "FacebookAI/xlm-roberta-large-finetuned-conll02-spanish",
-    "Babelscape/wikineural-multilingual-ner",
+    "rhnfzl/xlm-roberta-large-conll03-english-onnx",
+    "rhnfzl/xlm-roberta-large-conll02-dutch-onnx",
+    "rhnfzl/xlm-roberta-large-conll03-german-onnx",
+    "rhnfzl/xlm-roberta-large-conll02-spanish-onnx",
+    "rhnfzl/wikineural-multilingual-ner-onnx",
 ]

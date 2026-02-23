@@ -37,7 +37,7 @@ class TextCleaner:
 
         if self.cfg.check_ner_process:
             self.GeneralNER = ner.GeneralNER(
-                model_names=list(self.cfg.ner_models_list)
+                model_names=dict(self.cfg.ner_models)
             )
         else:
             self.GeneralNER = None
@@ -153,8 +153,8 @@ class TextCleaner:
             return results
 
         # Parallel processing: each text goes through the full pipeline independently.
-        # PyTorch releases the GIL during C++ tensor ops, so threads achieve real
-        # concurrency for the NER inference bottleneck.
+        # ONNX Runtime releases the GIL during C++ inference ops, so threads
+        # achieve real concurrency for the NER inference bottleneck.
         max_workers = min(len(to_process), os.cpu_count() or 4)
         if max_workers > 1:
             with ThreadPoolExecutor(max_workers=max_workers) as executor:
