@@ -5,7 +5,7 @@
 [![PyPI](https://img.shields.io/pypi/v/squeakycleantext.svg)](https://pypi.org/project/squeakycleantext/)
 [![PyPI - Downloads](https://img.shields.io/pypi/dm/squeakycleantext)](https://pypistats.org/packages/squeakycleantext)
 [![Python package](https://github.com/rhnfzl/SqueakyCleanText/actions/workflows/python-package.yml/badge.svg)](https://github.com/rhnfzl/SqueakyCleanText/actions/workflows/python-package.yml)
-[![Python Versions](https://img.shields.io/badge/Python-3.10%20|%203.11%20|%203.12%20|%203.13-blue)](https://pypi.org/project/squeakycleantext/)
+[![Python Versions](https://img.shields.io/badge/Python-3.10%20|%203.11%20|%203.12%20|%203.13%20|%203.14-blue)](https://pypi.org/project/squeakycleantext/)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 A comprehensive text cleaning and preprocessing pipeline for machine learning and NLP tasks.
@@ -441,7 +441,7 @@ Major release with architectural overhaul since v0.3.0:
 - Migrated from `setup.py` to `pyproject.toml` (PEP 517)
 
 **Quality**
-- Python 3.13 support
+- Python 3.10–3.14 support
 - `ruff` linter (replaces flake8)
 - hypothesis-based property testing with pytest-timeout
 - Collision-safe NER entity keys
