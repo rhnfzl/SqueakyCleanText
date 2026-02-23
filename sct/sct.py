@@ -80,7 +80,11 @@ class TextCleaner:
                 torch_model_names=torch_model_names,
                 ner_batch_size=self.cfg.ner_batch_size,
                 ensemble_models=dict(self.cfg.ner_ensemble) if self.cfg.ner_ensemble is not None else None,
-                ensemble_default_keys=tuple(self.cfg.ner_ensemble_default_keys) if self.cfg.ner_ensemble_default_keys is not None else None,
+                ensemble_default_keys=(
+                    tuple(self.cfg.ner_ensemble_default_keys)
+                    if self.cfg.ner_ensemble_default_keys is not None
+                    else None
+                ),
             )
         else:
             self.GeneralNER = None

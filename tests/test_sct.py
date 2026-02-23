@@ -928,12 +928,12 @@ class TextCleanerTest(unittest.TestCase):
     def test_sentence_boundary_no_false_split_on_abbreviation(self):
         """SENTENCE_BOUNDARY_PATTERN must not split abbreviation-dot + space."""
         from sct.utils.constants import SENTENCE_BOUNDARY_PATTERN
-        for text in ["Dr. Smith visited Berlin.",
-                     "Mr. Jones called Mrs. Smith.",
-                     "The U.S. Army Base is here."]:
-            pieces = SENTENCE_BOUNDARY_PATTERN.split(text)
+        for abbrev_text in ["Dr. Smith visited Berlin.",
+                            "Mr. Jones called Mrs. Smith.",
+                            "The U.S. Army Base is here."]:
+            pieces = SENTENCE_BOUNDARY_PATTERN.split(abbrev_text)
             self.assertEqual(len(pieces), 1,
-                             f"Should not split abbreviation in: {text!r}")
+                             f"Should not split abbreviation in: {abbrev_text!r}")
 
     def test_sentence_boundary_splits_real_sentence(self):
         """SENTENCE_BOUNDARY_PATTERN should split genuine sentence boundaries."""

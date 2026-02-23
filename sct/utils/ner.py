@@ -70,7 +70,11 @@ class GeneralNER:
         self._ner_batch_size = ner_batch_size
         self._gliner_pipe = None
         self._ensemble_models: Dict[str, tuple] = ensemble_models if ensemble_models is not None else DEFAULT_NER_ENSEMBLE
-        self._ensemble_default_keys: tuple = ensemble_default_keys if ensemble_default_keys is not None else NER_ENSEMBLE_DEFAULT_KEYS
+        self._ensemble_default_keys: tuple = (
+            ensemble_default_keys
+            if ensemble_default_keys is not None
+            else NER_ENSEMBLE_DEFAULT_KEYS
+        )
 
         # Device detection
         if device:
