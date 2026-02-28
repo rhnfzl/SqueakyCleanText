@@ -350,13 +350,14 @@ class GeneralNER:
                 if 0 <= entry.start < text_length and 0 < entry.end <= text_length
             ]
 
-            return self.engine.anonymize(text=text, analyzer_results=analyzer_result)
+            engine_result = self.engine.anonymize(text=text, analyzer_results=analyzer_result)
+            return AnonymizeResult(text=engine_result.text)
 
     def _anonymize_reversible(self, text, filtered_data, anon_map=None):
         """Replace entities with indexed placeholders and populate the map.
 
         Uses right-to-left replacement to preserve character offsets.
-        Returns an AnonymizeResult-like object with ``.text`` attribute.
+        Returns an ``AnonymizeResult`` with the anonymized ``.text``.
         """
         if anon_map is None:
             anon_map = AnonymizationMap()

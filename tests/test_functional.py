@@ -9,24 +9,23 @@ Usage:
 
 import asyncio
 import dataclasses
-import importlib
+import importlib.util
 import os
 import warnings
 
 import pytest
 
 from sct import TextCleaner, TextCleanerConfig, ProcessResult, AnonymizationMap
-from sct.config import LANG_KEYS, DEFAULT_NER_MODELS, PII_DEFAULT_MODEL
+from sct.config import DEFAULT_NER_MODELS, PII_DEFAULT_MODEL
+from sct.utils.ner import ENTITY_TYPE_MAP
+from tests.conftest import TEST_NER_MODELS
 
-# Presidio anonymizer maps model tags (PER/LOC/ORG) to these replacement tokens
-ENTITY_TAGS = ("<PERSON>", "<LOCATION>", "<ORGANISATION>", "<MISC>")
+# Derive entity tags from the authoritative map — stays in sync automatically
+ENTITY_TAGS = tuple(f"<{v}>" for v in ENTITY_TYPE_MAP.values())
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
-
-# Lightweight ONNX test model shared by all NER tests (never production 7GB)
-TEST_NER_MODELS = {k: "protectai/bert-base-NER-onnx" for k in LANG_KEYS}
 
 # Production ONNX models (only used when FUNC_TEST_PROD_MODELS=1)
 PROD_NER_MODELS = dict(DEFAULT_NER_MODELS)
@@ -37,12 +36,8 @@ NER_MODELS = PROD_NER_MODELS if USE_PROD else TEST_NER_MODELS
 
 
 def _has_package(name: str) -> bool:
-    """Check if a Python package is importable."""
-    try:
-        importlib.import_module(name)
-        return True
-    except ImportError:
-        return False
+    """Check if a Python package is installed (without importing it)."""
+    return importlib.util.find_spec(name) is not None
 
 
 HAS_TORCH = _has_package("torch")
@@ -640,7 +635,6 @@ class TestSyntheticReplacement:
         assert "example.com" not in lm
         assert "test@test.com" not in lm
 
-    @requires_faker
     def test_g42_synthetic_ner(self):
         """Synthetic NER: Faker-generated entity replacements."""
         cfg = _make_ner_cfg(replacement_mode="synthetic")
@@ -651,7 +645,6 @@ class TestSyntheticReplacement:
         assert "<ORGANISATION>" not in lm
         assert "<LOCATION>" not in lm
 
-    @requires_faker
     def test_g43_per_document_consistency(self):
         """Same entity text maps to same fake value within one document."""
         cfg = _make_ner_cfg(replacement_mode="synthetic")
@@ -733,12 +726,13 @@ class TestGLiNERBackend:
         result = tc.process("Tim Cook leads Apple in Cupertino.")
         assert isinstance(result.lm_text, str)
 
-    @pytest.mark.xfail(
-        reason="GLiNER issue #314: urchade/gliner_small-v2.1 doesn't ship model.onnx at root",
-        raises=FileNotFoundError,
-    )
-    def test_i48_gliner_onnx_mode(self):
-        """GLiNER with ONNX acceleration (gliner_onnx=True)."""
+    def test_i48_gliner_onnx_fallback(self):
+        """GLiNER ONNX gracefully falls back to PyTorch when model.onnx missing.
+
+        Most GLiNER models don't ship model.onnx at repo root (GLiNER #314).
+        The adapter should log a warning and fall back to PyTorch automatically.
+        Re-enable as a true ONNX test once GLiNER ships root-level ONNX files.
+        """
         cfg = _make_ner_cfg(
             ner_backend="gliner",
             gliner_model="urchade/gliner_small-v2.1",

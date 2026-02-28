@@ -48,10 +48,19 @@ class GLiNERAdapter:
                     "Install with: pip install squeakycleantext[gliner]"
                 )
             if onnx:
-                self.model = GLiNER.from_pretrained(
-                    model_id, load_onnx_model=True, load_tokenizer=True,
-                )
-                logger.info("Loaded GLiNER model in ONNX mode: %s", model_id)
+                try:
+                    self.model = GLiNER.from_pretrained(
+                        model_id, load_onnx_model=True, load_tokenizer=True,
+                    )
+                    logger.info("Loaded GLiNER model in ONNX mode: %s", model_id)
+                except FileNotFoundError:
+                    logger.warning(
+                        "ONNX model not found for %s (GLiNER issue #314: most models "
+                        "don't ship model.onnx at repo root). Falling back to PyTorch.",
+                        model_id,
+                    )
+                    self.model = GLiNER.from_pretrained(model_id)
+                    self._onnx = False
             else:
                 self.model = GLiNER.from_pretrained(model_id)
             if device == 'cuda' and not onnx:

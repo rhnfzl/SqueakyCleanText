@@ -109,9 +109,6 @@ class TextCleaner:
                 replacement_mode=self.cfg.replacement_mode,
                 synthetic_replacer=self._synthetic_replacer,
             )
-        else:
-            pass  # self.GeneralNER already initialized to None above
-
         # GLiClass document-level pre-classification (optional, lazy-loaded)
         self._gliclass: Any = None
         if self.cfg.check_classify_document:

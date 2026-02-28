@@ -7,7 +7,7 @@ from hypothesis.strategies import text, from_regex
 from faker import Faker
 from sct import config
 from sct.config import (
-    LANG_KEYS, TextCleanerConfig,
+    TextCleanerConfig,
     PII_LABELS, PII_LABEL_MAP, PII_DEFAULT_MODEL, PII_DEFAULT_THRESHOLD,
 )
 from sct.utils import contact, datetime, special, normtext, stopwords, constants, resources
@@ -17,10 +17,7 @@ from sct.utils.ner import GeneralNER
 from unittest.mock import patch, MagicMock
 from functools import wraps
 from sct.sct import TextCleaner
-
-
-# Lightweight ONNX test model for all languages (never use production 7GB models in tests)
-TEST_NER_MODELS = {k: "protectai/bert-base-NER-onnx" for k in LANG_KEYS}
+from tests.conftest import TEST_NER_MODELS
 
 
 def requires_ner(func):
