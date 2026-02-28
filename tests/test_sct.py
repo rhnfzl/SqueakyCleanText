@@ -2090,10 +2090,9 @@ class GLiClassConfigTest(unittest.TestCase):
         adapter = GLiClassAdapter.__new__(GLiClassAdapter)
         adapter.labels = ['email', 'code']
         adapter.threshold = 0.5
-        adapter._pipeline = MagicMock(return_value={
-            'labels': ['email', 'code'],
-            'scores': [0.9, 0.3],
-        })
+        adapter._pipeline = MagicMock(return_value=[
+            [{'label': 'email', 'score': 0.9}, {'label': 'code', 'score': 0.3}],
+        ])
         results = adapter.classify("Dear Sir, please find attached...")
         self.assertIsInstance(results, list)
         self.assertEqual(len(results), 1)  # only email above threshold

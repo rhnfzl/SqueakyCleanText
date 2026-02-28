@@ -77,16 +77,16 @@ class GLiClassAdapter:
 
         result = self._pipeline(
             text,
-            candidate_labels=self.labels,
+            labels=self.labels,
         )
 
-        # Pipeline returns {"sequence": ..., "labels": [...], "scores": [...]}
+        # Pipeline returns list[list[dict]] — one list per input text,
+        # each containing {"label": str, "score": float} dicts.
         classifications = []
-        labels = result.get('labels', [])
-        scores = result.get('scores', [])
-        for label, score in zip(labels, scores):
-            if score >= self.threshold:
-                classifications.append({'label': label, 'score': score})
+        entries = result[0] if result else []
+        for entry in entries:
+            if entry['score'] >= self.threshold:
+                classifications.append({'label': entry['label'], 'score': entry['score']})
 
         classifications.sort(key=lambda x: x['score'], reverse=True)
         return classifications

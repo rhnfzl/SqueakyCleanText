@@ -204,11 +204,12 @@ class GeneralNER:
         try:
             from presidio_analyzer.predefined_recognizers import GLiNERRecognizer  # noqa: S404
             gliner_recognizer = GLiNERRecognizer(
-                model_path=gliner_config['model'],
+                model_name=gliner_config['model'],
                 supported_entities=[
                     label.upper()
                     for label in gliner_config.get('labels', ['person', 'organization', 'location'])
                 ],
+                threshold=gliner_config.get('threshold', 0.4),
             )
             self._analyzer.registry.add_recognizer(gliner_recognizer)
         except ImportError:
