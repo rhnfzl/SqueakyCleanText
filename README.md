@@ -11,11 +11,11 @@
 A comprehensive text cleaning and preprocessing pipeline for machine learning and NLP tasks.
 </div>
 
-> **Using an AI coding assistant?** This repo includes an [`llms.txt`](./llms.txt) with the full API surface, config reference, and Q&A — optimised for Claude, Cursor, Copilot, and ChatGPT.
+> **Using an AI coding assistant?** This repo includes an [`llms.txt`](https://github.com/rhnfzl/SqueakyCleanText/blob/main/llms.txt) with the full API surface, config reference, and Q&A - optimised for Claude, Cursor, Copilot, and ChatGPT.
 
 In the world of machine learning and natural language processing, clean and well-structured text data is crucial for building effective downstream models and managing token limits in language models.
 
-SqueakyCleanText simplifies the process by automatically addressing common text issues — removing PII, anonymizing named entities (persons, organisations, locations), and ensuring your data is clean and well-structured for language models and classical ML pipelines with minimal effort on your part.
+SqueakyCleanText simplifies the process by automatically addressing common text issues - removing PII, anonymizing named entities (persons, organisations, locations), and ensuring your data is clean and well-structured for language models and classical ML pipelines with minimal effort on your part.
 
 ### Key Features
 
@@ -88,7 +88,7 @@ SqueakyCleanText simplifies the process by automatically addressing common text 
 pip install SqueakyCleanText
 ```
 
-The base install uses **ONNX Runtime** for NER inference — no PyTorch or Transformers required.
+The base install uses **ONNX Runtime** for NER inference - no PyTorch or Transformers required.
 
 ### Optional Extras
 
@@ -163,7 +163,7 @@ cfg = TextCleanerConfig(
     gliner_labels=('person', 'organization', 'location', 'product', 'event'),
     gliner_label_map={
         'person': 'PER', 'organization': 'ORG', 'location': 'LOC',
-        # 'product' and 'event' are unmapped — they become <PRODUCT>, <EVENT> tokens
+        # 'product' and 'event' are unmapped - they become <PRODUCT>, <EVENT> tokens
     },
     gliner_threshold=0.4,
 )
@@ -253,7 +253,7 @@ SqueakyCleanText supports five NER backends, selectable via the `ner_backend` co
 
 | Backend | Description | Dependencies | Best for |
 |---------|-------------|-------------|----------|
-| `onnx` (default) | ONNX Runtime inference with quantized XLM-RoBERTa models | Base install | Production — fast, torch-free |
+| `onnx` (default) | ONNX Runtime inference with quantized XLM-RoBERTa models | Base install | Production: fast, torch-free |
 | `torch` | PyTorch/Transformers pipeline with full XLM-RoBERTa models | `[torch]` extra | Compatibility with existing PyTorch workflows |
 | `gliner` | GLiNER zero-shot NER with custom entity labels | `[gliner]` or `[gliner2]` extra | Custom entity types (PRODUCT, SKILL, EVENT, etc.) |
 | `ensemble_onnx` | ONNX + GLiNER ensemble voting | `[gliner]` extra | Maximum recall with custom entities |
@@ -438,69 +438,30 @@ Input Text
 (lm_text, stat_text, language)
 ```
 
-Each step is toggled by a `TextCleanerConfig` field. The pipeline is built once at initialization — disabled steps are skipped entirely (zero overhead).
+Each step is toggled by a `TextCleanerConfig` field. The pipeline is built once at initialization; disabled steps are skipped entirely (zero overhead).
 
-## What's New in v0.5.0
+## What's New
 
-Quality, performance, and API improvements:
+**v0.5.x**
+- `aprocess_batch()`: async batch processing for FastAPI / aiohttp integrations
+- `warmup(languages)`: pre-load NER models at startup to eliminate first-request latency
+- `custom_pipeline_steps`: attach arbitrary `(text: str) -> str` callables after the built-in pipeline
+- French, Portuguese, and Italian NER support via a shared multilingual ONNX session
+- Improved NER sentence boundary detection with abbreviation guard
 
-**Async & API**
-- `aprocess_batch()` — async batch processing for FastAPI / aiohttp (uses `get_running_loop`, Python 3.12+ compatible)
-- `warmup(languages)` — public method to pre-load NER models at startup
-- `custom_pipeline_steps` config field — plug in arbitrary `(text: str) -> str` callables after the built-in pipeline
-
-**Language Support**
-- French, Portuguese, Italian now supported out of the box via the multilingual ONNX model
-- ONNX sessions are shared across same-model languages (FR/PT/IT → one session, ~600 MB saved)
-
-**Performance & Thread Safety**
-- Per-model inference locks replace the coarse per-language lock — true concurrent inference across different language models
-- `split_text()` is now lock-free (HF fast tokenizer is thread-safe)
-- Conservative `chars/token` ratio (2×) in `_simple_chunk` prevents context-window overflow for CJK and Arabic texts
-
-**Correctness**
-- `SENTENCE_BOUNDARY_PATTERN` upgraded to the `regex` library with an abbreviation guard — "Dr. Smith", "Mr. Jones", "U.S. Army" no longer cause false splits during NER chunking
-- `ner_batch_size=0` and `ner_batch_size=-1` now raise `ValueError` immediately instead of silently producing empty results
-- Quantized ONNX models are cached to `~/.cache/sct_quantized/` instead of the read-only HuggingFace Hub cache directory
-
----
-
-## What's New in v0.4.5
-
-Major release with architectural overhaul since v0.3.0:
-
-**Architecture**
-- Frozen `TextCleanerConfig` dataclass replaces global mutable config (thread-safe, per-instance)
-- ONNX-first NER inference — torch-free base install (~400MB models vs ~7GB)
-- Thread-parallel batch processing via `ThreadPoolExecutor` (ONNX releases the GIL)
-
-**NER**
-- 5 backends: `onnx`, `torch`, `gliner`, `ensemble_onnx`, `ensemble_torch`
+**v0.4.5**
+- Frozen `TextCleanerConfig` dataclass: immutable, thread-safe, per-instance configuration
+- ONNX-first NER inference: torch-free base install (~400 MB models vs ~7 GB)
+- Thread-parallel batch processing via `ThreadPoolExecutor`
+- Five NER backends: `onnx`, `torch`, `gliner`, `ensemble_onnx`, `ensemble_torch`
 - GLiNER zero-shot NER for custom entity types (PRODUCT, EVENT, SKILL, etc.)
 - Ensemble voting across backends for improved recall
-- Lazy per-language model loading (only loads models when needed)
-- Language-keyed model dict replaces fragile positional tuple
-- ONNX-quantized models hosted on [HuggingFace Hub](https://huggingface.co/rhnfzl)
-
-**Text Processing**
-- Multilingual date detection (ISO 8601, European formats, month names in EN/NL/DE/ES)
-- Fuzzy date matching for misspelled months (via rapidfuzz, empirically calibrated threshold)
-- Configurable emoji removal
-- Configurable bracket/brace content removal
-- Smart case folding (preserves NER replacement tokens)
-- Custom stopwords and month names per language
-
-**Dependencies**
-- `stop-words` package replaces NLTK (50KB bundled vs 30MB download)
-- PyTorch/Transformers moved to optional `[torch]` extra
-- New optional extras: `[gpu]`, `[fuzzy]`, `[gliner]`, `[gliner2]`, `[all-ner]`
-- Migrated from `setup.py` to `pyproject.toml` (PEP 517)
-
-**Quality**
-- Python 3.11–3.13 support
-- `ruff` linter (replaces flake8)
-- hypothesis-based property testing with pytest-timeout
-- Collision-safe NER entity keys
+- Lazy per-language model loading
+- Multilingual date detection and fuzzy date matching
+- Configurable emoji removal, bracket/brace content removal, and smart case folding
+- `stop-words` replaces NLTK (50 KB bundled vs 30 MB download)
+- PyTorch and Transformers moved to optional extras
+- Migrated to `pyproject.toml` (PEP 517), Python 3.11-3.13, ruff linter
 
 ## Contributing
 

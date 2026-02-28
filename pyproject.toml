@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "SqueakyCleanText"
-version = "0.5.1"
+dynamic = ["version"]
 description = "Text preprocessing & PII anonymization pipeline for NLP/ML: ONNX NER ensemble, language detection, stopword removal, and configurable token replacement."
 readme = "README.md"
 license = {text = "MIT"}
@@ -51,6 +51,7 @@ Homepage = "https://github.com/rhnfzl/SqueakyCleanText"
 Repository = "https://github.com/rhnfzl/SqueakyCleanText"
 Issues = "https://github.com/rhnfzl/SqueakyCleanText/issues"
 Changelog = "https://github.com/rhnfzl/SqueakyCleanText/releases"
+"llms.txt" = "https://github.com/rhnfzl/SqueakyCleanText/blob/main/llms.txt"
 
 [project.optional-dependencies]
 gpu = [
@@ -87,6 +88,9 @@ test = [
     "coverage>=7.3",
     "pytest-cov>=4.1",
 ]
+
+[tool.setuptools.dynamic]
+version = {attr = "sct.__version__"}
 
 [tool.setuptools.packages.find]
 include = ["sct*"]
