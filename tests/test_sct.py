@@ -2036,10 +2036,10 @@ class ReversibleAnonymizationTest(unittest.TestCase):
         self.assertIn('<PERSON_0>', result.text)
         self.assertIn('<ORGANISATION_0>', result.text)
         self.assertIn('<LOCATION_0>', result.text)
-        self.assertEqual(len(result.anon_map.entries), 3)
+        self.assertEqual(len(amap.entries), 3)
 
-        # Round-trip
-        self.assertEqual(result.anon_map.deanonymize(result.text), text)
+        # Round-trip (anon_map is mutated in-place, use the passed-in reference)
+        self.assertEqual(amap.deanonymize(result.text), text)
 
 
 class GLiClassConfigTest(unittest.TestCase):
@@ -2073,7 +2073,7 @@ class GLiClassConfigTest(unittest.TestCase):
         """GLiClassAdapter should accept model/labels/threshold (mock init)."""
         from sct.utils.gliclass_adapter import GLiClassAdapter
         # Patch the init methods to avoid importing gliclass
-        with patch.object(GLiClassAdapter, '_init_pytorch'):
+        with patch.object(GLiClassAdapter, '_init_model'):
             adapter = GLiClassAdapter.__new__(GLiClassAdapter)
             adapter.model_id = 'test-model'
             adapter.labels = ['email', 'code']

@@ -76,18 +76,6 @@ DETECTOR = _LazyDetectorProxy()
 # Language extensibility utilities (used by TextCleanerConfig and TextCleaner)
 # ---------------------------------------------------------------------------
 
-DEFAULT_LANGUAGES = frozenset({'ENGLISH', 'DUTCH', 'GERMAN', 'SPANISH'})
-
-
-def validate_language_name(name: str) -> str:
-    """Validate and resolve a language identifier to a Lingua name.
-
-    Accepts uppercase names, ISO 639-1, and ISO 639-3 codes.
-    Returns the canonical uppercase Lingua name.
-    Raises ValueError if unrecognized.
-    """
-    return resolve_language(name)
-
 
 def build_detector(supported_languages: frozenset):
     """Build a Lingua detector for the given language set.
@@ -95,6 +83,8 @@ def build_detector(supported_languages: frozenset):
     Filters out 'MULTILINGUAL' (not a real Lingua language).
     Returns a Lingua LanguageDetector instance.
     """
+    from sct.config import DEFAULT_LANGUAGES  # lazy: avoids circular import with config.py
+
     lingua_langs = []
     for name in supported_languages:
         if name == 'MULTILINGUAL':

@@ -3,7 +3,7 @@ import gc
 import threading
 from collections import defaultdict
 import logging
-from typing import Dict, List, Optional, Union
+from typing import Dict, List, Optional, Sequence, Union
 from pathlib import Path
 
 import onnxruntime as ort
@@ -11,10 +11,17 @@ import onnxruntime as ort
 from presidio_anonymizer import AnonymizerEngine
 from presidio_anonymizer.entities import RecognizerResult
 
+from typing import NamedTuple as _NamedTuple
+
 from sct.utils import constants
 from sct.utils.anonymization_map import AnonymizationMap
 from sct.utils.onnx_pipeline import load_onnx_ner_model
 from sct.config import DEFAULT_NER_MODELS, DEFAULT_NER_ENSEMBLE, NER_ENSEMBLE_DEFAULT_KEYS, LANG_KEYS
+
+
+class AnonymizeResult(_NamedTuple):
+    """Result of text anonymization — lightweight typed container."""
+    text: str
 
 ort.set_default_logger_severity(3)  # Silence ONNX Runtime warnings
 
@@ -53,7 +60,8 @@ class GeneralNER:
                  ner_batch_size: int = 8,
                  ensemble_models: Optional[Dict] = None,
                  ensemble_default_keys: Optional[tuple] = None,
-                 replacement_mode: str = 'placeholder'):
+                 replacement_mode: str = 'placeholder',
+                 synthetic_replacer=None):
         """Initialize NER processor.
 
         Args:
@@ -67,11 +75,12 @@ class GeneralNER:
                 Required when ner_backend involves GLiNER.
             torch_model_names: Language-keyed dict of PyTorch model repo IDs.
                 Required when ner_backend involves torch.
+            synthetic_replacer: Shared SyntheticReplacer instance (from TextCleaner).
         """
         self._ner_backend = ner_backend
         self._ner_batch_size = ner_batch_size
         self._replacement_mode = replacement_mode
-        self._synthetic_replacer = None  # Lazy-loaded when replacement_mode='synthetic'
+        self._synthetic_replacer = synthetic_replacer
         self._gliner_pipe = None
         self._ensemble_models: Dict[str, tuple] = ensemble_models if ensemble_models is not None else DEFAULT_NER_ENSEMBLE
         self._ensemble_default_keys: tuple = (
@@ -208,13 +217,6 @@ class GeneralNER:
                 "Install with: pip install presidio-analyzer gliner"
             )
 
-    def _get_synthetic_replacer(self):
-        """Lazily initialize the SyntheticReplacer."""
-        if self._synthetic_replacer is None:
-            from sct.utils.synthetic import SyntheticReplacer
-            self._synthetic_replacer = SyntheticReplacer()
-        return self._synthetic_replacer
-
     def _get_ensemble_keys(self, language: str) -> tuple:
         """Return ordered model keys to run for the given language."""
         return self._ensemble_models.get(language, self._ensemble_default_keys)
@@ -313,9 +315,8 @@ class GeneralNER:
             return self._anonymize_reversible(text, filtered_data, anon_map)
 
         if replacement_mode == 'synthetic':
-            replacer = self._get_synthetic_replacer()
-            result_text = replacer.generate_for_entities(text, filtered_data)
-            return type('AnonymizeResult', (), {'text': result_text})()
+            result_text = self._synthetic_replacer.generate_for_entities(text, filtered_data)
+            return AnonymizeResult(text=result_text)
 
         has_custom = any(
             items['entity_group'] not in ENTITY_TYPE_MAP
@@ -328,7 +329,7 @@ class GeneralNER:
             for items in sorted_data:
                 tag = ENTITY_TYPE_MAP.get(items['entity_group'], items['entity_group'])
                 text = text[:items['start']] + f"<{tag}>" + text[items['end']:]
-            return type('AnonymizeResult', (), {'text': text})()
+            return AnonymizeResult(text=text)
         else:
             # Standard entities only: use Presidio (existing behavior)
             analyzer_result = []
@@ -373,7 +374,7 @@ class GeneralNER:
             )
             text = text[:item['start']] + placeholder + text[item['end']:]
 
-        return type('AnonymizeResult', (), {'text': text, 'anon_map': anon_map})()
+        return AnonymizeResult(text=text)
 
     def ner_ensemble(self, ner_results, t):
         """Apply ensemble voting across multiple model results.
@@ -440,7 +441,7 @@ class GeneralNER:
     def ner_process(
         self,
         text: str,
-        positional_tags: Optional[List[str]] = None,
+        positional_tags: Optional[Sequence[str]] = None,
         ner_confidence_threshold: Optional[float] = None,
         language: Optional[str] = None,
         anon_map: Optional['AnonymizationMap'] = None,
@@ -474,6 +475,16 @@ class GeneralNER:
         if not chunks:
             return text
 
+        # Pre-compute GLiNER-only tag set (constant across chunks)
+        gliner_all_tags = None
+        if self._ner_backend == 'gliner' and self._gliner_pipe:
+            gliner_all_tags = set(positional_tags)
+            gliner_all_tags.update(self._gliner_pipe.label_map.values())
+            gliner_all_tags.update(
+                label.upper() for label in self._gliner_pipe.labels
+                if label not in self._gliner_pipe.label_map
+            )
+
         # --- Inference + ensemble per chunk ---
         ner_clean_text = []
         for chunk in chunks:
@@ -486,7 +497,7 @@ class GeneralNER:
                     model_name = self._model_names.get(key, key)
                     model_lock = self._get_lock(model_name)
                     with model_lock:
-                        batch = self._get_pipeline(key)([chunk])
+                        batch = self._pipelines[key]([chunk])
                     ner_results.extend(self.ner_data(batch[0], positional_tags))
 
             # GLiNER backend
@@ -495,15 +506,8 @@ class GeneralNER:
                 gliner_lock = self._get_lock('gliner')
                 with gliner_lock:
                     gliner_batch = self._gliner_pipe([chunk])
-                if self._ner_backend == 'gliner':
-                    # GLiNER-only: include all mapped entity types
-                    all_tags = set(positional_tags)
-                    all_tags.update(self._gliner_pipe.label_map.values())
-                    all_tags.update(
-                        label.upper() for label in self._gliner_pipe.labels
-                        if label not in self._gliner_pipe.label_map
-                    )
-                    ner_results.extend(self.ner_data(gliner_batch[0], all_tags))
+                if gliner_all_tags is not None:
+                    ner_results.extend(self.ner_data(gliner_batch[0], gliner_all_tags))
                 else:
                     # Ensemble: filter to positional_tags only
                     ner_results.extend(self.ner_data(gliner_batch[0], positional_tags))

@@ -25,6 +25,7 @@ DEFAULT_LANGUAGES = frozenset({'ENGLISH', 'DUTCH', 'GERMAN', 'SPANISH'})
 VALID_NER_BACKENDS = frozenset({
     'onnx', 'torch', 'gliner', 'ensemble_onnx', 'ensemble_torch', 'presidio_gliner',
 })
+GLINER_BACKENDS = frozenset({'gliner', 'ensemble_onnx', 'ensemble_torch', 'presidio_gliner'})
 
 DEFAULT_NER_MODELS: dict[str, str] = {
     'ENGLISH': 'rhnfzl/xlm-roberta-large-conll03-english-onnx',
@@ -320,9 +321,7 @@ class TextCleanerConfig:
             )
 
         # GLiNER fields required for gliner/ensemble backends
-        needs_gliner = self.ner_backend in (
-            'gliner', 'ensemble_onnx', 'ensemble_torch', 'presidio_gliner',
-        )
+        needs_gliner = self.ner_backend in GLINER_BACKENDS
         if needs_gliner:
             if not self.gliner_model:
                 raise ValueError(
