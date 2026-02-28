@@ -7,7 +7,7 @@ import os
 from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Callable, Dict, List, Optional
 
-from sct.config import TextCleanerConfig, _config_from_module_globals
+from sct.config import TextCleanerConfig, GLINER_BACKENDS, _config_from_module_globals
 from sct.utils import constants, contact, datetime, ner, normtext, resources, special, stopwords
 from sct.utils.anonymization_map import AnonymizationMap
 from sct.utils.process_result import ProcessResult
@@ -71,9 +71,7 @@ class TextCleaner:
         if self.cfg.check_ner_process:
             # Build GLiNER config dict (if needed)
             gliner_config = None
-            needs_gliner = self.cfg.ner_backend in (
-                'gliner', 'ensemble_onnx', 'ensemble_torch', 'presidio_gliner',
-            )
+            needs_gliner = self.cfg.ner_backend in GLINER_BACKENDS
             if needs_gliner:
                 gliner_config = {
                     'model': self.cfg.gliner_model,
@@ -109,10 +107,8 @@ class TextCleaner:
                     else None
                 ),
                 replacement_mode=self.cfg.replacement_mode,
+                synthetic_replacer=self._synthetic_replacer,
             )
-        else:
-            pass  # self.GeneralNER already initialized to None above
-
         # GLiClass document-level pre-classification (optional, lazy-loaded)
         self._gliclass: Any = None
         if self.cfg.check_classify_document:
@@ -126,7 +122,6 @@ class TextCleaner:
                 onnx=self.cfg.gliclass_onnx,
             )
 
-        self.batch_size = 8
         self._pipeline: List[Callable[[str], str]] = []
         self._post_fuzzy_pipeline: List[Callable[[str], str]] = []
         self._init_pipeline()
@@ -227,9 +222,6 @@ class TextCleaner:
         # Detect language (pure function, thread-safe)
         language = self._detect_language(text)
 
-        # Pass language explicitly through pipeline context dict
-        ctx = {"language": language}
-
         current_text = text
 
         # Pre-fuzzy pipeline steps (unicode fix → html → urls → emails → dates)
@@ -239,12 +231,11 @@ class TextCleaner:
         # Fuzzy date replacement — requires language context, called explicitly
         # to avoid thread-local; positioned between replace_dates and replace_years.
         if self.cfg.check_fuzzy_replace_dates:
-            lang = ctx.get("language")
             current_text = self.ProcessDateTime.fuzzy_replace_dates(
                 current_text,
                 replace_with=self.cfg.replace_with_dates,
                 score_cutoff=self.cfg.fuzzy_date_score_cutoff,
-                language=lang,
+                language=language,
             )
 
         # Post-fuzzy pipeline steps (years → phones → numbers → symbols → whitespace)
@@ -255,7 +246,7 @@ class TextCleaner:
         if self.cfg.check_ner_process and self.GeneralNER is not None:
             current_text = self.GeneralNER.ner_process(
                 current_text,
-                positional_tags=list(self.cfg.positional_tags),
+                positional_tags=self.cfg.positional_tags,
                 ner_confidence_threshold=self.cfg.ner_confidence_threshold,
                 language=language,
                 anon_map=anon_map,

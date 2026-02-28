@@ -7,7 +7,7 @@ from hypothesis.strategies import text, from_regex
 from faker import Faker
 from sct import config
 from sct.config import (
-    LANG_KEYS, TextCleanerConfig,
+    TextCleanerConfig,
     PII_LABELS, PII_LABEL_MAP, PII_DEFAULT_MODEL, PII_DEFAULT_THRESHOLD,
 )
 from sct.utils import contact, datetime, special, normtext, stopwords, constants, resources
@@ -17,10 +17,7 @@ from sct.utils.ner import GeneralNER
 from unittest.mock import patch, MagicMock
 from functools import wraps
 from sct.sct import TextCleaner
-
-
-# Lightweight ONNX test model for all languages (never use production 7GB models in tests)
-TEST_NER_MODELS = {k: "protectai/bert-base-NER-onnx" for k in LANG_KEYS}
+from tests.conftest import TEST_NER_MODELS
 
 
 def requires_ner(func):
@@ -2036,10 +2033,10 @@ class ReversibleAnonymizationTest(unittest.TestCase):
         self.assertIn('<PERSON_0>', result.text)
         self.assertIn('<ORGANISATION_0>', result.text)
         self.assertIn('<LOCATION_0>', result.text)
-        self.assertEqual(len(result.anon_map.entries), 3)
+        self.assertEqual(len(amap.entries), 3)
 
-        # Round-trip
-        self.assertEqual(result.anon_map.deanonymize(result.text), text)
+        # Round-trip (anon_map is mutated in-place, use the passed-in reference)
+        self.assertEqual(amap.deanonymize(result.text), text)
 
 
 class GLiClassConfigTest(unittest.TestCase):
@@ -2073,7 +2070,7 @@ class GLiClassConfigTest(unittest.TestCase):
         """GLiClassAdapter should accept model/labels/threshold (mock init)."""
         from sct.utils.gliclass_adapter import GLiClassAdapter
         # Patch the init methods to avoid importing gliclass
-        with patch.object(GLiClassAdapter, '_init_pytorch'):
+        with patch.object(GLiClassAdapter, '_init_model'):
             adapter = GLiClassAdapter.__new__(GLiClassAdapter)
             adapter.model_id = 'test-model'
             adapter.labels = ['email', 'code']
@@ -2090,10 +2087,9 @@ class GLiClassConfigTest(unittest.TestCase):
         adapter = GLiClassAdapter.__new__(GLiClassAdapter)
         adapter.labels = ['email', 'code']
         adapter.threshold = 0.5
-        adapter._pipeline = MagicMock(return_value={
-            'labels': ['email', 'code'],
-            'scores': [0.9, 0.3],
-        })
+        adapter._pipeline = MagicMock(return_value=[
+            [{'label': 'email', 'score': 0.9}, {'label': 'code', 'score': 0.3}],
+        ])
         results = adapter.classify("Dear Sir, please find attached...")
         self.assertIsInstance(results, list)
         self.assertEqual(len(results), 1)  # only email above threshold

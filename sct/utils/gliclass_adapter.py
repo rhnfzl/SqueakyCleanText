@@ -32,18 +32,21 @@ class GLiClassAdapter:
         self._onnx = onnx
         self._pipeline = None
 
-        if onnx:
-            self._init_onnx(model_id)
-        else:
-            self._init_pytorch(model_id)
+        self._init_model(model_id)
 
         logger.info(
             "Loaded GLiClass model: %s (onnx=%s, labels=%d)",
             model_id, onnx, len(self.labels),
         )
 
-    def _init_pytorch(self, model_id: str) -> None:
-        """Load GLiClass model via PyTorch (gliclass package)."""
+    def _init_model(self, model_id: str) -> None:
+        """Load GLiClass model via gliclass package.
+
+        Note: gliclass does not yet expose a native ONNX loader, so the
+        ``onnx`` flag is recorded but both paths use the same PyTorch-backed
+        ``GLiClassModel.from_pretrained``.  When gliclass adds ONNX support,
+        this method should branch on ``self._onnx``.
+        """
         try:
             from gliclass import GLiClassModel, ZeroShotClassificationPipeline  # noqa: S404
             from transformers import AutoTokenizer
@@ -51,26 +54,6 @@ class GLiClassAdapter:
             raise ImportError(
                 "gliclass is required for GLiClass classification backend. "
                 "Install with: pip install squeakycleantext[classify]"
-            )
-
-        model = GLiClassModel.from_pretrained(model_id)
-        tokenizer = AutoTokenizer.from_pretrained(model_id)
-        self._pipeline = ZeroShotClassificationPipeline(
-            model=model,
-            tokenizer=tokenizer,
-            classification_type=self.classification_type,
-            device='cpu',
-        )
-
-    def _init_onnx(self, model_id: str) -> None:
-        """Load GLiClass model via ONNX Runtime (torch-free)."""
-        try:
-            from gliclass import GLiClassModel, ZeroShotClassificationPipeline  # noqa: S404
-            from transformers import AutoTokenizer
-        except ImportError:
-            raise ImportError(
-                "gliclass + onnxruntime are required for ONNX GLiClass backend. "
-                "Install with: pip install squeakycleantext[classify] squeakycleantext[classify-onnx]"
             )
 
         model = GLiClassModel.from_pretrained(model_id)
@@ -94,16 +77,16 @@ class GLiClassAdapter:
 
         result = self._pipeline(
             text,
-            candidate_labels=self.labels,
+            labels=self.labels,
         )
 
-        # Pipeline returns {"sequence": ..., "labels": [...], "scores": [...]}
+        # Pipeline returns list[list[dict]] — one list per input text,
+        # each containing {"label": str, "score": float} dicts.
         classifications = []
-        labels = result.get('labels', [])
-        scores = result.get('scores', [])
-        for label, score in zip(labels, scores):
-            if score >= self.threshold:
-                classifications.append({'label': label, 'score': score})
+        entries = result[0] if result else []
+        for entry in entries:
+            if entry['score'] >= self.threshold:
+                classifications.append({'label': entry['label'], 'score': entry['score']})
 
         classifications.sort(key=lambda x: x['score'], reverse=True)
         return classifications

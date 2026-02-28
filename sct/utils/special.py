@@ -1,19 +1,4 @@
-import re
-import string
-#---
 from sct.utils import constants
-
-# Pre-compile punctuation regex at module level (avoids recompilation per call)
-_PUNCTUATION_CHARS = re.escape(string.punctuation)
-_PUNCTUATION_REGEX = re.compile('[' + _PUNCTUATION_CHARS + ']')
-
-# Pre-compile bracket/brace regexes
-_BRACKET_CONTENT_REGEX = re.compile(r'\[[^\]]+\]')
-_BRACE_CONTENT_REGEX = re.compile(r'\{[^}]+\}')
-_ISOLATED_QUOTES_REGEX = re.compile(
-    r"(?<![a-zA-Z0-9])['\"\-*%](?![a-zA-Z0-9])",
-    flags=re.UNICODE | re.IGNORECASE,
-)
 
 
 class ProcessSpecialSymbols:
@@ -58,13 +43,13 @@ class ProcessSpecialSymbols:
         """
         cleaned_text = text
         if remove_brackets:
-            cleaned_text = _BRACKET_CONTENT_REGEX.sub('', cleaned_text)
+            cleaned_text = constants.BRACKET_CONTENT_REGEX.sub('', cleaned_text)
         if remove_braces:
-            cleaned_text = _BRACE_CONTENT_REGEX.sub('', cleaned_text)
+            cleaned_text = constants.BRACE_CONTENT_REGEX.sub('', cleaned_text)
         cleaned_text = constants.ISOLATED_SPECIAL_SYMBOLS_REGEX.sub('', cleaned_text)
-        cleaned_text = _ISOLATED_QUOTES_REGEX.sub('', cleaned_text)
+        cleaned_text = constants.ISOLATED_QUOTES_REGEX.sub('', cleaned_text)
 
         return cleaned_text
 
     def remove_punctuation(self, text):
-        return _PUNCTUATION_REGEX.sub('', text)
+        return constants.PUNCTUATION_REGEX.sub('', text)
