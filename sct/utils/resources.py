@@ -6,6 +6,45 @@ from lingua import Language, LanguageDetectorBuilder
 # Only suppress known lingua deprecation warnings, not all warnings globally
 warnings.filterwarnings('ignore', module='lingua')
 
+# ---------------------------------------------------------------------------
+# ISO code → canonical Lingua name reverse lookup tables (built once)
+# ---------------------------------------------------------------------------
+_ISO1_TO_LANG: dict[str, str] = {}  # 'en' → 'ENGLISH'
+_ISO3_TO_LANG: dict[str, str] = {}  # 'eng' → 'ENGLISH'
+for _lang in Language.all():
+    _ISO1_TO_LANG[_lang.iso_code_639_1.name.lower()] = _lang.name
+    _ISO3_TO_LANG[_lang.iso_code_639_3.name.lower()] = _lang.name
+
+
+def resolve_language(value: str) -> str:
+    """Resolve a language identifier to its canonical uppercase Lingua name.
+
+    Accepts:
+      - Full Lingua name: ``'ENGLISH'``, ``'english'``, ``'English'``
+      - ISO 639-1 code: ``'en'``, ``'EN'``
+      - ISO 639-3 code: ``'eng'``, ``'ENG'``
+
+    Returns the canonical uppercase name (e.g. ``'ENGLISH'``).
+
+    Raises:
+        ValueError: If the value doesn't match any known language.
+    """
+    upper = value.strip().upper()
+    if upper in ('MULTILINGUAL', 'MUL'):
+        return 'MULTILINGUAL'
+    if hasattr(Language, upper):
+        return upper
+    lower = value.strip().lower()
+    if lower in _ISO1_TO_LANG:
+        return _ISO1_TO_LANG[lower]
+    if lower in _ISO3_TO_LANG:
+        return _ISO3_TO_LANG[lower]
+    raise ValueError(
+        f"Unknown language: '{value}'. Use a Lingua name (ENGLISH), "
+        f"ISO 639-1 code (en), or ISO 639-3 code (eng)."
+    )
+
+
 # ---- Supported languages (also used for language-to-NER-model mapping)
 LANGUAGES = [Language.DUTCH, Language.ENGLISH, Language.GERMAN, Language.SPANISH]
 LANGUAGE_NAME = [(language.name).lower() for language in LANGUAGES]
@@ -40,18 +79,14 @@ DETECTOR = _LazyDetectorProxy()
 DEFAULT_LANGUAGES = frozenset({'ENGLISH', 'DUTCH', 'GERMAN', 'SPANISH'})
 
 
-def validate_language_name(name: str) -> None:
-    """Validate that name corresponds to a lingua.Language member.
+def validate_language_name(name: str) -> str:
+    """Validate and resolve a language identifier to a Lingua name.
 
-    Raises ValueError if invalid. Skips 'MULTILINGUAL' (not a Lingua language).
+    Accepts uppercase names, ISO 639-1, and ISO 639-3 codes.
+    Returns the canonical uppercase Lingua name.
+    Raises ValueError if unrecognized.
     """
-    if name == 'MULTILINGUAL':
-        return
-    if not hasattr(Language, name):
-        raise ValueError(
-            f"Unknown language: '{name}'. Must be a lingua.Language member "
-            f"(e.g. ENGLISH, POLISH, FRENCH). See lingua docs for full list."
-        )
+    return resolve_language(name)
 
 
 def build_detector(supported_languages: frozenset):

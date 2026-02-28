@@ -1,5 +1,6 @@
 import logging
 import re
+from typing import Optional, Set
 from ftfy import fix_text
 from unidecode import unidecode
 from emoji import demojize, replace_emoji
@@ -52,7 +53,7 @@ class NormaliseText:
         """Detect lowercase-to-uppercase transition (e.g., GraphQL, DevOps)."""
         return bool(re.search(r'[a-z][A-Z]', text))
 
-    def smart_casefold(self, text: str, stop_words: set = None) -> str:
+    def smart_casefold(self, text: str, stop_words: Optional[Set[str]] = None) -> str:
         """Case-fold text while preserving abbreviations and camelCase.
 
         Per-token rules (applied in order):

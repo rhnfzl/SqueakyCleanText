@@ -5,10 +5,12 @@ import asyncio
 import logging
 import os
 from concurrent.futures import ThreadPoolExecutor
-from typing import List, Tuple, Optional
+from typing import Any, Callable, Dict, List, Optional
 
 from sct.config import TextCleanerConfig, _config_from_module_globals
 from sct.utils import constants, contact, datetime, ner, normtext, resources, special, stopwords
+from sct.utils.anonymization_map import AnonymizationMap
+from sct.utils.process_result import ProcessResult
 
 logger = logging.getLogger(__name__)
 
@@ -23,8 +25,11 @@ class TextCleaner:
         """
         self.cfg = cfg or _config_from_module_globals()
 
-        # Instance-scoped language detector
-        self._detector = resources.build_detector(self.cfg.supported_languages)
+        # Instance-scoped language detector — restricted when language is a tuple
+        if isinstance(self.cfg.language, tuple):
+            self._detector = resources.build_detector(frozenset(self.cfg.language))
+        else:
+            self._detector = resources.build_detector(self.cfg.supported_languages)
 
         # Instance-scoped stopwords (with custom override support)
         self.ProcessStopwords = stopwords.ProcessStopwords(
@@ -56,16 +61,34 @@ class TextCleaner:
         self.ProcessSpecialSymbols = special.ProcessSpecialSymbols()
         self.NormaliseText = normtext.NormaliseText()
 
+        # Synthetic replacer: shared by regex pipeline steps + NER processor
+        self._synthetic_replacer = None
+        if self.cfg.replacement_mode == 'synthetic':
+            from sct.utils.synthetic import SyntheticReplacer
+            self._synthetic_replacer = SyntheticReplacer()
+
+        self.GeneralNER: Optional[ner.GeneralNER] = None
         if self.cfg.check_ner_process:
             # Build GLiNER config dict (if needed)
             gliner_config = None
-            if self.cfg.ner_backend in ('gliner', 'ensemble_onnx', 'ensemble_torch'):
+            needs_gliner = self.cfg.ner_backend in (
+                'gliner', 'ensemble_onnx', 'ensemble_torch', 'presidio_gliner',
+            )
+            if needs_gliner:
                 gliner_config = {
                     'model': self.cfg.gliner_model,
                     'variant': self.cfg.gliner_variant,
                     'labels': self.cfg.gliner_labels,
                     'threshold': self.cfg.gliner_threshold,
-                    'label_map': dict(self.cfg.gliner_label_map) if self.cfg.gliner_label_map else None,
+                    'label_map': (
+                        dict(self.cfg.gliner_label_map)
+                        if self.cfg.gliner_label_map else None
+                    ),
+                    'label_descriptions': (
+                        dict(self.cfg.gliner_label_descriptions)
+                        if self.cfg.gliner_label_descriptions else None
+                    ),
+                    'onnx': self.cfg.gliner_onnx,
                 }
 
             # Determine torch model names (if needed)
@@ -74,7 +97,7 @@ class TextCleaner:
                 torch_model_names = dict(self.cfg.torch_ner_models) if self.cfg.torch_ner_models else None
 
             self.GeneralNER = ner.GeneralNER(
-                model_names=dict(self.cfg.ner_models),
+                model_names=dict(self.cfg.ner_models) if self.cfg.ner_models else None,
                 ner_backend=self.cfg.ner_backend,
                 gliner_config=gliner_config,
                 torch_model_names=torch_model_names,
@@ -85,13 +108,27 @@ class TextCleaner:
                     if self.cfg.ner_ensemble_default_keys is not None
                     else None
                 ),
+                replacement_mode=self.cfg.replacement_mode,
             )
         else:
-            self.GeneralNER = None
+            pass  # self.GeneralNER already initialized to None above
+
+        # GLiClass document-level pre-classification (optional, lazy-loaded)
+        self._gliclass: Any = None
+        if self.cfg.check_classify_document:
+            from sct.utils.gliclass_adapter import GLiClassAdapter
+            from sct.config import GLICLASS_DEFAULT_MODEL
+            self._gliclass = GLiClassAdapter(
+                model_id=self.cfg.gliclass_model or GLICLASS_DEFAULT_MODEL,
+                labels=self.cfg.gliclass_labels,
+                threshold=self.cfg.gliclass_threshold,
+                classification_type=self.cfg.gliclass_classification_type,
+                onnx=self.cfg.gliclass_onnx,
+            )
 
         self.batch_size = 8
-        self._pipeline = []
-        self._post_fuzzy_pipeline = []
+        self._pipeline: List[Callable[[str], str]] = []
+        self._post_fuzzy_pipeline: List[Callable[[str], str]] = []
         self._init_pipeline()
 
     def _init_pipeline(self):
@@ -138,12 +175,27 @@ class TextCleaner:
             self._post_fuzzy_pipeline.append(step_fn)
 
     def _detect_language(self, text: str) -> Optional[str]:
-        """Detect language as a pure function (no instance mutation)."""
-        language_config = self.cfg.language
-        if language_config:
-            if language_config.upper() in self.cfg.supported_languages:
-                return language_config.upper()
+        """Detect language as a pure function (no instance mutation).
 
+        Behavior depends on ``cfg.language``:
+          - ``str``: pinned to that language (skip detection)
+          - ``tuple``: restrict detection to those languages (detect per text)
+          - ``None``: full auto-detection among all supported languages
+        """
+        language_config = self.cfg.language
+
+        # Pinned: single string → return immediately (already resolved to uppercase)
+        if isinstance(language_config, str):
+            return language_config
+
+        # Tuple: restrict detection to listed languages
+        if isinstance(language_config, tuple):
+            detected = self._detector.detect_language_of(text)
+            if detected is not None and detected.name in language_config:
+                return detected.name
+            return language_config[0]  # Fallback to first listed
+
+        # None: full auto-detection
         if any([self.cfg.check_detect_language, self.cfg.check_ner_process,
                 self.cfg.check_remove_stopwords]):
             detected = self._detector.detect_language_of(text)
@@ -152,12 +204,26 @@ class TextCleaner:
 
         return None
 
-    def _process_single(self, text: str) -> Tuple[str, Optional[str], Optional[str]]:
+    def _process_single(self, text: str) -> ProcessResult:
         """Process a single text through the entire pipeline.
 
         Returns:
-            Always a 3-tuple: (lm_text, stat_text_or_None, language_or_None)
+            ProcessResult (unpacks as 3-tuple for backward compat).
         """
+        # Reset per-document synthetic consistency cache (thread-safe via threading.local)
+        if self._synthetic_replacer:
+            self._synthetic_replacer.reset_cache()
+
+        # Per-document anonymization map (reversible mode only)
+        anon_map = None
+        if self.cfg.replacement_mode == 'reversible':
+            anon_map = AnonymizationMap()
+
+        # Document-level classification (before any text modification)
+        doc_classes = None
+        if self.cfg.check_classify_document and self._gliclass is not None:
+            doc_classes = self._gliclass.classify(text)
+
         # Detect language (pure function, thread-safe)
         language = self._detect_language(text)
 
@@ -192,6 +258,7 @@ class TextCleaner:
                 positional_tags=list(self.cfg.positional_tags),
                 ner_confidence_threshold=self.cfg.ner_confidence_threshold,
                 language=language,
+                anon_map=anon_map,
             )
 
         # Statistical model processing (always returns stext, even if None)
@@ -199,30 +266,39 @@ class TextCleaner:
         if self.cfg.check_statistical_model_processing:
             stext = self._statistical_model_processing(current_text, language)
 
-        return (current_text, stext, language)
+        # Build metadata dict (only when extended features are active)
+        metadata: Optional[Dict[str, Any]] = None
+        if anon_map is not None:
+            metadata = metadata or {}
+            metadata['anon_map'] = anon_map
+        if doc_classes is not None:
+            metadata = metadata or {}
+            metadata['classes'] = doc_classes
 
-    def process_batch(self, texts: List[str], batch_size: int = None) -> List[Tuple[str, Optional[str], Optional[str]]]:
+        return ProcessResult(current_text, stext, language, metadata=metadata)
+
+    def process_batch(self, texts: List[str], batch_size: Optional[int] = None) -> List[ProcessResult]:
         """Process multiple texts.
 
         Returns:
-            List of 3-tuples: (lm_text, stat_text_or_None, language_or_None)
+            List of ProcessResult (each unpacks as 3-tuple for backward compat).
         """
         if not texts:
             return []
 
-        results = [None] * len(texts)
+        results: List[Optional[ProcessResult]] = [None] * len(texts)
         to_process = []
 
         for i, text in enumerate(texts):
             if not isinstance(text, str):
                 raise ValueError(f"Input must be string, got {type(text)}")
             if not text or text.isspace():
-                results[i] = ("", "", None)
+                results[i] = ProcessResult("", "", None)
             else:
                 to_process.append((i, text))
 
         if not to_process:
-            return results
+            return [r for r in results if r is not None]
 
         # Parallel processing: each text goes through the full pipeline independently.
         # ONNX Runtime releases the GIL during C++ inference ops, so threads
@@ -240,9 +316,9 @@ class TextCleaner:
             for i, text in to_process:
                 results[i] = self._process_single(text)
 
-        return results
+        return [r for r in results if r is not None]
 
-    async def aprocess_batch(self, texts: List[str], batch_size: int = None) -> List[Tuple[str, Optional[str], Optional[str]]]:
+    async def aprocess_batch(self, texts: List[str], batch_size: Optional[int] = None) -> List[ProcessResult]:
         """Async version of process_batch for use with asyncio-based frameworks (FastAPI, aiohttp).
 
         Runs process_batch in a thread-pool executor so it doesn't block the event loop.
@@ -266,11 +342,11 @@ class TextCleaner:
             except Exception as e:
                 logger.warning("warmup: skipping %s: %s", lang, e)
 
-    def process(self, text: str) -> Tuple[str, Optional[str], Optional[str]]:
+    def process(self, text: str) -> ProcessResult:
         """Process a single text. Maintains backward compatibility.
 
         Returns:
-            3-tuple: (lm_text, stat_text_or_None, language_or_None)
+            ProcessResult (unpacks as 3-tuple: lm_text, stat_text, language).
         """
         return self.process_batch([text])[0]
 
@@ -289,9 +365,17 @@ class TextCleaner:
         return self.ProcessContacts.replace_html(text, replace_with=self.cfg.replace_with_html)
 
     def _replace_urls(self, text):
+        if self._synthetic_replacer:
+            return self.ProcessContacts.replace_urls_with_fn(
+                text, lambda orig: self._synthetic_replacer.get_replacement('URL', orig),
+            )
         return self.ProcessContacts.replace_urls(text, replace_with=self.cfg.replace_with_url)
 
     def _replace_emails(self, text):
+        if self._synthetic_replacer:
+            return self.ProcessContacts.replace_emails_with_fn(
+                text, lambda orig: self._synthetic_replacer.get_replacement('EMAIL', orig),
+            )
         return self.ProcessContacts.replace_emails(text, replace_with=self.cfg.replace_with_email)
 
     def _replace_dates(self, text):
@@ -309,9 +393,17 @@ class TextCleaner:
         return self.ProcessDateTime.replace_years(text, replace_with=self.cfg.replace_with_years)
 
     def _replace_phone_numbers(self, text):
+        if self._synthetic_replacer:
+            return self.ProcessContacts.replace_phone_numbers_with_fn(
+                text, lambda orig: self._synthetic_replacer.get_replacement('PHONE_NUMBER', orig),
+            )
         return self.ProcessContacts.replace_phone_numbers(text, replace_with=self.cfg.replace_with_phone_numbers)
 
     def _replace_numbers(self, text):
+        if self._synthetic_replacer:
+            return self.ProcessContacts.replace_numbers_with_fn(
+                text, lambda orig: self._synthetic_replacer.get_replacement('NUMBER', orig),
+            )
         return self.ProcessContacts.replace_numbers(text, replace_with=self.cfg.replace_with_numbers)
 
     def _replace_currency_symbols(self, text):
@@ -334,11 +426,11 @@ class TextCleaner:
         """Generate statistical model text (lowercase, no stopwords, no punctuation)."""
         stext = text
         if self.cfg.check_smart_casefold:
-            stop_words = self.ProcessStopwords.get_stop_words(language)
+            stop_words = self.ProcessStopwords.get_stop_words(language) if language else set()
             stext = self.NormaliseText.smart_casefold(stext, stop_words=stop_words)
         elif self.cfg.check_casefold:
             stext = stext.casefold()
-        if self.cfg.check_remove_stopwords:
+        if self.cfg.check_remove_stopwords and language:
             stext = self.ProcessStopwords.remove_stopwords(stext, language)
         if self.cfg.check_remove_punctuation:
             stext = self.ProcessSpecialSymbols.remove_punctuation(stext)

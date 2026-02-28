@@ -12,6 +12,7 @@ from presidio_anonymizer import AnonymizerEngine
 from presidio_anonymizer.entities import RecognizerResult
 
 from sct.utils import constants
+from sct.utils.anonymization_map import AnonymizationMap
 from sct.utils.onnx_pipeline import load_onnx_ner_model
 from sct.config import DEFAULT_NER_MODELS, DEFAULT_NER_ENSEMBLE, NER_ENSEMBLE_DEFAULT_KEYS, LANG_KEYS
 
@@ -44,14 +45,15 @@ class GeneralNER:
         ensemble_torch — Torch + GLiNER combined via ensemble voting
     """
 
-    def __init__(self, cache_dir: Optional[Path] = None, device: str = None,
+    def __init__(self, cache_dir: Optional[Path] = None, device: Optional[str] = None,
                  model_names: Optional[Union[Dict[str, str], List[str]]] = None,
                  ner_backend: str = 'onnx',
                  gliner_config: Optional[Dict] = None,
                  torch_model_names: Optional[Dict[str, str]] = None,
                  ner_batch_size: int = 8,
                  ensemble_models: Optional[Dict] = None,
-                 ensemble_default_keys: Optional[tuple] = None):
+                 ensemble_default_keys: Optional[tuple] = None,
+                 replacement_mode: str = 'placeholder'):
         """Initialize NER processor.
 
         Args:
@@ -68,6 +70,8 @@ class GeneralNER:
         """
         self._ner_backend = ner_backend
         self._ner_batch_size = ner_batch_size
+        self._replacement_mode = replacement_mode
+        self._synthetic_replacer = None  # Lazy-loaded when replacement_mode='synthetic'
         self._gliner_pipe = None
         self._ensemble_models: Dict[str, tuple] = ensemble_models if ensemble_models is not None else DEFAULT_NER_ENSEMBLE
         self._ensemble_default_keys: tuple = (
@@ -135,6 +139,14 @@ class GeneralNER:
             self.min_token_length = None
             self.tokenizer = None
 
+        elif ner_backend == 'presidio_gliner':
+            # Presidio handles everything: GLiNER recognition + anonymization
+            self._model_names = {}
+            self.min_token_length = None
+            self.tokenizer = None
+            if gliner_config:
+                self._init_presidio_gliner(gliner_config)
+
         # --- GLiNER pipeline (for gliner/ensemble modes) ---
         if ner_backend in ('gliner', 'ensemble_onnx', 'ensemble_torch') and gliner_config:
             from sct.utils.gliner_adapter import GLiNERAdapter
@@ -144,7 +156,9 @@ class GeneralNER:
                 labels=gliner_config.get('labels'),
                 threshold=gliner_config.get('threshold', 0.4),
                 label_map=gliner_config.get('label_map'),
+                label_descriptions=gliner_config.get('label_descriptions'),
                 device=self.device,
+                onnx=gliner_config.get('onnx', False),
             )
 
     def _init_tokenizer_props(self):
@@ -167,6 +181,39 @@ class GeneralNER:
                 if lang_key not in self._inference_locks:
                     self._inference_locks[lang_key] = threading.Lock()
         return self._inference_locks[lang_key]
+
+    def _init_presidio_gliner(self, gliner_config):
+        """Initialize Presidio with GLiNERRecognizer (experimental beta backend)."""
+        try:
+            from presidio_analyzer import AnalyzerEngine  # noqa: S404
+        except ImportError:
+            raise ImportError(
+                "presidio-analyzer is required for presidio_gliner backend. "
+                "Install with: pip install presidio-analyzer"
+            )
+        self._analyzer = AnalyzerEngine()
+        try:
+            from presidio_analyzer.predefined_recognizers import GLiNERRecognizer  # noqa: S404
+            gliner_recognizer = GLiNERRecognizer(
+                model_path=gliner_config['model'],
+                supported_entities=[
+                    label.upper()
+                    for label in gliner_config.get('labels', ['person', 'organization', 'location'])
+                ],
+            )
+            self._analyzer.registry.add_recognizer(gliner_recognizer)
+        except ImportError:
+            raise ImportError(
+                "GLiNERRecognizer requires presidio-analyzer with GLiNER support. "
+                "Install with: pip install presidio-analyzer gliner"
+            )
+
+    def _get_synthetic_replacer(self):
+        """Lazily initialize the SyntheticReplacer."""
+        if self._synthetic_replacer is None:
+            from sct.utils.synthetic import SyntheticReplacer
+            self._synthetic_replacer = SyntheticReplacer()
+        return self._synthetic_replacer
 
     def _get_ensemble_keys(self, language: str) -> tuple:
         """Return ordered model keys to run for the given language."""
@@ -210,6 +257,7 @@ class GeneralNER:
                     self._tokenizers[lang_key] = shared_tok
                 return
             try:
+                pipeline_obj: object
                 if self._ner_backend in ('torch', 'ensemble_torch'):
                     from sct.utils.torch_pipeline import load_torch_ner_model
                     pipeline_obj, tok = load_torch_ner_model(
@@ -258,8 +306,17 @@ class GeneralNER:
                     unique_data[item['key']] = item
         return list(unique_data.values())
 
-    def anonymize_text(self, text, filtered_data):
-        """Anonymize text. Uses Presidio for standard tags, direct replacement for custom."""
+    def anonymize_text(self, text, filtered_data, replacement_mode='placeholder',
+                       anon_map=None):
+        """Anonymize text. Supports placeholder, synthetic, or reversible replacement."""
+        if replacement_mode == 'reversible':
+            return self._anonymize_reversible(text, filtered_data, anon_map)
+
+        if replacement_mode == 'synthetic':
+            replacer = self._get_synthetic_replacer()
+            result_text = replacer.generate_for_entities(text, filtered_data)
+            return type('AnonymizeResult', (), {'text': result_text})()
+
         has_custom = any(
             items['entity_group'] not in ENTITY_TYPE_MAP
             for items in filtered_data
@@ -292,6 +349,31 @@ class GeneralNER:
             ]
 
             return self.engine.anonymize(text=text, analyzer_results=analyzer_result)
+
+    def _anonymize_reversible(self, text, filtered_data, anon_map=None):
+        """Replace entities with indexed placeholders and populate the map.
+
+        Uses right-to-left replacement to preserve character offsets.
+        Returns an AnonymizeResult-like object with ``.text`` attribute.
+        """
+        if anon_map is None:
+            anon_map = AnonymizationMap()
+
+        sorted_data = sorted(filtered_data, key=lambda x: x['start'], reverse=True)
+        for item in sorted_data:
+            tag = ENTITY_TYPE_MAP.get(item['entity_group'], item['entity_group'])
+            placeholder = anon_map.next_placeholder(tag)
+            original = text[item['start']:item['end']]
+            anon_map.add(
+                placeholder=placeholder,
+                original=original,
+                entity_type=tag,
+                start=item['start'],
+                end=item['end'],
+            )
+            text = text[:item['start']] + placeholder + text[item['end']:]
+
+        return type('AnonymizeResult', (), {'text': text, 'anon_map': anon_map})()
 
     def ner_ensemble(self, ner_results, t):
         """Apply ensemble voting across multiple model results.
@@ -326,7 +408,7 @@ class GeneralNER:
             pieces = [p for p in delimiter.split(text) if p]
             if len(pieces) <= 1:
                 continue
-            chunks = []
+            chunks: List[str] = []
             current = pieces[0]
             for piece in pieces[1:]:
                 merged = current + ' ' + piece
@@ -342,7 +424,7 @@ class GeneralNER:
 
         # Last resort: split on whitespace
         words = text.split()
-        chunks: List[str] = []
+        chunks = []
         current = ''
         for word in words:
             test = (current + ' ' + word).strip()
@@ -358,24 +440,36 @@ class GeneralNER:
     def ner_process(
         self,
         text: str,
-        positional_tags: List[str] = None,
-        ner_confidence_threshold: float = None,
-        language: str = None
+        positional_tags: Optional[List[str]] = None,
+        ner_confidence_threshold: Optional[float] = None,
+        language: Optional[str] = None,
+        anon_map: Optional['AnonymizationMap'] = None,
     ) -> str:
         """Process text with NER models using the configured backend.
 
         Routes to ONNX, Torch, GLiNER, or ensemble depending on self._ner_backend.
+
+        When *anon_map* is provided (reversible mode), entity-to-placeholder
+        mappings are recorded in it for later deanonymization.
         """
         if not positional_tags:
             raise ValueError("Must provide at least one positional tag")
 
         ner_confidence_threshold = ner_confidence_threshold or 0.85
 
+        # --- Presidio GLiNER backend: delegates everything to Presidio ---
+        if self._ner_backend == 'presidio_gliner':
+            analyzer_results = self._analyzer.analyze(text=text, language='en')
+            result = self.engine.anonymize(text=text, analyzer_results=analyzer_results)
+            return result.text
+
         # --- Chunking --- (lock-free: HF fast tokenizer Rust backend is thread-safe)
         if self.tokenizer is not None:
             chunks = self.split_text(text, self.min_token_length, self.tokenizer)
         else:
-            chunks = self._simple_chunk(text)
+            # Use GLiNER adapter's dynamic context window when available
+            gliner_max = self._gliner_pipe.max_context_length if self._gliner_pipe else 384
+            chunks = self._simple_chunk(text, max_tokens=int(gliner_max * 0.9))
 
         if not chunks:
             return text
@@ -418,7 +512,11 @@ class GeneralNER:
             ensemble_results = self.ner_ensemble(ner_results, ner_confidence_threshold)
 
             if ensemble_results:
-                ner_text = self.anonymize_text(chunk, ensemble_results).text
+                result = self.anonymize_text(
+                    chunk, ensemble_results, self._replacement_mode,
+                    anon_map=anon_map,
+                )
+                ner_text = result.text
             else:
                 ner_text = chunk
 
@@ -519,10 +617,10 @@ class GeneralNER:
     def process_batch(
         self,
         texts: List[str],
-        batch_size: int = None,
-        positional_tags: List[str] = None,
-        ner_confidence_threshold: float = None,
-        language: str = None
+        batch_size: Optional[int] = None,
+        positional_tags: Optional[List[str]] = None,
+        ner_confidence_threshold: Optional[float] = None,
+        language: Optional[str] = None
     ) -> List[str]:
         """Process multiple texts in batches."""
         batch_size = batch_size if batch_size is not None else self._ner_batch_size

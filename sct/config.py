@@ -15,14 +15,16 @@ Legacy API (backward compatible):
 import sys
 from dataclasses import dataclass
 from types import MappingProxyType
-from typing import Mapping, Optional, Tuple
+from typing import Mapping, Optional, Tuple, Union
 
 
 LANG_KEYS = ('ENGLISH', 'DUTCH', 'GERMAN', 'SPANISH', 'MULTILINGUAL')
 REQUIRED_NER_KEYS = frozenset({'ENGLISH', 'MULTILINGUAL'})
 DEFAULT_LANGUAGES = frozenset({'ENGLISH', 'DUTCH', 'GERMAN', 'SPANISH'})
 
-VALID_NER_BACKENDS = frozenset({'onnx', 'torch', 'gliner', 'ensemble_onnx', 'ensemble_torch'})
+VALID_NER_BACKENDS = frozenset({
+    'onnx', 'torch', 'gliner', 'ensemble_onnx', 'ensemble_torch', 'presidio_gliner',
+})
 
 DEFAULT_NER_MODELS: dict[str, str] = {
     'ENGLISH': 'rhnfzl/xlm-roberta-large-conll03-english-onnx',
@@ -60,6 +62,66 @@ DEFAULT_NER_ENSEMBLE: dict[str, tuple] = {
 }
 # Fallback for any language not in DEFAULT_NER_ENSEMBLE (FR, PT, IT, etc.)
 NER_ENSEMBLE_DEFAULT_KEYS: tuple = ('MULTILINGUAL', 'ENGLISH')
+
+# PII label categories (compatible with knowledgator/gliner-pii-base-v1.0)
+PII_LABELS: tuple[str, ...] = (
+    # Personal
+    'name', 'first_name', 'last_name', 'date_of_birth', 'age',
+    'gender', 'marital_status', 'nationality',
+    # Contact
+    'email', 'phone_number', 'ip_address', 'url',
+    'street_address', 'city', 'state', 'country', 'zip_code',
+    # Financial (PCI)
+    'credit_card_number', 'cvv', 'expiration_date',
+    'social_security_number', 'bank_account_number', 'routing_number', 'tax_id',
+    # Healthcare (PHI)
+    'medical_condition', 'drug_name', 'dosage', 'blood_type',
+    'medical_code', 'healthcare_number',
+    # Identity
+    'passport_number', 'driver_license_number', 'username', 'password',
+    'vehicle_identification_number',
+    # Employment
+    'company_name', 'job_title', 'employee_id', 'salary',
+    # Digital
+    'mac_address', 'imei', 'device_id', 'api_key', 'access_token',
+    # Relationship
+    'spouse_name', 'child_name', 'emergency_contact',
+    # Geographic
+    'latitude', 'longitude', 'gps_coordinates',
+    # Temporal
+    'date', 'time', 'timestamp',
+    # Misc
+    'account_number', 'license_plate', 'serial_number',
+    'insurance_policy_number', 'beneficiary',
+)
+
+PII_LABEL_MAP: dict[str, str] = {
+    'name': 'PER', 'first_name': 'PER', 'last_name': 'PER',
+    'spouse_name': 'PER', 'child_name': 'PER', 'emergency_contact': 'PER',
+    'company_name': 'ORG', 'court_name': 'ORG', 'school_name': 'ORG',
+    'city': 'LOC', 'state': 'LOC', 'country': 'LOC',
+}
+
+PII_DEFAULT_MODEL = 'knowledgator/gliner-pii-base-v1.0'
+PII_DEFAULT_THRESHOLD = 0.3  # Recall > precision for PII
+
+VALID_NER_MODES = frozenset({'standard', 'pii'})
+VALID_REPLACEMENT_MODES = frozenset({'placeholder', 'synthetic', 'reversible'})
+
+# Optional ModernBERT NER models (available when exported via export_onnx_models.py)
+MODERNBERT_NER_MODELS: dict[str, str] = {
+    'ENGLISH': 'rhnfzl/modernbert-base-ner-conll03-english-onnx',
+    # Multilingual: not yet available — WikiNEuRaL remains the best option
+    'MULTILINGUAL': 'rhnfzl/wikineural-multilingual-ner-onnx',
+}
+
+# GLiClass document-level classification defaults
+GLICLASS_DEFAULT_MODEL = 'knowledgator/gliclass-edge-v3.0'      # 32.7M params, 131MB
+GLICLASS_ONNX_MODEL = 'cnmoro/gliclass-edge-v3.0-onnx'         # Community ONNX conversion
+
+# Placeholder constants for future multilingual NER models (blocked: models not yet published)
+OTTER_NER_MODELS: dict[str, str] = {}   # arXiv:2601.06347 — checkpoints not on HF Hub
+MMBERT_NER_MODELS: dict[str, str] = {}  # GLiNER bug #332 blocks mmBERT as backbone
 
 
 @dataclass(frozen=True)
@@ -122,10 +184,15 @@ class TextCleanerConfig:
     positional_tags: Tuple[str, ...] = ('PER', 'LOC', 'ORG', 'MISC')
     ner_confidence_threshold: float = 0.85
     ner_batch_size: int = 8
-    language: Optional[str] = None
+    language: Optional[Union[str, Tuple[str, ...]]] = None
 
     # NER backend selection
-    ner_backend: str = 'onnx'  # 'onnx' | 'torch' | 'gliner' | 'ensemble_onnx' | 'ensemble_torch'
+    ner_backend: str = 'onnx'  # 'onnx' | 'torch' | 'gliner' | 'ensemble_onnx' | 'ensemble_torch' | 'presidio_gliner'
+
+    # NER mode: 'standard' uses configured models, 'pii' auto-configures GLiNER for PII detection
+    ner_mode: str = 'standard'
+    # Replacement mode: 'placeholder' uses <TAG> tokens, 'synthetic' uses Faker-generated values
+    replacement_mode: str = 'placeholder'
 
     # Preferred: language-keyed dict of HuggingFace ONNX model repo IDs.
     # Models must have model.onnx, config.json, tokenizer.json on Hub.
@@ -163,6 +230,23 @@ class TextCleanerConfig:
     gliner_label_map: Optional[Mapping[str, str]] = None
     gliner_threshold: float = 0.4
 
+    # Entity description labels (ZERONER-style): maps labels to natural-language descriptions.
+    # When provided, descriptions are sent to GLiNER for inference, results mapped back to labels.
+    # Example: {'person': "a person's full legal name", 'location': "a geographical place name"}
+    gliner_label_descriptions: Optional[Mapping[str, str]] = None
+
+    # Load GLiNER model in ONNX mode (uses pre-built ONNX weights from HuggingFace Hub).
+    # Only works with uni-encoder models. Auto-set when ner_mode='pii' + ner_backend='onnx'.
+    gliner_onnx: bool = False
+
+    # GLiClass document-level pre-classification (zero-shot)
+    check_classify_document: bool = False
+    gliclass_model: Optional[str] = None
+    gliclass_labels: Tuple[str, ...] = ()
+    gliclass_threshold: float = 0.5
+    gliclass_classification_type: str = 'single-label'
+    gliclass_onnx: bool = False
+
     # Plugin: user-provided pipeline steps, each callable (text: str) -> str.
     # Appended after all built-in steps in _init_pipeline().
     custom_pipeline_steps: Tuple = ()
@@ -189,6 +273,39 @@ class TextCleanerConfig:
                     f"custom_pipeline_steps must contain callables, got: {type(step)!r}"
                 )
 
+        # --- NER mode + replacement mode validation ---
+        if self.ner_mode not in VALID_NER_MODES:
+            raise ValueError(
+                f"ner_mode must be one of {sorted(VALID_NER_MODES)}, got: {self.ner_mode!r}"
+            )
+        if self.replacement_mode not in VALID_REPLACEMENT_MODES:
+            raise ValueError(
+                f"replacement_mode must be one of {sorted(VALID_REPLACEMENT_MODES)}, "
+                f"got: {self.replacement_mode!r}"
+            )
+
+        # PII mode auto-configuration: sets GLiNER defaults for PII detection.
+        # User-provided values take priority (checked via default comparisons).
+        if self.ner_mode == 'pii':
+            if self.ner_backend == 'onnx':
+                object.__setattr__(self, 'ner_backend', 'gliner')
+                # Use ONNX-loaded GLiNER when available (pre-built ONNX on Hub)
+                if not self.gliner_onnx:
+                    object.__setattr__(self, 'gliner_onnx', True)
+            if not self.gliner_model:
+                object.__setattr__(self, 'gliner_model', PII_DEFAULT_MODEL)
+            if self.gliner_labels == ('person', 'organization', 'location'):
+                object.__setattr__(self, 'gliner_labels', PII_LABELS)
+            if self.gliner_threshold == 0.4:
+                object.__setattr__(self, 'gliner_threshold', PII_DEFAULT_THRESHOLD)
+            if self.gliner_label_map is None:
+                object.__setattr__(self, 'gliner_label_map', PII_LABEL_MAP)
+            # Expand positional_tags to include all PII label tags
+            pii_tags = set(self.positional_tags)
+            for label in self.gliner_labels:
+                pii_tags.add(PII_LABEL_MAP.get(label, label.upper()))
+            object.__setattr__(self, 'positional_tags', tuple(sorted(pii_tags)))
+
         # --- NER backend validation ---
         if self.ner_backend not in VALID_NER_BACKENDS:
             raise ValueError(
@@ -203,7 +320,9 @@ class TextCleanerConfig:
             )
 
         # GLiNER fields required for gliner/ensemble backends
-        needs_gliner = self.ner_backend in ('gliner', 'ensemble_onnx', 'ensemble_torch')
+        needs_gliner = self.ner_backend in (
+            'gliner', 'ensemble_onnx', 'ensemble_torch', 'presidio_gliner',
+        )
         if needs_gliner:
             if not self.gliner_model:
                 raise ValueError(
@@ -220,6 +339,11 @@ class TextCleanerConfig:
         if self.gliner_label_map is not None:
             object.__setattr__(self, 'gliner_label_map',
                                MappingProxyType(dict(self.gliner_label_map)))
+
+        # Freeze gliner_label_descriptions
+        if self.gliner_label_descriptions is not None:
+            object.__setattr__(self, 'gliner_label_descriptions',
+                               MappingProxyType(dict(self.gliner_label_descriptions)))
 
         # Reconcile torch_ner_models
         if self.torch_ner_models is not None:
@@ -263,29 +387,34 @@ class TextCleanerConfig:
             object.__setattr__(self, 'ner_models', MappingProxyType(models_dict))
 
         # --- Language validation and supported_languages computation ---
-        from sct.utils.resources import validate_language_name
+        from sct.utils.resources import resolve_language
 
-        # Coerce extra_languages to tuple
+        # Resolve language (str or tuple of str) via ISO code / name lookup
+        if self.language is not None:
+            if isinstance(self.language, str):
+                object.__setattr__(self, 'language', resolve_language(self.language))
+            elif isinstance(self.language, (list, tuple)):
+                resolved = tuple(resolve_language(lang) for lang in self.language)
+                object.__setattr__(self, 'language', resolved)
+
+        # Coerce extra_languages to tuple and resolve each entry
         if isinstance(self.extra_languages, list):
             object.__setattr__(self, 'extra_languages', tuple(self.extra_languages))
+        if self.extra_languages:
+            resolved_extra = tuple(resolve_language(lang) for lang in self.extra_languages)
+            object.__setattr__(self, 'extra_languages', resolved_extra)
 
-        # Validate extra_languages
-        for lang in self.extra_languages:
-            validate_language_name(lang)
-
-        # Validate and freeze custom_stopwords
+        # Validate and freeze custom_stopwords (keys must be valid language names)
         if self.custom_stopwords:
-            for lang in self.custom_stopwords:
-                validate_language_name(lang)
+            resolved_sw = {resolve_language(k): v for k, v in self.custom_stopwords.items()}
             object.__setattr__(self, 'custom_stopwords',
-                               MappingProxyType(dict(self.custom_stopwords)))
+                               MappingProxyType(resolved_sw))
 
         # Validate and freeze custom_month_names
         if self.custom_month_names:
-            for lang in self.custom_month_names:
-                validate_language_name(lang)
+            resolved_mn = {resolve_language(k): tuple(v) for k, v in self.custom_month_names.items()}
             object.__setattr__(self, 'custom_month_names',
-                               MappingProxyType({k: tuple(v) for k, v in self.custom_month_names.items()}))
+                               MappingProxyType(resolved_mn))
 
         # Compute supported_languages: union of all sources
         langs = set(DEFAULT_LANGUAGES)
@@ -297,16 +426,26 @@ class TextCleanerConfig:
             langs.update(self.custom_stopwords.keys())
         if self.custom_month_names:
             langs.update(self.custom_month_names.keys())
+        # Add languages from tuple-of-languages config
+        if isinstance(self.language, tuple):
+            langs.update(self.language)
         object.__setattr__(self, 'supported_languages', frozenset(langs))
 
-        # Validate language pin against supported set
-        if self.language:
-            upper = self.language.upper()
-            if upper not in self.supported_languages:
-                raise ValueError(
-                    f"language='{self.language}' not in supported languages: "
-                    f"{sorted(self.supported_languages)}"
-                )
+        # Validate language pin/restriction against supported set
+        if self.language is not None:
+            if isinstance(self.language, str):
+                if self.language not in self.supported_languages:
+                    raise ValueError(
+                        f"language='{self.language}' not in supported languages: "
+                        f"{sorted(self.supported_languages)}"
+                    )
+            elif isinstance(self.language, tuple):
+                for lang in self.language:
+                    if lang not in self.supported_languages:
+                        raise ValueError(
+                            f"language='{lang}' (from tuple) not in supported languages: "
+                            f"{sorted(self.supported_languages)}"
+                        )
 
 
 def _config_from_module_globals() -> TextCleanerConfig:
@@ -352,6 +491,9 @@ def _config_from_module_globals() -> TextCleanerConfig:
         replace_with_currency_symbols=m.REPLACE_WITH_CURRENCY_SYMBOLS,
         positional_tags=tuple(m.POSITIONAL_TAGS),
         ner_confidence_threshold=m.NER_CONFIDENCE_THRESHOLD,
+        ner_mode=getattr(m, 'NER_MODE', 'standard'),
+        replacement_mode=getattr(m, 'REPLACEMENT_MODE', 'placeholder'),
+        gliner_onnx=getattr(m, 'GLINER_ONNX', False),
         language=m.LANGUAGE,
         ner_models=dict(zip(LANG_KEYS, m.NER_MODELS_LIST)),
         extra_languages=(),
@@ -402,6 +544,9 @@ REPLACE_WITH_CURRENCY_SYMBOLS = None
 
 POSITIONAL_TAGS = ['PER', 'LOC', 'ORG', 'MISC']
 NER_CONFIDENCE_THRESHOLD = 0.85
+NER_MODE = 'standard'
+REPLACEMENT_MODE = 'placeholder'
+GLINER_ONNX = False
 LANGUAGE = None
 
 # Order: English, Dutch, German, Spanish, Multilingual

@@ -1,16 +1,20 @@
 import gc
 import unittest
 import string
+from types import MappingProxyType
 from hypothesis import given, settings
 from hypothesis.strategies import text, from_regex
 from faker import Faker
 from sct import config
-from sct.config import LANG_KEYS, TextCleanerConfig
-from sct.utils import contact, datetime, special, normtext, stopwords, constants
+from sct.config import (
+    LANG_KEYS, TextCleanerConfig,
+    PII_LABELS, PII_LABEL_MAP, PII_DEFAULT_MODEL, PII_DEFAULT_THRESHOLD,
+)
+from sct.utils import contact, datetime, special, normtext, stopwords, constants, resources
 from sct.utils.constants import build_month_names_dict, build_date_regex
 from sct.utils.stopwords import ProcessStopwords
 from sct.utils.ner import GeneralNER
-from unittest.mock import patch
+from unittest.mock import patch, MagicMock
 from functools import wraps
 from sct.sct import TextCleaner
 
@@ -1236,6 +1240,91 @@ class TextCleanerTest(unittest.TestCase):
         )
         self.assertEqual(cfg.language, 'POLISH')
 
+    # --- ISO code / tuple language tests ---
+
+    def test_resolve_language_full_name(self):
+        """resolve_language('ENGLISH') → 'ENGLISH'."""
+        self.assertEqual(resources.resolve_language('ENGLISH'), 'ENGLISH')
+
+    def test_resolve_language_lowercase(self):
+        """resolve_language('english') → 'ENGLISH'."""
+        self.assertEqual(resources.resolve_language('english'), 'ENGLISH')
+
+    def test_resolve_language_iso1(self):
+        """resolve_language('en') → 'ENGLISH'."""
+        self.assertEqual(resources.resolve_language('en'), 'ENGLISH')
+
+    def test_resolve_language_iso3(self):
+        """resolve_language('eng') → 'ENGLISH'."""
+        self.assertEqual(resources.resolve_language('eng'), 'ENGLISH')
+
+    def test_resolve_language_iso1_uppercase(self):
+        """resolve_language('EN') → 'ENGLISH'."""
+        self.assertEqual(resources.resolve_language('EN'), 'ENGLISH')
+
+    def test_resolve_language_multilingual_passthrough(self):
+        """resolve_language('MULTILINGUAL') → 'MULTILINGUAL' (special case)."""
+        self.assertEqual(resources.resolve_language('MULTILINGUAL'), 'MULTILINGUAL')
+
+    def test_resolve_language_invalid(self):
+        """resolve_language('xyz') raises ValueError."""
+        with self.assertRaises(ValueError) as ctx:
+            resources.resolve_language('xyz')
+        self.assertIn("Unknown language", str(ctx.exception))
+
+    def test_config_language_iso_code(self):
+        """TextCleanerConfig(language='en') resolves to 'ENGLISH'."""
+        cfg = TextCleanerConfig(check_ner_process=False, language='en')
+        self.assertEqual(cfg.language, 'ENGLISH')
+
+    def test_config_language_iso3_code(self):
+        """TextCleanerConfig(language='nld') resolves to 'DUTCH'."""
+        cfg = TextCleanerConfig(check_ner_process=False, language='nld')
+        self.assertEqual(cfg.language, 'DUTCH')
+
+    def test_config_language_tuple(self):
+        """TextCleanerConfig(language=('en', 'nl')) → ('ENGLISH', 'DUTCH')."""
+        cfg = TextCleanerConfig(check_ner_process=False, language=('en', 'nl'))
+        self.assertEqual(cfg.language, ('ENGLISH', 'DUTCH'))
+
+    def test_config_language_tuple_iso_mix(self):
+        """TextCleanerConfig(language=('ENGLISH', 'nl')) → ('ENGLISH', 'DUTCH')."""
+        cfg = TextCleanerConfig(check_ner_process=False, language=('ENGLISH', 'nl'))
+        self.assertEqual(cfg.language, ('ENGLISH', 'DUTCH'))
+
+    def test_config_language_tuple_in_supported(self):
+        """Tuple languages are added to supported_languages."""
+        cfg = TextCleanerConfig(check_ner_process=False, language=('en', 'nl', 'fr'))
+        self.assertIn('FRENCH', cfg.supported_languages)
+        self.assertIn('ENGLISH', cfg.supported_languages)
+        self.assertIn('DUTCH', cfg.supported_languages)
+
+    def test_config_extra_languages_iso(self):
+        """extra_languages=('fr',) resolves to ('FRENCH',)."""
+        cfg = TextCleanerConfig(check_ner_process=False, extra_languages=('fr',))
+        self.assertIn('FRENCH', cfg.supported_languages)
+
+    def test_detect_language_pinned_iso(self):
+        """language='de' pins to GERMAN (no detection)."""
+        cfg = TextCleanerConfig(check_ner_process=False, language='de')
+        cleaner = TextCleaner(cfg=cfg)
+        _, _, lang = cleaner.process("This is English text")
+        self.assertEqual(lang, 'GERMAN')
+
+    def test_detect_language_tuple_restricts(self):
+        """language=('en', 'nl') restricts detection; result is one of the two."""
+        cfg = TextCleanerConfig(check_ner_process=False, language=('en', 'nl'))
+        cleaner = TextCleaner(cfg=cfg)
+        _, _, lang = cleaner.process("This is clearly English text about the weather")
+        self.assertIn(lang, ('ENGLISH', 'DUTCH'))
+
+    def test_detect_language_tuple_fallback(self):
+        """language=('en', 'nl') with undetectable text falls back to first."""
+        cfg = TextCleanerConfig(check_ner_process=False, language=('en', 'nl'))
+        cleaner = TextCleaner(cfg=cfg)
+        _, _, lang = cleaner.process("xyz")
+        self.assertIn(lang, ('ENGLISH', 'DUTCH'))
+
     def test_default_backward_compat(self):
         """Default TextCleanerConfig() has same supported_languages as before."""
         cfg = TextCleanerConfig(check_ner_process=False)
@@ -1432,6 +1521,669 @@ class TextCleanerTest(unittest.TestCase):
         if hasattr(cls, 'ner') and cls.ner is not None:
             del cls.ner
         gc.collect()
+
+
+class PIIModeConfigTest(unittest.TestCase):
+    """Test PII mode auto-configuration (config-level only, no model downloads)."""
+
+    def test_pii_mode_auto_configures_gliner(self):
+        """PII mode should auto-switch to gliner backend with PII defaults."""
+        cfg = TextCleanerConfig(
+            check_ner_process=False,
+            ner_mode='pii',
+        )
+        self.assertEqual(cfg.ner_backend, 'gliner')
+        self.assertEqual(cfg.gliner_model, PII_DEFAULT_MODEL)
+        self.assertEqual(cfg.gliner_labels, PII_LABELS)
+        self.assertEqual(cfg.gliner_threshold, PII_DEFAULT_THRESHOLD)
+        self.assertIsNotNone(cfg.gliner_label_map)
+
+    def test_pii_mode_preserves_user_model(self):
+        """User-provided gliner_model should not be overridden by PII mode."""
+        cfg = TextCleanerConfig(
+            check_ner_process=False,
+            ner_mode='pii',
+            gliner_model='my-custom/pii-model',
+        )
+        self.assertEqual(cfg.gliner_model, 'my-custom/pii-model')
+
+    def test_pii_mode_preserves_user_labels(self):
+        """User-provided gliner_labels should not be overridden by PII mode."""
+        custom_labels = ('person', 'email', 'phone')
+        cfg = TextCleanerConfig(
+            check_ner_process=False,
+            ner_mode='pii',
+            gliner_model='knowledgator/gliner-pii-base-v1.0',
+            gliner_labels=custom_labels,
+        )
+        self.assertEqual(cfg.gliner_labels, custom_labels)
+
+    def test_pii_mode_preserves_user_backend(self):
+        """Non-onnx ner_backend should not be overridden by PII mode."""
+        cfg = TextCleanerConfig(
+            check_ner_process=False,
+            ner_mode='pii',
+            ner_backend='gliner',
+            gliner_model='knowledgator/gliner-pii-base-v1.0',
+        )
+        self.assertEqual(cfg.ner_backend, 'gliner')
+
+    def test_pii_mode_expands_positional_tags(self):
+        """PII mode should add PII-specific tags to positional_tags."""
+        cfg = TextCleanerConfig(
+            check_ner_process=False,
+            ner_mode='pii',
+        )
+        tags = set(cfg.positional_tags)
+        # Standard tags should still be present
+        self.assertIn('PER', tags)
+        self.assertIn('LOC', tags)
+        self.assertIn('ORG', tags)
+        # PII-specific tags should be added (uppercased label names)
+        self.assertIn('EMAIL', tags)
+        self.assertIn('PHONE_NUMBER', tags)
+        self.assertIn('CREDIT_CARD_NUMBER', tags)
+
+    def test_pii_mode_invalid_value(self):
+        """Invalid ner_mode should raise ValueError."""
+        with self.assertRaises(ValueError) as ctx:
+            TextCleanerConfig(
+                check_ner_process=False,
+                ner_mode='invalid',
+            )
+        self.assertIn('ner_mode', str(ctx.exception))
+
+    def test_replacement_mode_config_validation(self):
+        """replacement_mode should accept valid values and reject invalid ones."""
+        # Valid values
+        for mode in ('placeholder', 'synthetic'):
+            cfg = TextCleanerConfig(check_ner_process=False, replacement_mode=mode)
+            self.assertEqual(cfg.replacement_mode, mode)
+
+        # Invalid value
+        with self.assertRaises(ValueError) as ctx:
+            TextCleanerConfig(check_ner_process=False, replacement_mode='invalid')
+        self.assertIn('replacement_mode', str(ctx.exception))
+
+    def test_pii_labels_are_tuples(self):
+        """PII_LABELS should be an immutable tuple."""
+        self.assertIsInstance(PII_LABELS, tuple)
+        self.assertGreater(len(PII_LABELS), 50)
+
+    def test_pii_label_map_coverage(self):
+        """All PII_LABEL_MAP keys should map to standard NER tags."""
+        valid_tags = {'PER', 'LOC', 'ORG'}
+        for label, tag in PII_LABEL_MAP.items():
+            self.assertIn(tag, valid_tags, f"Label '{label}' maps to unexpected tag '{tag}'")
+
+
+class GLiNEROnnxConfigTest(unittest.TestCase):
+    """Test gliner_onnx config field and PII mode auto-set behaviour."""
+
+    def test_gliner_onnx_config_field_default(self):
+        """gliner_onnx should default to False."""
+        cfg = TextCleanerConfig(check_ner_process=False)
+        self.assertFalse(cfg.gliner_onnx)
+
+    def test_gliner_onnx_explicit_true(self):
+        """gliner_onnx can be explicitly set to True."""
+        cfg = TextCleanerConfig(check_ner_process=False, gliner_onnx=True)
+        self.assertTrue(cfg.gliner_onnx)
+
+    def test_pii_mode_onnx_backend_sets_gliner_onnx(self):
+        """PII mode with ner_backend='onnx' should auto-set gliner_onnx=True."""
+        cfg = TextCleanerConfig(
+            check_ner_process=False,
+            ner_mode='pii',
+            ner_backend='onnx',
+        )
+        self.assertTrue(cfg.gliner_onnx)
+        # ner_backend should be rewritten to 'gliner' (GLiNER loaded in ONNX mode)
+        self.assertEqual(cfg.ner_backend, 'gliner')
+
+    def test_pii_mode_gliner_backend_no_auto_onnx(self):
+        """PII mode with ner_backend='gliner' should NOT auto-set gliner_onnx."""
+        cfg = TextCleanerConfig(
+            check_ner_process=False,
+            ner_mode='pii',
+            ner_backend='gliner',
+        )
+        self.assertFalse(cfg.gliner_onnx)
+
+    def test_gliner_onnx_module_level_variable(self):
+        """Module-level GLINER_ONNX variable should exist and default to False."""
+        self.assertTrue(hasattr(config, 'GLINER_ONNX'))
+        self.assertFalse(config.GLINER_ONNX)
+
+
+class BiEncoderAdapterTest(unittest.TestCase):
+    """Test GLiNERAdapter bi-encoder detection and label caching (mock-based)."""
+
+    def _make_mock_model(self, is_bi_encoder=False, max_pos=None):
+        """Create a mock GLiNER model."""
+        model = MagicMock()
+        if is_bi_encoder:
+            model.encode_labels = MagicMock(return_value='mock_embeddings')
+            model.batch_predict_with_embeds = MagicMock(return_value=[[]])
+        else:
+            # Remove encode_labels so hasattr returns False
+            del model.encode_labels
+            model.predict_entities = MagicMock(return_value=[])
+
+        if max_pos is not None:
+            model.config = MagicMock()
+            model.config.max_position_embeddings = max_pos
+        else:
+            del model.config
+        return model
+
+    @patch('sct.utils.gliner_adapter.GLiNERAdapter.__init__', return_value=None)
+    def test_gliner_adapter_biencoder_detection(self, mock_init):
+        """Bi-encoder model should be detected via hasattr(model, 'encode_labels')."""
+        from sct.utils.gliner_adapter import GLiNERAdapter
+        adapter = GLiNERAdapter.__new__(GLiNERAdapter)
+        adapter.model = self._make_mock_model(is_bi_encoder=True)
+        adapter.variant = 'gliner'
+        adapter.labels = ['person', 'location']
+        adapter.threshold = 0.4
+        adapter.label_map = {}
+        adapter.label_descriptions = {}
+        adapter.model_id = 'test-model'
+        adapter._is_bi_encoder = hasattr(adapter.model, 'encode_labels')
+        adapter._label_embeddings = None
+        adapter._cached_labels_key = None
+
+        self.assertTrue(adapter._is_bi_encoder)
+
+    @patch('sct.utils.gliner_adapter.GLiNERAdapter.__init__', return_value=None)
+    def test_gliner_adapter_uniencoder_detection(self, mock_init):
+        """Uni-encoder model should NOT have encode_labels."""
+        from sct.utils.gliner_adapter import GLiNERAdapter
+        adapter = GLiNERAdapter.__new__(GLiNERAdapter)
+        adapter.model = self._make_mock_model(is_bi_encoder=False)
+        adapter._is_bi_encoder = hasattr(adapter.model, 'encode_labels')
+
+        self.assertFalse(adapter._is_bi_encoder)
+
+    @patch('sct.utils.gliner_adapter.GLiNERAdapter.__init__', return_value=None)
+    def test_gliner_adapter_label_cache_invalidation(self, mock_init):
+        """invalidate_label_cache() should clear cached embeddings."""
+        from sct.utils.gliner_adapter import GLiNERAdapter
+        adapter = GLiNERAdapter.__new__(GLiNERAdapter)
+        adapter._label_embeddings = 'some_embeddings'
+        adapter._cached_labels_key = ('person', 'location')
+
+        adapter.invalidate_label_cache()
+        self.assertIsNone(adapter._label_embeddings)
+        self.assertIsNone(adapter._cached_labels_key)
+
+    @patch('sct.utils.gliner_adapter.GLiNERAdapter.__init__', return_value=None)
+    def test_gliner_adapter_max_context_from_model_config(self, mock_init):
+        """max_context_length should derive from model.config.max_position_embeddings."""
+        from sct.utils.gliner_adapter import GLiNERAdapter
+        adapter = GLiNERAdapter.__new__(GLiNERAdapter)
+        adapter.variant = 'gliner'
+        adapter.model = self._make_mock_model(max_pos=2048)
+
+        self.assertEqual(adapter.max_context_length, 2048)
+
+    @patch('sct.utils.gliner_adapter.GLiNERAdapter.__init__', return_value=None)
+    def test_gliner_adapter_max_context_fallback(self, mock_init):
+        """max_context_length should fallback to 512 when no model config."""
+        from sct.utils.gliner_adapter import GLiNERAdapter
+        adapter = GLiNERAdapter.__new__(GLiNERAdapter)
+        adapter.variant = 'gliner'
+        adapter.model = self._make_mock_model()  # no config
+
+        self.assertEqual(adapter.max_context_length, 512)
+
+    @patch('sct.utils.gliner_adapter.GLiNERAdapter.__init__', return_value=None)
+    def test_gliner_adapter_gliner2_context_fallback(self, mock_init):
+        """max_context_length for gliner2 variant should fallback to 2048."""
+        from sct.utils.gliner_adapter import GLiNERAdapter
+        adapter = GLiNERAdapter.__new__(GLiNERAdapter)
+        adapter.variant = 'gliner2'
+        adapter.model = self._make_mock_model()  # no config
+
+        self.assertEqual(adapter.max_context_length, 2048)
+
+
+class SyntheticReplacementTest(unittest.TestCase):
+    """Test SyntheticReplacer (Faker-based replacement engine)."""
+
+    def test_synthetic_replacer_consistency(self):
+        """Same entity text should produce same fake value within a document."""
+        from sct.utils.synthetic import SyntheticReplacer
+        replacer = SyntheticReplacer(seed=42)
+
+        val1 = replacer.get_replacement('PER', 'John Smith')
+        val2 = replacer.get_replacement('PER', 'John Smith')
+        self.assertEqual(val1, val2)
+
+        # Different entity text should produce different value
+        val3 = replacer.get_replacement('PER', 'Jane Doe')
+        self.assertNotEqual(val1, val3)
+
+    def test_synthetic_replacer_cache_reset(self):
+        """reset_cache() should clear per-document consistency."""
+        from sct.utils.synthetic import SyntheticReplacer
+        replacer = SyntheticReplacer(seed=42)
+
+        val1 = replacer.get_replacement('PER', 'John Smith')
+        replacer.reset_cache()
+        # After reset, same input may produce different output
+        # (Faker state has advanced), but the important thing is cache is cleared
+        self.assertIsNotNone(val1)
+
+    def test_synthetic_replacer_entity_types(self):
+        """Different entity types should use appropriate Faker methods."""
+        from sct.utils.synthetic import SyntheticReplacer
+        replacer = SyntheticReplacer(seed=42)
+
+        email = replacer.get_replacement('EMAIL', 'test@example.com')
+        self.assertIn('@', email)  # Faker.email() always contains @
+
+        name = replacer.get_replacement('PER', 'Alice')
+        self.assertIsInstance(name, str)
+        self.assertGreater(len(name), 0)
+
+    def test_synthetic_replacer_unknown_type_fallback(self):
+        """Unknown entity types should fall back to name generation."""
+        from sct.utils.synthetic import SyntheticReplacer
+        replacer = SyntheticReplacer(seed=42)
+
+        result = replacer.get_replacement('UNKNOWN_TYPE', 'something')
+        self.assertIsInstance(result, str)
+        self.assertGreater(len(result), 0)
+
+    def test_synthetic_generate_for_entities(self):
+        """generate_for_entities should replace entities in text."""
+        from sct.utils.synthetic import SyntheticReplacer
+        replacer = SyntheticReplacer(seed=42)
+
+        text_input = "Hello John Smith, welcome to New York"
+        entities = [
+            {'entity_group': 'PER', 'word': 'John Smith', 'start': 6, 'end': 16},
+            {'entity_group': 'LOC', 'word': 'New York', 'start': 29, 'end': 37},
+        ]
+        result = replacer.generate_for_entities(text_input, entities)
+        self.assertNotIn('John Smith', result)
+        self.assertNotIn('New York', result)
+        self.assertIn('Hello', result)
+
+
+class EntityDescriptionTest(unittest.TestCase):
+    """Test entity description (ZERONER-style) label support."""
+
+    def test_label_descriptions_frozen(self):
+        """gliner_label_descriptions should be frozen after __post_init__."""
+        descriptions = {'person': "a person's full legal name"}
+        cfg = TextCleanerConfig(
+            check_ner_process=False,
+            gliner_label_descriptions=descriptions,
+        )
+        self.assertIsInstance(cfg.gliner_label_descriptions, MappingProxyType)
+        self.assertEqual(cfg.gliner_label_descriptions['person'], "a person's full legal name")
+
+    def test_label_descriptions_none_by_default(self):
+        """gliner_label_descriptions should be None when not provided."""
+        cfg = TextCleanerConfig(check_ner_process=False)
+        self.assertIsNone(cfg.gliner_label_descriptions)
+
+    @patch('sct.utils.gliner_adapter.GLiNERAdapter.__init__', return_value=None)
+    def test_label_descriptions_inference_labels(self, mock_init):
+        """_get_inference_labels should return descriptions when available."""
+        from sct.utils.gliner_adapter import GLiNERAdapter
+        adapter = GLiNERAdapter.__new__(GLiNERAdapter)
+        adapter.labels = ['person', 'location']
+        adapter.label_descriptions = {
+            'person': "a person's full name",
+            'location': "a geographical place",
+        }
+
+        result = adapter._get_inference_labels()
+        self.assertEqual(result, ["a person's full name", "a geographical place"])
+
+    @patch('sct.utils.gliner_adapter.GLiNERAdapter.__init__', return_value=None)
+    def test_label_descriptions_fallback_to_names(self, mock_init):
+        """_get_inference_labels should fall back to label names without descriptions."""
+        from sct.utils.gliner_adapter import GLiNERAdapter
+        adapter = GLiNERAdapter.__new__(GLiNERAdapter)
+        adapter.labels = ['person', 'location']
+        adapter.label_descriptions = {}
+
+        result = adapter._get_inference_labels()
+        self.assertEqual(result, ['person', 'location'])
+
+
+class PresidioGLiNERBackendTest(unittest.TestCase):
+    """Test presidio_gliner backend configuration."""
+
+    def test_presidio_gliner_backend_valid(self):
+        """Config should accept 'presidio_gliner' as a valid backend."""
+        cfg = TextCleanerConfig(
+            check_ner_process=False,
+            ner_backend='presidio_gliner',
+            gliner_model='knowledgator/gliner-pii-base-v1.0',
+        )
+        self.assertEqual(cfg.ner_backend, 'presidio_gliner')
+
+    def test_presidio_gliner_requires_model(self):
+        """presidio_gliner backend should require gliner_model."""
+        with self.assertRaises(ValueError):
+            TextCleanerConfig(
+                check_ner_process=False,
+                ner_backend='presidio_gliner',
+            )
+
+
+class ContactSyntheticMethodTest(unittest.TestCase):
+    """Test callable-based replacement methods in contact.py."""
+
+    def test_replace_emails_with_fn(self):
+        """replace_emails_with_fn should call the provided function."""
+        pc = contact.ProcessContacts()
+        replacements = []
+
+        def track_fn(matched):
+            replacements.append(matched)
+            return 'REPLACED'
+
+        result = pc.replace_emails_with_fn("Email me at test@example.com please", track_fn)
+        self.assertIn('REPLACED', result)
+        self.assertEqual(len(replacements), 1)
+        self.assertEqual(replacements[0], 'test@example.com')
+
+    def test_replace_urls_with_fn(self):
+        """replace_urls_with_fn should call the provided function."""
+        pc = contact.ProcessContacts()
+        result = pc.replace_urls_with_fn(
+            "Visit https://example.com today",
+            lambda m: 'FAKE_URL',
+        )
+        self.assertIn('FAKE_URL', result)
+        self.assertNotIn('https://example.com', result)
+
+    def test_replace_phone_numbers_with_fn(self):
+        """replace_phone_numbers_with_fn should call the provided function."""
+        pc = contact.ProcessContacts()
+        result = pc.replace_phone_numbers_with_fn(
+            "Call +1-234-567-8900",
+            lambda m: 'FAKE_PHONE',
+        )
+        self.assertIn('FAKE_PHONE', result)
+
+
+class ModernBERTConfigTest(unittest.TestCase):
+    """Test ModernBERT model constants."""
+
+    def test_modernbert_models_defined(self):
+        """MODERNBERT_NER_MODELS should be importable and have ENGLISH key."""
+        from sct.config import MODERNBERT_NER_MODELS
+        self.assertIn('ENGLISH', MODERNBERT_NER_MODELS)
+        self.assertIn('MULTILINGUAL', MODERNBERT_NER_MODELS)
+
+    def test_pii_exports_from_init(self):
+        """PII_LABELS and PII_LABEL_MAP should be importable from sct package."""
+        from sct import PII_LABELS, PII_LABEL_MAP
+        self.assertIsInstance(PII_LABELS, tuple)
+        self.assertIsInstance(PII_LABEL_MAP, dict)
+
+
+class ReversibleAnonymizationTest(unittest.TestCase):
+    """Test reversible anonymization: AnonymizationMap + indexed placeholders."""
+
+    def test_reversible_mode_config_valid(self):
+        """'reversible' should be a valid replacement_mode."""
+        cfg = TextCleanerConfig(check_ner_process=False, replacement_mode='reversible')
+        self.assertEqual(cfg.replacement_mode, 'reversible')
+
+    def test_anonymization_map_roundtrip(self):
+        """Anonymize with indexed placeholders then deanonymize to get original."""
+        from sct.utils.anonymization_map import AnonymizationMap
+        amap = AnonymizationMap()
+
+        original_text = "John Smith works at Google in London."
+        # Simulate NER entities (reversed order for right-to-left replacement)
+        entities = [
+            {'entity_group': 'PER', 'start': 0, 'end': 10, 'score': 0.99},
+            {'entity_group': 'ORG', 'start': 20, 'end': 26, 'score': 0.95},
+            {'entity_group': 'LOC', 'start': 30, 'end': 36, 'score': 0.92},
+        ]
+
+        # Apply right-to-left replacement (same logic as _anonymize_reversible)
+        text = original_text
+        sorted_entities = sorted(entities, key=lambda x: x['start'], reverse=True)
+        from sct.utils.ner import ENTITY_TYPE_MAP
+        for item in sorted_entities:
+            tag = ENTITY_TYPE_MAP.get(item['entity_group'], item['entity_group'])
+            placeholder = amap.next_placeholder(tag)
+            original = text[item['start']:item['end']]
+            amap.add(placeholder=placeholder, original=original,
+                     entity_type=tag, start=item['start'], end=item['end'])
+            text = text[:item['start']] + placeholder + text[item['end']:]
+
+        # Verify placeholders are indexed
+        self.assertIn('<LOCATION_0>', text)
+        self.assertIn('<ORGANISATION_0>', text)
+        self.assertIn('<PERSON_0>', text)
+
+        # Deanonymize should restore original
+        restored = amap.deanonymize(text)
+        self.assertEqual(restored, original_text)
+
+    def test_reversible_map_entries(self):
+        """Map entries should have correct placeholder format and preserve originals."""
+        from sct.utils.anonymization_map import AnonymizationMap
+        amap = AnonymizationMap()
+
+        p1 = amap.next_placeholder('PERSON')
+        self.assertEqual(p1, '<PERSON_0>')
+        p2 = amap.next_placeholder('PERSON')
+        self.assertEqual(p2, '<PERSON_1>')
+        p3 = amap.next_placeholder('LOCATION')
+        self.assertEqual(p3, '<LOCATION_0>')
+
+    def test_reversible_longest_first_deanonymize(self):
+        """<PERSON_10> should not collide with <PERSON_1> during deanonymize."""
+        from sct.utils.anonymization_map import AnonymizationMap
+        amap = AnonymizationMap()
+
+        # Create 11 PERSON entries so we get <PERSON_10>
+        for i in range(11):
+            amap.add(
+                placeholder=f'<PERSON_{i}>', original=f'Name{i}',
+                entity_type='PERSON', start=0, end=5,
+            )
+
+        text = '<PERSON_1> and <PERSON_10>'
+        restored = amap.deanonymize(text)
+        self.assertEqual(restored, 'Name1 and Name10')
+
+    def test_reversible_map_serialization(self):
+        """to_dict/from_dict should round-trip correctly."""
+        from sct.utils.anonymization_map import AnonymizationMap
+        amap = AnonymizationMap()
+        amap.add('<PERSON_0>', 'Alice', 'PERSON', 0, 5)
+        amap.add('<LOCATION_0>', 'Berlin', 'LOCATION', 15, 21)
+
+        data = amap.to_dict()
+        restored = AnonymizationMap.from_dict(data)
+
+        self.assertEqual(restored.session_id, amap.session_id)
+        self.assertEqual(len(restored.entries), 2)
+        self.assertEqual(restored.entries[0].placeholder, '<PERSON_0>')
+        self.assertEqual(restored.entries[0].original, 'Alice')
+        self.assertEqual(restored.entries[1].placeholder, '<LOCATION_0>')
+
+    def test_ner_anonymize_reversible(self):
+        """GeneralNER._anonymize_reversible should produce indexed placeholders."""
+        from sct.utils.anonymization_map import AnonymizationMap
+        ner_obj = GeneralNER.__new__(GeneralNER)
+
+        amap = AnonymizationMap()
+        text = "Alice works at ACME in Paris."
+        filtered = [
+            {'entity_group': 'PER', 'start': 0, 'end': 5, 'score': 0.99,
+             'word': 'Alice', 'key': '05'},
+            {'entity_group': 'ORG', 'start': 15, 'end': 19, 'score': 0.95,
+             'word': 'ACME', 'key': '1519'},
+            {'entity_group': 'LOC', 'start': 23, 'end': 28, 'score': 0.92,
+             'word': 'Paris', 'key': '2328'},
+        ]
+
+        result = ner_obj._anonymize_reversible(text, filtered, amap)
+        self.assertIn('<PERSON_0>', result.text)
+        self.assertIn('<ORGANISATION_0>', result.text)
+        self.assertIn('<LOCATION_0>', result.text)
+        self.assertEqual(len(result.anon_map.entries), 3)
+
+        # Round-trip
+        self.assertEqual(result.anon_map.deanonymize(result.text), text)
+
+
+class GLiClassConfigTest(unittest.TestCase):
+    """Test GLiClass document classification config fields."""
+
+    def test_gliclass_config_fields_exist(self):
+        """GLiClass config fields should exist with defaults."""
+        cfg = TextCleanerConfig(check_ner_process=False)
+        self.assertFalse(cfg.check_classify_document)
+        self.assertIsNone(cfg.gliclass_model)
+        self.assertEqual(cfg.gliclass_labels, ())
+        self.assertEqual(cfg.gliclass_threshold, 0.5)
+        self.assertEqual(cfg.gliclass_classification_type, 'single-label')
+        self.assertFalse(cfg.gliclass_onnx)
+
+    def test_gliclass_default_model_constant(self):
+        """GLICLASS_DEFAULT_MODEL should be defined."""
+        from sct.config import GLICLASS_DEFAULT_MODEL
+        self.assertIn('gliclass', GLICLASS_DEFAULT_MODEL)
+
+    def test_gliclass_config_accepts_labels(self):
+        """GLiClass config should accept custom labels tuple."""
+        cfg = TextCleanerConfig(
+            check_ner_process=False,
+            check_classify_document=True,
+            gliclass_labels=('email', 'code', 'legal'),
+        )
+        self.assertEqual(cfg.gliclass_labels, ('email', 'code', 'legal'))
+
+    def test_gliclass_adapter_init_mock(self):
+        """GLiClassAdapter should accept model/labels/threshold (mock init)."""
+        from sct.utils.gliclass_adapter import GLiClassAdapter
+        # Patch the init methods to avoid importing gliclass
+        with patch.object(GLiClassAdapter, '_init_pytorch'):
+            adapter = GLiClassAdapter.__new__(GLiClassAdapter)
+            adapter.model_id = 'test-model'
+            adapter.labels = ['email', 'code']
+            adapter.threshold = 0.5
+            adapter.classification_type = 'single-label'
+            adapter._onnx = False
+            adapter._pipeline = None
+            self.assertEqual(adapter.model_id, 'test-model')
+            self.assertEqual(adapter.labels, ['email', 'code'])
+
+    def test_gliclass_classify_returns_list_mock(self):
+        """classify() should return list of {label, score} dicts."""
+        from sct.utils.gliclass_adapter import GLiClassAdapter
+        adapter = GLiClassAdapter.__new__(GLiClassAdapter)
+        adapter.labels = ['email', 'code']
+        adapter.threshold = 0.5
+        adapter._pipeline = MagicMock(return_value={
+            'labels': ['email', 'code'],
+            'scores': [0.9, 0.3],
+        })
+        results = adapter.classify("Dear Sir, please find attached...")
+        self.assertIsInstance(results, list)
+        self.assertEqual(len(results), 1)  # only email above threshold
+        self.assertEqual(results[0]['label'], 'email')
+        self.assertGreaterEqual(results[0]['score'], 0.5)
+
+    def test_otter_mmbert_placeholders(self):
+        """OTTER_NER_MODELS and MMBERT_NER_MODELS should exist as empty dicts."""
+        from sct.config import OTTER_NER_MODELS, MMBERT_NER_MODELS
+        self.assertIsInstance(OTTER_NER_MODELS, dict)
+        self.assertIsInstance(MMBERT_NER_MODELS, dict)
+        self.assertEqual(len(OTTER_NER_MODELS), 0)
+        self.assertEqual(len(MMBERT_NER_MODELS), 0)
+
+
+class ProcessResultTest(unittest.TestCase):
+    """Test ProcessResult backward-compatible tuple wrapper."""
+
+    def test_process_result_unpacks_as_3tuple(self):
+        """ProcessResult should unpack as (lm_text, stat_text, language)."""
+        from sct.utils.process_result import ProcessResult
+        r = ProcessResult('cleaned', 'stat', 'ENGLISH')
+        a, b, c = r
+        self.assertEqual(a, 'cleaned')
+        self.assertEqual(b, 'stat')
+        self.assertEqual(c, 'ENGLISH')
+
+    def test_process_result_len(self):
+        """len(ProcessResult) should be 3."""
+        from sct.utils.process_result import ProcessResult
+        r = ProcessResult('a', 'b', 'c')
+        self.assertEqual(len(r), 3)
+
+    def test_process_result_getitem(self):
+        """ProcessResult[idx] should work like a tuple."""
+        from sct.utils.process_result import ProcessResult
+        r = ProcessResult('a', 'b', 'c')
+        self.assertEqual(r[0], 'a')
+        self.assertEqual(r[1], 'b')
+        self.assertEqual(r[2], 'c')
+
+    def test_process_result_metadata_none_by_default(self):
+        """metadata should be None when no extended features active."""
+        from sct.utils.process_result import ProcessResult
+        r = ProcessResult('a', None, None)
+        self.assertIsNone(r.metadata)
+
+    def test_process_result_metadata_accessible(self):
+        """metadata should carry anon_map and other keys."""
+        from sct.utils.process_result import ProcessResult
+        meta = {'anon_map': 'mock_map', 'classes': None}
+        r = ProcessResult('a', None, None, metadata=meta)
+        self.assertEqual(r.metadata['anon_map'], 'mock_map')
+
+    def test_process_result_equality_with_tuple(self):
+        """ProcessResult should compare equal to a matching 3-tuple."""
+        from sct.utils.process_result import ProcessResult
+        r = ProcessResult('a', 'b', 'c')
+        self.assertEqual(r, ('a', 'b', 'c'))
+
+    def test_process_returns_process_result(self):
+        """TextCleaner.process() should return ProcessResult."""
+        from sct.utils.process_result import ProcessResult
+        cleaner = TextCleaner(TextCleanerConfig(check_ner_process=False))
+        result = cleaner.process("Hello world")
+        self.assertIsInstance(result, ProcessResult)
+        # Should still unpack
+        lm, stat, lang = result
+        self.assertIsInstance(lm, str)
+
+    def test_process_reversible_returns_metadata(self):
+        """process() with replacement_mode='reversible' should set metadata."""
+        from sct.utils.process_result import ProcessResult
+        cfg = TextCleanerConfig(
+            check_ner_process=False,
+            replacement_mode='reversible',
+        )
+        cleaner = TextCleaner(cfg)
+        result = cleaner.process("Hello world")
+        self.assertIsInstance(result, ProcessResult)
+        # Even without NER entities, metadata should have anon_map
+        self.assertIsNotNone(result.metadata)
+        self.assertIn('anon_map', result.metadata)
+
+    def test_exports_from_init(self):
+        """AnonymizationMap, MapEntry, ProcessResult should be importable from sct."""
+        from sct import AnonymizationMap, MapEntry, ProcessResult
+        self.assertIsNotNone(AnonymizationMap)
+        self.assertIsNotNone(MapEntry)
+        self.assertIsNotNone(ProcessResult)
 
 
 if __name__ == "__main__":

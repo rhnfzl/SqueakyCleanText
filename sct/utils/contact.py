@@ -34,3 +34,21 @@ class ProcessContacts:
     def replace_numbers(self, text, replace_with="<NUMBER>"):
         """Replace all numbers in ``text`` str with ``replace_with`` str."""
         return constants.NUMBERS_REGEX.sub(replace_with, text)
+
+    # --- Callable-based replacements (for synthetic mode) ---
+
+    def replace_emails_with_fn(self, text, replace_fn):
+        """Replace emails using a callable: replace_fn(matched_text) -> replacement."""
+        return constants.EMAIL_REGEX.sub(lambda m: replace_fn(m.group()), text)
+
+    def replace_urls_with_fn(self, text, replace_fn):
+        """Replace URLs using a callable: replace_fn(matched_text) -> replacement."""
+        return constants.URL_REGEX.sub(lambda m: replace_fn(m.group()), text)
+
+    def replace_phone_numbers_with_fn(self, text, replace_fn):
+        """Replace phone numbers using a callable: replace_fn(matched_text) -> replacement."""
+        return constants.PHONE_REGEX.sub(lambda m: replace_fn(m.group()), text)
+
+    def replace_numbers_with_fn(self, text, replace_fn):
+        """Replace numbers using a callable: replace_fn(matched_text) -> replacement."""
+        return constants.NUMBERS_REGEX.sub(lambda m: replace_fn(m.group()), text)

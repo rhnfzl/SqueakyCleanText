@@ -99,6 +99,9 @@ The base install uses **ONNX Runtime** for NER inference - no PyTorch or Transfo
 | PyTorch NER | `pip install SqueakyCleanText[torch]` | PyTorch/Transformers NER backend |
 | GLiNER | `pip install SqueakyCleanText[gliner]` | [GLiNER](https://github.com/urchade/GLiNER) zero-shot NER |
 | GLiNER2 | `pip install SqueakyCleanText[gliner2]` | [GLiNER2](https://github.com/Knowledgator/GLiNER) (knowledgator) backend |
+| Synthetic | `pip install SqueakyCleanText[synthetic]` | Faker-based synthetic replacement (realistic fake values instead of `<TAG>` tokens) |
+| Presidio | `pip install SqueakyCleanText[presidio]` | Presidio-analyzer for `presidio_gliner` backend |
+| Classify | `pip install SqueakyCleanText[classify]` | GLiClass document-level pre-classification |
 | All NER | `pip install SqueakyCleanText[all-ner]` | All NER backends combined |
 | Development | `pip install SqueakyCleanText[dev]` | Testing and linting tools |
 
@@ -143,7 +146,7 @@ cfg = TextCleanerConfig(
     replace_with_url="<URL>",
     replace_with_email="<EMAIL>",
     replace_with_phone_numbers="<PHONE>",
-    language="ENGLISH",  # Skip auto-detection
+    language="en",  # Pin to English (also accepts 'ENGLISH', 'eng')
 )
 
 # Initialize with config
@@ -191,6 +194,144 @@ cfg = TextCleanerConfig(
 
 cleaner = TextCleaner(cfg=cfg)
 lm_text, stat_text, lang = cleaner.process("Angela Merkel visited the Bundestag in Berlin.")
+```
+
+### PII Detection Mode
+
+Automatically configure GLiNER for comprehensive PII detection with 60+ entity types (personal, financial, healthcare, identity, digital):
+
+```python
+from sct import TextCleaner, TextCleanerConfig
+
+cfg = TextCleanerConfig(ner_mode='pii')
+
+cleaner = TextCleaner(cfg=cfg)
+lm_text, stat_text, lang = cleaner.process(
+    "John Smith's SSN is 123-45-6789, email john@example.com, DOB 1990-01-15"
+)
+# Entities are anonymized: names, SSNs, emails, dates of birth, and 50+ more PII types
+```
+
+PII mode auto-configures: `ner_backend='gliner'`, uses [`knowledgator/gliner-pii-base-v1.0`](https://huggingface.co/knowledgator/gliner-pii-base-v1.0), sets threshold to 0.3 (recall-focused), and expands positional tags. User-provided values always take priority.
+
+**Alternative PII models** (pass as `gliner_model`):
+
+| Model | Type | Size | Labels | F1 |
+|-------|------|------|--------|-----|
+| [`knowledgator/gliner-pii-base-v1.0`](https://huggingface.co/knowledgator/gliner-pii-base-v1.0) | Uni-encoder | 330MB (ONNX FP16) | 60+ | 80.99% |
+| [`nvidia/gliner-PII`](https://huggingface.co/nvidia/gliner-PII) | Bi-encoder | 570MB | 55+ | — |
+| [`gretelai/gretel-gliner-bi-base-v1.0`](https://huggingface.co/gretelai/gretel-gliner-bi-base-v1.0) | Bi-encoder | ~800MB | 40+ | 95% |
+| [`urchade/gliner_multi_pii-v1`](https://huggingface.co/urchade/gliner_multi_pii-v1) | Multilingual | — | — | — |
+
+### Synthetic Replacement
+
+Replace detected entities with realistic fake values (via [Faker](https://faker.readthedocs.io/)) instead of `<TAG>` placeholder tokens:
+
+```python
+from sct import TextCleaner, TextCleanerConfig
+
+cfg = TextCleanerConfig(
+    ner_mode='pii',
+    replacement_mode='synthetic',  # pip install squeakycleantext[synthetic]
+)
+
+cleaner = TextCleaner(cfg=cfg)
+lm_text, stat_text, lang = cleaner.process(
+    "Contact John Smith at john.smith@company.com or +1-555-0123"
+)
+# Output: "Contact Jennifer Williams at lisa45@example.net or +1-555-0198"
+# Same entity always maps to same fake value within a document
+```
+
+> **Note**: Synthetic replacement preserves data utility for downstream ML tasks but is NOT GDPR-compliant anonymization. Same-document consistency is maintained (same entity text always maps to the same fake value).
+
+### Reversible Anonymization
+
+Replace entities with indexed placeholders (`<PERSON_0>`, `<LOCATION_1>`) and get a mapping for round-trip deanonymization:
+
+```python
+from sct import TextCleaner, TextCleanerConfig
+
+cfg = TextCleanerConfig(
+    ner_mode='pii',
+    replacement_mode='reversible',
+)
+
+cleaner = TextCleaner(cfg=cfg)
+result = cleaner.process("John Smith works at Google in London.")
+
+print(result.lm_text)
+# "<PERSON_0> works at <ORGANISATION_0> in <LOCATION_0>."
+
+# Access the anonymization map via metadata
+anon_map = result.metadata['anon_map']
+restored = anon_map.deanonymize(result.lm_text)
+# "John Smith works at Google in London."
+
+# Serialize the map for storage
+import json
+json.dumps(anon_map.to_dict())
+```
+
+> **Note**: `ProcessResult` from `process()` unpacks as a 3-tuple (`lm_text, stat_text, language`) for backward compatibility, but also exposes `.metadata` for reversible maps and document classification.
+
+### Document Classification (GLiClass)
+
+Classify documents before processing using zero-shot classification with [GLiClass](https://github.com/Knowledgator/GLiClass):
+
+```python
+from sct import TextCleaner, TextCleanerConfig
+
+cfg = TextCleanerConfig(
+    check_classify_document=True,
+    gliclass_labels=('email', 'code', 'legal', 'medical'),
+    # gliclass_model defaults to 'knowledgator/gliclass-edge-v3.0' (32.7M params)
+)
+
+cleaner = TextCleaner(cfg=cfg)  # pip install squeakycleantext[classify]
+result = cleaner.process("Dear Sir, please find attached the contract...")
+
+# Classification results in metadata
+print(result.metadata['classes'])
+# [{"label": "email", "score": 0.92}, {"label": "legal", "score": 0.78}]
+```
+
+### Bi-Encoder GLiNER Models
+
+Bi-encoder models (ModernBERT, etc.) are auto-detected and leverage pre-computed label embeddings for faster inference with larger context windows:
+
+```python
+from sct import TextCleaner, TextCleanerConfig
+
+cfg = TextCleanerConfig(
+    ner_backend='gliner',
+    gliner_model='knowledgator/gliner-bi-base-v2.0',
+    gliner_labels=('person', 'organization', 'location'),
+)
+
+cleaner = TextCleaner(cfg=cfg)
+# Auto-detects bi-encoder → caches label embeddings → uses 2048+ token context window
+```
+
+### Entity Description Labels (ZERONER-Style)
+
+Provide natural-language descriptions for labels to improve zero-shot recognition accuracy:
+
+```python
+from sct import TextCleaner, TextCleanerConfig
+
+cfg = TextCleanerConfig(
+    ner_backend='gliner',
+    gliner_model='knowledgator/gliner-bi-base-v2.0',
+    gliner_label_descriptions={
+        'person': "a person's full legal name",
+        'location': "a geographical place or address",
+        'organization': "a company, institution, or government body",
+    },
+)
+
+cleaner = TextCleaner(cfg=cfg)
+# Descriptions are used for inference, results are mapped back to original label names
 ```
 
 ### Batch Processing
@@ -249,15 +390,16 @@ cleaner = sct.TextCleaner()
 
 ## NER Backends
 
-SqueakyCleanText supports five NER backends, selectable via the `ner_backend` config field:
+SqueakyCleanText supports six NER backends, selectable via the `ner_backend` config field:
 
 | Backend | Description | Dependencies | Best for |
 |---------|-------------|-------------|----------|
 | `onnx` (default) | ONNX Runtime inference with quantized XLM-RoBERTa models | Base install | Production: fast, torch-free |
 | `torch` | PyTorch/Transformers pipeline with full XLM-RoBERTa models | `[torch]` extra | Compatibility with existing PyTorch workflows |
-| `gliner` | GLiNER zero-shot NER with custom entity labels | `[gliner]` or `[gliner2]` extra | Custom entity types (PRODUCT, SKILL, EVENT, etc.) |
+| `gliner` | GLiNER zero-shot NER with custom entity labels | `[gliner]` or `[gliner2]` extra | Custom entity types, PII detection, bi-encoder models |
 | `ensemble_onnx` | ONNX + GLiNER ensemble voting | `[gliner]` extra | Maximum recall with custom entities |
 | `ensemble_torch` | Torch + GLiNER ensemble voting | `[torch,gliner]` extra | Maximum recall with PyTorch |
+| `presidio_gliner` | Presidio + GLiNER recognizer (beta) | `presidio-analyzer`, `[gliner]` | Context-aware NER via Presidio's pipeline |
 
 ### Default NER Models (ONNX)
 
@@ -269,6 +411,17 @@ SqueakyCleanText supports five NER backends, selectable via the `ner_backend` co
 | Spanish | [`rhnfzl/xlm-roberta-large-conll02-spanish-onnx`](https://huggingface.co/rhnfzl/xlm-roberta-large-conll02-spanish-onnx) |
 | French / Portuguese / Italian | [`rhnfzl/wikineural-multilingual-ner-onnx`](https://huggingface.co/rhnfzl/wikineural-multilingual-ner-onnx) (shared session) |
 | Multilingual (fallback) | [`rhnfzl/wikineural-multilingual-ner-onnx`](https://huggingface.co/rhnfzl/wikineural-multilingual-ner-onnx) |
+
+### GLiNER Model Recommendations
+
+| Model | Architecture | Context | Languages | Best for |
+|-------|-------------|---------|-----------|----------|
+| `knowledgator/gliner-bi-base-v2.0` | Bi-encoder (ModernBERT) | 2048 | Multi | General NER, long documents |
+| `knowledgator/gliner-pii-base-v1.0` | Bi-encoder | 2048 | Multi | PII detection (60+ entity types) |
+| `urchade/gliner_large-v2.1` | Uni-encoder (DeBERTa) | 512 | Multi | Legacy, high accuracy on short texts |
+| `MatteoFasulo/ModernBERT-base-NER` | ModernBERT | 8192 | English | English-only, very long context |
+
+> **GLiNER2 note**: `pip install squeakycleantext[gliner2]` installs [Knowledgator's gliner2 package](https://github.com/Knowledgator/GLiNER), not Fastino AI's GLiNER2 from EMNLP 2025 (different API).
 
 ### GLiNER Label Mapping
 
@@ -380,7 +533,9 @@ new_cfg = dataclasses.replace(cfg, check_ner_process=False)
 
 | Field | Default | Description |
 |-------|---------|-------------|
-| `ner_backend` | `'onnx'` | Backend: `onnx`, `torch`, `gliner`, `ensemble_onnx`, `ensemble_torch` |
+| `ner_backend` | `'onnx'` | Backend: `onnx`, `torch`, `gliner`, `ensemble_onnx`, `ensemble_torch`, `presidio_gliner` |
+| `ner_mode` | `'standard'` | `'standard'` or `'pii'` (auto-configures GLiNER for PII detection) |
+| `replacement_mode` | `'placeholder'` | `'placeholder'`, `'synthetic'` (Faker), or `'reversible'` (indexed placeholders + deanonymize map) |
 | `positional_tags` | `('PER', 'LOC', 'ORG', 'MISC')` | Entity types to recognize |
 | `ner_confidence_threshold` | `0.85` | Minimum confidence score |
 | `ner_batch_size` | `8` | Inference batch size (must be >= 1) |
@@ -391,6 +546,7 @@ new_cfg = dataclasses.replace(cfg, check_ner_process=False)
 | `gliner_labels` | `('person', 'organization', 'location')` | GLiNER entity labels |
 | `gliner_label_map` | `None` | Maps GLiNER labels to NER tags |
 | `gliner_threshold` | `0.4` | GLiNER confidence threshold |
+| `gliner_label_descriptions` | `None` | ZERONER-style: `{label: "description"}` for improved zero-shot accuracy |
 | `fuzzy_date_score_cutoff` | `85` | Fuzzy matching threshold (0-100) for misspelled months |
 | `custom_pipeline_steps` | `()` | Tuple of `(text: str) -> str` callables appended after all built-in steps |
 
@@ -398,8 +554,8 @@ new_cfg = dataclasses.replace(cfg, check_ner_process=False)
 
 | Field | Default | Description |
 |-------|---------|-------------|
-| `language` | `None` | Pin language (skip detection) |
-| `extra_languages` | `()` | Additional language names for detection |
+| `language` | `None` | Pin language (`'en'`), restrict detection to a set (`('en','nl')`), or `None` for auto-detect. Accepts Lingua names, ISO 639-1, ISO 639-3 codes. |
+| `extra_languages` | `()` | Additional language names/codes for detection |
 | `custom_stopwords` | `None` | `{LANG: frozenset({...})}` custom stopword sets |
 | `custom_month_names` | `None` | `{LANG: ('Jan', 'Feb', ...)}` for date detection |
 
@@ -441,6 +597,19 @@ Input Text
 Each step is toggled by a `TextCleanerConfig` field. The pipeline is built once at initialization; disabled steps are skipped entirely (zero overhead).
 
 ## What's New
+
+**v0.6.0**
+- **PII detection mode** (`ner_mode='pii'`): auto-configures GLiNER with 60+ PII entity labels (personal, financial, healthcare, identity, digital)
+- **Synthetic replacement** (`replacement_mode='synthetic'`): Faker-generated realistic values instead of `<TAG>` placeholders, with per-document consistency
+- **Reversible anonymization** (`replacement_mode='reversible'`): indexed placeholders (`<PERSON_0>`) with `AnonymizationMap` for round-trip deanonymization
+- **Document classification** (`check_classify_document=True`): zero-shot GLiClass pre-classification before text processing
+- **ProcessResult**: `process()` returns `ProcessResult` (backward-compatible 3-tuple) with `.metadata` for anonymization maps and classification results
+- **GLiNER ONNX mode** (`gliner_onnx=True`): load GLiNER with pre-built ONNX weights from HuggingFace Hub (auto-set for PII + ONNX backend)
+- **Bi-encoder support**: auto-detects ModernBERT and other bi-encoder GLiNER models, caches label embeddings, dynamic context windows (2048-8192 tokens)
+- **Entity description labels**: ZERONER-style natural-language descriptions for improved zero-shot accuracy
+- **Presidio GLiNER backend** (beta): opt-in `ner_backend='presidio_gliner'` for Presidio's context-aware recognition pipeline
+- **ModernBERT ONNX export**: updated export script with ModernBERT support (English, 8192 token context)
+- **Dynamic chunk sizing**: GLiNER chunk size adapts to model's actual context window instead of hardcoded 384
 
 **v0.5.x**
 - `aprocess_batch()`: async batch processing for FastAPI / aiohttp integrations

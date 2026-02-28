@@ -19,6 +19,24 @@ import sys
 from pathlib import Path
 
 # Source → ONNX repo mapping
+#
+# Naming convention for target repos: rhnfzl/xlm-roberta-large-ner-{language}-onnx
+# or rhnfzl/xlm-roberta-large-conll0{2,3}-{language}-onnx for CoNLL-trained models.
+#
+# To add a new language:
+#   1. Find a suitable source model on HuggingFace (prefer XLM-RoBERTa-based, CoNLL-style labels)
+#   2. Add an entry below: "source-org/model-name": "rhnfzl/target-onnx-repo-name"
+#   3. Run: python scripts/export_onnx_models.py --models source-org/model-name
+#   4. After upload, update DEFAULT_NER_MODELS in sct/config.py with the new ONNX repo ID
+#
+# CoNLL-02/03 coverage: English, German, Dutch, Spanish (FacebookAI series below).
+# Other languages: search HuggingFace for XLM-RoBERTa NER models fine-tuned on
+# WikiNER, Evalita (Italian), HAREM (Portuguese), QUAERO (French), or similar corpora.
+#
+# Pending — add entries below when suitable source models are identified:
+#   "source-org/xlm-roberta-large-french-ner":     "rhnfzl/xlm-roberta-large-ner-french-onnx",
+#   "source-org/xlm-roberta-large-portuguese-ner": "rhnfzl/xlm-roberta-large-ner-portuguese-onnx",
+#   "source-org/xlm-roberta-large-italian-ner":    "rhnfzl/xlm-roberta-large-ner-italian-onnx",
 MODEL_MAP = {
     "FacebookAI/xlm-roberta-large-finetuned-conll03-english": "rhnfzl/xlm-roberta-large-conll03-english-onnx",
     "FacebookAI/xlm-roberta-large-finetuned-conll02-dutch": "rhnfzl/xlm-roberta-large-conll02-dutch-onnx",
@@ -26,6 +44,16 @@ MODEL_MAP = {
     "FacebookAI/xlm-roberta-large-finetuned-conll02-spanish": "rhnfzl/xlm-roberta-large-conll02-spanish-onnx",
     "Babelscape/wikineural-multilingual-ner": "rhnfzl/wikineural-multilingual-ner-onnx",
     "dslim/bert-base-NER": "rhnfzl/bert-base-NER-onnx",
+    # ModernBERT NER models (export with --device cpu to avoid FlashAttention issues).
+    # Optimization (--optimize) is not yet supported for ModernBERT architecture.
+    # English-only, 8192 token context — optional alternative to XLM-RoBERTa defaults.
+    "MatteoFasulo/ModernBERT-base-NER": "rhnfzl/modernbert-base-ner-conll03-english-onnx",
+}
+
+# Models requiring special export flags (overrides default optimum-cli invocation)
+MODEL_EXPORT_FLAGS: dict[str, list[str]] = {
+    # ModernBERT: must use CPU to avoid FlashAttention Triton errors
+    "MatteoFasulo/ModernBERT-base-NER": ["--device", "cpu"],
 }
 
 # Files to include in the ONNX repo (model.onnx_data added for large models
@@ -51,8 +79,13 @@ def export_model(source_model: str, output_dir: Path) -> None:
         sys.executable, "-m", "optimum.exporters.onnx",
         "--model", source_model,
         "--task", "token-classification",
-        str(output_dir),
     ]
+    # Apply model-specific export flags (e.g. --device cpu for ModernBERT)
+    extra_flags = MODEL_EXPORT_FLAGS.get(source_model, [])
+    if extra_flags:
+        cmd.extend(extra_flags)
+        print(f"  Using extra flags: {' '.join(extra_flags)}")
+    cmd.append(str(output_dir))
     subprocess.run(cmd, check=True)  # noqa: S603
 
     # Verify required files exist

@@ -15,7 +15,8 @@ pip install squeakycleantext
 from sct import TextCleaner, TextCleanerConfig
 
 cleaner = TextCleaner(cfg=TextCleanerConfig(check_ner_process=True))
-lm_text, stat_text, lang = cleaner.process("Contact John at john@acme.com or +1-555-123-4567.")
+result = cleaner.process("Contact John at john@acme.com or +1-555-123-4567.")
+lm_text, stat_text, lang = result  # backward-compatible 3-tuple unpacking
 # lm_text:   "Contact <PERSON> at <EMAIL> or <PHONE>."
 # stat_text: "contact"
 # lang:      "ENGLISH"
@@ -24,10 +25,13 @@ lm_text, stat_text, lang = cleaner.process("Contact John at john@acme.com or +1-
 ## API Surface
 
 - `TextCleaner(cfg=TextCleanerConfig(...))` — main pipeline class
-- `cleaner.process(text: str) -> (lm_text, stat_text, language)`
-- `cleaner.process_batch(texts: List[str]) -> List[tuple]` — thread-parallel
-- `cleaner.aprocess_batch(texts) -> List[tuple]` — async (FastAPI/aiohttp)
+- `cleaner.process(text) -> ProcessResult` — process single text (unpacks as 3-tuple)
+- `cleaner.process_batch(texts) -> List[ProcessResult]` — thread-parallel batch
+- `cleaner.aprocess_batch(texts) -> List[ProcessResult]` — async (FastAPI/aiohttp)
 - `cleaner.warmup(languages=None)` — pre-load NER models at startup
+- `ProcessResult.metadata` — dict with `anon_map` (reversible mode) and `classes` (GLiClass)
+- `AnonymizationMap.deanonymize(text)` — restore original text from reversible placeholders
+- `AnonymizationMap.to_dict()` / `.from_dict(data)` — serialization for storage
 
 ## TextCleanerConfig — Key Fields
 
@@ -42,14 +46,22 @@ check_remove_stopwords=True         # Language-aware stopword removal
 check_remove_punctuation=True       # Punctuation removal (stat output)
 check_remove_emoji=False            # Remove emoji characters
 check_statistical_model_processing=True  # Generate stat_text output
+check_classify_document=False       # GLiClass zero-shot pre-classification
 
-ner_backend='onnx'                  # 'onnx'|'torch'|'gliner'|'ensemble_onnx'|'ensemble_torch'
+ner_backend='onnx'                  # 'onnx'|'torch'|'gliner'|'ensemble_onnx'|'ensemble_torch'|'presidio_gliner'
+ner_mode='standard'                 # 'standard'|'pii' (auto-configures GLiNER for 60+ PII entity types)
+replacement_mode='placeholder'      # 'placeholder' | 'synthetic' | 'reversible' (indexed placeholders + deanonymize map)
 ner_confidence_threshold=0.85       # Min confidence for entity tagging
 ner_batch_size=8                    # Inference batch size (must be >= 1)
 positional_tags=('PER','LOC','ORG','MISC')
 
-language=None                       # Pin language (e.g. 'ENGLISH') or None for auto-detect
-extra_languages=()                  # Add languages: 'FRENCH', 'PORTUGUESE', 'ITALIAN'
+gliner_model=None                   # GLiNER model ID (auto-set by ner_mode='pii')
+gliner_onnx=False                   # Load GLiNER with ONNX weights (auto-set for PII + onnx backend)
+gliner_label_descriptions=None      # ZERONER-style: {'person': "a person's full name"} for zero-shot
+gliclass_model=None                 # GLiClass model ID (default: gliclass-edge-v3.0)
+gliclass_labels=()                  # Classification labels: ('email', 'code', 'legal')
+language=None                       # Pin ('en'), restrict (('en','nl')), or None for auto-detect. Accepts Lingua names, ISO 639-1/639-3.
+extra_languages=()                  # Add languages: 'FRENCH', 'fr', 'PORTUGUESE', 'pt', etc.
 custom_stopwords=None               # {LANG: frozenset({...})}
 custom_pipeline_steps=()            # Tuple of (text: str) -> str callables
 ```
@@ -57,11 +69,20 @@ custom_pipeline_steps=()            # Tuple of (text: str) -> str callables
 ## NER Backends
 
 ```
-onnx (default) — ONNX Runtime, torch-free, ~3-5x faster than PyTorch — base install
-torch          — PyTorch/Transformers pipeline — pip install squeakycleantext[torch]
-gliner         — Zero-shot custom entities (PRODUCT, EVENT, SKILL) — pip install squeakycleantext[gliner]
-ensemble_onnx  — ONNX + GLiNER voting — pip install squeakycleantext[gliner]
-ensemble_torch — Torch + GLiNER voting — pip install squeakycleantext[torch,gliner]
+onnx (default)    — ONNX Runtime, torch-free, ~3-5x faster than PyTorch — base install
+torch             — PyTorch/Transformers pipeline — pip install squeakycleantext[torch]
+gliner            — Zero-shot custom entities, PII mode, bi-encoder — pip install squeakycleantext[gliner]
+ensemble_onnx     — ONNX + GLiNER voting — pip install squeakycleantext[gliner]
+ensemble_torch    — Torch + GLiNER voting — pip install squeakycleantext[torch,gliner]
+presidio_gliner   — Presidio + GLiNER recognizer (beta) — pip install presidio-analyzer squeakycleantext[gliner]
+```
+
+## Replacement Modes
+
+```
+placeholder (default)  — Entities become <TAG> tokens: "John" → "<PERSON>"
+synthetic              — Faker-generated values: "John" → "Robert Chen" (pip install squeakycleantext[synthetic])
+reversible             — Indexed placeholders: "John" → "<PERSON_0>" with AnonymizationMap for round-trip restore
 ```
 
 ## Supported Languages
@@ -78,6 +99,21 @@ French / Portuguese / Italian  — rhnfzl/wikineural-multilingual-ner-onnx (shar
 
 **Q: How do I anonymize PII in text?**
 A: Set `check_ner_process=True` (default). Returns entities replaced with `<PERSON>`, `<ORGANISATION>`, `<LOCATION>`.
+
+**Q: How do I detect comprehensive PII (emails, SSNs, credit cards, etc.)?**
+A: Use `TextCleanerConfig(ner_mode='pii')`. Auto-configures GLiNER with 60+ PII entity labels.
+
+**Q: How do I get realistic fake values instead of <TAG> tokens?**
+A: Use `TextCleanerConfig(replacement_mode='synthetic')`. Requires `pip install squeakycleantext[synthetic]`.
+
+**Q: How do I get reversible anonymization with a deanonymize map?**
+A: Use `TextCleanerConfig(replacement_mode='reversible')`. Access the map via `result.metadata['anon_map']`.
+
+**Q: How do I classify documents before processing?**
+A: Use `TextCleanerConfig(check_classify_document=True, gliclass_labels=('email', 'code'))`. Requires `pip install squeakycleantext[classify]`.
+
+**Q: How do I use bi-encoder GLiNER models with longer context?**
+A: Just specify the model: `TextCleanerConfig(ner_backend='gliner', gliner_model='knowledgator/gliner-bi-base-v2.0')`. Bi-encoder is auto-detected.
 
 **Q: How do I process texts in a FastAPI route without blocking the event loop?**
 A: Use: `results = await cleaner.aprocess_batch(texts)`
@@ -97,14 +133,19 @@ A: `lm_text` preserves sentence structure with replacement tokens (for LLM fine-
 ## Key Source Files
 
 ```
-sct/sct.py               — TextCleaner orchestrator, pipeline assembly
-sct/config.py            — TextCleanerConfig frozen dataclass, all defaults
-sct/utils/ner.py         — GeneralNER: ensemble NER, lazy loading, ONNX session sharing
-sct/utils/onnx_pipeline.py — ONNXNERPipeline: ONNX inference, BIO aggregation
-sct/utils/constants.py   — Pre-compiled regexes (URL, email, phone, date, currency, etc.)
-sct/utils/stopwords.py   — Language-aware stopword removal (O(1) set lookup)
-sct/utils/resources.py   — Lingua language detector (lazy singleton)
-tests/test_sct.py        — Full test suite (hypothesis, faker, pytest-timeout)
+sct/sct.py                       — TextCleaner orchestrator, pipeline assembly
+sct/config.py                    — TextCleanerConfig frozen dataclass, all defaults
+sct/utils/ner.py                 — GeneralNER: ensemble NER, lazy loading, ONNX session sharing
+sct/utils/gliner_adapter.py      — GLiNERAdapter: bi-encoder support, label embedding cache
+sct/utils/gliclass_adapter.py    — GLiClassAdapter: zero-shot document classification
+sct/utils/anonymization_map.py   — AnonymizationMap: reversible anonymization mapping
+sct/utils/process_result.py      — ProcessResult: backward-compatible result with metadata
+sct/utils/synthetic.py           — SyntheticReplacer: Faker-based entity replacement
+sct/utils/onnx_pipeline.py       — ONNXNERPipeline: ONNX inference, BIO aggregation
+sct/utils/constants.py           — Pre-compiled regexes (URL, email, phone, date, currency, etc.)
+sct/utils/stopwords.py           — Language-aware stopword removal (O(1) set lookup)
+sct/utils/resources.py           — Lingua language detector (lazy singleton)
+tests/test_sct.py                — Full test suite (hypothesis, faker, pytest-timeout)
 ```
 
 ## Resources

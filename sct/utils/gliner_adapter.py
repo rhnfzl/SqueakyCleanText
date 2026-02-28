@@ -1,6 +1,7 @@
 """GLiNER adapter — normalizes GLiNER output to match ONNXNERPipeline format.
 
 Supports both original GLiNER (urchade) and GLiNER2 (knowledgator/fastino).
+Auto-detects bi-encoder models (ModernBERT, etc.) and caches label embeddings.
 Optional backend. Requires: pip install squeakycleantext[gliner] or [gliner2]
 """
 import logging
@@ -14,6 +15,9 @@ class GLiNERAdapter:
 
     __call__(texts) returns List[List[dict]] with keys:
         entity_group, score, word, start, end
+
+    Automatically detects bi-encoder models (via ``encode_labels``) and caches
+    label embeddings for efficient repeated inference.
     """
 
     def __init__(
@@ -23,13 +27,17 @@ class GLiNERAdapter:
         labels: Optional[Tuple[str, ...]] = None,
         threshold: float = 0.4,
         label_map: Optional[Dict[str, str]] = None,
+        label_descriptions: Optional[Dict[str, str]] = None,
         device: str = 'cpu',
+        onnx: bool = False,
     ):
         self.variant = variant
         self.labels = list(labels) if labels else ['person', 'organization', 'location']
         self.threshold = threshold
         self.label_map = label_map or {}
+        self.label_descriptions = label_descriptions or {}
         self.model_id = model_id
+        self._onnx = onnx
 
         if variant == 'gliner':
             try:
@@ -39,8 +47,14 @@ class GLiNERAdapter:
                     "gliner is required for GLiNER backend. "
                     "Install with: pip install squeakycleantext[gliner]"
                 )
-            self.model = GLiNER.from_pretrained(model_id)
-            if device == 'cuda':
+            if onnx:
+                self.model = GLiNER.from_pretrained(
+                    model_id, load_onnx_model=True, load_tokenizer=True,
+                )
+                logger.info("Loaded GLiNER model in ONNX mode: %s", model_id)
+            else:
+                self.model = GLiNER.from_pretrained(model_id)
+            if device == 'cuda' and not onnx:
                 self.model = self.model.to('cuda')
 
         elif variant == 'gliner2':
@@ -55,7 +69,42 @@ class GLiNERAdapter:
         else:
             raise ValueError(f"Unknown GLiNER variant: {variant!r}. Use 'gliner' or 'gliner2'.")
 
-        logger.info("Loaded GLiNER model: %s (variant=%s)", model_id, variant)
+        # Bi-encoder detection: ModernBERT and similar architectures expose encode_labels()
+        self._is_bi_encoder = hasattr(self.model, 'encode_labels')
+        self._label_embeddings = None
+        self._cached_labels_key: Optional[tuple] = None
+
+        logger.info(
+            "Loaded GLiNER model: %s (variant=%s, bi_encoder=%s)",
+            model_id, variant, self._is_bi_encoder,
+        )
+
+    def _get_inference_labels(self) -> list:
+        """Return labels for inference. Uses descriptions if provided, falls back to names."""
+        if self.label_descriptions:
+            return [self.label_descriptions.get(label, label) for label in self.labels]
+        return list(self.labels)
+
+    def _ensure_label_embeddings(self) -> None:
+        """Pre-compute and cache label embeddings for bi-encoder models.
+
+        Thread-safe: called under the GLiNER inference lock in ner.py.
+        """
+        labels_key = tuple(self.labels)
+        if self._label_embeddings is not None and self._cached_labels_key == labels_key:
+            return
+        inference_labels = self._get_inference_labels()
+        self._label_embeddings = self.model.encode_labels(inference_labels, batch_size=8)
+        self._cached_labels_key = labels_key
+        logger.info(
+            "Cached label embeddings for %d labels (bi-encoder: %s)",
+            len(self.labels), self.model_id,
+        )
+
+    def invalidate_label_cache(self) -> None:
+        """Clear cached label embeddings. Call after changing self.labels."""
+        self._label_embeddings = None
+        self._cached_labels_key = None
 
     def _map_label(self, label: str) -> str:
         """Map a GLiNER label to entity_group tag."""
@@ -68,14 +117,34 @@ class GLiNERAdapter:
 
         all_results: List[List[dict]] = []
 
+        # Build description-to-label reverse mapping for ZERONER-style labels
+        desc_to_label: Dict[str, str] = {}
+        if self.label_descriptions:
+            for label in self.labels:
+                desc = self.label_descriptions.get(label, label)
+                desc_to_label[desc] = label
+
         for text in texts:
             if self.variant == 'gliner':
-                raw = self.model.predict_entities(
-                    text, self.labels, threshold=self.threshold
-                )
+                inference_labels = self._get_inference_labels()
+
+                if self._is_bi_encoder:
+                    self._ensure_label_embeddings()
+                    raw_batch = self.model.batch_predict_with_embeds(
+                        [text], self._label_embeddings, self.labels,
+                        threshold=self.threshold,
+                    )
+                    raw = raw_batch[0] if raw_batch else []
+                else:
+                    raw = self.model.predict_entities(
+                        text, inference_labels, threshold=self.threshold,
+                    )
+
                 entities = [
                     {
-                        'entity_group': self._map_label(e['label']),
+                        'entity_group': self._map_label(
+                            desc_to_label.get(e['label'], e['label'])
+                        ),
                         'score': e['score'],
                         'word': e['text'],
                         'start': e['start'],
@@ -106,5 +175,17 @@ class GLiNERAdapter:
 
     @property
     def max_context_length(self) -> int:
-        """Max context window: 512 (GLiNER/DeBERTa), 2048 (GLiNER2)."""
-        return 2048 if self.variant == 'gliner2' else 512
+        """Derive max context window from the loaded model's config.
+
+        Works for all architectures: DeBERTa (512), ModernBERT (2048-8192),
+        GLiNER2 models, etc.
+        """
+        config = getattr(self.model, 'config', None)
+        if config is not None:
+            max_pos = getattr(config, 'max_position_embeddings', None)
+            if max_pos is not None:
+                return max_pos
+        # Fallback for GLiNER2 or unknown models
+        if self.variant == 'gliner2':
+            return 2048
+        return 512

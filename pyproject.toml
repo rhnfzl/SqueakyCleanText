@@ -32,18 +32,18 @@ classifiers = [
     "Operating System :: OS Independent",
 ]
 dependencies = [
-    "lingua-language-detector>=2.0.2",
+    "lingua-language-detector>=2.1.0",
     "stop-words>=2025.11.4",
-    "emoji>=2.8",
-    "ftfy>=6.1",
-    "Unidecode>=1.3",
-    "beautifulsoup4>=4.12",
-    "onnxruntime>=1.24.1",
-    "tokenizers>=0.22.0",
-    "huggingface-hub>=1.4.0",
-    "numpy>=2.0.0",
-    "presidio_anonymizer>=2.2.355",
-    "regex>=2024.0.0",
+    "emoji>=2.14",
+    "ftfy>=6.3",
+    "Unidecode>=1.4",
+    "beautifulsoup4>=4.14",
+    "onnxruntime>=1.24.2",
+    "tokenizers>=0.22.2",
+    "huggingface-hub>=1.5.0",
+    "numpy>=2.2.0",
+    "presidio_anonymizer>=2.2.360",
+    "regex>=2024.11.6",
 ]
 
 [project.urls]
@@ -55,38 +55,50 @@ Changelog = "https://github.com/rhnfzl/SqueakyCleanText/releases"
 
 [project.optional-dependencies]
 gpu = [
-    "onnxruntime-gpu>=1.24.1",
+    "onnxruntime-gpu>=1.24.2",
 ]
 fuzzy = [
-    "rapidfuzz>=3.0",
+    "rapidfuzz>=3.12",
 ]
 torch = [
-    "torch>=2.0.0",
-    "transformers>=4.30",
+    "torch>=2.6.0",
+    "transformers>=4.48",
 ]
 gliner = [
-    "gliner>=1.0",
+    "gliner>=0.2.25,<1.0",
 ]
 gliner2 = [
-    "gliner2>=0.0.1",
+    "gliner2>=1.0,<2.0",
+]
+synthetic = [
+    "faker>=33.0",
+]
+presidio = [
+    "presidio-analyzer>=2.2.360",
+]
+classify = [
+    "gliclass>=0.1.16",
+]
+classify-onnx = [
+    "onnxruntime>=1.24.2",
 ]
 all-ner = [
-    "torch>=2.0.0",
-    "transformers>=4.30",
-    "gliner>=1.0",
-    "gliner2>=0.0.1",
+    "torch>=2.6.0",
+    "transformers>=4.48",
+    "gliner>=0.2.25,<1.0",
+    "gliner2>=1.0,<2.0",
 ]
 dev = [
-    "hypothesis>=6.82",
-    "faker>=20.0",
-    "ruff>=0.4",
-    "pytest>=8.0",
-    "pytest-timeout>=2.2",
-    "rapidfuzz>=3.0",
+    "hypothesis>=6.130",
+    "faker>=33.0",
+    "ruff>=0.11",
+    "pytest>=8.3",
+    "pytest-timeout>=2.3",
+    "rapidfuzz>=3.12",
 ]
 test = [
-    "coverage>=7.3",
-    "pytest-cov>=4.1",
+    "coverage>=7.8",
+    "pytest-cov>=6.0",
 ]
 
 [tool.setuptools.dynamic]
