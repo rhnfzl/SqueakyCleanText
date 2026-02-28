@@ -153,6 +153,21 @@ cfg = TextCleanerConfig(
 cleaner = TextCleaner(cfg=cfg)
 ```
 
+#### Language Specification
+
+All language parameters accept Lingua names (`'ENGLISH'`), ISO 639-1 (`'en'`), or ISO 639-3 (`'eng'`) codes:
+
+```python
+# Pin to one language (skip auto-detection)
+cfg = TextCleanerConfig(language='de', check_ner_process=False)
+
+# Restrict detection to specific languages (auto-detect among them)
+cfg = TextCleanerConfig(language=('en', 'nl', 'de'), check_ner_process=False)
+
+# Add extra languages for detection
+cfg = TextCleanerConfig(extra_languages=('fr', 'pt'), check_ner_process=False)
+```
+
 ### GLiNER: Zero-Shot Custom NER
 
 Use [GLiNER](https://github.com/urchade/GLiNER) to recognize any entity type without retraining:
