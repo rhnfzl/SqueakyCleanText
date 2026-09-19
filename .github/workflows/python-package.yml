@@ -13,7 +13,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.11", "3.12", "3.13"]
+        python-version: ["3.11", "3.12", "3.13", "3.14"]
 
     steps:
     - uses: actions/checkout@v4
@@ -43,4 +43,4 @@ jobs:
 
     - name: Test with pytest and coverage
       run: |
-        pytest tests/ --cov=sct --cov-report=xml -v
+        pytest tests/ --cov=sct --cov-report=xml --cov-fail-under=85 -v

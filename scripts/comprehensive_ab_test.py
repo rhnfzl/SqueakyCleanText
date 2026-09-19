@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
-"""Comprehensive A/B test: Torch vs ONNX NER pipelines.
+"""Comprehensive backend-parity test: Torch vs ONNX NER pipelines.
 
 Uses a 200+ sentence hand-crafted corpus covering all entity types, languages,
-edge cases, and text lengths. Measures entity accuracy AND inference speed.
+edge cases, and text lengths. Measures backend agreement and inference speed.
+It does not measure accuracy against reviewed ground truth.
 
 Requires: torch, transformers, onnxruntime (all in current env)
 """
@@ -358,7 +359,7 @@ def main():
     onnx_model_name = "protectai/bert-base-NER-onnx"
 
     print("=" * 90)
-    print("COMPREHENSIVE A/B TEST: HuggingFace Torch vs ONNX NER Pipeline")
+    print("BACKEND PARITY TEST: HuggingFace Torch vs ONNX NER Pipeline")
     print("=" * 90)
     print(f"\nCorpus: {len(ALL_TEXTS)} texts across 8 categories")
     print(f"  Persons:      {len(PERSON_TEXTS)}")
@@ -383,8 +384,8 @@ def main():
     print(f"  ONNX:  {onnx_model_name}")
     onnx_pipe, _ = load_onnx_ner_model(onnx_model_name, device="cpu")
 
-    # ── Entity Accuracy Comparison ──
-    print("\n[2/4] Running entity accuracy comparison...")
+    # ── Entity Parity Comparison ──
+    print("\n[2/4] Running entity parity comparison...")
     exact_matches = 0
     label_matches = 0
     total = 0
@@ -475,7 +476,7 @@ def main():
     print("=" * 90)
 
     print(f"\n{'─' * 50}")
-    print("ENTITY ACCURACY")
+    print("ENTITY PARITY")
     print(f"{'─' * 50}")
     print(f"  Total texts tested:   {total}")
     print(f"  Torch entities found: {entity_count_torch}")
@@ -541,7 +542,7 @@ def main():
 
     # Save detailed results
     results = {
-        "accuracy": {
+        "parity": {
             "total_texts": total,
             "exact_match": exact_matches,
             "exact_match_pct": round(100 * exact_matches / total, 2),

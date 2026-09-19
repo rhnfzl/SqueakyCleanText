@@ -1,5 +1,6 @@
 import math
 import gc
+import re
 import threading
 from collections import defaultdict
 import logging
@@ -13,10 +14,16 @@ from presidio_anonymizer.entities import RecognizerResult
 
 from typing import NamedTuple as _NamedTuple
 
-from sct.utils import constants
+from sct.utils import constants, resources
 from sct.utils.anonymization_map import AnonymizationMap
 from sct.utils.onnx_pipeline import load_onnx_ner_model
 from sct.config import DEFAULT_NER_MODELS, DEFAULT_NER_ENSEMBLE, NER_ENSEMBLE_DEFAULT_KEYS, LANG_KEYS
+from sct.privacy import (
+    DetectedEntity,
+    EntityFinding,
+    NERProcessingResult,
+    PrivacyPolicy,
+)
 
 
 class AnonymizeResult(_NamedTuple):
@@ -54,9 +61,11 @@ class GeneralNER:
 
     def __init__(self, cache_dir: Optional[Path] = None, device: Optional[str] = None,
                  model_names: Optional[Union[Dict[str, str], List[str]]] = None,
+                 model_revisions: Optional[Dict[str, str]] = None,
                  ner_backend: str = 'onnx',
                  gliner_config: Optional[Dict] = None,
                  torch_model_names: Optional[Dict[str, str]] = None,
+                 torch_model_revisions: Optional[Dict[str, str]] = None,
                  ner_batch_size: int = 8,
                  ensemble_models: Optional[Dict] = None,
                  ensemble_default_keys: Optional[tuple] = None,
@@ -81,6 +90,8 @@ class GeneralNER:
         self._ner_batch_size = ner_batch_size
         self._replacement_mode = replacement_mode
         self._synthetic_replacer = synthetic_replacer
+        self._model_revisions = dict(model_revisions or {})
+        self._torch_model_revisions = dict(torch_model_revisions or {})
         self._gliner_pipe = None
         self._ensemble_models: Dict[str, tuple] = ensemble_models if ensemble_models is not None else DEFAULT_NER_ENSEMBLE
         self._ensemble_default_keys: tuple = (
@@ -161,6 +172,7 @@ class GeneralNER:
             from sct.utils.gliner_adapter import GLiNERAdapter
             self._gliner_pipe = GLiNERAdapter(
                 model_id=gliner_config['model'],
+                revision=gliner_config.get('revision'),
                 variant=gliner_config.get('variant', 'gliner'),
                 labels=gliner_config.get('labels'),
                 threshold=gliner_config.get('threshold', 0.4),
@@ -266,12 +278,14 @@ class GeneralNER:
                     pipeline_obj, tok = load_torch_ner_model(
                         model_name, device=self.device,
                         cache_dir=self._cache_args.get("cache_dir"),
+                        revision=self._torch_model_revisions.get(lang_key),
                     )
                 else:
                     pipeline_obj, tok = load_onnx_ner_model(
                         model_name,
                         device=self.device,
                         cache_dir=self._cache_args.get("cache_dir"),
+                        revision=self._model_revisions.get(lang_key),
                     )
                 self._pipelines[lang_key] = pipeline_obj
                 self._tokenizers[lang_key] = tok
@@ -440,15 +454,63 @@ class GeneralNER:
             chunks.append(current)
         return chunks or [text]
 
-    def ner_process(
+    @staticmethod
+    def _align_chunk(
+        source: str,
+        chunk: str,
+        search_start: int,
+    ) -> tuple[str, int, list[int]]:
+        """Locate a whitespace-normalized chunk and map its offsets to source."""
+        parts = re.split(r'(\s+)', chunk)
+        pattern = ''.join(
+            r'\s+' if part.isspace() else re.escape(part)
+            for part in parts if part
+        )
+        match = re.compile(pattern).search(source, search_start)
+        if match is None:
+            raise RuntimeError("Could not align NER chunk to its source text")
+
+        source_chunk = match.group()
+        offsets = [0] * (len(chunk) + 1)
+        chunk_index = 0
+        source_index = 0
+        while chunk_index < len(chunk):
+            if chunk[chunk_index].isspace():
+                chunk_end = chunk_index
+                while chunk_end < len(chunk) and chunk[chunk_end].isspace():
+                    chunk_end += 1
+                source_end = source_index
+                while (
+                    source_end < len(source_chunk)
+                    and source_chunk[source_end].isspace()
+                ):
+                    source_end += 1
+                chunk_width = chunk_end - chunk_index
+                source_width = source_end - source_index
+                for offset in range(chunk_width + 1):
+                    offsets[chunk_index + offset] = (
+                        source_index
+                        + (offset * source_width // chunk_width)
+                    )
+                chunk_index = chunk_end
+                source_index = source_end
+            else:
+                offsets[chunk_index] = source_index
+                chunk_index += 1
+                source_index += 1
+        offsets[len(chunk)] = len(source_chunk)
+        return source_chunk, match.start(), offsets
+
+    def ner_process_detailed(
         self,
         text: str,
         positional_tags: Optional[Sequence[str]] = None,
         ner_confidence_threshold: Optional[float] = None,
         language: Optional[str] = None,
         anon_map: Optional['AnonymizationMap'] = None,
-    ) -> str:
-        """Process text with NER models using the configured backend.
+        privacy_policy: Optional[PrivacyPolicy] = None,
+    ) -> NERProcessingResult:
+        """Process text and return transformed text with entity findings.
 
         Routes to ONNX, Torch, GLiNER, or ensemble depending on self._ner_backend.
 
@@ -462,9 +524,33 @@ class GeneralNER:
 
         # --- Presidio GLiNER backend: delegates everything to Presidio ---
         if self._ner_backend == 'presidio_gliner':
-            analyzer_results = self._analyzer.analyze(text=text, language='en')
+            analyzer_language = resources.language_to_iso(language) if language else 'en'
+            analyzer_results = self._analyzer.analyze(
+                text=text,
+                language=analyzer_language,
+            )
+            entities = tuple(
+                DetectedEntity(
+                    entity_type=result.entity_type,
+                    score=result.score,
+                    text=text[result.start:result.end],
+                    start=result.start,
+                    end=result.end,
+                )
+                for result in analyzer_results
+            )
+            if privacy_policy is not None:
+                findings = privacy_policy.evaluate(entities)
+                return NERProcessingResult(
+                    text=privacy_policy.transform(text, findings),
+                    findings=findings,
+                )
             result = self.engine.anonymize(text=text, analyzer_results=analyzer_results)
-            return result.text
+            findings = tuple(
+                EntityFinding(entity, self._replacement_mode, 'detector-threshold')
+                for entity in entities
+            )
+            return NERProcessingResult(text=result.text, findings=findings)
 
         # --- Chunking --- (lock-free: HF fast tokenizer Rust backend is thread-safe)
         if self.tokenizer is not None:
@@ -475,7 +561,7 @@ class GeneralNER:
             chunks = self._simple_chunk(text, max_tokens=int(gliner_max * 0.9))
 
         if not chunks:
-            return text
+            return NERProcessingResult(text=text, findings=())
 
         # Pre-compute GLiNER-only tag set (constant across chunks)
         gliner_all_tags = None
@@ -489,7 +575,17 @@ class GeneralNER:
 
         # --- Inference + ensemble per chunk ---
         ner_clean_text = []
+        all_findings = []
+        search_start = 0
         for chunk in chunks:
+            source_chunk, chunk_start, source_offsets = self._align_chunk(
+                text,
+                chunk,
+                search_start,
+            )
+            if chunk_start > search_start:
+                ner_clean_text.append(text[search_start:chunk_start])
+            search_start = chunk_start + len(source_chunk)
             ner_results = []
 
             # Primary backend: ONNX or Torch — run each key in the ensemble
@@ -518,17 +614,94 @@ class GeneralNER:
             ensemble_results = self.ner_ensemble(ner_results, ner_confidence_threshold)
 
             if ensemble_results:
-                result = self.anonymize_text(
-                    chunk, ensemble_results, self._replacement_mode,
-                    anon_map=anon_map,
+                ensemble_results = [
+                    {
+                        **item,
+                        'start': source_offsets[item['start']],
+                        'end': source_offsets[item['end']],
+                        'word': source_chunk[
+                            source_offsets[item['start']]:
+                            source_offsets[item['end']]
+                        ],
+                    }
+                    for item in ensemble_results
+                ]
+                local_entities = tuple(
+                    DetectedEntity(
+                        entity_type=ENTITY_TYPE_MAP.get(
+                            item['entity_group'], item['entity_group']
+                        ),
+                        score=item['score'],
+                        text=source_chunk[item['start']:item['end']],
+                        start=item['start'],
+                        end=item['end'],
+                    )
+                    for item in ensemble_results
                 )
-                ner_text = result.text
+                if privacy_policy is not None:
+                    local_findings = privacy_policy.evaluate(local_entities)
+                    ner_text = privacy_policy.transform(
+                        source_chunk,
+                        local_findings,
+                    )
+                else:
+                    result = self.anonymize_text(
+                        source_chunk,
+                        ensemble_results,
+                        self._replacement_mode,
+                        anon_map=anon_map,
+                    )
+                    ner_text = result.text
+                    local_findings = tuple(
+                        EntityFinding(
+                            entity,
+                            self._replacement_mode,
+                            'detector-threshold',
+                        )
+                        for entity in local_entities
+                    )
+                all_findings.extend(
+                    EntityFinding(
+                        DetectedEntity(
+                            entity_type=finding.entity.entity_type,
+                            score=finding.entity.score,
+                            text=finding.entity.text,
+                            start=finding.entity.start + chunk_start,
+                            end=finding.entity.end + chunk_start,
+                        ),
+                        finding.action,
+                        finding.reason,
+                    )
+                    for finding in local_findings
+                )
             else:
-                ner_text = chunk
+                ner_text = source_chunk
 
             ner_clean_text.append(ner_text)
 
-        return ' '.join(ner_clean_text)
+        if search_start < len(text):
+            ner_clean_text.append(text[search_start:])
+        return NERProcessingResult(
+            text=''.join(ner_clean_text),
+            findings=tuple(all_findings),
+        )
+
+    def ner_process(
+        self,
+        text: str,
+        positional_tags: Optional[Sequence[str]] = None,
+        ner_confidence_threshold: Optional[float] = None,
+        language: Optional[str] = None,
+        anon_map: Optional['AnonymizationMap'] = None,
+    ) -> str:
+        """Process text while preserving the legacy string return type."""
+        return self.ner_process_detailed(
+            text,
+            positional_tags=positional_tags,
+            ner_confidence_threshold=ner_confidence_threshold,
+            language=language,
+            anon_map=anon_map,
+        ).text
 
     def _token_count(self, text: str, tokenizer) -> int:
         """Count tokens in text."""

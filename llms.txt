@@ -32,6 +32,60 @@ lm_text, stat_text, lang = result  # backward-compatible 3-tuple unpacking
 - `ProcessResult.metadata` — dict with `anon_map` (reversible mode) and `classes` (GLiClass)
 - `AnonymizationMap.deanonymize(text)` — restore original text from reversible placeholders
 - `AnonymizationMap.to_dict()` / `.from_dict(data)` — serialization for storage
+- `sct.evaluation.evaluate_pii(examples, predictions, model=...)` — exact-span PII evaluation
+- `EvaluationReport` — overall metrics plus label, language, domain, and slice metrics
+- `PrivacyPolicy` / `EntityRule` — versioned entity actions and score thresholds
+- `TokenStore` — external storage boundary for reversible token maps
+- `process_json` / `process_dataframe` / `process_rag_chunks` — boundary adapters
+- `BufferedStreamingRedactor` / `WindowedStreamingRedactor` — streaming interfaces
+- `redact_image` / `TesseractOCRProvider` — optional OCR image redaction
+- `assess_reidentification_risk` — corpus k-anonymity summary
+- `MODEL_CANDIDATES` / `run_model_benchmark` — pinned model evaluation
+
+## PII Evaluation
+
+Use the evaluation harness before changing a default model:
+
+```
+python -m scripts.evaluate_pii \
+  --dataset evaluation/pii_starter.jsonl \
+  --predictions path/to/model-predictions.jsonl \
+  --model model-name-and-revision \
+  --output evaluation/results/model-name.json
+```
+
+The starter corpus is a synthetic smoke fixture, not evidence for accuracy or
+compliance claims. See `evaluation/README.md` for the JSONL schemas and release rules.
+
+Benchmark a pinned model candidate:
+
+```
+python -m scripts.benchmark_models \
+  --dataset evaluation/pii_starter.jsonl \
+  --candidate gliner2-pii \
+  --output evaluation/results/gliner2-pii.json
+```
+
+## Privacy Policies and Audit Metadata
+
+Pass `privacy_policy=PrivacyPolicy(...)` and `include_entities=True` to
+`TextCleaner`. `ProcessResult.metadata` then includes policy findings and
+detector model revisions.
+
+Pass `token_store=...` in reversible mode to return an opaque
+`anon_map_reference` instead of the map. Reversible output remains
+pseudonymized personal data.
+
+## Boundary Commands
+
+```
+printf 'Email maria@example.com' | sct-clean --no-ner
+pip install 'squeakycleantext[mcp]'
+sct-mcp
+```
+
+FastMCP loads only when the MCP server starts. OCR requires the `ocr` extra and
+a local Tesseract executable when using `TesseractOCRProvider`.
 
 ## TextCleanerConfig — Key Fields
 

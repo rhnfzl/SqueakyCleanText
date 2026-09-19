@@ -17,7 +17,10 @@ class ProcessResult:
 
     Metadata keys (all optional, ``None`` when feature is inactive):
         ``anon_map``  — :class:`AnonymizationMap` when ``replacement_mode='reversible'``
+        ``anon_map_reference`` — opaque external token-store reference
         ``classes``   — ``list[dict]`` when ``check_classify_document=True``
+        ``findings``  — policy decisions and detected entity spans
+        ``policy``    — active policy name and version
     """
 
     __slots__ = ('lm_text', 'stat_text', 'language', 'metadata')

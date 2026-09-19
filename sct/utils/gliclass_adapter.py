@@ -1,8 +1,6 @@
 """GLiClass adapter — zero-shot document classification.
 
-Supports PyTorch (``gliclass`` package) and ONNX backends.
 Optional dependency. Requires: ``pip install squeakycleantext[classify]``
-or ``pip install squeakycleantext[classify-onnx]`` for torch-free path.
 """
 
 import logging
@@ -20,6 +18,7 @@ class GLiClassAdapter:
     def __init__(
         self,
         model_id: str,
+        revision: str | None = None,
         labels: Tuple[str, ...] = (),
         threshold: float = 0.5,
         classification_type: str = 'single-label',
@@ -31,6 +30,11 @@ class GLiClassAdapter:
         self.classification_type = classification_type
         self._onnx = onnx
         self._pipeline = None
+        self._revision = revision
+        if onnx:
+            raise ValueError(
+                "GLiClass ONNX is not supported by the gliclass package."
+            )
 
         self._init_model(model_id)
 
@@ -42,10 +46,7 @@ class GLiClassAdapter:
     def _init_model(self, model_id: str) -> None:
         """Load GLiClass model via gliclass package.
 
-        Note: gliclass does not yet expose a native ONNX loader, so the
-        ``onnx`` flag is recorded but both paths use the same PyTorch-backed
-        ``GLiClassModel.from_pretrained``.  When gliclass adds ONNX support,
-        this method should branch on ``self._onnx``.
+        The gliclass package currently exposes a PyTorch loader only.
         """
         try:
             from gliclass import GLiClassModel, ZeroShotClassificationPipeline  # noqa: S404
@@ -56,8 +57,9 @@ class GLiClassAdapter:
                 "Install with: pip install squeakycleantext[classify]"
             )
 
-        model = GLiClassModel.from_pretrained(model_id)
-        tokenizer = AutoTokenizer.from_pretrained(model_id)
+        load_kwargs = {"revision": self._revision} if self._revision else {}
+        model = GLiClassModel.from_pretrained(model_id, **load_kwargs)
+        tokenizer = AutoTokenizer.from_pretrained(model_id, **load_kwargs)
         self._pipeline = ZeroShotClassificationPipeline(
             model=model,
             tokenizer=tokenizer,

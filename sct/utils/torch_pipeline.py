@@ -16,7 +16,8 @@ class TorchNERPipeline:
     """
 
     def __init__(self, model_name: str, device: str = 'cpu',
-                 cache_dir: Optional[str] = None):
+                 cache_dir: Optional[str] = None,
+                 revision: Optional[str] = None):
         try:
             import torch  # noqa: S404
             from transformers import (  # noqa: S404
@@ -33,6 +34,8 @@ class TorchNERPipeline:
         transformers.logging.set_verbosity_error()
 
         cache_kwargs = {"cache_dir": cache_dir} if cache_dir else {}
+        if revision:
+            cache_kwargs["revision"] = revision
 
         self._tokenizer = AutoTokenizer.from_pretrained(model_name, **cache_kwargs)
         model = AutoModelForTokenClassification.from_pretrained(
@@ -74,11 +77,17 @@ def load_torch_ner_model(
     model_name: str,
     device: str = 'cpu',
     cache_dir: Optional[str] = None,
+    revision: Optional[str] = None,
 ) -> Tuple['TorchNERPipeline', object]:
     """Load a PyTorch NER model and return (pipeline, tokenizer).
 
     Returns the same tuple shape as load_onnx_ner_model for interface parity.
     The tokenizer is an HF AutoTokenizer (already has max_len_single_sentence).
     """
-    pipe = TorchNERPipeline(model_name, device=device, cache_dir=cache_dir)
+    pipe = TorchNERPipeline(
+        model_name,
+        device=device,
+        cache_dir=cache_dir,
+        revision=revision,
+    )
     return pipe, pipe._tokenizer

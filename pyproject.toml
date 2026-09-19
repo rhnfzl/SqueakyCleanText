@@ -7,7 +7,7 @@ name = "SqueakyCleanText"
 dynamic = ["version"]
 description = "Text preprocessing & PII anonymization pipeline for NLP/ML: ONNX NER ensemble, language detection, stopword removal, and configurable token replacement."
 readme = "README.md"
-license = {text = "MIT"}
+license = "MIT"
 authors = [{name = "Rehan Fazal"}]
 requires-python = ">=3.11"
 keywords = [
@@ -28,7 +28,7 @@ classifiers = [
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
-    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3.14",
     "Operating System :: OS Independent",
 ]
 dependencies = [
@@ -37,7 +37,6 @@ dependencies = [
     "emoji>=2.14",
     "ftfy>=6.3",
     "Unidecode>=1.4",
-    "beautifulsoup4>=4.14",
     "onnxruntime>=1.24.2",
     "tokenizers>=0.22.2",
     "huggingface-hub>=1.5.0",
@@ -52,6 +51,10 @@ Repository = "https://github.com/rhnfzl/SqueakyCleanText"
 Issues = "https://github.com/rhnfzl/SqueakyCleanText/issues"
 Changelog = "https://github.com/rhnfzl/SqueakyCleanText/releases"
 "llms.txt" = "https://github.com/rhnfzl/SqueakyCleanText/blob/main/llms.txt"
+
+[project.scripts]
+sct-clean = "sct.cli:main"
+sct-mcp = "sct.mcp_server:main"
 
 [project.optional-dependencies]
 gpu = [
@@ -79,9 +82,6 @@ presidio = [
 classify = [
     "gliclass>=0.1.16",
 ]
-classify-onnx = [
-    "onnxruntime>=1.24.2",
-]
 all-ner = [
     "torch>=2.6.0",
     "transformers>=4.48",
@@ -99,6 +99,13 @@ dev = [
 test = [
     "coverage>=7.8",
     "pytest-cov>=6.0",
+]
+mcp = [
+    "fastmcp>=4.0.5",
+]
+ocr = [
+    "pillow>=12.3.0",
+    "pytesseract>=0.3.13",
 ]
 
 [tool.setuptools.dynamic]

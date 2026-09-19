@@ -254,6 +254,7 @@ def load_onnx_ner_model(
     device: str = 'cpu',
     cache_dir: Optional[str] = None,
     quantize: bool = False,
+    revision: Optional[str] = None,
 ) -> Tuple[ONNXNERPipeline, TokenizerWrapper]:
     """Download and load an ONNX NER model from HuggingFace Hub.
 
@@ -279,6 +280,8 @@ def load_onnx_ner_model(
     download_kwargs = {}
     if cache_dir:
         download_kwargs['cache_dir'] = cache_dir
+    if revision:
+        download_kwargs['revision'] = revision
 
     # Download required files
     model_path = hf_hub_download(model_name, 'model.onnx', **download_kwargs)
