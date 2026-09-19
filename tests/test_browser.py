@@ -1,7 +1,9 @@
+import json
+
 import pytest
 
 from sct import TextCleanerConfig
-from sct.browser import build_browser_manifest
+from sct.browser import build_browser_manifest, write_browser_manifest
 from sct.config import DEFAULT_NER_MODELS
 
 
@@ -24,3 +26,12 @@ def test_browser_manifest_rejects_unpinned_custom_models():
 
     with pytest.raises(ValueError, match="ENGLISH"):
         build_browser_manifest(config)
+
+
+def test_write_browser_manifest_creates_deterministic_json(tmp_path):
+    output = tmp_path / "manifest.json"
+
+    write_browser_manifest(TextCleanerConfig(), output)
+
+    assert json.loads(output.read_text())["format_version"] == 1
+    assert output.read_text().endswith("\n")

@@ -1,6 +1,8 @@
 from io import StringIO
 import json
 
+import pytest
+
 from sct.cli import main
 
 
@@ -41,3 +43,37 @@ def test_cli_reversible_mode_writes_restricted_token_map(tmp_path):
         "maria@example.com"
     )
     assert token_map.stat().st_mode & 0o777 == 0o600
+
+
+def test_cli_processes_json_file_input(tmp_path):
+    source = tmp_path / "input.json"
+    source.write_text('{"email": "maria@example.com"}')
+    output = StringIO()
+
+    exit_code = main(
+        [str(source), "--no-ner", "--json-input"],
+        stdout=output,
+    )
+
+    assert exit_code == 0
+    assert json.loads(output.getvalue()) == {"email": "<EMAIL>"}
+
+
+def test_cli_reversible_mode_requires_token_map():
+    with pytest.raises(SystemExit):
+        main(
+            ["--no-ner", "--replacement-mode", "reversible"],
+            stdin=StringIO("Email maria@example.com"),
+        )
+
+
+def test_cli_rejects_reversible_json_input(tmp_path):
+    with pytest.raises(SystemExit):
+        main([
+            "--no-ner",
+            "--json-input",
+            "--replacement-mode",
+            "reversible",
+            "--token-map",
+            str(tmp_path / "tokens.json"),
+        ])
