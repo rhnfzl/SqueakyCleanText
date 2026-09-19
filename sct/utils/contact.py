@@ -1,8 +1,5 @@
-import logging
 from sct.utils import constants
-from bs4 import BeautifulSoup
 
-logger = logging.getLogger(__name__)
 
 class ProcessContacts:
 
@@ -15,13 +12,7 @@ class ProcessContacts:
 
     def replace_html(self, text, replace_with="<HTML>"):
         """Replace all html tags in ``text`` str with ``replace_with`` str."""
-        try:
-            soup = BeautifulSoup(text, 'html.parser')
-            text = soup.get_text()
-        except Exception:
-            logger.debug("HTML parsing failed, falling back to regex", exc_info=True)
-            text = constants.HTML_REGEX.sub(replace_with, text)
-        return text
+        return constants.HTML_REGEX.sub(replace_with, text)
 
     def replace_emails(self, text, replace_with="<EMAIL>"):
         """Replace all emails in ``text`` str with ``replace_with`` str."""

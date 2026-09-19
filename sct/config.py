@@ -39,6 +39,17 @@ DEFAULT_NER_MODELS: dict[str, str] = {
     'MULTILINGUAL': 'rhnfzl/wikineural-multilingual-ner-onnx',
 }
 
+DEFAULT_NER_REVISIONS: dict[str, str] = {
+    'ENGLISH': '2c10955af9538d6ff8a68316c5dbfcd0b968761e',
+    'DUTCH': '381e34ba4c222bc221e9fd02832f52a179ed840d',
+    'GERMAN': 'fe4aecfa6dc376244ef37da37e6df3b1b0911d71',
+    'SPANISH': 'ef52a7f08172203c763d51fe36660d36985bb388',
+    'FRENCH': '74191432b21c956b5b04b4778c0e92e569b1f80d',
+    'PORTUGUESE': '74191432b21c956b5b04b4778c0e92e569b1f80d',
+    'ITALIAN': '74191432b21c956b5b04b4778c0e92e569b1f80d',
+    'MULTILINGUAL': '74191432b21c956b5b04b4778c0e92e569b1f80d',
+}
+
 DEFAULT_TORCH_NER_MODELS: dict[str, str] = {
     'ENGLISH': 'FacebookAI/xlm-roberta-large-finetuned-conll03-english',
     'DUTCH': 'FacebookAI/xlm-roberta-large-finetuned-conll02-dutch',
@@ -49,6 +60,17 @@ DEFAULT_TORCH_NER_MODELS: dict[str, str] = {
     'PORTUGUESE': 'Babelscape/wikineural-multilingual-ner',
     'ITALIAN': 'Babelscape/wikineural-multilingual-ner',
     'MULTILINGUAL': 'Babelscape/wikineural-multilingual-ner',
+}
+
+DEFAULT_TORCH_NER_REVISIONS: dict[str, str] = {
+    'ENGLISH': '18f95e9924f3f452df09cc90945073906ef18f1e',
+    'DUTCH': '630d5d48d08071704d9a2719b045082019b6ac12',
+    'GERMAN': '1fbcc7a00a69ce5ab754623154a8e9cc6ba868e2',
+    'SPANISH': 'a7c5f08c766adcbd6c22f343145fa65d38b3c1d5',
+    'FRENCH': 'bed6ee7a45d2827b6c90a4fd7983f0241ae0a5c1',
+    'PORTUGUESE': 'bed6ee7a45d2827b6c90a4fd7983f0241ae0a5c1',
+    'ITALIAN': 'bed6ee7a45d2827b6c90a4fd7983f0241ae0a5c1',
+    'MULTILINGUAL': 'bed6ee7a45d2827b6c90a4fd7983f0241ae0a5c1',
 }
 
 # NER ensemble: ordered model keys to run per input language.
@@ -104,6 +126,7 @@ PII_LABEL_MAP: dict[str, str] = {
 }
 
 PII_DEFAULT_MODEL = 'knowledgator/gliner-pii-base-v1.0'
+PII_DEFAULT_REVISION = '61726e0ad791dcab3e29339bbec3ad42ded65641'
 PII_DEFAULT_THRESHOLD = 0.3  # Recall > precision for PII
 
 VALID_NER_MODES = frozenset({'standard', 'pii'})
@@ -118,7 +141,7 @@ MODERNBERT_NER_MODELS: dict[str, str] = {
 
 # GLiClass document-level classification defaults
 GLICLASS_DEFAULT_MODEL = 'knowledgator/gliclass-edge-v3.0'      # 32.7M params, 131MB
-GLICLASS_ONNX_MODEL = 'cnmoro/gliclass-edge-v3.0-onnx'         # Community ONNX conversion
+GLICLASS_DEFAULT_REVISION = 'df03993a2ed98e5e4a0d2dd7efbbd105abe874cf'
 
 # Placeholder constants for future multilingual NER models (blocked: models not yet published)
 OTTER_NER_MODELS: dict[str, str] = {}   # arXiv:2601.06347 — checkpoints not on HF Hub
@@ -200,6 +223,7 @@ class TextCleanerConfig:
     # ENGLISH and MULTILINGUAL are always required (loaded eagerly).
     # Missing keys are filled from DEFAULT_NER_MODELS.
     ner_models: Optional[Mapping[str, str]] = None
+    ner_model_revisions: Optional[Mapping[str, str]] = None
 
     # Ensemble routing: maps each input language to an ordered tuple of model keys
     # to run. Keys must exist in the resolved ner_models dict.
@@ -223,9 +247,11 @@ class TextCleanerConfig:
 
     # Torch backend models (only used when ner_backend is 'torch' or 'ensemble_torch')
     torch_ner_models: Optional[Mapping[str, str]] = None
+    torch_ner_model_revisions: Optional[Mapping[str, str]] = None
 
     # GLiNER settings (only used when ner_backend contains 'gliner' or 'ensemble')
     gliner_model: Optional[str] = None
+    gliner_revision: Optional[str] = None
     gliner_variant: str = 'gliner'  # 'gliner' or 'gliner2'
     gliner_labels: Tuple[str, ...] = ('person', 'organization', 'location')
     gliner_label_map: Optional[Mapping[str, str]] = None
@@ -243,6 +269,7 @@ class TextCleanerConfig:
     # GLiClass document-level pre-classification (zero-shot)
     check_classify_document: bool = False
     gliclass_model: Optional[str] = None
+    gliclass_revision: Optional[str] = None
     gliclass_labels: Tuple[str, ...] = ()
     gliclass_threshold: float = 0.5
     gliclass_classification_type: str = 'single-label'
@@ -261,6 +288,21 @@ class TextCleanerConfig:
     supported_languages: frozenset = frozenset()
 
     def __post_init__(self):
+        if self.gliclass_onnx:
+            raise ValueError(
+                "GLiClass ONNX is not supported by the gliclass package. "
+                "Use gliclass_onnx=False."
+            )
+        if (
+            self.gliclass_model in (None, GLICLASS_DEFAULT_MODEL)
+            and self.gliclass_revision is None
+        ):
+            object.__setattr__(
+                self,
+                'gliclass_revision',
+                GLICLASS_DEFAULT_REVISION,
+            )
+
         # Convert mutable collections to immutable for frozen safety
         if isinstance(self.positional_tags, list):
             object.__setattr__(self, 'positional_tags', tuple(self.positional_tags))
@@ -284,6 +326,13 @@ class TextCleanerConfig:
                 f"replacement_mode must be one of {sorted(VALID_REPLACEMENT_MODES)}, "
                 f"got: {self.replacement_mode!r}"
             )
+        if (
+            self.replacement_mode == 'reversible'
+            and self.check_fuzzy_replace_dates
+        ):
+            raise ValueError(
+                "reversible mode does not support fuzzy date replacement"
+            )
 
         # PII mode auto-configuration: sets GLiNER defaults for PII detection.
         # User-provided values take priority (checked via default comparisons).
@@ -295,6 +344,15 @@ class TextCleanerConfig:
                     object.__setattr__(self, 'gliner_onnx', True)
             if not self.gliner_model:
                 object.__setattr__(self, 'gliner_model', PII_DEFAULT_MODEL)
+            if (
+                self.gliner_model == PII_DEFAULT_MODEL
+                and self.gliner_revision is None
+            ):
+                object.__setattr__(
+                    self,
+                    'gliner_revision',
+                    PII_DEFAULT_REVISION,
+                )
             if self.gliner_labels == ('person', 'organization', 'location'):
                 object.__setattr__(self, 'gliner_labels', PII_LABELS)
             if self.gliner_threshold == 0.4:
@@ -357,6 +415,19 @@ class TextCleanerConfig:
         elif self.ner_backend in ('torch', 'ensemble_torch'):
             object.__setattr__(self, 'torch_ner_models',
                                MappingProxyType(dict(DEFAULT_TORCH_NER_MODELS)))
+        if self.torch_ner_models is not None:
+            torch_revisions = {
+                key: revision
+                for key, revision in DEFAULT_TORCH_NER_REVISIONS.items()
+                if self.torch_ner_models.get(key) == DEFAULT_TORCH_NER_MODELS.get(key)
+            }
+            if self.torch_ner_model_revisions is not None:
+                torch_revisions.update(self.torch_ner_model_revisions)
+            object.__setattr__(
+                self,
+                'torch_ner_model_revisions',
+                MappingProxyType(torch_revisions),
+            )
 
         # Reconcile ner_models (dict, preferred) and ner_models_list (tuple, deprecated).
         # After this block, both fields are guaranteed populated.
@@ -376,14 +447,29 @@ class TextCleanerConfig:
             )
         else:
             # No dict provided — derive from ner_models_list (may be default or custom)
-            import warnings
-            warnings.warn(
-                "ner_models_list is deprecated. Use ner_models dict instead.",
-                DeprecationWarning,
-                stacklevel=2,
-            )
+            default_models_list = tuple(DEFAULT_NER_MODELS[k] for k in LANG_KEYS)
+            if self.ner_models_list != default_models_list:
+                import warnings
+                warnings.warn(
+                    "ner_models_list is deprecated. Use ner_models dict instead.",
+                    DeprecationWarning,
+                    stacklevel=2,
+                )
             models_dict = dict(zip(LANG_KEYS, self.ner_models_list))
             object.__setattr__(self, 'ner_models', MappingProxyType(models_dict))
+
+        pinned_revisions = {
+            key: revision
+            for key, revision in DEFAULT_NER_REVISIONS.items()
+            if self.ner_models.get(key) == DEFAULT_NER_MODELS.get(key)
+        }
+        if self.ner_model_revisions is not None:
+            pinned_revisions.update(self.ner_model_revisions)
+        object.__setattr__(
+            self,
+            'ner_model_revisions',
+            MappingProxyType(pinned_revisions),
+        )
 
         # --- Language validation and supported_languages computation ---
         from sct.utils.resources import resolve_language

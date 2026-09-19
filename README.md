@@ -5,7 +5,7 @@
 [![PyPI](https://img.shields.io/pypi/v/squeakycleantext.svg)](https://pypi.org/project/squeakycleantext/)
 [![PyPI - Downloads](https://img.shields.io/pypi/dm/squeakycleantext)](https://pypistats.org/packages/squeakycleantext)
 [![Python package](https://github.com/rhnfzl/SqueakyCleanText/actions/workflows/python-package.yml/badge.svg)](https://github.com/rhnfzl/SqueakyCleanText/actions/workflows/python-package.yml)
-[![Python Versions](https://img.shields.io/badge/Python-3.11%20|%203.12%20|%203.13-blue)](https://pypi.org/project/squeakycleantext/)
+[![Python Versions](https://img.shields.io/badge/Python-3.11%20|%203.12%20|%203.13%20|%203.14-blue)](https://pypi.org/project/squeakycleantext/)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 A comprehensive text cleaning and preprocessing pipeline for machine learning and NLP tasks.
@@ -102,6 +102,8 @@ The base install uses **ONNX Runtime** for NER inference - no PyTorch or Transfo
 | Synthetic | `pip install SqueakyCleanText[synthetic]` | Faker-based synthetic replacement (realistic fake values instead of `<TAG>` tokens) |
 | Presidio | `pip install SqueakyCleanText[presidio]` | Presidio-analyzer for `presidio_gliner` backend |
 | Classify | `pip install SqueakyCleanText[classify]` | GLiClass document-level pre-classification |
+| MCP | `pip install SqueakyCleanText[mcp]` | FastMCP server with text and JSON cleaning tools |
+| OCR | `pip install SqueakyCleanText[ocr]` | Pillow image redaction and Tesseract OCR adapter |
 | All NER | `pip install SqueakyCleanText[all-ner]` | All NER backends combined |
 | Development | `pip install SqueakyCleanText[dev]` | Testing and linting tools |
 
@@ -576,6 +578,116 @@ new_cfg = dataclasses.replace(cfg, check_ner_process=False)
 
 </details>
 
+## Privacy Engine
+
+Applications can apply versioned policy rules and inspect each decision.
+This makes privacy behavior testable across services, datasets, and model upgrades.
+
+```python
+from sct import EntityRule, PrivacyPolicy, TextCleaner, TextCleanerConfig
+
+policy = PrivacyPolicy(
+    name="support-export",
+    version="1",
+    rules={
+        "PERSON": EntityRule(action="redact", min_score=0.8),
+        "ORGANISATION": EntityRule(action="keep"),
+    },
+    allowlist=frozenset({"Jane Public"}),
+)
+
+cleaner = TextCleaner(
+    cfg=TextCleanerConfig(ner_mode="pii"),
+    privacy_policy=policy,
+    include_entities=True,
+)
+result = cleaner.process("Contact Maria Chen for help.")
+
+print(result.metadata["findings"])
+print(result.metadata["detector"])
+```
+
+Reversible output is pseudonymized personal data. Anyone with the token map can
+restore the source values. Keep token maps outside logs and cleaned datasets.
+
+Use a `TokenStore` implementation to keep maps behind opaque references:
+
+```python
+from sct import InMemoryTokenStore, TextCleaner, TextCleanerConfig
+
+store = InMemoryTokenStore()
+cleaner = TextCleaner(
+    cfg=TextCleanerConfig(replacement_mode="reversible"),
+    token_store=store,
+)
+result = cleaner.process("Maria lives in Utrecht.")
+reference = result.metadata["anon_map_reference"]
+```
+
+`InMemoryTokenStore` supports tests and short sessions. Production systems
+should implement `TokenStore` with encryption, access control, expiry, and audit logs.
+
+### Boundary adapters
+
+The base package includes JSON, DataFrame, retrieval, command-line, and streaming adapters:
+
+```python
+from sct import RAGChunk, process_json, process_rag_chunks
+
+cleaned_json = process_json(cleaner, {"message": "Email a@example.com"})
+cleaned_chunks = process_rag_chunks(
+    cleaner,
+    [RAGChunk(id="1", text="Call +1-202-555-0147", metadata={})],
+)
+```
+
+```sh
+printf 'Email maria@example.com' | sct-clean --no-ner
+printf 'Email maria@example.com' | sct-clean --no-ner \
+  --replacement-mode reversible --token-map tokens.json
+pip install 'SqueakyCleanText[mcp]'
+sct-mcp
+```
+
+`BufferedStreamingRedactor` holds a full document for cross-chunk NER safety.
+`WindowedStreamingRedactor` provides bounded latency for contact tokens.
+
+The OCR adapter accepts any `OCRProvider`. The included Tesseract provider also
+needs a local Tesseract executable. Browser export writes an ONNX Runtime Web
+manifest, but it does not copy model files or Python language detection.
+
+Corpus owners can call `assess_reidentification_risk` to measure k-anonymity
+for selected quasi-identifiers. Reports contain counts only, not source values.
+
+## PII Evaluation
+
+Model changes need ground-truth privacy evaluation, not only backend agreement.
+The evaluation harness reports exact entity metrics by label, language, domain,
+and named slice.
+
+```sh
+python -m scripts.evaluate_pii \
+  --dataset evaluation/pii_starter.jsonl \
+  --predictions path/to/model-predictions.jsonl \
+  --model model-name-and-revision \
+  --output evaluation/results/model-name.json
+```
+
+The included starter corpus is synthetic and only checks the evaluation path.
+See [`evaluation/README.md`](evaluation/README.md) for schemas and release rules.
+
+Pinned candidates live in `sct.model_candidates`. Run one candidate with:
+
+```sh
+python -m scripts.benchmark_models \
+  --dataset evaluation/pii_starter.jsonl \
+  --candidate gliner2-pii \
+  --output evaluation/results/gliner2-pii.json
+```
+
+Published third-party results are reference data only. `assess_candidate`
+requires local recall, exact-span F1, latency, and ONNX parity before adoption.
+
 ## Architecture
 
 SqueakyCleanText processes text through a configurable pipeline of sequential steps:
@@ -612,6 +724,23 @@ Input Text
 Each step is toggled by a `TextCleanerConfig` field. The pipeline is built once at initialization; disabled steps are skipped entirely (zero overhead).
 
 ## What's New
+
+**v0.7.0**
+- **Privacy policies**: Apply versioned entity rules, allowlists, thresholds, and redaction actions.
+- **Structured audit findings**: Inspect entity decisions, detector backends, and pinned model revisions.
+- **Safer reversible processing**: Restore contact values and keep token maps behind an optional `TokenStore`.
+- **Boundary adapters**: Clean JSON, DataFrame-like objects, RAG chunks, standard input, and MCP tool requests.
+- **Privacy evaluation**: Score exact PII spans by label, language, domain, and custom slice.
+- **Model adoption gates**: Compare pinned candidates using recall, F1, latency, and ONNX parity.
+- **Extended media support**: Redact OCR regions, process bounded streams, and export browser deployment manifests.
+- **Corpus risk indicators**: Measure k-anonymity for user-selected quasi-identifiers.
+- **Supply-chain improvements**: Pin model revisions, publish through PyPI Trusted Publishing, and ship standard lockfiles.
+- **Python 3.14**: Added CI coverage alongside Python 3.11 through 3.13.
+
+Migration notes:
+- `gliclass_onnx=True` now raises an error because the upstream package has no native ONNX loader.
+- HTML processing now honors `replace_with_html` instead of silently stripping tags.
+- Structured adapters reject reversible mode unless each token map can be retained safely.
 
 **v0.6.0**
 - **PII detection mode** (`ner_mode='pii'`): auto-configures GLiNER with 60+ PII entity labels (personal, financial, healthcare, identity, digital)

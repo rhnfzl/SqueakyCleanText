@@ -23,6 +23,7 @@ class GLiNERAdapter:
     def __init__(
         self,
         model_id: str,
+        revision: Optional[str] = None,
         variant: str = 'gliner',
         labels: Optional[Tuple[str, ...]] = None,
         threshold: float = 0.4,
@@ -38,6 +39,7 @@ class GLiNERAdapter:
         self.label_descriptions = label_descriptions or {}
         self.model_id = model_id
         self._onnx = onnx
+        load_kwargs = {"revision": revision} if revision else {}
 
         if variant == 'gliner':
             try:
@@ -51,6 +53,7 @@ class GLiNERAdapter:
                 try:
                     self.model = GLiNER.from_pretrained(
                         model_id, load_onnx_model=True, load_tokenizer=True,
+                        **load_kwargs,
                     )
                     logger.info("Loaded GLiNER model in ONNX mode: %s", model_id)
                 except FileNotFoundError:
@@ -59,10 +62,10 @@ class GLiNERAdapter:
                         "don't ship model.onnx at repo root). Falling back to PyTorch.",
                         model_id,
                     )
-                    self.model = GLiNER.from_pretrained(model_id)
+                    self.model = GLiNER.from_pretrained(model_id, **load_kwargs)
                     self._onnx = False
             else:
-                self.model = GLiNER.from_pretrained(model_id)
+                self.model = GLiNER.from_pretrained(model_id, **load_kwargs)
             if device == 'cuda' and not onnx:
                 self.model = self.model.to('cuda')
 
@@ -74,7 +77,7 @@ class GLiNERAdapter:
                     "gliner2 is required for GLiNER2 backend. "
                     "Install with: pip install squeakycleantext[gliner2]"
                 )
-            self.model = GLiNER2.from_pretrained(model_id)
+            self.model = GLiNER2.from_pretrained(model_id, **load_kwargs)
         else:
             raise ValueError(f"Unknown GLiNER variant: {variant!r}. Use 'gliner' or 'gliner2'.")
 

@@ -4,10 +4,14 @@ Comprehensive text cleaning and preprocessing pipeline.
 import asyncio
 import logging
 import os
+import re
+import threading
+import time
 from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Callable, Dict, List, Optional
 
 from sct.config import TextCleanerConfig, GLINER_BACKENDS, _config_from_module_globals
+from sct.privacy import PrivacyPolicy, ProcessingMetrics, TokenStore
 from sct.utils import constants, contact, datetime, ner, normtext, resources, special, stopwords
 from sct.utils.anonymization_map import AnonymizationMap
 from sct.utils.process_result import ProcessResult
@@ -16,7 +20,15 @@ logger = logging.getLogger(__name__)
 
 class TextCleaner:
 
-    def __init__(self, cfg: Optional[TextCleanerConfig] = None):
+    def __init__(
+        self,
+        cfg: Optional[TextCleanerConfig] = None,
+        *,
+        privacy_policy: Optional[PrivacyPolicy] = None,
+        token_store: Optional[TokenStore] = None,
+        include_entities: bool = False,
+        metrics_callback: Optional[Callable[[ProcessingMetrics], None]] = None,
+    ):
         """Initialize the text cleaning pipeline.
 
         Args:
@@ -24,6 +36,18 @@ class TextCleaner:
                  config variables (backward compatible).
         """
         self.cfg = cfg or _config_from_module_globals()
+        if (
+            privacy_policy is not None
+            and self.cfg.replacement_mode != 'placeholder'
+        ):
+            raise ValueError(
+                "privacy_policy currently requires replacement_mode='placeholder'"
+            )
+        self._privacy_policy = privacy_policy
+        self._token_store = token_store
+        self._include_entities = include_entities
+        self._metrics_callback = metrics_callback
+        self._document_context = threading.local()
 
         # Instance-scoped language detector — restricted when language is a tuple
         if isinstance(self.cfg.language, tuple):
@@ -75,6 +99,7 @@ class TextCleaner:
             if needs_gliner:
                 gliner_config = {
                     'model': self.cfg.gliner_model,
+                    'revision': self.cfg.gliner_revision,
                     'variant': self.cfg.gliner_variant,
                     'labels': self.cfg.gliner_labels,
                     'threshold': self.cfg.gliner_threshold,
@@ -96,9 +121,17 @@ class TextCleaner:
 
             self.GeneralNER = ner.GeneralNER(
                 model_names=dict(self.cfg.ner_models) if self.cfg.ner_models else None,
+                model_revisions=(
+                    dict(self.cfg.ner_model_revisions)
+                    if self.cfg.ner_model_revisions else None
+                ),
                 ner_backend=self.cfg.ner_backend,
                 gliner_config=gliner_config,
                 torch_model_names=torch_model_names,
+                torch_model_revisions=(
+                    dict(self.cfg.torch_ner_model_revisions)
+                    if self.cfg.torch_ner_model_revisions else None
+                ),
                 ner_batch_size=self.cfg.ner_batch_size,
                 ensemble_models=dict(self.cfg.ner_ensemble) if self.cfg.ner_ensemble is not None else None,
                 ensemble_default_keys=(
@@ -116,6 +149,7 @@ class TextCleaner:
             from sct.config import GLICLASS_DEFAULT_MODEL
             self._gliclass = GLiClassAdapter(
                 model_id=self.cfg.gliclass_model or GLICLASS_DEFAULT_MODEL,
+                revision=self.cfg.gliclass_revision,
                 labels=self.cfg.gliclass_labels,
                 threshold=self.cfg.gliclass_threshold,
                 classification_type=self.cfg.gliclass_classification_type,
@@ -200,11 +234,19 @@ class TextCleaner:
         return None
 
     def _process_single(self, text: str) -> ProcessResult:
+        try:
+            return self._process_single_with_context(text)
+        finally:
+            self._document_context.anon_map = None
+
+    def _process_single_with_context(self, text: str) -> ProcessResult:
         """Process a single text through the entire pipeline.
 
         Returns:
             ProcessResult (unpacks as 3-tuple for backward compat).
         """
+        started_at = time.perf_counter()
+
         # Reset per-document synthetic consistency cache (thread-safe via threading.local)
         if self._synthetic_replacer:
             self._synthetic_replacer.reset_cache()
@@ -213,6 +255,7 @@ class TextCleaner:
         anon_map = None
         if self.cfg.replacement_mode == 'reversible':
             anon_map = AnonymizationMap()
+        self._document_context.anon_map = anon_map
 
         # Document-level classification (before any text modification)
         doc_classes = None
@@ -243,14 +286,31 @@ class TextCleaner:
             current_text = step(current_text)
 
         # NER processing
+        findings = ()
         if self.cfg.check_ner_process and self.GeneralNER is not None:
-            current_text = self.GeneralNER.ner_process(
-                current_text,
-                positional_tags=self.cfg.positional_tags,
-                ner_confidence_threshold=self.cfg.ner_confidence_threshold,
-                language=language,
-                anon_map=anon_map,
-            )
+            if (
+                self._privacy_policy is not None
+                or self._include_entities
+                or self._metrics_callback is not None
+            ):
+                detailed = self.GeneralNER.ner_process_detailed(
+                    current_text,
+                    positional_tags=self.cfg.positional_tags,
+                    ner_confidence_threshold=self.cfg.ner_confidence_threshold,
+                    language=language,
+                    anon_map=anon_map,
+                    privacy_policy=self._privacy_policy,
+                )
+                current_text = detailed.text
+                findings = detailed.findings
+            else:
+                current_text = self.GeneralNER.ner_process(
+                    current_text,
+                    positional_tags=self.cfg.positional_tags,
+                    ner_confidence_threshold=self.cfg.ner_confidence_threshold,
+                    language=language,
+                    anon_map=anon_map,
+                )
 
         # Statistical model processing (always returns stext, even if None)
         stext = None
@@ -261,19 +321,83 @@ class TextCleaner:
         metadata: Optional[Dict[str, Any]] = None
         if anon_map is not None:
             metadata = metadata or {}
-            metadata['anon_map'] = anon_map
+            if self._token_store is not None:
+                metadata['anon_map_reference'] = self._token_store.save(anon_map)
+            else:
+                metadata['anon_map'] = anon_map
         if doc_classes is not None:
             metadata = metadata or {}
             metadata['classes'] = doc_classes
+        if self._privacy_policy is not None:
+            metadata = metadata or {}
+            metadata['policy'] = {
+                'name': self._privacy_policy.name,
+                'version': self._privacy_policy.version,
+            }
+        if self._include_entities or self._privacy_policy is not None:
+            metadata = metadata or {}
+            metadata['findings'] = findings
+            detector_models: Dict[str, Dict[str, Optional[str]]] = {}
+            if self.cfg.ner_backend in ('onnx', 'ensemble_onnx'):
+                detector_models.update({
+                    key: {
+                        'id': model_id,
+                        'revision': (
+                            self.cfg.ner_model_revisions or {}
+                        ).get(key),
+                    }
+                    for key, model_id in (
+                        self.cfg.ner_models or {}
+                    ).items()
+                })
+            if self.cfg.ner_backend in ('torch', 'ensemble_torch'):
+                detector_models.update({
+                    key: {
+                        'id': model_id,
+                        'revision': (
+                            self.cfg.torch_ner_model_revisions or {}
+                        ).get(key),
+                    }
+                    for key, model_id in (
+                        self.cfg.torch_ner_models or {}
+                    ).items()
+                })
+            if (
+                self.cfg.ner_backend in GLINER_BACKENDS
+                or self.cfg.ner_backend == 'presidio_gliner'
+            ):
+                detector_models['GLINER'] = {
+                    'id': self.cfg.gliner_model,
+                    'revision': self.cfg.gliner_revision,
+                }
+            metadata['detector'] = {
+                'backend': self.cfg.ner_backend,
+                'models': detector_models,
+            }
+
+        if self._metrics_callback is not None:
+            entity_counts: Dict[str, int] = {}
+            for finding in findings:
+                entity_type = finding.entity.entity_type
+                entity_counts[entity_type] = entity_counts.get(entity_type, 0) + 1
+            self._metrics_callback(ProcessingMetrics(
+                duration_ms=(time.perf_counter() - started_at) * 1000,
+                language=language,
+                backend=self.cfg.ner_backend if self.cfg.check_ner_process else None,
+                policy=self._privacy_policy.name if self._privacy_policy else None,
+                entity_counts=entity_counts,
+            ))
 
         return ProcessResult(current_text, stext, language, metadata=metadata)
 
     def process_batch(self, texts: List[str], batch_size: Optional[int] = None) -> List[ProcessResult]:
-        """Process multiple texts.
+        """Process multiple texts with bounded document concurrency.
 
         Returns:
             List of ProcessResult (each unpacks as 3-tuple for backward compat).
         """
+        if batch_size is not None and batch_size <= 0:
+            raise ValueError("batch_size must be >= 1")
         if not texts:
             return []
 
@@ -294,7 +418,8 @@ class TextCleaner:
         # Parallel processing: each text goes through the full pipeline independently.
         # ONNX Runtime releases the GIL during C++ inference ops, so threads
         # achieve real concurrency for the NER inference bottleneck.
-        max_workers = min(len(to_process), os.cpu_count() or 4)
+        worker_limit = batch_size if batch_size is not None else (os.cpu_count() or 4)
+        max_workers = min(len(to_process), worker_limit)
         if max_workers > 1:
             with ThreadPoolExecutor(max_workers=max_workers) as executor:
                 futures = {
@@ -343,6 +468,24 @@ class TextCleaner:
 
     # --- Pipeline step methods (private, used by _init_pipeline) ---
 
+    def _replace_reversible(self, text, pattern, entity_type):
+        anon_map = getattr(self._document_context, 'anon_map', None)
+        if anon_map is None:
+            return None
+
+        def replace(match):
+            placeholder = anon_map.next_placeholder(entity_type)
+            anon_map.add(
+                placeholder,
+                match.group(),
+                entity_type,
+                match.start(),
+                match.end(),
+            )
+            return placeholder
+
+        return pattern.sub(replace, text)
+
     def _fix_bad_unicode(self, text):
         return self.NormaliseText.fix_bad_unicode(text)
 
@@ -353,9 +496,23 @@ class TextCleaner:
         return self.NormaliseText.remove_emoji(text)
 
     def _replace_html(self, text):
+        reversible = self._replace_reversible(
+            text,
+            constants.HTML_REGEX,
+            'HTML',
+        )
+        if reversible is not None:
+            return reversible
         return self.ProcessContacts.replace_html(text, replace_with=self.cfg.replace_with_html)
 
     def _replace_urls(self, text):
+        reversible = self._replace_reversible(
+            text,
+            constants.URL_REGEX,
+            'URL',
+        )
+        if reversible is not None:
+            return reversible
         if self._synthetic_replacer:
             return self.ProcessContacts.replace_urls_with_fn(
                 text, lambda orig: self._synthetic_replacer.get_replacement('URL', orig),
@@ -363,6 +520,13 @@ class TextCleaner:
         return self.ProcessContacts.replace_urls(text, replace_with=self.cfg.replace_with_url)
 
     def _replace_emails(self, text):
+        reversible = self._replace_reversible(
+            text,
+            constants.EMAIL_REGEX,
+            'EMAIL',
+        )
+        if reversible is not None:
+            return reversible
         if self._synthetic_replacer:
             return self.ProcessContacts.replace_emails_with_fn(
                 text, lambda orig: self._synthetic_replacer.get_replacement('EMAIL', orig),
@@ -370,6 +534,13 @@ class TextCleaner:
         return self.ProcessContacts.replace_emails(text, replace_with=self.cfg.replace_with_email)
 
     def _replace_dates(self, text):
+        reversible = self._replace_reversible(
+            text,
+            self.ProcessDateTime._date_regex,
+            'DATE',
+        )
+        if reversible is not None:
+            return reversible
         return self.ProcessDateTime.replace_dates(text, replace_with=self.cfg.replace_with_dates)
 
     def _fuzzy_replace_dates(self, text, language=None):
@@ -381,9 +552,23 @@ class TextCleaner:
         )
 
     def _replace_years(self, text):
+        reversible = self._replace_reversible(
+            text,
+            constants.YEAR_REGEX,
+            'YEAR',
+        )
+        if reversible is not None:
+            return reversible
         return self.ProcessDateTime.replace_years(text, replace_with=self.cfg.replace_with_years)
 
     def _replace_phone_numbers(self, text):
+        reversible = self._replace_reversible(
+            text,
+            constants.PHONE_REGEX,
+            'PHONE_NUMBER',
+        )
+        if reversible is not None:
+            return reversible
         if self._synthetic_replacer:
             return self.ProcessContacts.replace_phone_numbers_with_fn(
                 text, lambda orig: self._synthetic_replacer.get_replacement('PHONE_NUMBER', orig),
@@ -391,6 +576,25 @@ class TextCleaner:
         return self.ProcessContacts.replace_phone_numbers(text, replace_with=self.cfg.replace_with_phone_numbers)
 
     def _replace_numbers(self, text):
+        anon_map = getattr(self._document_context, 'anon_map', None)
+        if anon_map is not None:
+            protected = {}
+
+            def protect(match):
+                key = f"\ue000{chr(65 + len(protected))}\ue001"
+                protected[key] = match.group()
+                return key
+
+            placeholder_pattern = re.compile(r"<[A-Z][A-Z0-9_]*_\d+>")
+            text = placeholder_pattern.sub(protect, text)
+            reversible = self._replace_reversible(
+                text,
+                constants.NUMBERS_REGEX,
+                'NUMBER',
+            )
+            for key, placeholder in protected.items():
+                reversible = reversible.replace(key, placeholder)
+            return reversible
         if self._synthetic_replacer:
             return self.ProcessContacts.replace_numbers_with_fn(
                 text, lambda orig: self._synthetic_replacer.get_replacement('NUMBER', orig),
@@ -398,6 +602,13 @@ class TextCleaner:
         return self.ProcessContacts.replace_numbers(text, replace_with=self.cfg.replace_with_numbers)
 
     def _replace_currency_symbols(self, text):
+        reversible = self._replace_reversible(
+            text,
+            constants.CURRENCY_REGEX,
+            'CURRENCY',
+        )
+        if reversible is not None:
+            return reversible
         return self.ProcessSpecialSymbols.replace_currency_symbols(text, replace_with=self.cfg.replace_with_currency_symbols)
 
     def _remove_isolated_letters(self, text):
