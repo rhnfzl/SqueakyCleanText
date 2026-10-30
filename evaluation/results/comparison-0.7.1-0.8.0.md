@@ -134,8 +134,10 @@ With the locked huggingface-hub 1.32.0, the Linux cache stores `model.onnx` and
 1.31.1) refuses the external data file ("External data path escapes model directory"). This
 fails for the XLM-RoBERTa-large default models in both 0.7.1 and 0.8.0, so it is not a 0.8.0
 regression. For the benchmark the two files were hard-linked into each snapshot directory.
-The Mac venv (huggingface-hub 2.4.0) is not affected. Not fixed in 0.8.0 (out of scope for a
-speed release).
+The Mac venv (huggingface-hub 2.4.0) is not affected. Cause: hub 1.32.0 stores each blob in
+its own directory (`hub/blobs/<xx>/<sha256>`), and onnxruntime only allows external data in
+the real directory of `model.onnx`. Fixed later in 0.8.0: SCT hard-links both files into one
+directory in that layout (see CHANGELOG); the timings above were measured before the fix.
 
 ### Harness
 

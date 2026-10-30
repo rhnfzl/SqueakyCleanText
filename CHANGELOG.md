@@ -38,6 +38,7 @@ placeholder merge below.
 - ONNX models exported with a fixed batch dimension of 1 run one row per call instead of failing under `ner_batch_size > 1`.
 - `replacement_mode='synthetic'`: the regex steps and NER now share one consistency cache per document under `ner_batch_size > 1`, so the same value replaced by both gets the same fake value (as with `ner_batch_size=1`).
 - The INT8 quantized cache directory name is collision-free: revisions are hashed (`release/v1` and `release__v1` no longer share a directory), and repo ids that contain `__` are %-quoted. Plain `org/name` ids keep the 0.7.1 `org__name` directory.
+- ONNX models with external weights (the default XLM-RoBERTa-large models) load from a huggingface-hub cache that stores each blob in its own directory (`hub/blobs/<xx>/<sha256>`, seen with huggingface-hub 1.32.0). onnxruntime refused them with "External data path escapes model directory"; 0.7.1 fails the same way. In that layout SCT now hard-links `model.onnx` and `model.onnx_data` into `~/.cache/sct_linked/<model>` (under `cache_dir` when set) and loads them from there; if hard links are not possible (another filesystem) the files are copied once (about 2.2 GB per model) and a warning is logged. Other cache layouts load in place as before.
 - `scripts/benchmark_release.py` imports on Windows (no `resource` module); peak RSS is reported as `null` there.
 
 ### Known limits
@@ -46,7 +47,6 @@ placeholder merge below.
 - Only `process_batch` is faster. `process` of one document is not batched across documents.
 - GLiNER2 runs one chunk per call; torch models and GLiNER keep one lock per model, so they do not run in parallel across threads.
 - `ner_chunk_overlap` (off by default) can still cut an entity longer than the overlap that starts at the very end of a chunk.
-- With huggingface-hub 1.32.0 on Linux, onnxruntime can refuse the default XLM-RoBERTa-large models ("External data path escapes model directory") because `model.onnx` and `model.onnx_data` are cached in different directories. 0.7.1 has the same problem; it is not fixed in this release.
 
 ## 0.7.1 - 2026-10-30
 

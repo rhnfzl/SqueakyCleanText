@@ -8,6 +8,9 @@ byte-identical entity span and label output.
 import hashlib
 import json
 import logging
+import os
+import shutil
+import uuid
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
@@ -290,6 +293,47 @@ def _quantized_dir(model_name: str, revision: Optional[str]) -> str:
     return name + (f"@{hashlib.sha256(revision.encode()).hexdigest()[:16]}" if revision else "")
 
 
+def _colocate_external_data(model_path: str, data_path: str, link_dir: Path) -> str:
+    """Return a model path whose external data file resolves next to it.
+
+    ONNX Runtime only accepts ``model.onnx_data`` whose real path is in the real directory of
+    ``model.onnx``. A huggingface-hub cache that stores each blob in its own directory (the
+    sharded ``hub/blobs/<xx>/<sha256>`` store) breaks that, so both files are hard-linked
+    (copied if linking fails) into ``link_dir``. Other layouts are returned unchanged.
+    """
+    real_model, real_data = Path(model_path).resolve(), Path(data_path).resolve()
+    if real_model.parent == real_data.parent:
+        return model_path
+    pairs = [(real_model, 'model.onnx'), (real_data, 'model.onnx_data')]
+
+    def ready() -> bool:
+        try:
+            return all(os.path.samefile(src, link_dir / name) for src, name in pairs)
+        except OSError:
+            return False
+
+    if not ready():
+        tmp = link_dir.parent / f'.{link_dir.name}.{uuid.uuid4().hex}'
+        tmp.mkdir(parents=True)
+        try:
+            for src, name in pairs:
+                try:
+                    os.link(src, tmp / name)
+                except OSError:
+                    logger.warning("Cannot hard-link %s, copying it to %s", src, link_dir)
+                    shutil.copyfile(src, tmp / name)
+            if link_dir.exists() and not ready():
+                shutil.rmtree(link_dir)  # stale: the snapshot moved to other blobs
+            try:
+                os.rename(tmp, link_dir)  # complete directory appears atomically
+            except OSError:
+                if not ready():  # lost a race only if the winner's directory is good
+                    raise
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+    return str(link_dir / 'model.onnx')
+
+
 def load_onnx_ner_model(
     model_name: str,
     device: str = 'cpu',
@@ -334,12 +378,17 @@ def load_onnx_ner_model(
     tokenizer_path = hf_hub_download(model_name, 'tokenizer.json', **download_kwargs)
 
     # Large models (XLM-RoBERTa-large ~2.1GB) store weights in an external
-    # data file. ONNX Runtime finds it automatically if it's in the same
-    # directory as model.onnx — hf_hub_download caches to the same dir.
+    # data file. ONNX Runtime needs it in the real directory of model.onnx.
     try:
-        hf_hub_download(model_name, 'model.onnx_data', **download_kwargs)
+        data_path = hf_hub_download(model_name, 'model.onnx_data', **download_kwargs)
     except Exception:  # noqa: S110
         pass  # Smaller models don't have this file
+    else:
+        link_base = Path(cache_dir) if cache_dir else Path.home() / ".cache"
+        model_path = _colocate_external_data(
+            model_path, data_path,
+            link_base / "sct_linked" / _quantized_dir(model_name, revision),
+        )
 
     # Try to get tokenizer_config.json for model_max_length
     model_max_length = 512  # safe default
