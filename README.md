@@ -610,6 +610,11 @@ print(result.metadata["findings"])
 print(result.metadata["detector"])
 ```
 
+Finding offsets (`start`, `end`) and NER entries in the reversible map are
+document-relative positions in the post-regex text: the text after the regex
+stages replaced URLs, emails, phones and the like. They are not offsets into the
+raw input.
+
 Reversible output is pseudonymized personal data. Anyone with the token map can
 restore the source values. Keep token maps outside logs and cleaned datasets.
 

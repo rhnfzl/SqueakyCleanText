@@ -42,7 +42,11 @@ class InMemoryTokenStore:
 
 @dataclass(frozen=True)
 class DetectedEntity:
-    """One entity produced by a detector."""
+    """One entity produced by a detector.
+
+    ``start``/``end`` index the post-regex text (after the regex replacement
+    stages ran), not the raw input passed to ``process()``.
+    """
 
     entity_type: str
     score: float

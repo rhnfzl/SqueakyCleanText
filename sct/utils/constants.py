@@ -373,10 +373,12 @@ SENTENCE_BOUNDARY_PATTERN = regex.compile(
 # Ordered delimiter hierarchy for text chunking (inspired by semchunk).
 # Tried from coarsest to finest; first delimiter that produces a split wins.
 # Lookbehind patterns keep the delimiter attached to the preceding chunk.
+# A match may be empty (CJK); the matched text is kept as the rejoin separator.
 CHUNK_DELIMITERS = (
     re.compile(r'\n\n+'),                     # Paragraph breaks
     re.compile(r'\n'),                         # Single newlines
-    re.compile(r'(?<=[.!?\u3002])\s+'),       # Sentence terminators (. ! ? and CJK period)
+    # Sentence terminators: . ! ? need whitespace; CJK 。！？ and danda । ॥ do not
+    re.compile(r'(?<=[.!?])\s+|(?<=[\u3002\uff01\uff1f\u0964\u0965])\s*'),
     re.compile(r'(?<=[;:,\u2014\u2026])\s+'), # Clause separators (; : , em-dash, ellipsis)
     re.compile(r'\s+'),                        # Any whitespace (word boundaries)
 )
