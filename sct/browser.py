@@ -51,6 +51,30 @@ def build_browser_manifest(config: TextCleanerConfig) -> dict[str, Any]:
             "Browser export requires replacement tokens without currency symbols"
         )
 
+    # Same reason for any token a later enabled rule would match
+    # (an HTML token holding an email or URL, a URL token holding an email).
+    ordered = [
+        ("html", constants.HTML_REGEX, config.replace_with_html, config.check_replace_html),
+        ("url", constants.URL_REGEX, config.replace_with_url, config.check_replace_urls),
+        ("email", constants.EMAIL_REGEX, config.replace_with_email, config.check_replace_emails),
+        ("ip", constants.IP_REGEX, config.replace_with_ips, config.check_replace_ips),
+        ("date", constants.DATE_REGEX, config.replace_with_dates, config.check_replace_dates),
+        ("phone", constants.PHONE_REGEX, config.replace_with_phone_numbers,
+         config.check_replace_phone_numbers),
+        ("year", constants.YEAR_REGEX, config.replace_with_years, config.check_replace_years),
+        ("number", constants.NUMBERS_REGEX, config.replace_with_numbers,
+         config.check_replace_numbers),
+        ("currency", constants.CURRENCY_REGEX, config.replace_with_currency_symbols,
+         config.check_replace_currency_symbols),
+    ]
+    for i, (name, _, token, enabled) in enumerate(ordered):
+        for later, pattern, _, later_enabled in ordered[i + 1:]:
+            if enabled and later_enabled and pattern.search(token):
+                raise ValueError(
+                    f"Browser export: the {name} replacement token would be "
+                    f"rewritten by the later {later} rule"
+                )
+
     model_revisions = config.ner_model_revisions or {}
     unpinned_models = sorted(
         key

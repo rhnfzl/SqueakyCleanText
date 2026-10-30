@@ -11,7 +11,7 @@ and leaked PII values from 6 of 67 to 0.
 - More PII is found and replaced: glued and international phone numbers, IP addresses, and GLiNER findings between 0.3 and 0.85 in PII mode. Output text changes for inputs that contain them.
 - IP addresses are now replaced with `<IP>` by default (`<IP_ADDRESS_n>` in reversible mode), including private ones.
 - New config flags: `check_replace_ips` (default `True`), `replace_ips_public_only` (default `False`) and `replace_with_ips` (default `"<IP>"`). They are the last `TextCleanerConfig` fields, so positional arguments keep their 0.7.0 meaning.
-- The browser manifest rejects replacement tokens that contain digits (the browser has no protection for emitted tokens).
+- The browser manifest rejects replacement tokens that contain digits, or that a later enabled rule would rewrite (for example an HTML token holding an email); the browser has no protection for emitted tokens.
 - `process_json` finding paths for dict keys use `["@key", <index>]` instead of the key text.
 
 ### Fixes
@@ -22,11 +22,11 @@ and leaked PII values from 6 of 67 to 0.
 - IPv6 is matched in every valid compressed form, including IPv4 tails (`::abcd:192.0.2.1`, `1:2:3:4:5::192.0.2.1`), and invalid forms are not matched, also in the browser rule.
 - Replacement tokens and synthetic values (`<EMAIL1>`, a synthetic IP or phone) and IPs kept by `replace_ips_public_only` are no longer rewritten by the later phone, year and number steps.
 - Phone detection covers more international formats (`+34 612 345 678`, `+91 98765 43210`) and Indian mobiles (`98765 43210`, `098765-43210`).
-- Oversized NER chunks are split again, also long Chinese, Japanese and Hindi text without spaces: to the tokenizer's token budget for ONNX/torch models, and to a cap of `2 * max_tokens` characters in GLiNER-only mode (a character estimate, not a token count; token-budget chunking is planned for 0.8.0). Text is split after `。！？` and `। ॥`, and reversible map offsets for NER entities are now document-relative. Long whitespace runs at a chunk cut no longer break chunk alignment.
+- Oversized NER chunks are split again, also long Chinese, Japanese and Hindi text without spaces: to the tokenizer's token budget for ONNX/torch models, and to a cap of `2 * max_tokens` characters in GLiNER-only mode (a character estimate, not a token count; token-budget chunking is planned for 0.8.0). Text is split after `。！？` and `। ॥`, and reversible map offsets for NER entities are now document-relative. Long whitespace runs at a chunk cut no longer break chunk alignment. Chunk planning ignores truncation set in a model's `tokenizer.json`, and a slice that grows when re-tokenized is split again, so text past the model limit is no longer left out of model input.
 - Languages the `stop-words` package does not support (for example `THAI`) no longer crash `TextCleaner` creation.
 - PII mode: the final `ner_confidence_threshold` now follows `gliner_threshold` (0.3 by default) instead of a hidden 0.85, so GLiNER findings between 0.3 and 0.85 are no longer dropped. An explicit `ner_confidence_threshold` other than 0.85 still wins (0.85 equals the default and cannot be told apart), and `0.0` is no longer turned into 0.85.
 - `process_json` and MCP `clean_json` no longer return original dict keys in finding paths: a key's own findings use `["@key", <index>]`.
-- `is_sensitive_result` compares placeholder counts, so `<EMAIL> alice@example.com` (HTML step off) is reported as sensitive.
+- `is_sensitive_result` compares placeholder counts, so `<EMAIL> alice@example.com` (HTML step off) is reported as sensitive. Marker-like tags removed by the HTML step (`<EMAIL> Alice` with `replace_with_html=""`) no longer cancel a new placeholder.
 - `TextCleanerConfig` can be pickled and deep-copied, and the copy keeps the exact state. `dataclasses.replace(cfg)` no longer grows the default 5 NER models to 8 and 4 supported languages to 7. A partial `ner_models` mapping gets the same defaults whatever its mapping type.
 
 ## 0.7.0 - 2026-09-19

@@ -6,6 +6,7 @@ from typing import Any, Iterable, Mapping, Optional
 
 from sct.privacy import EntityFinding
 from sct.sct import TextCleaner
+from sct.utils import constants
 
 
 @dataclass(frozen=True)
@@ -75,6 +76,11 @@ def is_sensitive_result(
         and result.lm_text != source
     ):
         return True
+    # The HTML step rewrites marker-like tags already in the source, so they
+    # cannot offset markers emitted later (``<EMAIL> Alice`` -> ``<PERSON>``).
+    baseline = source
+    if cleaner.cfg.check_replace_html:
+        baseline = constants.HTML_REGEX.sub("", source)
     configured_markers = (
         cleaner.cfg.replace_with_url,
         cleaner.cfg.replace_with_html,
@@ -89,7 +95,7 @@ def is_sensitive_result(
     if any(
         isinstance(marker, str)
         and marker
-        and result.lm_text.count(marker) > source.count(marker)
+        and result.lm_text.count(marker) > baseline.count(marker)
         for marker in configured_markers
     ):
         return True
@@ -97,7 +103,7 @@ def is_sensitive_result(
     # still gains one per replacement.
     marker_pattern = r"<[A-Z][A-Z0-9_]*>"
     return len(re.findall(marker_pattern, result.lm_text)) > len(
-        re.findall(marker_pattern, source)
+        re.findall(marker_pattern, baseline)
     )
 
 

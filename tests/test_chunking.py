@@ -64,6 +64,37 @@ def test_split_text_offset_fallback_reserves_special_tokens():
     assert all(ner._token_count(c, bert_like) <= 20 for c in chunks)
 
 
+def test_split_text_offset_fallback_rechecks_retokenized_slices():
+    def marker_tokenizer(text, **kwargs):
+        # a word-start marker token on every non-empty text, like XLM-R's "_"
+        return SimpleNamespace(
+            input_ids=[0] * (len(text) + 1 if text else 0),
+            offset_mapping=[(0, 0)] + [(i, i + 1) for i in range(len(text))],
+        )
+
+    ner = _ner()
+    chunks = ner.split_text("x" * 100, 20, marker_tokenizer)
+    assert "".join(chunks) == "x" * 100
+    assert all(ner._token_count(c, marker_tokenizer) <= 20 for c in chunks)
+
+
+def test_split_text_ignores_tokenizer_file_truncation():
+    from tokenizers import Regex, Tokenizer, models, pre_tokenizers
+
+    from sct.utils.onnx_pipeline import TokenizerWrapper
+
+    tok = Tokenizer(models.WordLevel({"[UNK]": 0, "x": 1}, unk_token="[UNK]"))  # noqa: S106
+    tok.pre_tokenizer = pre_tokenizers.Split(Regex("."), "isolated")
+    tok.enable_truncation(max_length=20)  # as shipped in some tokenizer.json files
+    wrapper = TokenizerWrapper(tok, model_max_length=20)
+
+    text = "x" * 100 + "Alice"
+    chunks = _ner().split_text(text, 20, wrapper)
+    assert "".join(chunks) == text
+    assert chunks[-1].endswith("Alice") and len(chunks[-1]) <= 20
+    assert tok.truncation is not None  # inference tokenizer keeps its own setting
+
+
 class _FakeGLiNER:
     """Finds every occurrence of NAMES in a chunk, like a perfect detector."""
 

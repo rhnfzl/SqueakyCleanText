@@ -122,3 +122,28 @@ def test_sensitive_counts_markers_already_in_source():
     assert is_sensitive_result(
         cleaner, "<EMAIL> only", cleaner.process("<EMAIL> only"),
     ) is False
+
+
+@pytest.mark.parametrize("source, output", [
+    ("<EMAIL> Alice", "<PERSON>"),
+    ("<PERSON> Alice", "<PERSON>"),
+    ("<URL> John Smith", "<PERSON>"),
+])
+def test_sensitive_when_html_step_removes_source_markers(source, output):
+    from types import SimpleNamespace
+
+    from sct.adapters import is_sensitive_result
+
+    cleaner = TextCleaner(cfg=TextCleanerConfig(
+        replace_with_html="",
+        check_ner_process=False,
+        check_detect_language=False,
+        check_statistical_model_processing=False,
+    ))
+    # NER output as observed with ONNX models; no model download here.
+    result = SimpleNamespace(lm_text=output, metadata=None)
+
+    assert is_sensitive_result(cleaner, source, result) is True
+    plain = cleaner.process("<PERSON> only")
+    assert plain.lm_text.strip() == "only"
+    assert is_sensitive_result(cleaner, "<PERSON> only", plain) is False

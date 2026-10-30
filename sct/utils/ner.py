@@ -809,7 +809,17 @@ class GeneralNER:
         if last_end < len(text):
             chunks.append(text[last_end:])
 
-        return chunks
+        # Re-tokenizing a slice can add tokens (word-start markers), so halve any
+        # slice that still does not fit until it does.
+        result = []
+        for chunk in chunks:
+            if len(chunk) > 1 and not fits(chunk):
+                mid = len(chunk) // 2
+                result.extend(self.split_text(chunk[:mid], max_tokens, tokenizer))
+                result.extend(self.split_text(chunk[mid:], max_tokens, tokenizer))
+            else:
+                result.append(chunk)
+        return result
 
     def process_batch(
         self,

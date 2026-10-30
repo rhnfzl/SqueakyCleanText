@@ -285,3 +285,16 @@ def test_fuzzy_date_token_not_rewritten_by_year_step(mode):
 def test_browser_export_rejects_currency_tokens():
     with pytest.raises(ValueError, match="without currency symbols"):
         build_browser_manifest(TextCleanerConfig(replace_with_email="$EMAIL"))
+
+
+@pytest.mark.parametrize("field, token, later", [
+    ("replace_with_html", "alice@example.com", "email"),
+    ("replace_with_html", "https://example.com", "url"),
+    ("replace_with_url", "alice@example.com", "email"),
+])
+def test_browser_export_rejects_tokens_later_rules_rewrite(field, token, later):
+    with pytest.raises(ValueError, match=f"later {later} rule"):
+        build_browser_manifest(TextCleanerConfig(**{field: token}))
+    # A disabled later rule cannot rewrite the token.
+    off = {"email": "check_replace_emails", "url": "check_replace_urls"}[later]
+    build_browser_manifest(TextCleanerConfig(**{field: token, off: False}))
