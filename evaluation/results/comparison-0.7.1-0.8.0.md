@@ -1,8 +1,8 @@
 # Release benchmark: 0.7.1 vs 0.8.0
 
-0.8.0 is a speed release. 0.7.1 is tag `v0.7.1`; 0.8.0 is branch `perf/v0.8.0-speed` at
-`c88e3ca` (`sct.__version__` still reads 0.7.1 until the version bump). Default config unless
-a row says otherwise.
+0.8.0 is a speed release. 0.7.1 is tag `v0.7.1`; 0.8.0 is branch `perf/v0.8.0-speed`.
+Correctness and output parity were re-run at `ef3f245` (`sct.__version__` 0.8.0); the Linux
+speed runs were made earlier at `c88e3ca`. Default config unless a row says otherwise.
 
 ## Headline
 
@@ -27,19 +27,26 @@ Full numbers: `benchmark-0.8.0.md` / `.json`.
 | Labels with a TP/FP/FN change | | none |
 | Languages with a TP/FP/FN change | | none |
 | Full / partial leaks | 0 / 0 | 0 / 0 |
-| Reversible `lm_text`, 30 documents | | identical to the committed 0.7.1 outputs |
-| Speed, docs/s (single run, default config) | 6.923 | 7.524 |
-| Mean / p95 ms | 144.4 / 758.9 | 132.9 / 879.5 |
+| Reversible `lm_text`, 30 documents | | 29 identical to the committed 0.7.1 outputs; `zh-glued-001` fixed (below) |
+| Speed, docs/s (single run, default config) | 6.923 | 7.462 |
+| Mean / p95 ms | 144.4 / 758.9 | 134.0 / 663.6 |
 
-The 0.7.1 run was made with lingua 2.1.x; 0.8.0 needs lingua 2.2. The outputs above are
+The one reversible difference is `zh-glued-001`: 0.7.1 gives the garbled
+`他住<LOCATION_1>OCATION_0>。`, 0.8.0 gives `他住<LOCATION_0>。`. Two overlapping LOCATION
+detections are now merged before replacement (CHANGELOG). Its spans score the same, so the
+TP/FP/FN counts do not move.
+
+The 0.7.1 run was made with lingua 2.1.x; 0.8.0 needs lingua 2.2. The other outputs are
 equal anyway, so the lingua change does not move any document of this set.
 
 ## Output parity, default config
 
 Default `TextCleanerConfig()`, `lm_text` of every dataset document, 0.7.1 code (temporary
 `git worktree` of `v0.7.1`) and 0.8.0 code in the same venv (Mac), through both `process`
-and `process_batch`. 29 of 30 documents are byte-identical; `process` and `process_batch`
-agree with each other in both versions.
+and `process_batch`, over the 30 documents plus the 4 long documents (every 8 documents joined
+into one). 32 of 34 are byte-identical; `process` and `process_batch` agree with each other in
+both versions. The two differences are `zh-long-001` and the long document that contains it
+(one merged pair there), and both are equal once adjacent repeated placeholders are merged.
 
 The one difference, `zh-long-001` (longer than one NER chunk):
 
