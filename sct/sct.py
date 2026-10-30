@@ -283,7 +283,7 @@ class TextCleaner:
         if self.cfg.check_fuzzy_replace_dates:
             current_text = self.ProcessDateTime.fuzzy_replace_dates(
                 current_text,
-                replace_with=self.cfg.replace_with_dates,
+                replace_with=self._protect(self.cfg.replace_with_dates),
                 score_cutoff=self.cfg.fuzzy_date_score_cutoff,
                 language=language,
             )
@@ -480,8 +480,9 @@ class TextCleaner:
         protected = getattr(self._document_context, 'protected', None)
         if protected is None:
             return value
-        # Private-use plane 15: no digit, letter or space for later steps to match.
-        return protected.setdefault(value, f"\ue002{chr(0xF0000 + len(protected))}\ue003")
+        # Private-use planes 15-16 only: outside the BMP letter ranges the email and URL
+        # rules accept, and no digit, letter or space for later steps to match.
+        return protected.setdefault(value, f"\U00100000{chr(0xF0000 + len(protected))}\U00100001")
 
     def _restore_protected(self, text):
         for value, key in (getattr(self._document_context, 'protected', None) or {}).items():
@@ -587,14 +588,6 @@ class TextCleaner:
         if reversible is not None:
             return reversible
         return self.ProcessDateTime.replace_dates(text, replace_with=self._protect(self.cfg.replace_with_dates))
-
-    def _fuzzy_replace_dates(self, text, language=None):
-        return self.ProcessDateTime.fuzzy_replace_dates(
-            text,
-            replace_with=self.cfg.replace_with_dates,
-            score_cutoff=self.cfg.fuzzy_date_score_cutoff,
-            language=language,
-        )
 
     def _replace_years(self, text):
         reversible = self._replace_reversible(

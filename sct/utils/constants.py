@@ -70,8 +70,17 @@ _IPV6 = "|".join([
     rf"(?:(?:{_H16}:){{0,5}}{_H16})?::{_H16}",
     rf"(?:{_H16}:){{0,6}}{_H16}::",
 ])
+# Only ASCII letters/digits glue to an address, so CJK or Hindi text around it
+# ("地址fe80::1") does not hide it. A "label:" prefix is allowed when the label
+# cannot itself be the start of the address ("client_ip:fd12::1", "src:fe80::1").
+_IPV6_START = (
+    r"(?:(?<![A-Za-z0-9_:.])"
+    r"|(?<=[G-Zg-z_]:)|(?<=[G-Zg-z_][0-9A-Fa-f]:)"
+    r"|(?<=[G-Zg-z_][0-9A-Fa-f]{2}:)|(?<=[G-Zg-z_][0-9A-Fa-f]{3}:)"
+    r"|(?<=[0-9A-Fa-f]{5}:))"
+)
 IP_REGEX = re.compile(
-    rf"(?<![\w:.])(?:{_IPV6})(?![\w:]|\.[0-9])"
+    rf"{_IPV6_START}(?:{_IPV6})(?![A-Za-z0-9_:]|\.[0-9])"
     rf"|(?<![0-9.])(?:{_IPV4})(?![0-9]|\.[0-9])"
 )
 

@@ -449,11 +449,11 @@ class TextCleanerConfig:
                     f"ner_models must include {sorted(REQUIRED_NER_KEYS)}, "
                     f"missing: {sorted(missing)}"
                 )
-            # A frozen map of exactly LANG_KEYS matching ner_models_list is a
-            # normalized legacy/default config (replace(), copy): keep it exact.
+            # A map of exactly LANG_KEYS matching ner_models_list is a normalized
+            # legacy/default config (replace(), copy): keep it exact. Decided by
+            # content only, so a dict and a mapping proxy give the same config.
             derived = (
-                isinstance(self.ner_models, MappingProxyType)
-                and set(self.ner_models) == set(LANG_KEYS)
+                set(self.ner_models) == set(LANG_KEYS)
                 and tuple(self.ner_models[k] for k in LANG_KEYS) == self.ner_models_list
             )
             merged = (

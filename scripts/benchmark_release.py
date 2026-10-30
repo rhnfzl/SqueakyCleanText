@@ -44,9 +44,13 @@ def predicted_spans(source: str, output: str, originals: dict[str, str]) -> list
         # untouched earlier copy of the value ("Ann met <PERSON_0>") is not reused.
         context = output[previous_end:match.start()]
         previous_end = match.end()
-        found = source.find(context, cursor) if context else -1
-        if found >= 0:
-            cursor = found + len(context)
+        # A cleanup step may have changed the context ("Ann x met" -> "Ann met"):
+        # align on its longest suffix still found in the source.
+        for cut in range(len(context)):
+            found = source.find(context[cut:], cursor)
+            if found >= 0:
+                cursor = found + len(context) - cut
+                break
         label = LABEL_ALIASES.get(match.group(1), match.group(1))
         value = originals.get(match.group(0), "")
         start = source.find(value, cursor) if value else -1

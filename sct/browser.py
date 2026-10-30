@@ -44,6 +44,12 @@ def build_browser_manifest(config: TextCleanerConfig) -> dict[str, Any]:
     )
     if any(ch.isdigit() for token in tokens for ch in token):
         raise ValueError("Browser export requires replacement tokens without digits")
+    if config.check_replace_currency_symbols and any(
+        constants.CURRENCY_REGEX.search(token) for token in tokens
+    ):
+        raise ValueError(
+            "Browser export requires replacement tokens without currency symbols"
+        )
 
     model_revisions = config.ner_model_revisions or {}
     unpinned_models = sorted(

@@ -106,3 +106,16 @@ def test_partial_ner_models_same_for_any_mapping_type():
 
     assert as_proxy.ner_models == as_dict.ner_models
     assert as_proxy.supported_languages == as_dict.supported_languages
+
+
+def test_legacy_five_ner_models_same_for_any_mapping_type():
+    from sct.config import DEFAULT_NER_MODELS, LANG_KEYS
+
+    models = {key: DEFAULT_NER_MODELS[key] for key in LANG_KEYS}
+    as_dict = TextCleanerConfig(ner_models=models)
+    as_proxy = TextCleanerConfig(ner_models=MappingProxyType(models))
+
+    assert as_dict.ner_models == as_proxy.ner_models
+    assert as_dict.supported_languages == as_proxy.supported_languages
+    for cfg in (as_dict, dataclasses.replace(as_dict), copy.deepcopy(as_dict)):
+        assert cfg.ner_models == TextCleanerConfig().ner_models

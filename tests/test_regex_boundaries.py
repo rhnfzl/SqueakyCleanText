@@ -243,3 +243,45 @@ def test_public_only_kept_ips_survive_default_later_steps(mode, public):
 def test_browser_export_rejects_digit_tokens():
     with pytest.raises(ValueError, match="without digits"):
         build_browser_manifest(TextCleanerConfig(replace_with_email="<EMAIL1>"))
+
+
+@pytest.mark.parametrize("text, ip", [
+    ("client_ip:fd12:3456:789a::1", "fd12:3456:789a::1"),
+    ("src:fe80::1", "fe80::1"),
+    ("地址fe80::abcd", "fe80::abcd"),
+    ("fe80::abcd地址", "fe80::abcd"),
+])
+@pytest.mark.parametrize("mode", ["placeholder", "synthetic", "reversible"])
+@pytest.mark.parametrize("numbers", [True, False])
+def test_ipv6_beside_labels_and_any_script_replaced(text, ip, mode, numbers):
+    out = _cleaner(replacement_mode=mode, check_replace_numbers=numbers).process(text).lm_text
+    assert ip not in out
+    assert not any(part in out for part in ("fd12", "3456", "789a", "fe80", "abcd", "<NUMBER>"))
+
+
+@pytest.mark.parametrize("text", ["std::vector", "Foo::Bar", "1:2:3:4:5:6:7:8:9"])
+def test_ip_regex_keeps_ascii_glued_non_addresses(text):
+    assert constants.IP_REGEX.search(text) is None
+
+
+@pytest.mark.parametrize("text, expected", [
+    ("mail alice@example.com<br> now", "mail <EMAIL><HTML> now"),
+    ("see https://example.com<br> now", "see <URL><HTML> now"),
+])
+def test_contacts_beside_protected_html_token(text, expected):
+    out = _cleaner().process(text).lm_text
+    assert out == expected
+
+
+@pytest.mark.parametrize("mode", ["placeholder", "synthetic"])
+def test_fuzzy_date_token_not_rewritten_by_year_step(mode):
+    out = _cleaner(
+        replacement_mode=mode, check_fuzzy_replace_dates=True, replace_with_dates="<DATE2024>",
+    ).process("on 12 Januray 2023 we met").lm_text
+    assert "<DATE2024>" in out
+    assert "2023" not in out
+
+
+def test_browser_export_rejects_currency_tokens():
+    with pytest.raises(ValueError, match="without currency symbols"):
+        build_browser_manifest(TextCleanerConfig(replace_with_email="$EMAIL"))

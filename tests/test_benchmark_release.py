@@ -58,3 +58,10 @@ def test_find_leaks_catches_split_values():
 
     assert leaks == []
     assert [item["label"] for item in partial] == ["PHONE_NUMBER", "IP"]
+
+
+def test_predicted_spans_context_changed_by_cleanup():
+    # Isolated-letter removal drops "x", so the output context is not in the source.
+    assert predicted_spans("Ann x met Ann", "Ann met <PERSON_0>", {"<PERSON_0>": "Ann"}) == [
+        EntitySpan("PERSON", 10, 13),
+    ]
