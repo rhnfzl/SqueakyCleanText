@@ -741,9 +741,10 @@ class TextCleanerTest(unittest.TestCase):
 
         chunks = self.ner.split_text(text, max_tokens, self.ner.tokenizer)
         self.assertGreaterEqual(len(chunks), 2)
-        # Paragraph breaks should not appear within any chunk
+        # Chunks are exact source slices (original breaks kept) ending at a boundary
         for chunk in chunks:
-            self.assertNotIn("\n\n", chunk)
+            self.assertIn(chunk, text)
+            self.assertTrue(chunk.endswith('.'))
 
     @requires_ner
     def test_split_text_sentence_boundaries(self):

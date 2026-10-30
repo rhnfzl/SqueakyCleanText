@@ -181,18 +181,23 @@ class TextCleaner:
             self._pipeline.append(self._replace_urls)
         if cfg.check_replace_emails:
             self._pipeline.append(self._replace_emails)
+        if cfg.check_replace_ips:
+            self._pipeline.append(self._replace_ips)
         if cfg.check_replace_dates:
             self._pipeline.append(self._replace_dates)
         # fuzzy_replace_dates runs here (between replace_dates and replace_years)
         # but is called explicitly in _process_single with language context.
-        if cfg.check_replace_years:
-            self._post_fuzzy_pipeline.append(self._replace_years)
+        # Phones before years, so a year step cannot split "+31 6 1234 2019".
         if cfg.check_replace_phone_numbers:
             self._post_fuzzy_pipeline.append(self._replace_phone_numbers)
+        if cfg.check_replace_years:
+            self._post_fuzzy_pipeline.append(self._replace_years)
         if cfg.check_replace_numbers:
             self._post_fuzzy_pipeline.append(self._replace_numbers)
         if cfg.check_replace_currency_symbols:
             self._post_fuzzy_pipeline.append(self._replace_currency_symbols)
+        # Emitted tokens and kept IPs are hidden from the steps above; put them back.
+        self._post_fuzzy_pipeline.append(self._restore_protected)
         if cfg.check_remove_isolated_letters:
             self._post_fuzzy_pipeline.append(self._remove_isolated_letters)
         if cfg.check_remove_isolated_special_symbols:
@@ -238,6 +243,7 @@ class TextCleaner:
             return self._process_single_with_context(text)
         finally:
             self._document_context.anon_map = None
+            self._document_context.protected = None
 
     def _process_single_with_context(self, text: str) -> ProcessResult:
         """Process a single text through the entire pipeline.
@@ -256,6 +262,7 @@ class TextCleaner:
         if self.cfg.replacement_mode == 'reversible':
             anon_map = AnonymizationMap()
         self._document_context.anon_map = anon_map
+        self._document_context.protected = {}
 
         # Document-level classification (before any text modification)
         doc_classes = None
@@ -267,7 +274,7 @@ class TextCleaner:
 
         current_text = text
 
-        # Pre-fuzzy pipeline steps (unicode fix → html → urls → emails → dates)
+        # Pre-fuzzy pipeline steps (unicode fix → html → urls → emails → ips → dates)
         for step in self._pipeline:
             current_text = step(current_text)
 
@@ -276,12 +283,12 @@ class TextCleaner:
         if self.cfg.check_fuzzy_replace_dates:
             current_text = self.ProcessDateTime.fuzzy_replace_dates(
                 current_text,
-                replace_with=self.cfg.replace_with_dates,
+                replace_with=self._protect(self.cfg.replace_with_dates),
                 score_cutoff=self.cfg.fuzzy_date_score_cutoff,
                 language=language,
             )
 
-        # Post-fuzzy pipeline steps (years → phones → numbers → symbols → whitespace)
+        # Post-fuzzy pipeline steps (phones → years → numbers → symbols → whitespace)
         for step in self._post_fuzzy_pipeline:
             current_text = step(current_text)
 
@@ -468,12 +475,28 @@ class TextCleaner:
 
     # --- Pipeline step methods (private, used by _init_pipeline) ---
 
-    def _replace_reversible(self, text, pattern, entity_type):
+    def _protect(self, value):
+        """Hide an emitted value from later regex steps (``<EMAIL1>``, kept IPs)."""
+        protected = getattr(self._document_context, 'protected', None)
+        if protected is None:
+            return value
+        # Private-use planes 15-16 only: outside the BMP letter ranges the email and URL
+        # rules accept, and no digit, letter or space for later steps to match.
+        return protected.setdefault(value, f"\U00100000{chr(0xF0000 + len(protected))}\U00100001")
+
+    def _restore_protected(self, text):
+        for value, key in (getattr(self._document_context, 'protected', None) or {}).items():
+            text = text.replace(key, value)
+        return text
+
+    def _replace_reversible(self, text, pattern, entity_type, keep=None):
         anon_map = getattr(self._document_context, 'anon_map', None)
         if anon_map is None:
             return None
 
         def replace(match):
+            if keep is not None and keep(match.group()):
+                return self._protect(match.group())
             placeholder = anon_map.next_placeholder(entity_type)
             anon_map.add(
                 placeholder,
@@ -503,7 +526,7 @@ class TextCleaner:
         )
         if reversible is not None:
             return reversible
-        return self.ProcessContacts.replace_html(text, replace_with=self.cfg.replace_with_html)
+        return self.ProcessContacts.replace_html(text, replace_with=self._protect(self.cfg.replace_with_html))
 
     def _replace_urls(self, text):
         reversible = self._replace_reversible(
@@ -515,9 +538,9 @@ class TextCleaner:
             return reversible
         if self._synthetic_replacer:
             return self.ProcessContacts.replace_urls_with_fn(
-                text, lambda orig: self._synthetic_replacer.get_replacement('URL', orig),
+                text, lambda orig: self._protect(self._synthetic_replacer.get_replacement('URL', orig)),
             )
-        return self.ProcessContacts.replace_urls(text, replace_with=self.cfg.replace_with_url)
+        return self.ProcessContacts.replace_urls(text, replace_with=self._protect(self.cfg.replace_with_url))
 
     def _replace_emails(self, text):
         reversible = self._replace_reversible(
@@ -529,9 +552,32 @@ class TextCleaner:
             return reversible
         if self._synthetic_replacer:
             return self.ProcessContacts.replace_emails_with_fn(
-                text, lambda orig: self._synthetic_replacer.get_replacement('EMAIL', orig),
+                text, lambda orig: self._protect(self._synthetic_replacer.get_replacement('EMAIL', orig)),
             )
-        return self.ProcessContacts.replace_emails(text, replace_with=self.cfg.replace_with_email)
+        return self.ProcessContacts.replace_emails(text, replace_with=self._protect(self.cfg.replace_with_email))
+
+    def _replace_ips(self, text):
+        public_only = self.cfg.replace_ips_public_only
+        reversible = self._replace_reversible(
+            text,
+            constants.IP_REGEX,
+            'IP_ADDRESS',
+            keep=lambda orig: not contact.is_replaceable_ip(orig, public_only),
+        )
+        if reversible is not None:
+            return reversible
+        if self._synthetic_replacer:
+            def emit(orig):
+                return self._synthetic_replacer.get_replacement('IP_ADDRESS', orig)
+        else:
+            def emit(orig):
+                return self.cfg.replace_with_ips
+        return self.ProcessContacts.replace_ips_with_fn(
+            text,
+            lambda orig: self._protect(
+                emit(orig) if contact.is_replaceable_ip(orig, public_only) else orig
+            ),
+        )
 
     def _replace_dates(self, text):
         reversible = self._replace_reversible(
@@ -541,15 +587,7 @@ class TextCleaner:
         )
         if reversible is not None:
             return reversible
-        return self.ProcessDateTime.replace_dates(text, replace_with=self.cfg.replace_with_dates)
-
-    def _fuzzy_replace_dates(self, text, language=None):
-        return self.ProcessDateTime.fuzzy_replace_dates(
-            text,
-            replace_with=self.cfg.replace_with_dates,
-            score_cutoff=self.cfg.fuzzy_date_score_cutoff,
-            language=language,
-        )
+        return self.ProcessDateTime.replace_dates(text, replace_with=self._protect(self.cfg.replace_with_dates))
 
     def _replace_years(self, text):
         reversible = self._replace_reversible(
@@ -559,7 +597,7 @@ class TextCleaner:
         )
         if reversible is not None:
             return reversible
-        return self.ProcessDateTime.replace_years(text, replace_with=self.cfg.replace_with_years)
+        return self.ProcessDateTime.replace_years(text, replace_with=self._protect(self.cfg.replace_with_years))
 
     def _replace_phone_numbers(self, text):
         reversible = self._replace_reversible(
@@ -571,9 +609,11 @@ class TextCleaner:
             return reversible
         if self._synthetic_replacer:
             return self.ProcessContacts.replace_phone_numbers_with_fn(
-                text, lambda orig: self._synthetic_replacer.get_replacement('PHONE_NUMBER', orig),
+                text, lambda orig: self._protect(self._synthetic_replacer.get_replacement('PHONE_NUMBER', orig)),
             )
-        return self.ProcessContacts.replace_phone_numbers(text, replace_with=self.cfg.replace_with_phone_numbers)
+        return self.ProcessContacts.replace_phone_numbers(
+            text, replace_with=self._protect(self.cfg.replace_with_phone_numbers),
+        )
 
     def _replace_numbers(self, text):
         anon_map = getattr(self._document_context, 'anon_map', None)
@@ -589,7 +629,7 @@ class TextCleaner:
             text = placeholder_pattern.sub(protect, text)
             reversible = self._replace_reversible(
                 text,
-                constants.NUMBERS_REGEX,
+                contact.numbers_regex(self.cfg.replace_numbers_in_words),
                 'NUMBER',
             )
             for key, placeholder in protected.items():
@@ -598,8 +638,11 @@ class TextCleaner:
         if self._synthetic_replacer:
             return self.ProcessContacts.replace_numbers_with_fn(
                 text, lambda orig: self._synthetic_replacer.get_replacement('NUMBER', orig),
+                in_words=self.cfg.replace_numbers_in_words,
             )
-        return self.ProcessContacts.replace_numbers(text, replace_with=self.cfg.replace_with_numbers)
+        return self.ProcessContacts.replace_numbers(
+            text, replace_with=self.cfg.replace_with_numbers, in_words=self.cfg.replace_numbers_in_words,
+        )
 
     def _replace_currency_symbols(self, text):
         reversible = self._replace_reversible(

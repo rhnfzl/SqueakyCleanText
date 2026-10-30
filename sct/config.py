@@ -287,6 +287,12 @@ class TextCleanerConfig:
     # Computed at __post_init__ — union of all language sources
     supported_languages: frozenset = frozenset()
 
+    # Added in 0.7.1; kept last so existing positional arguments keep their meaning.
+    check_replace_ips: bool = True
+    replace_ips_public_only: bool = False  # True keeps private/loopback/reserved IPs
+    replace_with_ips: str = "<IP>"
+    replace_numbers_in_words: bool = False  # True also replaces digits glued to Latin/Greek/Cyrillic letters (GPT4)
+
     def __post_init__(self):
         if self.gliclass_onnx:
             raise ValueError(
@@ -357,6 +363,11 @@ class TextCleanerConfig:
                 object.__setattr__(self, 'gliner_labels', PII_LABELS)
             if self.gliner_threshold == 0.4:
                 object.__setattr__(self, 'gliner_threshold', PII_DEFAULT_THRESHOLD)
+            # The final ensemble filter must not drop what GLiNER kept.
+            if self.ner_confidence_threshold == 0.85:
+                object.__setattr__(
+                    self, 'ner_confidence_threshold', self.gliner_threshold,
+                )
             if self.gliner_label_map is None:
                 object.__setattr__(self, 'gliner_label_map', PII_LABEL_MAP)
             # Expand positional_tags to include all PII label tags
@@ -439,7 +450,17 @@ class TextCleanerConfig:
                     f"ner_models must include {sorted(REQUIRED_NER_KEYS)}, "
                     f"missing: {sorted(missing)}"
                 )
-            merged = {**DEFAULT_NER_MODELS, **self.ner_models}
+            # A map of exactly LANG_KEYS matching ner_models_list is a normalized
+            # legacy/default config (replace(), copy): keep it exact. Decided by
+            # content only, so a dict and a mapping proxy give the same config.
+            derived = (
+                set(self.ner_models) == set(LANG_KEYS)
+                and tuple(self.ner_models[k] for k in LANG_KEYS) == self.ner_models_list
+            )
+            merged = (
+                dict(self.ner_models) if derived
+                else {**DEFAULT_NER_MODELS, **self.ner_models}
+            )
             object.__setattr__(self, 'ner_models', MappingProxyType(merged))
             object.__setattr__(
                 self, 'ner_models_list',
@@ -532,6 +553,21 @@ class TextCleanerConfig:
                             f"{sorted(self.supported_languages)}"
                         )
 
+    def __getstate__(self):
+        # Restore the exact normalized state; never re-run __post_init__.
+        state = dict(self.__dict__)
+        frozen = [k for k, v in state.items() if isinstance(v, MappingProxyType)]
+        for key in frozen:
+            state[key] = dict(state[key])
+        return state, frozen
+
+    def __setstate__(self, packed):
+        state, frozen = packed
+        for key, value in state.items():
+            if key in frozen:
+                value = MappingProxyType(value)
+            object.__setattr__(self, key, value)
+
 
 def _config_from_module_globals() -> TextCleanerConfig:
     """Build a TextCleanerConfig from the current module-level variable state.
@@ -546,12 +582,15 @@ def _config_from_module_globals() -> TextCleanerConfig:
         check_replace_html=m.CHECK_REPLACE_HTML,
         check_replace_urls=m.CHECK_REPLACE_URLS,
         check_replace_emails=m.CHECK_REPLACE_EMAILS,
+        check_replace_ips=getattr(m, 'CHECK_REPLACE_IPS', True),
+        replace_ips_public_only=getattr(m, 'REPLACE_IPS_PUBLIC_ONLY', False),
         check_replace_years=m.CHECK_REPLACE_YEARS,
         check_replace_dates=getattr(m, 'CHECK_REPLACE_DATES', False),
         check_fuzzy_replace_dates=getattr(m, 'CHECK_FUZZY_REPLACE_DATES', False),
         fuzzy_date_score_cutoff=getattr(m, 'FUZZY_DATE_SCORE_CUTOFF', 85),
         check_replace_phone_numbers=m.CHECK_REPLACE_PHONE_NUMBERS,
         check_replace_numbers=m.CHECK_REPLACE_NUMBERS,
+        replace_numbers_in_words=getattr(m, 'REPLACE_NUMBERS_IN_WORDS', False),
         check_replace_currency_symbols=m.CHECK_REPLACE_CURRENCY_SYMBOLS,
         check_ner_process=m.CHECK_NER_PROCESS,
         check_remove_isolated_letters=m.CHECK_REMOVE_ISOLATED_LETTERS,
@@ -569,6 +608,7 @@ def _config_from_module_globals() -> TextCleanerConfig:
         replace_with_url=m.REPLACE_WITH_URL,
         replace_with_html=m.REPLACE_WITH_HTML,
         replace_with_email=m.REPLACE_WITH_EMAIL,
+        replace_with_ips=getattr(m, 'REPLACE_WITH_IPS', '<IP>'),
         replace_with_years=m.REPLACE_WITH_YEARS,
         replace_with_dates=getattr(m, 'REPLACE_WITH_DATES', '<DATE>'),
         replace_with_phone_numbers=m.REPLACE_WITH_PHONE_NUMBERS,
@@ -597,12 +637,15 @@ CHECK_TO_ASCII_UNICODE = True
 CHECK_REPLACE_HTML = True
 CHECK_REPLACE_URLS = True
 CHECK_REPLACE_EMAILS = True
+CHECK_REPLACE_IPS = True
+REPLACE_IPS_PUBLIC_ONLY = False
 CHECK_REPLACE_YEARS = True
 CHECK_REPLACE_DATES = False
 CHECK_FUZZY_REPLACE_DATES = False
 FUZZY_DATE_SCORE_CUTOFF = 85
 CHECK_REPLACE_PHONE_NUMBERS = True
 CHECK_REPLACE_NUMBERS = True
+REPLACE_NUMBERS_IN_WORDS = False
 CHECK_REPLACE_CURRENCY_SYMBOLS = True
 CHECK_NER_PROCESS = True
 CHECK_REMOVE_ISOLATED_LETTERS = True
@@ -621,6 +664,7 @@ CHECK_REMOVE_EMOJI = False
 REPLACE_WITH_URL = "<URL>"
 REPLACE_WITH_HTML = "<HTML>"
 REPLACE_WITH_EMAIL = "<EMAIL>"
+REPLACE_WITH_IPS = "<IP>"
 REPLACE_WITH_YEARS = "<YEAR>"
 REPLACE_WITH_DATES = "<DATE>"
 REPLACE_WITH_PHONE_NUMBERS = "<PHONE>"

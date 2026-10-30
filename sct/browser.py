@@ -7,6 +7,7 @@ from typing import Any
 
 from sct.config import TextCleanerConfig
 from sct.utils import constants
+from sct.utils.contact import numbers_regex
 
 
 def _rule(pattern, replacement, enabled: bool) -> dict[str, Any]:
@@ -29,6 +30,51 @@ def build_browser_manifest(config: TextCleanerConfig) -> dict[str, Any]:
         raise ValueError(
             "Browser export currently supports placeholder replacement only"
         )
+
+    if config.check_replace_ips and config.replace_ips_public_only:
+        raise ValueError(
+            "Browser export does not support replace_ips_public_only=True"
+        )
+
+    # The browser runs rules in order with nothing protecting emitted tokens,
+    # so a digit in one ("<EMAIL1>") would be rewritten by the number rules.
+    tokens = (
+        config.replace_with_html, config.replace_with_url, config.replace_with_email,
+        config.replace_with_ips, config.replace_with_dates,
+        config.replace_with_phone_numbers, config.replace_with_years,
+    )
+    if any(ch.isdigit() for token in tokens for ch in token):
+        raise ValueError("Browser export requires replacement tokens without digits")
+    if config.check_replace_currency_symbols and any(
+        constants.CURRENCY_REGEX.search(token) for token in tokens
+    ):
+        raise ValueError(
+            "Browser export requires replacement tokens without currency symbols"
+        )
+
+    # Same reason for any token a later enabled rule would match
+    # (an HTML token holding an email or URL, a URL token holding an email).
+    ordered = [
+        ("html", constants.HTML_REGEX, config.replace_with_html, config.check_replace_html),
+        ("url", constants.URL_REGEX, config.replace_with_url, config.check_replace_urls),
+        ("email", constants.EMAIL_REGEX, config.replace_with_email, config.check_replace_emails),
+        ("ip", constants.IP_REGEX, config.replace_with_ips, config.check_replace_ips),
+        ("date", constants.DATE_REGEX, config.replace_with_dates, config.check_replace_dates),
+        ("phone", constants.PHONE_REGEX, config.replace_with_phone_numbers,
+         config.check_replace_phone_numbers),
+        ("year", constants.YEAR_REGEX, config.replace_with_years, config.check_replace_years),
+        ("number", numbers_regex(config.replace_numbers_in_words), config.replace_with_numbers,
+         config.check_replace_numbers),
+        ("currency", constants.CURRENCY_REGEX, config.replace_with_currency_symbols,
+         config.check_replace_currency_symbols),
+    ]
+    for i, (name, _, token, enabled) in enumerate(ordered):
+        for later, pattern, _, later_enabled in ordered[i + 1:]:
+            if enabled and later_enabled and pattern.search(token):
+                raise ValueError(
+                    f"Browser export: the {name} replacement token would be "
+                    f"rewritten by the later {later} rule"
+                )
 
     model_revisions = config.ner_model_revisions or {}
     unpinned_models = sorted(
@@ -54,7 +100,7 @@ def build_browser_manifest(config: TextCleanerConfig) -> dict[str, Any]:
         "runtime": "onnxruntime-web",
         "models": models,
         "rule_order": [
-            "html", "url", "email", "date", "year", "phone", "number",
+            "html", "url", "email", "ip", "date", "phone", "year", "number",
             "currency",
         ],
         "rules": {
@@ -73,6 +119,11 @@ def build_browser_manifest(config: TextCleanerConfig) -> dict[str, Any]:
                 config.replace_with_email,
                 config.check_replace_emails,
             ),
+            "ip": _rule(
+                constants.IP_REGEX,
+                config.replace_with_ips,
+                config.check_replace_ips,
+            ),
             "date": _rule(
                 constants.DATE_REGEX,
                 config.replace_with_dates,
@@ -89,7 +140,7 @@ def build_browser_manifest(config: TextCleanerConfig) -> dict[str, Any]:
                 config.check_replace_phone_numbers,
             ),
             "number": _rule(
-                constants.NUMBERS_REGEX,
+                numbers_regex(config.replace_numbers_in_words),
                 config.replace_with_numbers,
                 config.check_replace_numbers,
             ),

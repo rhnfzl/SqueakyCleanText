@@ -412,47 +412,48 @@ class GeneralNER:
         return filter_ner_results
 
     def _simple_chunk(self, text: str, max_tokens: int = 384) -> List[str]:
-        """Split text into token-aware chunks for GLiNER.
+        """Split text into chunks of at most ``max_tokens * 2`` characters for GLiNER.
 
         Used for GLiNER-only mode where no ONNX/torch tokenizer is available.
-        Estimates token count at ~4 chars/token (safe average for European scripts).
+        Every chunk fits the budget: oversized pieces are split again with
+        finer delimiters, and runs without any delimiter are cut hard.
         """
         max_chars = max_tokens * 2  # conservative: CJK=1, Arabic=2-3, Latin=4 chars/token
         if len(text) <= max_chars:
             return [text]
 
         for delimiter in constants.CHUNK_DELIMITERS:
-            pieces = [p for p in delimiter.split(text) if p]
+            pieces = self._split_pieces(delimiter, text)
             if len(pieces) <= 1:
                 continue
             chunks: List[str] = []
-            current = pieces[0]
-            for piece in pieces[1:]:
-                merged = current + ' ' + piece
-                if len(merged) <= max_chars:
-                    current = merged
-                else:
-                    if current:
-                        chunks.append(current)
-                    current = piece
-            if current:
-                chunks.append(current)
+            for chunk in self._merge_pieces(pieces, lambda c: len(c) <= max_chars):
+                chunks.extend(self._simple_chunk(chunk, max_tokens))
             return chunks
 
-        # Last resort: split on whitespace
-        words = text.split()
-        chunks = []
-        current = ''
-        for word in words:
-            test = (current + ' ' + word).strip()
-            if len(test) > max_chars and current:
-                chunks.append(current)
-                current = word
-            else:
-                current = test
-        if current:
-            chunks.append(current)
-        return chunks or [text]
+        # shortcut: hard cut can split an entity; window overlap fixes this in 0.8.0
+        return [text[i:i + max_chars] for i in range(0, len(text), max_chars)]
+
+    @staticmethod
+    def _split_pieces(pattern, text: str) -> List[tuple]:
+        """Split *text* on *pattern* into ``(separator_before, piece)`` pairs.
+
+        Keeping the matched separator lets chunks be rejoined exactly as in
+        the source (no invented spaces between CJK sentences). Empty pieces
+        are dropped; their separators fold into the next piece's separator.
+        """
+        pieces = []
+        last = 0
+        separator = ''
+        for match in pattern.finditer(text):
+            if match.start() > last:
+                pieces.append((separator, text[last:match.start()]))
+                separator = ''
+            separator += match.group()
+            last = max(last, match.end())
+        if last < len(text):
+            pieces.append((separator, text[last:]))
+        return pieces
 
     @staticmethod
     def _align_chunk(
@@ -461,6 +462,11 @@ class GeneralNER:
         search_start: int,
     ) -> tuple[str, int, list[int]]:
         """Locate a whitespace-normalized chunk and map its offsets to source."""
+        # Chunks are normally exact source slices; a greedy \s+ match would eat
+        # whitespace that belongs to the next chunk (hard cuts, blank chunks).
+        start = source.find(chunk, search_start)
+        if start >= 0:
+            return chunk, start, list(range(len(chunk) + 1))
         parts = re.split(r'(\s+)', chunk)
         pattern = ''.join(
             r'\s+' if part.isspace() else re.escape(part)
@@ -516,11 +522,15 @@ class GeneralNER:
 
         When *anon_map* is provided (reversible mode), entity-to-placeholder
         mappings are recorded in it for later deanonymization.
+
+        Finding and map-entry offsets index *text* as passed in, i.e. the text
+        after the regex replacement stages (post-regex), not the raw input.
         """
         if not positional_tags:
             raise ValueError("Must provide at least one positional tag")
 
-        ner_confidence_threshold = ner_confidence_threshold or 0.85
+        if ner_confidence_threshold is None:
+            ner_confidence_threshold = 0.85
 
         # --- Presidio GLiNER backend: delegates everything to Presidio ---
         if self._ner_backend == 'presidio_gliner':
@@ -645,6 +655,7 @@ class GeneralNER:
                         local_findings,
                     )
                 else:
+                    map_size = len(anon_map.entries) if anon_map is not None else 0
                     result = self.anonymize_text(
                         source_chunk,
                         ensemble_results,
@@ -652,6 +663,10 @@ class GeneralNER:
                         anon_map=anon_map,
                     )
                     ner_text = result.text
+                    # Map entries were recorded in chunk coordinates; make them document-relative.
+                    for entry in (anon_map.entries[map_size:] if anon_map is not None else ()):
+                        entry.start += chunk_start
+                        entry.end += chunk_start
                     local_findings = tuple(
                         EntityFinding(
                             entity,
@@ -707,20 +722,19 @@ class GeneralNER:
         """Count tokens in text."""
         return len(tokenizer(text).input_ids)
 
-    def _merge_pieces(self, pieces: List[str], max_tokens: int, tokenizer,
-                       separator: str = ' ') -> List[str]:
-        """Greedily merge adjacent pieces into chunks that fit max_tokens.
+    @staticmethod
+    def _merge_pieces(pieces: List[tuple], fits) -> List[str]:
+        """Greedily merge adjacent ``(separator, piece)`` pairs while ``fits(chunk)``.
 
-        Uses *separator* to rejoin pieces that were split apart by a regex
-        delimiter (which consumes the whitespace between them).
+        Pieces inside a chunk are rejoined with their original separator.
         """
         if not pieces:
             return []
         chunks = []
-        current = pieces[0]
-        for piece in pieces[1:]:
+        current = pieces[0][1]
+        for separator, piece in pieces[1:]:
             merged = current + separator + piece
-            if self._token_count(merged, tokenizer) <= max_tokens:
+            if fits(merged):
                 current = merged
             else:
                 if current:
@@ -742,10 +756,12 @@ class GeneralNER:
             return [text]
 
         # Prefer sentence-boundary splits to avoid fragmenting entities mid-sentence
-        sentence_pieces = constants.SENTENCE_BOUNDARY_PATTERN.split(text)
-        sentence_pieces = [p for p in sentence_pieces if p]
+        def fits(chunk):
+            return self._token_count(chunk, tokenizer) <= max_tokens
+
+        sentence_pieces = self._split_pieces(constants.SENTENCE_BOUNDARY_PATTERN, text)
         if len(sentence_pieces) > 1:
-            merged = self._merge_pieces(sentence_pieces, max_tokens, tokenizer)
+            merged = self._merge_pieces(sentence_pieces, fits)
             result = []
             for chunk in merged:
                 if self._token_count(chunk, tokenizer) > max_tokens:
@@ -756,14 +772,12 @@ class GeneralNER:
 
         # Try each delimiter in priority order
         for delimiter in constants.CHUNK_DELIMITERS:
-            pieces = delimiter.split(text)
-            # Filter empty strings from split (e.g. leading/trailing delimiters)
-            pieces = [p for p in pieces if p]
+            pieces = self._split_pieces(delimiter, text)
             if len(pieces) <= 1:
                 continue
 
             # Greedily merge small adjacent pieces
-            merged = self._merge_pieces(pieces, max_tokens, tokenizer)
+            merged = self._merge_pieces(pieces, fits)
 
             # Recurse on any chunk that still exceeds the limit
             result = []
@@ -777,12 +791,16 @@ class GeneralNER:
         # Last resort: character-level splitting via token offsets
         tokenized = tokenizer(text, return_offsets_mapping=True)
         offsets = tokenized.offset_mapping
+        # Reserve room for the special tokens ([CLS]/[SEP]) each chunk gets back.
+        budget = max(1, max_tokens - self._token_count('', tokenizer))
         chunks = []
         last_end = 0
         current_tokens = 0
 
         for start, end in offsets:
-            if current_tokens >= max_tokens:
+            if end <= start:
+                continue  # special token, no source text
+            if current_tokens >= budget:
                 chunks.append(text[last_end:start])
                 last_end = start
                 current_tokens = 0
@@ -791,7 +809,17 @@ class GeneralNER:
         if last_end < len(text):
             chunks.append(text[last_end:])
 
-        return chunks
+        # Re-tokenizing a slice can add tokens (word-start markers), so halve any
+        # slice that still does not fit until it does.
+        result = []
+        for chunk in chunks:
+            if len(chunk) > 1 and not fits(chunk):
+                mid = len(chunk) // 2
+                result.extend(self.split_text(chunk[:mid], max_tokens, tokenizer))
+                result.extend(self.split_text(chunk[mid:], max_tokens, tokenizer))
+            else:
+                result.append(chunk)
+        return result
 
     def process_batch(
         self,

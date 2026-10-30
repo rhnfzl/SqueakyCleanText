@@ -95,3 +95,21 @@ and candidate on the same machine and reviewed dataset.
 
 Published SPY scores place Fastino GLiNER2 PII above NVIDIA GLiNER PII. These
 scores do not replace local evaluation because labels, languages, and domains differ.
+
+## Release benchmark
+
+`release_benchmark.jsonl` is a fixed synthetic multilingual set (EN/NL/DE/ES/ZH/JA/HI/BN/TA)
+covering names, emails, URLs, international and Indian phone formats, digits glued to
+letters, IPv4/IPv6, long CJK and Hindi text, and years/numbers that must not become phones.
+Run it once per release, on the same machine, before and after code changes:
+
+```sh
+python -m scripts.benchmark_release
+```
+
+It writes `evaluation/results/benchmark-<version>.json` and `.md`: exact-span precision and
+recall per label and language, PII values still present in the output (full and partial
+leaks), cleaned outputs for parity diffs, and default-config speed (docs/s, one warmup
+pass, single process). Correctness uses `replacement_mode="reversible"` so each placeholder
+maps back to its exact source span, and `check_to_ascii_unicode=False` so leaks stay visible.
+A speed gain counts only if recall per label and language does not drop.

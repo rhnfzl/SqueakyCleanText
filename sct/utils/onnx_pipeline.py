@@ -52,6 +52,10 @@ class TokenizerWrapper:
     def __init__(self, tokenizer: Tokenizer, model_max_length: int = 512):
         self._tokenizer = tokenizer
         self._model_max_length = model_max_length
+        # Chunk planning must see every token: a truncating tokenizer.json would
+        # hide the text past max_length and leave it out of model input.
+        self._counter = Tokenizer.from_str(tokenizer.to_str())
+        self._counter.no_truncation()
 
     @property
     def max_len_single_sentence(self) -> int:
@@ -61,7 +65,7 @@ class TokenizerWrapper:
     def __call__(self, text: str, *,
                  return_offsets_mapping: bool = False) -> _EncodingResult:
         """Tokenize *text* and return an HF-compatible result object."""
-        encoding = self._tokenizer.encode(text)
+        encoding = self._counter.encode(text)
         offsets = encoding.offsets if return_offsets_mapping else None
         return _EncodingResult(ids=encoding.ids, offsets=offsets)
 

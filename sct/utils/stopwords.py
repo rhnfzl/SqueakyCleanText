@@ -1,4 +1,4 @@
-from stop_words import get_stop_words as _get_pkg_stop_words
+from stop_words import StopWordError, get_stop_words as _get_pkg_stop_words
 
 from sct.utils.resources import language_to_iso
 
@@ -25,7 +25,7 @@ class ProcessStopwords:
                 iso = language_to_iso(lang)
                 try:
                     self._lang_map[lang] = set(_get_pkg_stop_words(iso))
-                except KeyError:
+                except (KeyError, StopWordError):
                     # stop-words package doesn't support this language
                     self._lang_map[lang] = set()
 

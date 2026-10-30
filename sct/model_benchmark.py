@@ -56,6 +56,7 @@ def candidate_config(candidate: ModelCandidate) -> TextCleanerConfig:
         "check_replace_html": False,
         "check_replace_urls": False,
         "check_replace_emails": False,
+        "check_replace_ips": False,
         "check_replace_years": False,
         "check_replace_dates": False,
         "check_replace_phone_numbers": False,
@@ -82,6 +83,7 @@ def candidate_config(candidate: ModelCandidate) -> TextCleanerConfig:
             gliner_labels=PII_LABELS,
             gliner_label_map=PII_LABEL_MAP,
             gliner_threshold=0.3,
+            ner_confidence_threshold=0.3,
             gliner_onnx=candidate.supports_onnx,
         )
     if candidate.backend == "torch":

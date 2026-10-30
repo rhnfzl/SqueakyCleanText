@@ -93,6 +93,7 @@ a local Tesseract executable when using `TesseractOCRProvider`.
 check_ner_process=True              # NER entity anonymization
 check_replace_urls=True             # Replace URLs with <URL>
 check_replace_emails=True           # Replace emails with <EMAIL>
+check_replace_ips=True              # Replace IPv4/IPv6 with <IP> (replace_ips_public_only=False)
 check_replace_phone_numbers=True    # Replace phones with <PHONE>
 check_replace_dates=False           # Replace dates with <DATE>
 check_fuzzy_replace_dates=False     # Fuzzy misspelled month matching (requires [fuzzy])

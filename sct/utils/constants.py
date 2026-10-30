@@ -39,15 +39,70 @@ EMAIL_REGEX = re.compile(
     flags=re.IGNORECASE | re.UNICODE,
 )
 
+# Digit boundaries are "not next to a digit", so numbers glued to letters of
+# any script (``电话9876543210``, ``फोन9876543210पर``) are still found.
 PHONE_REGEX = re.compile(
-    r"((?:^|(?<=[^\w)]))((\+?\d+|0{1,2}\d*?)[ .-]?)?(\(?\d{3,4}\)?/?[ .-]?)?"
-    r"(\d{3}[ .-]?\d{4})(\s?(?:ext\.?|[#x-])\s?\d{2,6})?(?:$|(?=\W)))|\+?\d{4,5}[ .-/]\d{6,9}"
+    # A leading year group ("1999 2000", "2019 555-1234") stays for the year step.
+    r"((?<![\d_)])(?!(?:19|20)\d\d[ .-])((\+?\d+|0{1,2}\d*?)[ .-]?)?(\(?\d{3,4}\)?/?[ .-]?)?"
+    r"(\d{3}[ .-]?\d{4})(\s?(?:ext\.?|[#x-])\s?\d{2,6})?(?![\d_]))|\+?\d{4,5}[ .-/]\d{6,9}"
+    # Indian mobile: 98765 43210, 098765-43210
+    r"|(?<![\d_)])0?[6-9]\d{4}[ -]?\d{5}(?![\d_])"
+    # International: "+" then at least 8 digits in groups (+34 612 345 678, +91 98765 43210)
+    r"|(?<![\d+])\+(?=(?:[ .()-]{0,2}\d){8})\d{1,3}(?:[ .-]?\(?\d{1,5}\)?){1,5}"
+    r"(?:\s?(?:ext\.?|[#x])\s?\d{2,6})?(?![\d_(])"
 )
 
-NUMBERS_REGEX = re.compile(
-    r"(?:^|(?<=[^\w,.]))[+–-]?(([1-9]\d{0,2}(,\d{3})+(\.\d*)?)"
-    r"|([1-9]\d{0,2}([ .]\d{3})+(,\d*)?)|(\d*?[.,]\d+)|\d+)(?:$|(?=\b))"
+# IPv4 and IPv6 (incl. "::" forms and IPv4-mapped tails). Runs before the
+# date/year/phone steps so "2001:4860:4860::8888" is not read as a year.
+_IPV4 = r"(?:(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])\.){3}(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])"
+_H16 = r"[0-9A-Fa-f]{1,4}"
+_LS32 = rf"(?:{_H16}:{_H16}|{_IPV4})"
+# Every valid layout (RFC 3986 IPv6address), so a match is always the whole
+# address. Bare "::" is left alone: it is not personal data.
+_IPV6 = "|".join([
+    rf"(?:{_H16}:){{6}}{_LS32}",
+    rf"::(?:{_H16}:){{5}}{_LS32}",
+    rf"(?:{_H16})?::(?:{_H16}:){{4}}{_LS32}",
+    rf"(?:(?:{_H16}:){{0,1}}{_H16})?::(?:{_H16}:){{3}}{_LS32}",
+    rf"(?:(?:{_H16}:){{0,2}}{_H16})?::(?:{_H16}:){{2}}{_LS32}",
+    rf"(?:(?:{_H16}:){{0,3}}{_H16})?::{_H16}:{_LS32}",
+    rf"(?:(?:{_H16}:){{0,4}}{_H16})?::{_LS32}",
+    rf"(?:(?:{_H16}:){{0,5}}{_H16})?::{_H16}",
+    rf"(?:{_H16}:){{0,6}}{_H16}::",
+])
+# Only ASCII letters/digits glue to an address, so CJK or Hindi text around it
+# ("地址fe80::1") does not hide it. A "label:" prefix is allowed when the label
+# cannot itself be the start of the address ("client_ip:fd12::1", "src:fe80::1").
+_IPV6_START = (
+    r"(?:(?<![A-Za-z0-9_:.])"
+    r"|(?<=[G-Zg-z_]:)|(?<=[G-Zg-z_][0-9A-Fa-f]:)"
+    r"|(?<=[G-Zg-z_][0-9A-Fa-f]{2}:)|(?<=[G-Zg-z_][0-9A-Fa-f]{3}:)"
+    r"|(?<=[0-9A-Fa-f]{5}:))"
 )
+IP_REGEX = re.compile(
+    rf"{_IPV6_START}(?:{_IPV6})(?![A-Za-z0-9_:]|\.[0-9])"
+    rf"|(?<![0-9.])(?:{_IPV4})(?![0-9]|\.[0-9])"
+)
+
+_NUMBER_BODY = (
+    r"[+–-]?(([1-9]\d{0,2}(,\d{3})+(\.\d*)?)"
+    r"|([1-9]\d{0,2}([ .]\d{3})+(,\d*)?)|(\d*?[.,]\d+)|\d+)"
+)
+# Latin, Greek and Cyrillic put spaces between words, so a digit glued to their
+# letters is part of a word (GPT4, Qwen3-8B, H2O) and is kept by default.
+# Scripts without spaces (``金额5000元``) still get the number replaced.
+_SPACED_LETTERS = "A-Za-z\u00C0-\u024F\u0370-\u03FF\u0400-\u04FF"
+# shortcut: common ISO 4217 codes only (EUR4500 is an amount, GPT4 is a name); add codes as needed.
+_CURRENCY_CODES = (
+    "EUR|USD|GBP|JPY|CNY|INR|CHF|CAD|AUD|NZD|SEK|NOK|DKK|PLN|CZK|HUF|RUB|UAH|TRY|"
+    "BRL|MXN|ARS|ZAR|KRW|SGD|HKD|THB|IDR|MYR|PHP|VND|PKR|BDT|LKR|NPR|AED|SAR|ILS|EGP|NGN|KES"
+)
+NUMBERS_REGEX = re.compile(
+    rf"(?:(?<![\d_,.{_SPACED_LETTERS}])|(?<=\b(?:{_CURRENCY_CODES})))"
+    rf"{_NUMBER_BODY}(?![\d_{_SPACED_LETTERS}])"
+)
+# Strict mode (replace_numbers_in_words=True): only an adjacent digit blocks a match.
+NUMBERS_IN_WORDS_REGEX = re.compile(rf"(?<![\d_,.]){_NUMBER_BODY}(?![\d_])")
 
 LINEBREAK_REGEX = re.compile(r"((\r\n)|[\n\v])+")
 TWO_LINEBREAK_REGEX = re.compile(r"((\r\n)|[\n\v])+((\r\n)|[\n\v])+")
@@ -98,7 +153,7 @@ strange_single_quotes = ["'", "‛", "\u2019", "❛", "❜", "`", "´", "\u2018"
 DOUBLE_QUOTE_REGEX = re.compile("|".join(strange_double_quotes))
 SINGLE_QUOTE_REGEX = re.compile("|".join(strange_single_quotes))
 
-YEAR_REGEX = re.compile(r"\b(19|20)\d{2}\b")
+YEAR_REGEX = re.compile(r"(?<![\d_])(19|20)\d{2}(?![\d_])")
 
 # ---------------------------------------------------------------------------
 # Multilingual month name vocabulary (EN, NL, DE, ES, FR, PT, IT)
@@ -347,10 +402,12 @@ SENTENCE_BOUNDARY_PATTERN = regex.compile(
 # Ordered delimiter hierarchy for text chunking (inspired by semchunk).
 # Tried from coarsest to finest; first delimiter that produces a split wins.
 # Lookbehind patterns keep the delimiter attached to the preceding chunk.
+# A match may be empty (CJK); the matched text is kept as the rejoin separator.
 CHUNK_DELIMITERS = (
     re.compile(r'\n\n+'),                     # Paragraph breaks
     re.compile(r'\n'),                         # Single newlines
-    re.compile(r'(?<=[.!?\u3002])\s+'),       # Sentence terminators (. ! ? and CJK period)
+    # Sentence terminators: . ! ? need whitespace; CJK 。！？ and danda । ॥ do not
+    re.compile(r'(?<=[.!?])\s+|(?<=[\u3002\uff01\uff1f\u0964\u0965])\s*'),
     re.compile(r'(?<=[;:,\u2014\u2026])\s+'), # Clause separators (; : , em-dash, ellipsis)
     re.compile(r'\s+'),                        # Any whitespace (word boundaries)
 )

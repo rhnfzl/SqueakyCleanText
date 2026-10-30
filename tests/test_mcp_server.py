@@ -93,3 +93,53 @@ def test_mcp_server_reports_missing_optional_package(monkeypatch):
 
     with pytest.raises(ImportError, match=r"squeakycleantext\[mcp\]"):
         create_mcp_server()
+
+
+def test_mcp_clean_json_result_contains_no_source_values(monkeypatch):
+    import json
+
+    class FakeFastMCP:
+        def __init__(self, name, *, instructions):
+            self.tools = {}
+
+        def tool(self, function):
+            self.tools[function.__name__] = function
+            return function
+
+    class FakeCleaner:
+        cfg = TextCleanerConfig(check_ner_process=False)
+
+        def process(self, text):
+            if text not in ("Alice", "alice@example.com"):
+                return ProcessResult(text, None, "ENGLISH", metadata=None)
+            label = "PERSON" if text == "Alice" else "EMAIL"
+            return ProcessResult(
+                f"<{label}>",
+                None,
+                "ENGLISH",
+                metadata={"findings": (EntityFinding(
+                    DetectedEntity(label, 0.9, text, 0, len(text)),
+                    "placeholder",
+                    "default",
+                ),)},
+            )
+
+    monkeypatch.setitem(
+        sys.modules,
+        "fastmcp",
+        SimpleNamespace(FastMCP=FakeFastMCP),
+    )
+    server = create_mcp_server(FakeCleaner())
+
+    result = server.tools["clean_json"](
+        {"team": {"Alice": "alice@example.com"}},
+    )
+    serialized = json.dumps(result)
+
+    assert result["value"] == {"team": {"<PERSON>": "<EMAIL>"}}
+    assert [item["path"] for item in result["findings"]] == [
+        ["team", "@key", 0],
+        ["team", "<PERSON>"],
+    ]
+    assert "Alice" not in serialized
+    assert "alice@example.com" not in serialized

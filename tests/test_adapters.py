@@ -102,3 +102,48 @@ def test_process_dataframe_copies_and_processes_selected_columns():
     assert result.frame.at[0, "body"] == "Email <EMAIL>"
     assert result.frame.at[0, "label"] == "keep@example.com"
     assert source.at[0, "body"] == "Email a@example.com"
+
+
+def test_sensitive_counts_markers_already_in_source():
+    from sct.adapters import is_sensitive_result
+
+    cleaner = TextCleaner(cfg=TextCleanerConfig(
+        check_replace_html=False,
+        check_ner_process=False,
+        check_detect_language=False,
+        check_statistical_model_processing=False,
+    ))
+    source = "<EMAIL> alice@example.com"
+
+    result = cleaner.process(source)
+
+    assert result.lm_text == "<EMAIL> <EMAIL>"
+    assert is_sensitive_result(cleaner, source, result) is True
+    assert is_sensitive_result(
+        cleaner, "<EMAIL> only", cleaner.process("<EMAIL> only"),
+    ) is False
+
+
+@pytest.mark.parametrize("source, output", [
+    ("<EMAIL> Alice", "<PERSON>"),
+    ("<PERSON> Alice", "<PERSON>"),
+    ("<URL> John Smith", "<PERSON>"),
+])
+def test_sensitive_when_html_step_removes_source_markers(source, output):
+    from types import SimpleNamespace
+
+    from sct.adapters import is_sensitive_result
+
+    cleaner = TextCleaner(cfg=TextCleanerConfig(
+        replace_with_html="",
+        check_ner_process=False,
+        check_detect_language=False,
+        check_statistical_model_processing=False,
+    ))
+    # NER output as observed with ONNX models; no model download here.
+    result = SimpleNamespace(lm_text=output, metadata=None)
+
+    assert is_sensitive_result(cleaner, source, result) is True
+    plain = cleaner.process("<PERSON> only")
+    assert plain.lm_text.strip() == "only"
+    assert is_sensitive_result(cleaner, "<PERSON> only", plain) is False

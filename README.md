@@ -229,7 +229,7 @@ lm_text, stat_text, lang = cleaner.process(
 # Entities are anonymized: names, SSNs, emails, dates of birth, and 50+ more PII types
 ```
 
-PII mode auto-configures: `ner_backend='gliner'`, uses [`knowledgator/gliner-pii-base-v1.0`](https://huggingface.co/knowledgator/gliner-pii-base-v1.0), sets threshold to 0.3 (recall-focused), and expands positional tags. User-provided values always take priority.
+PII mode auto-configures: `ner_backend='gliner'`, uses [`knowledgator/gliner-pii-base-v1.0`](https://huggingface.co/knowledgator/gliner-pii-base-v1.0), sets `gliner_threshold` and the final `ner_confidence_threshold` to 0.3 (recall-focused), and expands positional tags. User-provided values always take priority.
 
 **Alternative PII models** (pass as `gliner_model`):
 
@@ -513,11 +513,14 @@ new_cfg = dataclasses.replace(cfg, check_ner_process=False)
 | `check_replace_html` | `True` | Strip/replace HTML tags |
 | `check_replace_urls` | `True` | Replace URLs with token |
 | `check_replace_emails` | `True` | Replace emails with token |
+| `check_replace_ips` | `True` | Replace IPv4/IPv6 addresses (runs before dates, phones, years) |
+| `replace_ips_public_only` | `False` | Keep private, loopback and reserved IPs; replace only public ones |
 | `check_replace_years` | `True` | Replace years (1900-2099) |
 | `check_replace_dates` | `False` | Replace full dates (ISO 8601, month names) |
 | `check_fuzzy_replace_dates` | `False` | Fuzzy match misspelled months (requires `[fuzzy]`) |
 | `check_replace_phone_numbers` | `True` | Replace phone numbers |
 | `check_replace_numbers` | `True` | Replace standalone numbers |
+| `replace_numbers_in_words` | `False` | Also replace digits inside Latin/Greek/Cyrillic words (`GPT4` to `GPT<NUMBER>`) |
 | `check_replace_currency_symbols` | `True` | Replace currency symbols |
 | `check_ner_process` | `True` | Run NER entity recognition |
 | `check_remove_isolated_letters` | `True` | Remove single letters |
@@ -540,6 +543,7 @@ new_cfg = dataclasses.replace(cfg, check_ner_process=False)
 | `replace_with_url` | `"<URL>"` |
 | `replace_with_html` | `"<HTML>"` |
 | `replace_with_email` | `"<EMAIL>"` |
+| `replace_with_ips` | `"<IP>"` |
 | `replace_with_years` | `"<YEAR>"` |
 | `replace_with_dates` | `"<DATE>"` |
 | `replace_with_phone_numbers` | `"<PHONE>"` |
@@ -606,6 +610,11 @@ result = cleaner.process("Contact Maria Chen for help.")
 print(result.metadata["findings"])
 print(result.metadata["detector"])
 ```
+
+Finding offsets (`start`, `end`) and NER entries in the reversible map are
+document-relative positions in the post-regex text: the text after the regex
+stages replaced URLs, emails, phones and the like. They are not offsets into the
+raw input.
 
 Reversible output is pseudonymized personal data. Anyone with the token map can
 restore the source values. Keep token maps outside logs and cleaned datasets.

@@ -17,8 +17,10 @@ class MapEntry:
     placeholder: str   # e.g. "<PERSON_0>"
     original: str      # e.g. "John Smith"
     entity_type: str   # e.g. "PERSON"
-    start: int         # character offset in the *original* text
-    end: int           # character offset in the *original* text
+    # Offsets index the text the replacing stage saw: for NER entries that is
+    # the whole post-regex document (not the raw input, not a chunk).
+    start: int
+    end: int
 
 
 @dataclass

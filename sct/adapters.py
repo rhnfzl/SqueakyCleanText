@@ -6,6 +6,7 @@ from typing import Any, Iterable, Mapping, Optional
 
 from sct.privacy import EntityFinding
 from sct.sct import TextCleaner
+from sct.utils import constants
 
 
 @dataclass(frozen=True)
@@ -75,10 +76,16 @@ def is_sensitive_result(
         and result.lm_text != source
     ):
         return True
+    # The HTML step rewrites marker-like tags already in the source, so they
+    # cannot offset markers emitted later (``<EMAIL> Alice`` -> ``<PERSON>``).
+    baseline = source
+    if cleaner.cfg.check_replace_html:
+        baseline = constants.HTML_REGEX.sub("", source)
     configured_markers = (
         cleaner.cfg.replace_with_url,
         cleaner.cfg.replace_with_html,
         cleaner.cfg.replace_with_email,
+        cleaner.cfg.replace_with_ips,
         cleaner.cfg.replace_with_years,
         cleaner.cfg.replace_with_dates,
         cleaner.cfg.replace_with_phone_numbers,
@@ -88,14 +95,15 @@ def is_sensitive_result(
     if any(
         isinstance(marker, str)
         and marker
-        and marker in result.lm_text
-        and marker not in source
+        and result.lm_text.count(marker) > baseline.count(marker)
         for marker in configured_markers
     ):
         return True
-    return bool(
-        re.search(r"<[A-Z][A-Z0-9_]*>", result.lm_text)
-        and not re.search(r"<[A-Z][A-Z0-9_]*>", source)
+    # Compare counts, not presence: a source that already holds a marker
+    # still gains one per replacement.
+    marker_pattern = r"<[A-Z][A-Z0-9_]*>"
+    return len(re.findall(marker_pattern, result.lm_text)) > len(
+        re.findall(marker_pattern, baseline)
     )
 
 
@@ -122,9 +130,10 @@ def process_json(cleaner: TextCleaner, value: Any) -> StructuredResult:
             return result.lm_text
         if isinstance(item, dict):
             processed = {}
-            for key, child in item.items():
+            for index, (key, child) in enumerate(item.items()):
+                # The raw key may itself be PII, so its path uses the index.
                 processed_key = (
-                    visit(key, path + ("@key", key))
+                    visit(key, path + ("@key", index))
                     if isinstance(key, str) else key
                 )
                 if processed_key in processed:
