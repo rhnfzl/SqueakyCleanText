@@ -10,6 +10,7 @@ import logging
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
+from urllib.parse import quote
 
 import numpy as np
 import onnxruntime as ort
@@ -104,8 +105,11 @@ class ONNXNERPipeline:
 
         # Detect which inputs the model expects (BERT needs token_type_ids,
         # XLM-RoBERTa does not).
-        self._input_names = [inp.name for inp in session.get_inputs()]
+        inputs = session.get_inputs()
+        self._input_names = [inp.name for inp in inputs]
         self._needs_token_type_ids = 'token_type_ids' in self._input_names
+        # Models exported with a fixed batch dimension of 1 take one row per run.
+        self._single_row = any(inp.shape and inp.shape[0] == 1 for inp in inputs)
 
     # ------------------------------------------------------------------
     # Public API
@@ -137,7 +141,7 @@ class ONNXNERPipeline:
         all_results: List[List[dict]] = [[] for _ in texts]
         # Similar lengths share a batch, which keeps padding small.
         order = sorted(range(len(texts)), key=lambda i: len(encodings[i].ids))
-        batch_size = max(1, batch_size)
+        batch_size = 1 if self._single_row else max(1, batch_size)
 
         def run_batch(rows):
             width = max(len(encodings[i].ids) for i in rows)
@@ -272,6 +276,18 @@ class ONNXNERPipeline:
 # Model loader
 # ---------------------------------------------------------------------------
 
+def _quantized_dir(model_name: str, revision: Optional[str]) -> str:
+    """Cache dir name for a quantized model; distinct ids and revisions never share one.
+
+    Keeps the 0.7.1 ``org__name`` form unless the id holds ``__`` itself.
+    """
+    name = (
+        quote(model_name, safe="").replace("_", "%5F") if "__" in model_name
+        else model_name.replace("/", "__")
+    )
+    return name + (f"@{quote(revision, safe='')}" if revision else "")
+
+
 def load_onnx_ner_model(
     model_name: str,
     device: str = 'cpu',
@@ -351,8 +367,7 @@ def load_onnx_ner_model(
     if quantize:
         from onnxruntime.quantization import QuantType, quantize_dynamic  # noqa: PLC0415
         _qcache = Path(cache_dir) if cache_dir else Path.home() / ".cache" / "sct_quantized"
-        _qdir = model_name.replace("/", "__") + (f"@{revision.replace('/', '__')}" if revision else "")
-        quantized_path = _qcache / _qdir / "model_quantized.onnx"
+        quantized_path = _qcache / _quantized_dir(model_name, revision) / "model_quantized.onnx"
         quantized_path.parent.mkdir(parents=True, exist_ok=True)
         if not quantized_path.exists():
             logger.info("Quantizing model to INT8: %s", quantized_path)

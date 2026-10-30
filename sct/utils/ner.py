@@ -359,17 +359,20 @@ class GeneralNER:
     def anonymize_text(self, text, filtered_data, replacement_mode='placeholder',
                        anon_map=None):
         """Anonymize text. Supports placeholder, synthetic, or reversible replacement."""
+        has_custom = any(
+            items['entity_group'] not in ENTITY_TYPE_MAP
+            for items in filtered_data
+        )
+        if has_custom or replacement_mode in ('reversible', 'synthetic'):
+            # Right-to-left slicing keeps offsets only for disjoint spans.
+            filtered_data = self._merge_overlaps(text, filtered_data)
+
         if replacement_mode == 'reversible':
             return self._anonymize_reversible(text, filtered_data, anon_map)
 
         if replacement_mode == 'synthetic':
             result_text = self._synthetic_replacer.generate_for_entities(text, filtered_data)
             return AnonymizeResult(text=result_text)
-
-        has_custom = any(
-            items['entity_group'] not in ENTITY_TYPE_MAP
-            for items in filtered_data
-        )
 
         if has_custom:
             # Mixed labels: right-to-left string replacement (preserves offsets)
@@ -399,6 +402,25 @@ class GeneralNER:
 
             engine_result = self.engine.anonymize(text=text, analyzer_results=analyzer_result)
             return AnonymizeResult(text=engine_result.text)
+
+    @staticmethod
+    def _merge_overlaps(text, filtered_data):
+        """Merge overlapping spans into their union, labelled by the highest score.
+
+        Same rule as ``PrivacyPolicy.transform``, so no part of a nested or
+        partly overlapping entity stays visible.
+        """
+        merged = []
+        for item in sorted(filtered_data, key=lambda x: (x['start'], -x['end'])):
+            if merged and item['start'] < merged[-1]['end']:
+                last = merged[-1]
+                best = last if last['score'] >= item['score'] else item
+                start, end = last['start'], max(last['end'], item['end'])
+                merged[-1] = {**best, 'start': start, 'end': end,
+                              'word': text[start:end], 'key': f"{start}:{end}"}
+            else:
+                merged.append(item)
+        return merged
 
     def _anonymize_reversible(self, text, filtered_data, anon_map=None):
         """Replace entities with indexed placeholders and populate the map.
@@ -595,6 +617,7 @@ class GeneralNER:
             )
             return NERProcessingResult(text=result.text, findings=findings)
 
+        self._load_models([language])
         windows = self._plan_windows(text)
         if not windows:
             return NERProcessingResult(text=text, findings=())
@@ -621,7 +644,7 @@ class GeneralNER:
         Windows of all documents go through each model in calls of up to
         ``ner_batch_size`` windows; replacement then runs per document exactly as
         in ``ner_process_detailed``. *before_finalize(i)* runs just before
-        document *i* is replaced (TextCleaner resets the synthetic cache there).
+        document *i* is replaced (TextCleaner restores its synthetic cache there).
         *max_workers* ONNX batches run at once.
         """
         if not positional_tags:
@@ -640,6 +663,7 @@ class GeneralNER:
                 ))
             return results
 
+        self._load_models(languages)
         doc_windows = [self._plan_windows(text) for text in texts]
         flat_windows = [window[0] for windows in doc_windows for window in windows]
         flat_languages = [
@@ -663,10 +687,40 @@ class GeneralNER:
             ))
         return results
 
+    def _load_models(self, languages) -> None:
+        """Load every model these languages route to, so windows are sized for all of them."""
+        if self._ner_backend in ('onnx', 'torch', 'ensemble_onnx', 'ensemble_torch'):
+            for language in dict.fromkeys(languages):
+                for key in self._get_ensemble_keys(language or 'MULTILINGUAL'):
+                    self._ensure_loaded(key)
+
+    def _model_tokenizers(self) -> list:
+        """Distinct tokenizers of the loaded token-classification models."""
+        return list({id(tok): tok for tok in getattr(self, '_tokenizers', {}).values()}.values())
+
+    def _window_tokenizer(self):
+        """Tokenizer the chunker counts with: a window must fit every loaded model.
+
+        Offsets still come from ``self.tokenizer``; counts are the largest any
+        model tokenizer gives, so no model truncates a window.
+        """
+        tokenizers = self._model_tokenizers()
+        if len(tokenizers) <= 1:
+            return self.tokenizer
+        primary = self.tokenizer
+
+        def strictest(text, **kwargs):
+            if kwargs:
+                return primary(text, **kwargs)
+            return max((tok(text) for tok in tokenizers), key=lambda r: len(r.input_ids))
+        return strictest
+
     def _chunk_budget(self) -> int:
         """Token budget of one NER window (GLiNER-only: of its context window)."""
         if self.tokenizer is not None:
-            return self.min_token_length
+            return min([self.min_token_length] + [
+                math.ceil(tok.max_len_single_sentence * 0.9) for tok in self._model_tokenizers()
+            ])
         # Use GLiNER adapter's dynamic context window when available
         gliner_max = self._gliner_pipe.max_context_length if self._gliner_pipe else 384
         return int(gliner_max * 0.9)
@@ -679,14 +733,16 @@ class GeneralNER:
         neighbouring text on both sides (GLiNER-only: 2 chars per token, as in
         ``_simple_chunk``). ``win_start + offsets[i]`` is the document position of
         window position *i*. A span belongs to the window whose core owns its
-        start (``own_start <= start < own_end``); copies seen by other windows are
-        dropped. With overlap 0 windows are the 0.7.1 chunks and own everything.
+        start (``own_start <= start < own_end``); a copy seen by another window is
+        kept only when no owned span covers it. With overlap 0 windows are the
+        0.7.1 chunks and own everything.
         """
         overlap = self._ner_chunk_overlap
         budget = self._chunk_budget() - 2 * overlap
         # lock-free: HF fast tokenizer Rust backend is thread-safe
         if self.tokenizer is not None:
-            chunks = self.split_text(text, budget, self.tokenizer)
+            counter = self._window_tokenizer()
+            chunks = self.split_text(text, budget, counter)
         else:
             chunks = self._simple_chunk(text, max_tokens=budget)
 
@@ -718,6 +774,8 @@ class GeneralNER:
                     max(core_end, ends[min(len(ends), after + overlap) - 1])
                     if after < len(ends) else core_end
                 )
+                if self._token_count(text[win_start:win_end], counter) > budget + 2 * overlap:
+                    win_start, win_end = core_start, core_end  # overlap would truncate another model
             else:
                 win_start = max(0, core_start - overlap * 2)
                 win_end = min(len(text), core_end + overlap * 2)
@@ -799,16 +857,19 @@ class GeneralNER:
         privacy_policy: Optional[PrivacyPolicy],
     ) -> NERProcessingResult:
         """Merge window spans in document coordinates, vote, and replace once."""
-        spans = []
+        spans, foreign = [], []
         for (_, win_start, offsets, own_start, own_end), ner_results in zip(windows, window_results):
             for item in ner_results:
                 start = win_start + offsets[item['start']]
-                if own_start <= start < own_end:
-                    end = win_start + offsets[item['end']]
-                    spans.append({
-                        **item, 'start': start, 'end': end,
-                        'word': text[start:end], 'key': f"{start}:{end}",
-                    })
+                end = win_start + offsets[item['end']]
+                span = {**item, 'start': start, 'end': end,
+                        'word': text[start:end], 'key': f"{start}:{end}"}
+                (spans if own_start <= start < own_end else foreign).append(span)
+        # A neighbour's copy counts only where the owning window found nothing covering it.
+        spans += [
+            span for span in foreign
+            if not any(o['start'] <= span['start'] and span['end'] <= o['end'] for o in spans)
+        ]
 
         ensemble_results = self.ner_ensemble(spans, ner_confidence_threshold)
         if not ensemble_results:

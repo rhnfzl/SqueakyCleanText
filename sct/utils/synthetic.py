@@ -5,7 +5,7 @@ caches, so parallel batch processing in TextCleaner has no shared mutable state.
 """
 import logging
 import threading
-from typing import Dict
+from typing import Dict, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -78,6 +78,15 @@ class SyntheticReplacer:
         """Clear per-document consistency cache. Call at start of each document."""
         if hasattr(self._local, 'cache'):
             self._local.cache.clear()
+
+    def swap_cache(self, cache: Optional[Dict[tuple, str]] = None) -> Dict[tuple, str]:
+        """Install *cache* (default: a new one) for this thread; return the previous one.
+
+        Lets a document's cache move between threads and processing stages.
+        """
+        previous = self._get_cache()
+        self._local.cache = {} if cache is None else cache
+        return previous
 
     def _get_cache(self) -> Dict[tuple, str]:
         """Get or create the thread-local consistency cache."""

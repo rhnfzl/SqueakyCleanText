@@ -22,7 +22,6 @@ import hashlib
 import json
 import platform
 import re
-import resource
 import subprocess
 import sys
 import time
@@ -198,7 +197,11 @@ def long_documents(texts: list[str], per_document: int = 8) -> list[str]:
     return [" ".join(texts[i:i + per_document]) for i in range(0, len(texts), per_document)]
 
 
-def _peak_rss_mb() -> float:
+def _peak_rss_mb() -> float | None:
+    try:
+        import resource  # noqa: PLC0415  # POSIX only
+    except ImportError:
+        return None
     peak = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
     return round(peak / (1024 * 1024 if sys.platform == "darwin" else 1024), 1)  # bytes vs KiB
 

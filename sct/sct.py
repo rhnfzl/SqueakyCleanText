@@ -466,11 +466,19 @@ class TextCleaner:
         ):
             # Batched NER: pre-NER steps per document in threads, one NER call over
             # all documents (model calls batch chunks across documents), then the rest.
-            states = run(self._before_ner_isolated)
+            replacer = self._synthetic_replacer
 
-            def reset_synthetic(_index):
-                if self._synthetic_replacer:
-                    self._synthetic_replacer.reset_cache()
+            def before_ner(text):
+                # Keep the regex steps' synthetic cache with the document for its NER step.
+                state = self._before_ner_isolated(text)
+                return state, replacer.swap_cache() if replacer else None
+
+            staged = run(before_ner)
+            states = [state for state, _ in staged]
+
+            def restore_synthetic(index):
+                if replacer:
+                    replacer.swap_cache(staged[index][1])
 
             ner_results = self.GeneralNER.ner_process_batch_detailed(
                 [state[0] for state in states],
@@ -479,7 +487,7 @@ class TextCleaner:
                 ner_confidence_threshold=self.cfg.ner_confidence_threshold,
                 anon_maps=[state[2] for state in states],
                 privacy_policy=self._privacy_policy,
-                before_finalize=reset_synthetic,
+                before_finalize=restore_synthetic,
                 max_workers=max_workers,
             )
             for (i, _), state, ner_result in zip(to_process, states, ner_results):
