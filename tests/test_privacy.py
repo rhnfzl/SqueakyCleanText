@@ -332,3 +332,70 @@ def test_text_cleaner_clears_reversible_context_after_failure():
         raise AssertionError("processing should propagate pipeline failures")
 
     assert cleaner._document_context.anon_map is None
+
+
+_REDACT_PERSON = PrivacyPolicy(
+    name="strict",
+    version="1",
+    rules={"PERSON": EntityRule(action="redact")},
+)
+
+
+def _gliner_ner_with_score(score):
+    class FakeGLiNER:
+        max_context_length = 512
+        labels = ["person"]
+        label_map = {"person": "PER"}
+
+        def __call__(self, texts):
+            return [[{
+                "entity_group": "PER",
+                "score": score,
+                "word": "Maria",
+                "start": 0,
+                "end": 5,
+            }]]
+
+    ner = object.__new__(GeneralNER)
+    ner._ner_backend = "gliner"
+    ner._gliner_pipe = FakeGLiNER()
+    ner._replacement_mode = "placeholder"
+    ner._synthetic_replacer = None
+    ner._inference_locks = {}
+    ner._locks_lock = threading.Lock()
+    ner.tokenizer = None
+    return ner
+
+
+def test_pii_mode_final_threshold_keeps_what_gliner_keeps():
+    cfg = TextCleanerConfig(ner_mode="pii")
+    assert cfg.ner_confidence_threshold == cfg.gliner_threshold == 0.3
+    assert TextCleanerConfig(
+        ner_mode="pii", gliner_threshold=0.5,
+    ).ner_confidence_threshold == 0.5
+    assert TextCleanerConfig(
+        ner_mode="pii", ner_confidence_threshold=0.9,
+    ).ner_confidence_threshold == 0.9
+    assert TextCleanerConfig().ner_confidence_threshold == 0.85
+
+    result = _gliner_ner_with_score(0.5).ner_process_detailed(
+        "Maria arrived.",
+        positional_tags=cfg.positional_tags,
+        ner_confidence_threshold=cfg.ner_confidence_threshold,
+        language="ENGLISH",
+        privacy_policy=_REDACT_PERSON,
+    )
+
+    assert result.text == "<REDACTED> arrived."
+
+
+def test_zero_ner_confidence_threshold_is_not_replaced_by_default():
+    result = _gliner_ner_with_score(0.5).ner_process_detailed(
+        "Maria arrived.",
+        positional_tags=("PER",),
+        ner_confidence_threshold=0.0,
+        language="ENGLISH",
+        privacy_policy=_REDACT_PERSON,
+    )
+
+    assert result.text == "<REDACTED> arrived."

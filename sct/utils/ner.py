@@ -524,7 +524,8 @@ class GeneralNER:
         if not positional_tags:
             raise ValueError("Must provide at least one positional tag")
 
-        ner_confidence_threshold = ner_confidence_threshold or 0.85
+        if ner_confidence_threshold is None:
+            ner_confidence_threshold = 0.85
 
         # --- Presidio GLiNER backend: delegates everything to Presidio ---
         if self._ner_backend == 'presidio_gliner':

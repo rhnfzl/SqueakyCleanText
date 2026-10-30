@@ -360,6 +360,11 @@ class TextCleanerConfig:
                 object.__setattr__(self, 'gliner_labels', PII_LABELS)
             if self.gliner_threshold == 0.4:
                 object.__setattr__(self, 'gliner_threshold', PII_DEFAULT_THRESHOLD)
+            # The final ensemble filter must not drop what GLiNER kept.
+            if self.ner_confidence_threshold == 0.85:
+                object.__setattr__(
+                    self, 'ner_confidence_threshold', self.gliner_threshold,
+                )
             if self.gliner_label_map is None:
                 object.__setattr__(self, 'gliner_label_map', PII_LABEL_MAP)
             # Expand positional_tags to include all PII label tags
@@ -442,7 +447,14 @@ class TextCleanerConfig:
                     f"ner_models must include {sorted(REQUIRED_NER_KEYS)}, "
                     f"missing: {sorted(missing)}"
                 )
-            merged = {**DEFAULT_NER_MODELS, **self.ner_models}
+            # A frozen map is a normalized config's own output (replace(),
+            # copying another config): fill only LANG_KEYS so it stays exact.
+            defaults = (
+                {k: DEFAULT_NER_MODELS[k] for k in LANG_KEYS}
+                if isinstance(self.ner_models, MappingProxyType)
+                else DEFAULT_NER_MODELS
+            )
+            merged = {**defaults, **self.ner_models}
             object.__setattr__(self, 'ner_models', MappingProxyType(merged))
             object.__setattr__(
                 self, 'ner_models_list',
@@ -534,6 +546,21 @@ class TextCleanerConfig:
                             f"language='{lang}' (from tuple) not in supported languages: "
                             f"{sorted(self.supported_languages)}"
                         )
+
+    def __getstate__(self):
+        # Restore the exact normalized state; never re-run __post_init__.
+        state = dict(self.__dict__)
+        frozen = [k for k, v in state.items() if isinstance(v, MappingProxyType)]
+        for key in frozen:
+            state[key] = dict(state[key])
+        return state, frozen
+
+    def __setstate__(self, packed):
+        state, frozen = packed
+        for key, value in state.items():
+            if key in frozen:
+                value = MappingProxyType(value)
+            object.__setattr__(self, key, value)
 
 
 def _config_from_module_globals() -> TextCleanerConfig:

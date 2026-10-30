@@ -229,7 +229,7 @@ lm_text, stat_text, lang = cleaner.process(
 # Entities are anonymized: names, SSNs, emails, dates of birth, and 50+ more PII types
 ```
 
-PII mode auto-configures: `ner_backend='gliner'`, uses [`knowledgator/gliner-pii-base-v1.0`](https://huggingface.co/knowledgator/gliner-pii-base-v1.0), sets threshold to 0.3 (recall-focused), and expands positional tags. User-provided values always take priority.
+PII mode auto-configures: `ner_backend='gliner'`, uses [`knowledgator/gliner-pii-base-v1.0`](https://huggingface.co/knowledgator/gliner-pii-base-v1.0), sets `gliner_threshold` and the final `ner_confidence_threshold` to 0.3 (recall-focused), and expands positional tags. User-provided values always take priority.
 
 **Alternative PII models** (pass as `gliner_model`):
 

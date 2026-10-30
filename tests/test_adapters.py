@@ -102,3 +102,23 @@ def test_process_dataframe_copies_and_processes_selected_columns():
     assert result.frame.at[0, "body"] == "Email <EMAIL>"
     assert result.frame.at[0, "label"] == "keep@example.com"
     assert source.at[0, "body"] == "Email a@example.com"
+
+
+def test_sensitive_counts_markers_already_in_source():
+    from sct.adapters import is_sensitive_result
+
+    cleaner = TextCleaner(cfg=TextCleanerConfig(
+        check_replace_html=False,
+        check_ner_process=False,
+        check_detect_language=False,
+        check_statistical_model_processing=False,
+    ))
+    source = "<EMAIL> alice@example.com"
+
+    result = cleaner.process(source)
+
+    assert result.lm_text == "<EMAIL> <EMAIL>"
+    assert is_sensitive_result(cleaner, source, result) is True
+    assert is_sensitive_result(
+        cleaner, "<EMAIL> only", cleaner.process("<EMAIL> only"),
+    ) is False

@@ -9,6 +9,10 @@
 - Phones now run before years, so `+31 6 1234 2019` and `2001:4860:4860::8888` are no longer split by the year rule. The browser manifest uses the same order.
 - Phone detection covers more international formats (`+34 612 345 678`, `+91 98765 43210`) and Indian mobiles (`98765 43210`, `098765-43210`).
 - Languages the `stop-words` package does not support (for example `THAI`) no longer crash `TextCleaner` creation.
+- PII mode: the final `ner_confidence_threshold` now follows `gliner_threshold` (0.3 by default) instead of a hidden 0.85, so GLiNER findings between 0.3 and 0.85 are no longer dropped. An explicit `ner_confidence_threshold` still wins, and `0.0` is no longer turned into 0.85.
+- `process_json` and MCP `clean_json` no longer return original dict keys in finding paths: a key's own findings use `["@key", <index>]`.
+- `is_sensitive_result` compares placeholder counts, so `<EMAIL> alice@example.com` (HTML step off) is reported as sensitive.
+- `TextCleanerConfig` can be pickled and deep-copied, and the copy keeps the exact state. `dataclasses.replace(cfg)` no longer grows the default 5 NER models to 8 and 4 supported languages to 7.
 
 ## 0.7.0 - 2026-09-19
 
