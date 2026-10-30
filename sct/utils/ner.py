@@ -198,12 +198,16 @@ class GeneralNER:
             )
 
         if ner_backend != 'presidio_gliner' and ner_chunk_overlap:
-            budget = self._chunk_budget()
-            if not 0 < 2 * ner_chunk_overlap < budget // 2:
-                raise ValueError(
-                    f"ner_chunk_overlap must be >= 0 and 2 * overlap < {budget // 2} "
-                    f"(half the {budget}-token window), got {ner_chunk_overlap}"
-                )
+            self._check_overlap(self._chunk_budget())
+
+    def _check_overlap(self, budget: int) -> None:
+        """Reject an overlap that leaves no core inside a *budget*-token window."""
+        overlap = self._ner_chunk_overlap
+        if not 0 < 2 * overlap < budget // 2:
+            raise ValueError(
+                f"ner_chunk_overlap must be >= 0 and 2 * overlap < {budget // 2} "
+                f"(half the {budget}-token window), got {overlap}"
+            )
 
     def _init_tokenizer_props(self):
         """Set min_token_length and tokenizer from loaded ENGLISH/MULTILINGUAL models."""
@@ -618,7 +622,7 @@ class GeneralNER:
             return NERProcessingResult(text=result.text, findings=findings)
 
         self._load_models([language])
-        windows = self._plan_windows(text)
+        windows = self._plan_windows(text, self._window_keys(language))
         if not windows:
             return NERProcessingResult(text=text, findings=())
         window_results = self._detect(
@@ -664,7 +668,10 @@ class GeneralNER:
             return results
 
         self._load_models(languages)
-        doc_windows = [self._plan_windows(text) for text in texts]
+        doc_windows = [
+            self._plan_windows(text, self._window_keys(language))
+            for text, language in zip(texts, languages)
+        ]
         flat_windows = [window[0] for windows in doc_windows for window in windows]
         flat_languages = [
             languages[i] for i, windows in enumerate(doc_windows) for _ in windows
@@ -694,20 +701,28 @@ class GeneralNER:
                 for key in self._get_ensemble_keys(language or 'MULTILINGUAL'):
                     self._ensure_loaded(key)
 
-    def _model_tokenizers(self) -> list:
-        """Distinct tokenizers of the loaded token-classification models."""
-        return list({id(tok): tok for tok in getattr(self, '_tokenizers', {}).values()}.values())
+    def _window_keys(self, language):
+        """Model keys a document's windows must fit (None in GLiNER-only mode)."""
+        return self._get_ensemble_keys(language or 'MULTILINGUAL') if self.tokenizer is not None else None
 
-    def _window_tokenizer(self):
-        """Tokenizer the chunker counts with: a window must fit every loaded model.
+    def _model_tokenizers(self, keys=None) -> list:
+        """Distinct tokenizers of the loaded models for *keys* (None: every loaded model)."""
+        loaded = getattr(self, '_tokenizers', {})
+        if keys is not None:
+            loaded = {key: loaded[key] for key in keys if key in loaded}
+        return list({id(tok): tok for tok in loaded.values()}.values())
+
+    def _window_tokenizer(self, keys=None):
+        """Tokenizer the chunker counts with: a window must fit every model in *keys*.
 
         Offsets still come from ``self.tokenizer``; counts are the largest any
         model tokenizer gives, so no model truncates a window.
         """
-        tokenizers = self._model_tokenizers()
-        if len(tokenizers) <= 1:
-            return self.tokenizer
         primary = self.tokenizer
+        tokenizers = [tok for tok in self._model_tokenizers(keys) if tok is not primary]
+        if not tokenizers:
+            return primary
+        tokenizers.append(primary)
 
         def strictest(text, **kwargs):
             if kwargs:
@@ -715,18 +730,21 @@ class GeneralNER:
             return max((tok(text) for tok in tokenizers), key=lambda r: len(r.input_ids))
         return strictest
 
-    def _chunk_budget(self) -> int:
+    def _chunk_budget(self, keys=None) -> int:
         """Token budget of one NER window (GLiNER-only: of its context window)."""
         if self.tokenizer is not None:
             return min([self.min_token_length] + [
-                math.ceil(tok.max_len_single_sentence * 0.9) for tok in self._model_tokenizers()
+                math.ceil(tok.max_len_single_sentence * 0.9) for tok in self._model_tokenizers(keys)
             ])
         # Use GLiNER adapter's dynamic context window when available
         gliner_max = self._gliner_pipe.max_context_length if self._gliner_pipe else 384
         return int(gliner_max * 0.9)
 
-    def _plan_windows(self, text: str) -> List[tuple]:
+    def _plan_windows(self, text: str, keys=None) -> List[tuple]:
         """Split *text* into model windows ``(window, win_start, offsets, own_start, own_end)``.
+
+        Windows fit the models in *keys* (the document's ensemble; None: every
+        loaded model), so other documents' models never change this one.
 
         Core chunks come from the chunker with ``2 * ner_chunk_overlap`` tokens
         less budget; each window adds up to ``ner_chunk_overlap`` tokens of the
@@ -738,10 +756,13 @@ class GeneralNER:
         0.7.1 chunks and own everything.
         """
         overlap = self._ner_chunk_overlap
-        budget = self._chunk_budget() - 2 * overlap
+        budget = self._chunk_budget(keys)
+        if overlap:
+            self._check_overlap(budget)  # a model loaded after construction can shrink it
+        budget -= 2 * overlap
         # lock-free: HF fast tokenizer Rust backend is thread-safe
         if self.tokenizer is not None:
-            counter = self._window_tokenizer()
+            counter = self._window_tokenizer(keys)
             chunks = self.split_text(text, budget, counter)
         else:
             chunks = self._simple_chunk(text, max_tokens=budget)
@@ -865,7 +886,9 @@ class GeneralNER:
                 span = {**item, 'start': start, 'end': end,
                         'word': text[start:end], 'key': f"{start}:{end}"}
                 (spans if own_start <= start < own_end else foreign).append(span)
-        # A neighbour's copy counts only where the owning window found nothing covering it.
+        # A neighbour's copy counts only where the owning window found nothing eligible covering it.
+        if foreign:
+            spans = self.ner_ensemble(spans, ner_confidence_threshold)
         spans += [
             span for span in foreign
             if not any(o['start'] <= span['start'] and span['end'] <= o['end'] for o in spans)

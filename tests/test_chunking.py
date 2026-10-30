@@ -129,6 +129,8 @@ def _gliner_ner(mode):
     ner._synthetic_replacer = None
     ner._inference_locks = {}
     ner._locks_lock = threading.Lock()
+    ner._ensemble_models = {}
+    ner._ensemble_default_keys = ()
     ner.tokenizer = None
     return ner
 
