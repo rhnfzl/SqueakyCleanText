@@ -107,7 +107,7 @@ def _leak_summary(items: list[dict], total: int) -> dict:
 def _git_commit() -> str | None:
     try:
         return subprocess.run(
-            ["git", "rev-parse", "HEAD"], cwd=ROOT, capture_output=True,
+            ["git", "rev-parse", "HEAD"], cwd=ROOT,  # noqa: S607 capture_output=True,
             text=True, check=True,
         ).stdout.strip()
     except (OSError, subprocess.CalledProcessError):
@@ -234,7 +234,7 @@ def to_markdown(result: dict) -> str:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser = argparse.ArgumentParser(description=(__doc__ or "Release benchmark").splitlines()[0])
     parser.add_argument("--dataset", type=Path, default=DATASET)
     parser.add_argument("--output-dir", type=Path, default=RESULTS)
     args = parser.parse_args()
