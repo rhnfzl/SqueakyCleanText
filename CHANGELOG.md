@@ -1,15 +1,24 @@
 # Changelog
 
-## 0.8.0 - unreleased
+## 0.8.0 - 2026-10-30
+
+This is a speed release. NER model calls run in batches, also across the documents of one
+`process_batch` call, and ONNX models no longer queue on a lock. On the release benchmark
+(`evaluation/results/comparison-0.7.1-0.8.0.md`) `process_batch` on 16 Linux cores is 4.2x
+faster on short documents (3.69 to 15.55 docs/s) and 3.2x faster on long documents (0.65 to
+2.08 docs/s). Single-document `process` is unchanged within noise (0.95x to 1.10x).
+Exact-span TP/FP/FN, recall (0.98) and leaks (0 of 67) are identical to 0.7.1, and 29 of 30
+default-config outputs are byte-identical; the other one is the documented chunk-boundary
+placeholder merge below.
 
 ### Behaviour changes
 
 - Python 3.11 is no longer supported; 0.8.0 needs Python 3.12 or newer. pip on Python 3.11 keeps resolving to 0.7.1.
 - `lingua-language-detector` minimum raised from 2.1.0 to 2.2. Lingua 2.2 can detect the language of some texts differently from 2.1.1, which changes the language-specific NER model, stopwords and date handling chosen for those texts.
-- ONNX NER models no longer share one lock per model: threads in `process_batch` now run ONNX inference at the same time (`InferenceSession.run` is thread-safe). Output is unchanged. Torch models and GLiNER still run one call at a time. Because each ONNX run uses all cores by default, many workers can oversubscribe the CPU; set `onnx_intra_op_threads` so workers x threads is about the number of physical cores.
+- ONNX NER models no longer share one lock per model: threads in `process_batch` now run ONNX inference at the same time (`InferenceSession.run` is thread-safe). Output is unchanged. Torch models and GLiNER still run one call at a time. With the ONNX Runtime default threads, a session uses every physical core of the machine and ignores `taskset`/CPU affinity; set `onnx_intra_op_threads` to cap CPU use. On the benchmark, fewer threads per session was slower, not faster, because the batched NER pass runs a few large calls rather than one per worker.
 - Two language keys that use the same model repo with different revisions now load each revision. Before, the second key silently reused the first key's revision. The INT8 quantized cache directory now includes the revision (`<model>@<revision>`), so a quantized file from one revision is not reused for another.
 - `ner_batch_size` (default 8) now batches model calls: NER chunks of one document, and of all documents in one `process_batch` call, go through each ONNX, torch or GLiNER model `ner_batch_size` chunks per forward pass (rows right-padded). `process_batch` runs the steps before NER per document in threads, then one batched NER pass over all documents (ONNX batches run on the same number of threads), then the steps after NER. Output text, languages and finding spans are unchanged; padded batches can move scores in the last digits (max 5e-6 on the release and long-document sets with the default models). `ner_batch_size=1` keeps the 0.7.1 call pattern and scores exactly. GLiNER2 still runs one chunk per call.
-- Throughput with the default models on a 16-core CPU (`scripts/benchmark_release.py --batch 64`, docs/s, `ner_batch_size` 1 vs 8): short documents 14.8 vs 14.9; long documents (about 8 joined documents each) 2.66 vs 2.38 with cpu-count workers, 1.50 vs 1.64 with one worker. With many workers on CPU, threads already fill the cores, so batching mainly adds padding and memory (peak RSS on the long set about 6 GB vs 12 GB). On CPU with many workers and long documents, `ner_batch_size=1` is the faster setting; batching helps with few workers or on GPU.
+- Throughput with the default models on a 16-core CPU (`scripts/benchmark_release.py --batch 64`, docs/s, `ner_batch_size` 1 vs 8): short documents 14.8 vs 14.9; long documents (about 8 joined documents each) 2.66 vs 2.38 with cpu-count workers, 1.50 vs 1.64 with one worker. With many workers on CPU, threads already fill the cores, so batching mainly adds padding and memory (peak RSS on the long set about 6 GB vs 12 GB). The release benchmark on another machine (Threadripper, 16 cores) measured the opposite: `ner_batch_size` 8 vs 1 was 15.55 vs 10.31 docs/s (short) and 2.08 vs 1.82 (long) with 16 workers. Which setting is faster depends on the CPU; measure before changing it. `ner_batch_size=1` always uses less memory.
 - With `ner_batch_size > 1` and NER on, `metrics_callback` `duration_ms` includes the time a document waits for the shared NER pass of its batch.
 - NER now collects the spans of all chunks of a document in document coordinates, votes once and replaces once per document, instead of voting and replacing chunk by chunk. Chunks and model input are unchanged. Differences, only for documents longer than one chunk:
   - `replacement_mode='reversible'`: placeholder numbers (`<PERSON_0>`...) are assigned right to left over the whole document, as for short documents, so indices can differ. Deanonymisation still round-trips.
@@ -21,6 +30,13 @@
 
 - `onnx_intra_op_threads` and `onnx_inter_op_threads` (default `None`, the ONNX Runtime default, same as 0.7.1). Legacy module globals `ONNX_INTRA_OP_THREADS` / `ONNX_INTER_OP_THREADS`. Not applied to GLiNER's own ONNX session (`gliner_onnx=True`).
 - `ner_chunk_overlap` (default `0`, legacy module global `NER_CHUNK_OVERLAP`): each NER window adds this many tokens of the neighbouring text on both sides of its chunk (GLiNER-only: 2 characters per token), and a span is kept only from the window whose chunk holds its start. This finds entities that a chunk boundary would split (sentence, whitespace or hard cut). The default `0` keeps the 0.7.1 chunks; overlap changes the context the model sees in long documents, so detections can change either way, and inference grows by about `2 * overlap / window`. An entity longer than the overlap that starts at the very end of a chunk can still be cut. Must satisfy `2 * overlap < window // 2`.
+
+### Known limits
+
+- Only `process_batch` is faster. `process` of one document is not batched across documents.
+- GLiNER2 runs one chunk per call; torch models and GLiNER keep one lock per model, so they do not run in parallel across threads.
+- `ner_chunk_overlap` (off by default) can still cut an entity longer than the overlap that starts at the very end of a chunk.
+- With huggingface-hub 1.32.0 on Linux, onnxruntime can refuse the default XLM-RoBERTa-large models ("External data path escapes model directory") because `model.onnx` and `model.onnx_data` are cached in different directories. 0.7.1 has the same problem; it is not fixed in this release.
 
 ## 0.7.1 - 2026-10-30
 

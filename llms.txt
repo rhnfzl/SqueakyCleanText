@@ -108,7 +108,7 @@ ner_mode='standard'                 # 'standard'|'pii' (auto-configures GLiNER f
 replacement_mode='placeholder'      # 'placeholder' | 'synthetic' | 'reversible' (indexed placeholders + deanonymize map)
 ner_confidence_threshold=0.85       # Min confidence for entity tagging
 ner_batch_size=8                    # NER chunks per forward pass, batched across process_batch docs; 1 = 0.7.1 pattern
-onnx_intra_op_threads=None          # ONNX Runtime threads per inference (None = ORT default); workers x threads ~= cores
+onnx_intra_op_threads=None          # ONNX Runtime threads per inference (None = ORT default, all cores); set to cap CPU use
 onnx_inter_op_threads=None          # ONNX Runtime inter-op threads (None = ORT default; rarely needed)
 ner_chunk_overlap=0                 # NER window overlap in tokens per side for long docs (0 = 0.7.1 chunks)
 positional_tags=('PER','LOC','ORG','MISC')
