@@ -1,6 +1,17 @@
 # Changelog
 
-## 0.7.1 - Unreleased
+## 0.7.1 - 2026-10-30
+
+This release fixes PII that 0.7.0 left in the output. On the release benchmark
+(`evaluation/results/comparison-0.7.0-0.7.1.md`) exact-span recall goes from 0.62 to 0.87
+and leaked PII values from 6 of 67 to 0.
+
+### Behaviour changes
+
+- More PII is found and replaced: glued and international phone numbers, IP addresses, and GLiNER findings between 0.3 and 0.85 in PII mode. Output text changes for inputs that contain them.
+- IP addresses are now replaced with `<IP>` by default (`<IP_ADDRESS_n>` in reversible mode), including private ones.
+- New config flags: `check_replace_ips` (default `True`), `replace_ips_public_only` (default `False`) and `replace_with_ips` (default `"<IP>"`).
+- `process_json` finding paths for dict keys use `["@key", <index>]` instead of the key text.
 
 ### Fixes
 
@@ -8,6 +19,7 @@
 - IPv4 and IPv6 addresses (public and private) are replaced with `<IP>` before the date, phone and year steps. Set `replace_ips_public_only=True` to keep private, loopback and reserved addresses, or `check_replace_ips=False` to turn the step off.
 - Phones now run before years, so `+31 6 1234 2019` and `2001:4860:4860::8888` are no longer split by the year rule. The browser manifest uses the same order.
 - Phone detection covers more international formats (`+34 612 345 678`, `+91 98765 43210`) and Indian mobiles (`98765 43210`, `098765-43210`).
+- NER chunks never exceed the model budget, also for long Chinese, Japanese and Hindi text without spaces. Text is split after `。！？` and `। ॥`, and reversible map offsets for NER entities are now document-relative.
 - Languages the `stop-words` package does not support (for example `THAI`) no longer crash `TextCleaner` creation.
 - PII mode: the final `ner_confidence_threshold` now follows `gliner_threshold` (0.3 by default) instead of a hidden 0.85, so GLiNER findings between 0.3 and 0.85 are no longer dropped. An explicit `ner_confidence_threshold` still wins, and `0.0` is no longer turned into 0.85.
 - `process_json` and MCP `clean_json` no longer return original dict keys in finding paths: a key's own findings use `["@key", <index>]`.

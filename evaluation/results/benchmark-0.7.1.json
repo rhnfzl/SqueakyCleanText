@@ -1,0 +1,413 @@
+{
+  "correctness": {
+    "config": "TextCleanerConfig(**{'replacement_mode': 'reversible', 'check_to_ascii_unicode': False})",
+    "leaks": {
+      "by_label": {},
+      "count": 0,
+      "items": [],
+      "total_pii": 67
+    },
+    "partial_leaks": {
+      "by_label": {},
+      "count": 0,
+      "items": [],
+      "total_pii": 67
+    },
+    "report": {
+      "by_domain": {
+        "business": {
+          "f1": 1.0,
+          "false_negatives": 0,
+          "false_positives": 0,
+          "precision": 1.0,
+          "recall": 1.0,
+          "true_positives": 13
+        },
+        "logs": {
+          "f1": 0.10000000000000002,
+          "false_negatives": 9,
+          "false_positives": 9,
+          "precision": 0.1,
+          "recall": 0.1,
+          "true_positives": 1
+        },
+        "support": {
+          "f1": 0.9672131147540983,
+          "false_negatives": 2,
+          "false_positives": 2,
+          "precision": 0.9672131147540983,
+          "recall": 0.9672131147540983,
+          "true_positives": 59
+        }
+      },
+      "by_label": {
+        "EMAIL": {
+          "f1": 0.8571428571428571,
+          "false_negatives": 1,
+          "false_positives": 1,
+          "precision": 0.8571428571428571,
+          "recall": 0.8571428571428571,
+          "true_positives": 6
+        },
+        "IP": {
+          "f1": 0.0,
+          "false_negatives": 9,
+          "false_positives": 0,
+          "precision": 0.0,
+          "recall": 0.0,
+          "true_positives": 0
+        },
+        "IP_ADDRESS": {
+          "f1": 0.0,
+          "false_negatives": 0,
+          "false_positives": 9,
+          "precision": 0.0,
+          "recall": 0.0,
+          "true_positives": 0
+        },
+        "LOCATION": {
+          "f1": 0.8333333333333334,
+          "false_negatives": 1,
+          "false_positives": 1,
+          "precision": 0.8333333333333334,
+          "recall": 0.8333333333333334,
+          "true_positives": 5
+        },
+        "NUMBER": {
+          "f1": 1.0,
+          "false_negatives": 0,
+          "false_positives": 0,
+          "precision": 1.0,
+          "recall": 1.0,
+          "true_positives": 8
+        },
+        "ORGANISATION": {
+          "f1": 1.0,
+          "false_negatives": 0,
+          "false_positives": 0,
+          "precision": 1.0,
+          "recall": 1.0,
+          "true_positives": 2
+        },
+        "PERSON": {
+          "f1": 1.0,
+          "false_negatives": 0,
+          "false_positives": 0,
+          "precision": 1.0,
+          "recall": 1.0,
+          "true_positives": 25
+        },
+        "PHONE_NUMBER": {
+          "f1": 1.0,
+          "false_negatives": 0,
+          "false_positives": 0,
+          "precision": 1.0,
+          "recall": 1.0,
+          "true_positives": 16
+        },
+        "URL": {
+          "f1": 1.0,
+          "false_negatives": 0,
+          "false_positives": 0,
+          "precision": 1.0,
+          "recall": 1.0,
+          "true_positives": 2
+        },
+        "YEAR": {
+          "f1": 1.0,
+          "false_negatives": 0,
+          "false_positives": 0,
+          "precision": 1.0,
+          "recall": 1.0,
+          "true_positives": 9
+        }
+      },
+      "by_language": {
+        "bn": {
+          "f1": 1.0,
+          "false_negatives": 0,
+          "false_positives": 0,
+          "precision": 1.0,
+          "recall": 1.0,
+          "true_positives": 2
+        },
+        "de": {
+          "f1": 1.0,
+          "false_negatives": 0,
+          "false_positives": 0,
+          "precision": 1.0,
+          "recall": 1.0,
+          "true_positives": 9
+        },
+        "en": {
+          "f1": 0.7272727272727273,
+          "false_negatives": 9,
+          "false_positives": 9,
+          "precision": 0.7272727272727273,
+          "recall": 0.7272727272727273,
+          "true_positives": 24
+        },
+        "es": {
+          "f1": 1.0,
+          "false_negatives": 0,
+          "false_positives": 0,
+          "precision": 1.0,
+          "recall": 1.0,
+          "true_positives": 8
+        },
+        "hi": {
+          "f1": 1.0,
+          "false_negatives": 0,
+          "false_positives": 0,
+          "precision": 1.0,
+          "recall": 1.0,
+          "true_positives": 10
+        },
+        "ja": {
+          "f1": 1.0,
+          "false_negatives": 0,
+          "false_positives": 0,
+          "precision": 1.0,
+          "recall": 1.0,
+          "true_positives": 4
+        },
+        "nl": {
+          "f1": 1.0,
+          "false_negatives": 0,
+          "false_positives": 0,
+          "precision": 1.0,
+          "recall": 1.0,
+          "true_positives": 8
+        },
+        "ta": {
+          "f1": 1.0,
+          "false_negatives": 0,
+          "false_positives": 0,
+          "precision": 1.0,
+          "recall": 1.0,
+          "true_positives": 2
+        },
+        "zh": {
+          "f1": 0.75,
+          "false_negatives": 2,
+          "false_positives": 2,
+          "precision": 0.75,
+          "recall": 0.75,
+          "true_positives": 6
+        }
+      },
+      "by_slice": {
+        "cjk": {
+          "f1": 0.8333333333333334,
+          "false_negatives": 2,
+          "false_positives": 2,
+          "precision": 0.8333333333333334,
+          "recall": 0.8333333333333334,
+          "true_positives": 10
+        },
+        "contact": {
+          "f1": 1.0,
+          "false_negatives": 0,
+          "false_positives": 0,
+          "precision": 1.0,
+          "recall": 1.0,
+          "true_positives": 25
+        },
+        "danda": {
+          "f1": 1.0,
+          "false_negatives": 0,
+          "false_positives": 0,
+          "precision": 1.0,
+          "recall": 1.0,
+          "true_positives": 7
+        },
+        "glued": {
+          "f1": 0.9444444444444444,
+          "false_negatives": 1,
+          "false_positives": 1,
+          "precision": 0.9444444444444444,
+          "recall": 0.9444444444444444,
+          "true_positives": 17
+        },
+        "ip": {
+          "f1": 0.10000000000000002,
+          "false_negatives": 9,
+          "false_positives": 9,
+          "precision": 0.1,
+          "recall": 0.1,
+          "true_positives": 1
+        },
+        "ipv4": {
+          "f1": 0.14285714285714285,
+          "false_negatives": 6,
+          "false_positives": 6,
+          "precision": 0.14285714285714285,
+          "recall": 0.14285714285714285,
+          "true_positives": 1
+        },
+        "ipv6": {
+          "f1": 0.16666666666666666,
+          "false_negatives": 5,
+          "false_positives": 5,
+          "precision": 0.16666666666666666,
+          "recall": 0.16666666666666666,
+          "true_positives": 1
+        },
+        "long": {
+          "f1": 0.8571428571428571,
+          "false_negatives": 1,
+          "false_positives": 1,
+          "precision": 0.8571428571428571,
+          "recall": 0.8571428571428571,
+          "true_positives": 6
+        },
+        "no-phone": {
+          "f1": 1.0,
+          "false_negatives": 0,
+          "false_positives": 0,
+          "precision": 1.0,
+          "recall": 1.0,
+          "true_positives": 9
+        },
+        "no-year": {
+          "f1": 1.0,
+          "false_negatives": 0,
+          "false_positives": 0,
+          "precision": 1.0,
+          "recall": 1.0,
+          "true_positives": 2
+        },
+        "number": {
+          "f1": 1.0,
+          "false_negatives": 0,
+          "false_positives": 0,
+          "precision": 1.0,
+          "recall": 1.0,
+          "true_positives": 16
+        },
+        "phone": {
+          "f1": 0.9666666666666667,
+          "false_negatives": 1,
+          "false_positives": 1,
+          "precision": 0.9666666666666667,
+          "recall": 0.9666666666666667,
+          "true_positives": 29
+        },
+        "phone-in": {
+          "f1": 1.0,
+          "false_negatives": 0,
+          "false_positives": 0,
+          "precision": 1.0,
+          "recall": 1.0,
+          "true_positives": 4
+        },
+        "synthetic": {
+          "f1": 0.8690476190476191,
+          "false_negatives": 11,
+          "false_positives": 11,
+          "precision": 0.8690476190476191,
+          "recall": 0.8690476190476191,
+          "true_positives": 73
+        },
+        "url": {
+          "f1": 1.0,
+          "false_negatives": 0,
+          "false_positives": 0,
+          "precision": 1.0,
+          "recall": 1.0,
+          "true_positives": 5
+        },
+        "year": {
+          "f1": 1.0,
+          "false_negatives": 0,
+          "false_positives": 0,
+          "precision": 1.0,
+          "recall": 1.0,
+          "true_positives": 23
+        }
+      },
+      "model": "default",
+      "overall": {
+        "f1": 0.8690476190476191,
+        "false_negatives": 11,
+        "false_positives": 11,
+        "precision": 0.8690476190476191,
+        "recall": 0.8690476190476191,
+        "true_positives": 73
+      }
+    }
+  },
+  "dataset": "release_benchmark.jsonl",
+  "dataset_sha256": "9ceb6ac5c75268a0d7862df7ba18067bf55b1c56250dda9feee463799042b938",
+  "documents": 30,
+  "entities": 84,
+  "git_commit": "ef4a651936117ce11e36f5ca7e3e8653c3c2104c",
+  "models": {
+    "ner_backend": "onnx",
+    "ner_model_revisions": {
+      "DUTCH": "381e34ba4c222bc221e9fd02832f52a179ed840d",
+      "ENGLISH": "2c10955af9538d6ff8a68316c5dbfcd0b968761e",
+      "FRENCH": "74191432b21c956b5b04b4778c0e92e569b1f80d",
+      "GERMAN": "fe4aecfa6dc376244ef37da37e6df3b1b0911d71",
+      "ITALIAN": "74191432b21c956b5b04b4778c0e92e569b1f80d",
+      "MULTILINGUAL": "74191432b21c956b5b04b4778c0e92e569b1f80d",
+      "PORTUGUESE": "74191432b21c956b5b04b4778c0e92e569b1f80d",
+      "SPANISH": "ef52a7f08172203c763d51fe36660d36985bb388"
+    },
+    "ner_models": {
+      "DUTCH": "rhnfzl/xlm-roberta-large-conll02-dutch-onnx",
+      "ENGLISH": "rhnfzl/xlm-roberta-large-conll03-english-onnx",
+      "FRENCH": "rhnfzl/wikineural-multilingual-ner-onnx",
+      "GERMAN": "rhnfzl/xlm-roberta-large-conll03-german-onnx",
+      "ITALIAN": "rhnfzl/wikineural-multilingual-ner-onnx",
+      "MULTILINGUAL": "rhnfzl/wikineural-multilingual-ner-onnx",
+      "PORTUGUESE": "rhnfzl/wikineural-multilingual-ner-onnx",
+      "SPANISH": "rhnfzl/xlm-roberta-large-conll02-spanish-onnx"
+    }
+  },
+  "outputs": {
+    "bn-glued-001": "<PERSON_0> কে কল<PHONE_NUMBER_0>করুন।",
+    "de-contact-001": "Bitte kontaktieren Sie <PERSON_0> unter <EMAIL_0> oder <PHONE_NUMBER_0>",
+    "de-contact-002": "<PERSON_0> zog im Jahr <YEAR_0> nach <LOCATION_0> und arbeitet bei <ORGANISATION_0>.",
+    "de-url-001": "Weitere Informationen finden Sie unter <URL_0> bei <PERSON_0>.",
+    "en-contact-001": "Contact <PERSON_0> at <EMAIL_0> or <PHONE_NUMBER_0>",
+    "en-contact-002": "Please email <PERSON_0> at <EMAIL_0> or visit <URL_0> for details.",
+    "en-glued-001": "Call me on Tel<PHONE_NUMBER_0> or text <PERSON_0> tonight.",
+    "en-glued-002": "The invoice total was EUR<NUMBER_0> for fiscal year FY<YEAR_0>",
+    "en-ip-001": "Requests from <IP_ADDRESS_0> and <IP_ADDRESS_1> were blocked, but <IP_ADDRESS_2> and <IP_ADDRESS_3> were allowed.",
+    "en-ip-002": "The host <IP_ADDRESS_0> answered, while <IP_ADDRESS_1> and <IP_ADDRESS_2> stayed on the local network.",
+    "en-ip-003": "Server <IP_ADDRESS_0> forwards to <IP_ADDRESS_1> for user <PERSON_0>.",
+    "en-numbers-001": "In <YEAR_0> the team shipped <NUMBER_0> units to <NUMBER_1> stores, up from <NUMBER_2> in <YEAR_1>",
+    "en-numbers-002": "Between <YEAR_0> and <YEAR_1> the company grew from <NUMBER_0> to <NUMBER_1> employees.",
+    "en-phone-in-001": "You can reach <PERSON_0> on <PHONE_NUMBER_0> during office hours.",
+    "en-phone-in-002": "Her mobile is <PHONE_NUMBER_0> and the landline is <PHONE_NUMBER_1> if needed.",
+    "es-contact-001": "Llame a <PERSON_0> al <PHONE_NUMBER_0> escriba a <EMAIL_0>",
+    "es-contact-002": "<PERSON_0> vive en <LOCATION_0> desde <YEAR_0>",
+    "es-phone-001": "Mi número es <PHONE_NUMBER_0> mi correo es <EMAIL_0>",
+    "hi-danda-001": "<PERSON_1> <LOCATION_1> में रहते हैं। उनका फोन नंबर <PHONE_NUMBER_0> है। <PERSON_0> <LOCATION_0> में काम करती हैं।",
+    "hi-glued-001": "फोन<PHONE_NUMBER_0>पर कॉल करें। राशि<NUMBER_0>रुपये है। वर्ष<YEAR_0>में भुगतान हुआ।",
+    "hi-long-001": "<PERSON_1> इस परियोजना के प्रमुख हैं। आज मौसम बहुत अच्छा है और हम सब पार्क में घूमने गए। बैठक में अगली तिमाही की कार्य योजना पर चर्चा हुई। सभी लोग उत्पाद की गुणवत्ता सुधारने पर सहमत हुए। टीम के सदस्यों ने परियोजना की समस्याओं के बारे में बताया। हमें महीने के अंत तक सारा परीक्षण कार्य पूरा करना है। ग्राहकों ने नए डिज़ाइन के बारे में कुछ सुझाव दिए। आज मौसम बहुत अच्छा है और हम सब पार्क में घूमने गए। बैठक में अगली तिमाही की कार्य योजना पर चर्चा हुई। सभी लोग उत्पाद की गुणवत्ता सुधारने पर सहमत हुए। टीम के सदस्यों ने परियोजना की समस्याओं के बारे में बताया। हमें महीने के अंत तक सारा परीक्षण कार्य पूरा करना है। ग्राहकों ने नए डिज़ाइन के बारे में कुछ सुझाव दिए। आज मौसम बहुत अच्छा है और हम सब पार्क में घूमने गए। बैठक में अगली तिमाही की कार्य योजना पर चर्चा हुई। सभी लोग उत्पाद की गुणवत्ता सुधारने पर सहमत हुए। टीम के सदस्यों ने परियोजना की समस्याओं के बारे में बताया। अधिक जानकारी के लिए <PERSON_0> से संपर्क करें।",
+    "ja-glued-001": "<PERSON_0>さんの電話番号は<PHONE_NUMBER_0>です。",
+    "ja-long-001": "担当者は<PERSON_1>です。今日はとても良い天気なので、みんなで公園を散歩しました。会議では来期の作業計画と予算について話し合いました。製品の品質と使いやすさを引き続き改善することになりました。チームのメンバーはプロジェクトで直面した課題を共有しました。月末までにすべてのテスト作業を終える必要があります。お客様から新しい画面デザインについていくつかの意見をいただきました。午後の研修では新しい開発の進め方が紹介されました。毎週の作業報告を期限までに提出してください。今日はとても良い天気なので、みんなで公園を散歩しました。会議では来期の作業計画と予算について話し合いました。製品の品質と使いやすさを引き続き改善することになりました。チームのメンバーはプロジェクトで直面した課題を共有しました。月末までにすべてのテスト作業を終える必要があります。お客様から新しい画面デザインについていくつかの意見をいただきました。午後の研修では新しい開発の進め方が紹介されました。毎週の作業報告を期限までに提出してください。今日はとても良い天気なので、みんなで公園を散歩しました。会議では来期の作業計画と予算について話し合いました。製品の品質と使いやすさを引き続き改善することになりました。チームのメンバーはプロジェクトで直面した課題を共有しました。月末までにすべてのテスト作業を終える必要があります。お客様から新しい画面デザインについていくつかの意見をいただきました。午後の研修では新しい開発の進め方が紹介されました。毎週の作業報告を期限までに提出してください。今日はとても良い天気なので、みんなで公園を散歩しました。会議では来期の作業計画と予算について話し合いました。製品の品質と使いやすさを引き続き改善することになりました。チームのメンバーはプロジェクトで直面した課題を共有しました。月末までにすべてのテスト作業を終える必要があります。お客様から新しい画面デザインについていくつかの意見をいただきました。詳しくは<PERSON_0>さんに連絡してください。",
+    "nl-contact-001": "Neem contact op met <PERSON_0> via <EMAIL_0> of bel <PHONE_NUMBER_0>",
+    "nl-contact-002": "<PERSON_0> woont in <LOCATION_0> en werkt bij <ORGANISATION_0>.",
+    "nl-phone-year-001": "Bel <PHONE_NUMBER_0> voor een afspraak met <PERSON_0>.",
+    "ta-glued-001": "<PERSON_0> அவர்களை அழை<PHONE_NUMBER_0>இல் தொடர்பு கொள்ளவும்",
+    "zh-glued-001": "<PERSON_0>的电话<PHONE_NUMBER_0>他住<LOCATION_1>OCATION_0>。",
+    "zh-glued-002": "公司在<YEAR_0>年卖出了<NUMBER_0>台设备。",
+    "zh-long-001": "<PERSON_1>负责这个项目。今天天气很好我们一起去公园散步。会议讨论了下一季度的工作计划和预算安排。大家都同意继续改进产品的质量和用户体验。团队成员分享了各自在项目中遇到的问题。我们需要在月底之前完成所有的测试工作。客户对新版本的界面设计提出了一些建议。下午的培训课程主要介绍了新的开发流程。请大家按时提交每周的工作总结和反馈意见。今天天气很好我们一起去公园散步。会议讨论了下一季度的工作计划和预算安排。大家都同意继续改进产品的质量和用户体验。团队成员分享了各自在项目中遇到的问题。我们需要在月底之前完成所有的测试工作。客户对新版本的界面设计提出了一些建议。下午的培训课程主要介绍了新的开发流程。请大家按时提交每周的工作总结和反馈意见。今天天气很好我们一起去公园散步。会议讨论了下一季度的工作计划和预算安排。大家都同意继续改进产品的质量和用户体验。团队成员分享了各自在项目中遇到的问题。我们需要在月底之前完成所有的测试工作。客户对新版本的界面设计提出了一些建议。下午的培训课程主要介绍了新的开发流程。请大家按时提交每周的工作总结和反馈意见。今天天气很好我们一起去公园散步。会议讨论了下一季度的工作计划和预算安排。大家都同意继续改进产品的质量和用户体验。团队成员分享了各自在项目中遇到的问题。我们需要在月底之前完成所有的测试工作。客户对新版本的界面设计提出了一些建议。下午的培训课程主要介绍了新的开发流程。请大家按时提交每周的工作总结和反馈意见。今天天气很好我们一起去公园散步。会议讨论了下一季度的工作计划和预算安排。大家都同意继续改进产品的质量和用户体验。团队成员分享了各自在项目中遇到的问题。我们需要在月底之前完成所有的测试工作。客户对新版本的界面设计提出了一些建议。下午的培训课程主要介绍了新的开发流程。请大家按时提交每周的工作总结和反馈意见。今天天气很好我们一起去公园散步。会议讨论了下一季度的工作计划和预算安排。如有问题请联系<PERSON_0><EMAIL_0>"
+  },
+  "platform": "macOS-27.2-arm64-arm-64bit-Mach-O",
+  "python": "3.13.12",
+  "sct_version": "0.7.1",
+  "speed": {
+    "config": "TextCleanerConfig()",
+    "docs_per_second": 6.923,
+    "mean_ms": 144.445,
+    "p95_ms": 758.89,
+    "repeats": 3,
+    "seconds": 13.0,
+    "timed_documents": 90,
+    "warmup": "one pass over all documents"
+  }
+}
