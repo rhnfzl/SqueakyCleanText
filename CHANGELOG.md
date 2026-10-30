@@ -6,6 +6,12 @@
 
 - Python 3.11 is no longer supported; 0.8.0 needs Python 3.12 or newer. pip on Python 3.11 keeps resolving to 0.7.1.
 - `lingua-language-detector` minimum raised from 2.1.0 to 2.2. Lingua 2.2 can detect the language of some texts differently from 2.1.1, which changes the language-specific NER model, stopwords and date handling chosen for those texts.
+- ONNX NER models no longer share one lock per model: threads in `process_batch` now run ONNX inference at the same time (`InferenceSession.run` is thread-safe). Output is unchanged. Torch models and GLiNER still run one call at a time. Because each ONNX run uses all cores by default, many workers can oversubscribe the CPU; set `onnx_intra_op_threads` so workers x threads is about the number of physical cores.
+- Two language keys that use the same model repo with different revisions now load each revision. Before, the second key silently reused the first key's revision. The INT8 quantized cache directory now includes the revision (`<model>@<revision>`), so a quantized file from one revision is not reused for another.
+
+### New options
+
+- `onnx_intra_op_threads` and `onnx_inter_op_threads` (default `None`, the ONNX Runtime default, same as 0.7.1). Legacy module globals `ONNX_INTRA_OP_THREADS` / `ONNX_INTER_OP_THREADS`. Not applied to GLiNER's own ONNX session (`gliner_onnx=True`).
 
 ## 0.7.1 - 2026-10-30
 

@@ -560,6 +560,8 @@ new_cfg = dataclasses.replace(cfg, check_ner_process=False)
 | `positional_tags` | `('PER', 'LOC', 'ORG', 'MISC')` | Entity types to recognize |
 | `ner_confidence_threshold` | `0.85` | Minimum confidence score |
 | `ner_batch_size` | `8` | Inference batch size (must be >= 1) |
+| `onnx_intra_op_threads` | `None` | ONNX Runtime threads per inference (`None` = ORT default, all cores). With `process_batch`, aim for workers x threads ~= physical cores |
+| `onnx_inter_op_threads` | `None` | ONNX Runtime inter-op threads (`None` = ORT default). Only matters with ORT parallel execution mode, so `onnx_intra_op_threads` is the usual knob |
 | `ner_models` | `None` | Language-keyed dict of ONNX model repo IDs |
 | `torch_ner_models` | `None` | Language-keyed dict of PyTorch model repo IDs |
 | `gliner_model` | `None` | GLiNER model ID (required for gliner/ensemble backends) |

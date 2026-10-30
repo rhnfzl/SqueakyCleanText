@@ -95,7 +95,7 @@ def test_general_ner_passes_pinned_revision_to_model_loader(monkeypatch):
     class FakeTokenizer:
         max_len_single_sentence = 510
 
-    def fake_loader(model_name, *, device, cache_dir, revision):
+    def fake_loader(model_name, *, device, cache_dir, revision, **thread_kwargs):
         calls.append((model_name, revision))
         return object(), FakeTokenizer()
 

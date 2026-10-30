@@ -293,6 +293,10 @@ class TextCleanerConfig:
     replace_with_ips: str = "<IP>"
     replace_numbers_in_words: bool = False  # True also replaces digits glued to Latin/Greek/Cyrillic letters (GPT4)
 
+    # Added in 0.8.0; kept last so existing positional arguments keep their meaning.
+    onnx_intra_op_threads: Optional[int] = None  # None = ONNX Runtime default (all cores)
+    onnx_inter_op_threads: Optional[int] = None  # None = ONNX Runtime default
+
     def __post_init__(self):
         if self.gliclass_onnx:
             raise ValueError(
@@ -388,6 +392,10 @@ class TextCleanerConfig:
             raise ValueError(
                 f"ner_batch_size must be >= 1, got {self.ner_batch_size}"
             )
+        for name in ('onnx_intra_op_threads', 'onnx_inter_op_threads'):
+            value = getattr(self, name)
+            if value is not None and value < 1:
+                raise ValueError(f"{name} must be None or >= 1, got {value}")
 
         # GLiNER fields required for gliner/ensemble backends
         needs_gliner = self.ner_backend in GLINER_BACKENDS
@@ -591,6 +599,8 @@ def _config_from_module_globals() -> TextCleanerConfig:
         check_replace_phone_numbers=m.CHECK_REPLACE_PHONE_NUMBERS,
         check_replace_numbers=m.CHECK_REPLACE_NUMBERS,
         replace_numbers_in_words=getattr(m, 'REPLACE_NUMBERS_IN_WORDS', False),
+        onnx_intra_op_threads=getattr(m, 'ONNX_INTRA_OP_THREADS', None),
+        onnx_inter_op_threads=getattr(m, 'ONNX_INTER_OP_THREADS', None),
         check_replace_currency_symbols=m.CHECK_REPLACE_CURRENCY_SYMBOLS,
         check_ner_process=m.CHECK_NER_PROCESS,
         check_remove_isolated_letters=m.CHECK_REMOVE_ISOLATED_LETTERS,
@@ -646,6 +656,8 @@ FUZZY_DATE_SCORE_CUTOFF = 85
 CHECK_REPLACE_PHONE_NUMBERS = True
 CHECK_REPLACE_NUMBERS = True
 REPLACE_NUMBERS_IN_WORDS = False
+ONNX_INTRA_OP_THREADS = None
+ONNX_INTER_OP_THREADS = None
 CHECK_REPLACE_CURRENCY_SYMBOLS = True
 CHECK_NER_PROCESS = True
 CHECK_REMOVE_ISOLATED_LETTERS = True

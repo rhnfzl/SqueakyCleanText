@@ -70,7 +70,9 @@ class GeneralNER:
                  ensemble_models: Optional[Dict] = None,
                  ensemble_default_keys: Optional[tuple] = None,
                  replacement_mode: str = 'placeholder',
-                 synthetic_replacer=None):
+                 synthetic_replacer=None,
+                 onnx_intra_op_threads: Optional[int] = None,
+                 onnx_inter_op_threads: Optional[int] = None):
         """Initialize NER processor.
 
         Args:
@@ -85,6 +87,8 @@ class GeneralNER:
             torch_model_names: Language-keyed dict of PyTorch model repo IDs.
                 Required when ner_backend involves torch.
             synthetic_replacer: Shared SyntheticReplacer instance (from TextCleaner).
+            onnx_intra_op_threads, onnx_inter_op_threads: ONNX Runtime session
+                thread counts; None keeps the ONNX Runtime default.
         """
         self._ner_backend = ner_backend
         self._ner_batch_size = ner_batch_size
@@ -92,6 +96,8 @@ class GeneralNER:
         self._synthetic_replacer = synthetic_replacer
         self._model_revisions = dict(model_revisions or {})
         self._torch_model_revisions = dict(torch_model_revisions or {})
+        self._onnx_intra_op_threads = onnx_intra_op_threads
+        self._onnx_inter_op_threads = onnx_inter_op_threads
         self._gliner_pipe = None
         self._ensemble_models: Dict[str, tuple] = ensemble_models if ensemble_models is not None else DEFAULT_NER_ENSEMBLE
         self._ensemble_default_keys: tuple = (
@@ -122,7 +128,8 @@ class GeneralNER:
         self._pipelines: Dict = {}
         self._tokenizers: Dict = {}
         self._load_lock = threading.Lock()
-        # Per-model inference locks: enables parallel NER across different languages
+        # Per-model inference locks for torch models and GLiNER. ONNX runs lock-free:
+        # InferenceSession.run and the Rust tokenizer are thread-safe.
         self._inference_locks: Dict[str, threading.Lock] = {}
         self._locks_lock = threading.Lock()  # Guards creation of per-model locks
 
@@ -238,6 +245,13 @@ class GeneralNER:
         """Pre-load NER model for the given language key (stable public API)."""
         self._ensure_loaded(lang_key)
 
+    def _model_key(self, lang_key: str) -> tuple:
+        """(model name, revision) for a language key; same key = same loaded model."""
+        revisions = (self._torch_model_revisions
+                     if self._ner_backend in ('torch', 'ensemble_torch')
+                     else self._model_revisions)
+        return self._model_names.get(lang_key, lang_key), revisions.get(lang_key)
+
     def _get_model_name(self, lang_key: str) -> str:
         """Get model name for a language via direct dict lookup."""
         model = self._model_names.get(lang_key)
@@ -257,16 +271,17 @@ class GeneralNER:
                 return
             model_name = self._get_model_name(lang_key)
             logger.info("Loading model for %s: %s", lang_key, model_name)
-            # Reuse existing pipeline/tokenizer if another key already loaded this model
+            # Reuse existing pipeline/tokenizer if another key already loaded this model + revision
+            model_key = self._model_key(lang_key)
             shared_pipe = next(
                 (p for k, p in self._pipelines.items()
-                 if self._model_names.get(k) == model_name), None
+                 if self._model_key(k) == model_key), None
             )
             if shared_pipe is not None:
                 self._pipelines[lang_key] = shared_pipe
                 shared_tok = next(
                     (t for k, t in self._tokenizers.items()
-                     if self._model_names.get(k) == model_name), None
+                     if self._model_key(k) == model_key), None
                 )
                 if shared_tok is not None:
                     self._tokenizers[lang_key] = shared_tok
@@ -286,6 +301,8 @@ class GeneralNER:
                         device=self.device,
                         cache_dir=self._cache_args.get("cache_dir"),
                         revision=self._model_revisions.get(lang_key),
+                        intra_op_threads=self._onnx_intra_op_threads,
+                        inter_op_threads=self._onnx_inter_op_threads,
                     )
                 self._pipelines[lang_key] = pipeline_obj
                 self._tokenizers[lang_key] = tok
@@ -602,10 +619,11 @@ class GeneralNER:
             if self._ner_backend in ('onnx', 'torch', 'ensemble_onnx', 'ensemble_torch'):
                 for key in self._get_ensemble_keys(language or 'MULTILINGUAL'):
                     self._ensure_loaded(key)
-                    model_name = self._model_names.get(key, key)
-                    model_lock = self._get_lock(model_name)
-                    with model_lock:
+                    if self._ner_backend in ('onnx', 'ensemble_onnx'):
                         batch = self._pipelines[key]([chunk])
+                    else:
+                        with self._get_lock(self._model_key(key)):
+                            batch = self._pipelines[key]([chunk])
                     ner_results.extend(self.ner_data(batch[0], positional_tags))
 
             # GLiNER backend

@@ -108,6 +108,8 @@ ner_mode='standard'                 # 'standard'|'pii' (auto-configures GLiNER f
 replacement_mode='placeholder'      # 'placeholder' | 'synthetic' | 'reversible' (indexed placeholders + deanonymize map)
 ner_confidence_threshold=0.85       # Min confidence for entity tagging
 ner_batch_size=8                    # Inference batch size (must be >= 1)
+onnx_intra_op_threads=None          # ONNX Runtime threads per inference (None = ORT default); workers x threads ~= cores
+onnx_inter_op_threads=None          # ONNX Runtime inter-op threads (None = ORT default; rarely needed)
 positional_tags=('PER','LOC','ORG','MISC')
 
 gliner_model=None                   # GLiNER model ID (auto-set by ner_mode='pii')

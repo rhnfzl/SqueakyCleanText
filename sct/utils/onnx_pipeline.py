@@ -259,6 +259,8 @@ def load_onnx_ner_model(
     cache_dir: Optional[str] = None,
     quantize: bool = False,
     revision: Optional[str] = None,
+    intra_op_threads: Optional[int] = None,
+    inter_op_threads: Optional[int] = None,
 ) -> Tuple[ONNXNERPipeline, TokenizerWrapper]:
     """Download and load an ONNX NER model from HuggingFace Hub.
 
@@ -275,6 +277,8 @@ def load_onnx_ner_model(
         loading.  The quantized model is cached next to the original
         (``model_quantized.onnx``) so quantization only runs once per model.
         Reduces model size ~4× with a small accuracy trade-off.  Default: ``False``.
+    intra_op_threads, inter_op_threads : int, optional
+        ONNX Runtime session thread counts. ``None`` keeps the ONNX Runtime default.
 
     Returns
     -------
@@ -328,7 +332,8 @@ def load_onnx_ner_model(
     if quantize:
         from onnxruntime.quantization import QuantType, quantize_dynamic  # noqa: PLC0415
         _qcache = Path(cache_dir) if cache_dir else Path.home() / ".cache" / "sct_quantized"
-        quantized_path = _qcache / model_name.replace("/", "__") / "model_quantized.onnx"
+        _qdir = model_name.replace("/", "__") + (f"@{revision.replace('/', '__')}" if revision else "")
+        quantized_path = _qcache / _qdir / "model_quantized.onnx"
         quantized_path.parent.mkdir(parents=True, exist_ok=True)
         if not quantized_path.exists():
             logger.info("Quantizing model to INT8: %s", quantized_path)
@@ -343,6 +348,10 @@ def load_onnx_ner_model(
 
     session_options = ort.SessionOptions()
     session_options.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
+    if intra_op_threads is not None:
+        session_options.intra_op_num_threads = intra_op_threads
+    if inter_op_threads is not None:
+        session_options.inter_op_num_threads = inter_op_threads
 
     session = ort.InferenceSession(
         model_path,
