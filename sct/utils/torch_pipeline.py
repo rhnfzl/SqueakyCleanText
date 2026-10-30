@@ -51,13 +51,13 @@ class TorchNERPipeline:
 
         logger.info("Loaded Torch NER model: %s (device=%s)", model_name, device)
 
-    def __call__(self, texts) -> List[List[dict]]:
+    def __call__(self, texts, batch_size: int = 1) -> List[List[dict]]:
         """Run NER inference. Same interface as ONNXNERPipeline."""
         if isinstance(texts, str):
             texts = [texts]
 
         with self._torch.no_grad():
-            results = self._pipeline(texts)
+            results = self._pipeline(texts, batch_size=batch_size)
 
         # HF pipeline returns List[dict] for single text, List[List[dict]] for batch
         if texts and not isinstance(results[0], list):

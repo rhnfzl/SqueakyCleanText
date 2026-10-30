@@ -107,6 +107,9 @@ def test_text_cleaner_returns_policy_findings(monkeypatch):
                 findings=findings,
             )
 
+        def ner_process_batch_detailed(self, texts, languages, *, privacy_policy, **kwargs):
+            return [self.ner_process_detailed(t, privacy_policy=privacy_policy) for t in texts]
+
     monkeypatch.setattr("sct.sct.ner.GeneralNER", FakeNER)
     policy = PrivacyPolicy(
         name="strict",
@@ -160,7 +163,7 @@ def test_general_ner_detailed_processing_returns_real_offsets():
         labels = ["person"]
         label_map = {"person": "PER"}
 
-        def __call__(self, texts):
+        def __call__(self, texts, batch_size=1):
             return [[{
                 "entity_group": "PER",
                 "score": 0.95,
@@ -203,7 +206,7 @@ def test_detailed_processing_maps_normalized_chunk_offsets_to_source():
         labels = ["person"]
         label_map = {"person": "PER"}
 
-        def __call__(self, texts):
+        def __call__(self, texts, batch_size=1):
             assert texts == ["Intro. Maria"]
             return [[{
                 "entity_group": "PER",
@@ -248,6 +251,12 @@ def test_text_cleaner_stores_reversible_map_externally(monkeypatch):
         def ner_process(self, text, *, anon_map, **kwargs):
             anon_map.add("<PERSON_0>", "Maria", "PERSON", 0, 5)
             return "<PERSON_0> arrived."
+
+        def ner_process_batch_detailed(self, texts, languages, *, anon_maps, **kwargs):
+            return [
+                NERProcessingResult(text=self.ner_process(t, anon_map=m), findings=())
+                for t, m in zip(texts, anon_maps)
+            ]
 
     monkeypatch.setattr("sct.sct.ner.GeneralNER", FakeNER)
     store = InMemoryTokenStore()
@@ -347,7 +356,7 @@ def _gliner_ner_with_score(score):
         labels = ["person"]
         label_map = {"person": "PER"}
 
-        def __call__(self, texts):
+        def __call__(self, texts, batch_size=1):
             return [[{
                 "entity_group": "PER",
                 "score": score,

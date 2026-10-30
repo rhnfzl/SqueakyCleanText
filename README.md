@@ -559,7 +559,7 @@ new_cfg = dataclasses.replace(cfg, check_ner_process=False)
 | `replacement_mode` | `'placeholder'` | `'placeholder'`, `'synthetic'` (Faker), or `'reversible'` (indexed placeholders + deanonymize map) |
 | `positional_tags` | `('PER', 'LOC', 'ORG', 'MISC')` | Entity types to recognize |
 | `ner_confidence_threshold` | `0.85` | Minimum confidence score |
-| `ner_batch_size` | `8` | Inference batch size (must be >= 1) |
+| `ner_batch_size` | `8` | NER chunks per model forward pass, batched across the documents of a `process_batch` call (must be >= 1). `1` = 0.7.1 call pattern and exact scores; on CPU with many workers and long documents `1` can be faster and uses less memory |
 | `onnx_intra_op_threads` | `None` | ONNX Runtime threads per inference (`None` = ORT default, all cores). With `process_batch`, aim for workers x threads ~= physical cores |
 | `onnx_inter_op_threads` | `None` | ONNX Runtime inter-op threads (`None` = ORT default). Only matters with ORT parallel execution mode, so `onnx_intra_op_threads` is the usual knob |
 | `ner_models` | `None` | Language-keyed dict of ONNX model repo IDs |

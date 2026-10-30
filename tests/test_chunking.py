@@ -103,7 +103,7 @@ class _FakeGLiNER:
     label_map = {"person": "PER"}
     names = ("王小明", "राहुल", "ரவி")
 
-    def __call__(self, texts):
+    def __call__(self, texts, batch_size=1):
         out = []
         for text in texts:
             found = []

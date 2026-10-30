@@ -59,7 +59,7 @@ def test_gliner_calls_stay_serialised():
         labels = ["person"]
         label_map = {"person": "PER"}
 
-        def __call__(self, texts):
+        def __call__(self, texts, batch_size=1):
             with guard:
                 state["inside"] += 1
                 state["max"] = max(state["max"], state["inside"])

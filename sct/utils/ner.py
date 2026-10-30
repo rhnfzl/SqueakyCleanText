@@ -59,6 +59,8 @@ class GeneralNER:
         ensemble_torch — Torch + GLiNER combined via ensemble voting
     """
 
+    _ner_batch_size = 8  # chunks per model call; __init__ sets the configured value
+
     def __init__(self, cache_dir: Optional[Path] = None, device: Optional[str] = None,
                  model_names: Optional[Union[Dict[str, str], List[str]]] = None,
                  model_revisions: Optional[Dict[str, str]] = None,
@@ -579,32 +581,154 @@ class GeneralNER:
             )
             return NERProcessingResult(text=result.text, findings=findings)
 
-        # --- Chunking --- (lock-free: HF fast tokenizer Rust backend is thread-safe)
-        if self.tokenizer is not None:
-            chunks = self.split_text(text, self.min_token_length, self.tokenizer)
-        else:
-            # Use GLiNER adapter's dynamic context window when available
-            gliner_max = self._gliner_pipe.max_context_length if self._gliner_pipe else 384
-            chunks = self._simple_chunk(text, max_tokens=int(gliner_max * 0.9))
-
+        chunks = self._chunk_text(text)
         if not chunks:
             return NERProcessingResult(text=text, findings=())
+        chunk_results = self._detect(chunks, [language] * len(chunks), positional_tags)
+        return self._finalize(
+            text, chunks, chunk_results, ner_confidence_threshold, anon_map, privacy_policy,
+        )
 
-        # Pre-compute GLiNER-only tag set (constant across chunks)
-        gliner_all_tags = None
-        if self._ner_backend == 'gliner' and self._gliner_pipe:
-            gliner_all_tags = set(positional_tags)
-            gliner_all_tags.update(self._gliner_pipe.label_map.values())
-            gliner_all_tags.update(
-                label.upper() for label in self._gliner_pipe.labels
-                if label not in self._gliner_pipe.label_map
-            )
+    def ner_process_batch_detailed(
+        self,
+        texts: Sequence[str],
+        languages: Sequence[Optional[str]],
+        positional_tags: Optional[Sequence[str]] = None,
+        ner_confidence_threshold: Optional[float] = None,
+        anon_maps: Optional[Sequence[Optional['AnonymizationMap']]] = None,
+        privacy_policy: Optional[PrivacyPolicy] = None,
+        before_finalize=None,
+        max_workers: int = 1,
+    ) -> List[NERProcessingResult]:
+        """``ner_process_detailed`` for many documents, batching model calls across them.
 
-        # --- Inference + ensemble per chunk ---
+        Chunks of all documents go through each model in calls of up to
+        ``ner_batch_size`` chunks; replacement then runs per document exactly as
+        in ``ner_process_detailed``. *before_finalize(i)* runs just before
+        document *i* is replaced (TextCleaner resets the synthetic cache there).
+        *max_workers* ONNX batches run at once.
+        """
+        if not positional_tags:
+            raise ValueError("Must provide at least one positional tag")
+        if ner_confidence_threshold is None:
+            ner_confidence_threshold = 0.85
+        anon_maps = anon_maps if anon_maps is not None else [None] * len(texts)
+        if self._ner_backend == 'presidio_gliner':
+            results = []
+            for i, text in enumerate(texts):
+                if before_finalize is not None:
+                    before_finalize(i)
+                results.append(self.ner_process_detailed(
+                    text, positional_tags, ner_confidence_threshold, languages[i],
+                    anon_maps[i], privacy_policy,
+                ))
+            return results
+
+        doc_chunks = [self._chunk_text(text) for text in texts]
+        flat_chunks = [chunk for chunks in doc_chunks for chunk in chunks]
+        flat_languages = [
+            languages[i] for i, chunks in enumerate(doc_chunks) for _ in chunks
+        ]
+        flat_results = self._detect(flat_chunks, flat_languages, positional_tags, max_workers)
+
+        results = []
+        offset = 0
+        for i, (text, chunks) in enumerate(zip(texts, doc_chunks)):
+            chunk_results = flat_results[offset:offset + len(chunks)]
+            offset += len(chunks)
+            if before_finalize is not None:
+                before_finalize(i)
+            if not chunks:
+                results.append(NERProcessingResult(text=text, findings=()))
+                continue
+            results.append(self._finalize(
+                text, chunks, chunk_results, ner_confidence_threshold,
+                anon_maps[i], privacy_policy,
+            ))
+        return results
+
+    def _chunk_text(self, text: str) -> List[str]:
+        """Split *text* into model-sized chunks."""
+        # lock-free: HF fast tokenizer Rust backend is thread-safe
+        if self.tokenizer is not None:
+            return self.split_text(text, self.min_token_length, self.tokenizer)
+        # Use GLiNER adapter's dynamic context window when available
+        gliner_max = self._gliner_pipe.max_context_length if self._gliner_pipe else 384
+        return self._simple_chunk(text, max_tokens=int(gliner_max * 0.9))
+
+    def _detect(
+        self,
+        chunks: List[str],
+        languages: List[Optional[str]],
+        positional_tags: Sequence[str],
+        max_workers: int = 1,
+    ) -> List[list]:
+        """Run every model on its chunks; return the raw NER results per chunk.
+
+        The only place that calls model pipelines. Each model gets one call over
+        all chunks it applies to, run ``ner_batch_size`` chunks per forward pass
+        (ONNX: up to *max_workers* forward passes at once).
+        Per chunk, results keep the order of that language's ensemble keys,
+        then GLiNER, as in the one-chunk-at-a-time loop.
+        """
+        per_key: List[Dict[str, list]] = [{} for _ in chunks]
+        chunk_keys: List[tuple] = [()] * len(chunks)
+
+        # Primary backend: ONNX or Torch — run each key in the ensemble
+        if self._ner_backend in ('onnx', 'torch', 'ensemble_onnx', 'ensemble_torch'):
+            chunk_keys = [
+                self._get_ensemble_keys(language or 'MULTILINGUAL') for language in languages
+            ]
+            for key in dict.fromkeys(k for keys in chunk_keys for k in keys):
+                indices = [i for i, keys in enumerate(chunk_keys) if key in keys]
+                self._ensure_loaded(key)
+                key_chunks = [chunks[i] for i in indices]
+                if self._ner_backend in ('onnx', 'ensemble_onnx'):
+                    batch = self._pipelines[key](
+                        key_chunks, batch_size=self._ner_batch_size, max_workers=max_workers,
+                    )
+                else:
+                    with self._get_lock(self._model_key(key)):
+                        batch = self._pipelines[key](key_chunks, batch_size=self._ner_batch_size)
+                for i, data in zip(indices, batch):
+                    per_key[i][key] = self.ner_data(data, positional_tags)
+
+        results = [
+            [item for key in keys for item in per_key[i][key]]
+            for i, keys in enumerate(chunk_keys)
+        ]
+
+        # GLiNER backend
+        if self._ner_backend in ('gliner', 'ensemble_onnx', 'ensemble_torch') \
+                and self._gliner_pipe and chunks:
+            # GLiNER-only keeps every label it was given; ensembles keep positional_tags.
+            gliner_tags = set(positional_tags)
+            if self._ner_backend == 'gliner':
+                gliner_tags.update(self._gliner_pipe.label_map.values())
+                gliner_tags.update(
+                    label.upper() for label in self._gliner_pipe.labels
+                    if label not in self._gliner_pipe.label_map
+                )
+            with self._get_lock('gliner'):
+                gliner_batch = self._gliner_pipe(chunks, batch_size=self._ner_batch_size)
+            for i, data in enumerate(gliner_batch):
+                results[i].extend(self.ner_data(data, gliner_tags))
+        return results
+
+    def _finalize(
+        self,
+        text: str,
+        chunks: List[str],
+        chunk_results: List[list],
+        ner_confidence_threshold: float,
+        anon_map: Optional['AnonymizationMap'],
+        privacy_policy: Optional[PrivacyPolicy],
+    ) -> NERProcessingResult:
+        """Vote and replace chunk by chunk; offsets come back document-relative."""
         ner_clean_text = []
         all_findings = []
         search_start = 0
-        for chunk in chunks:
+        for chunk, ner_results in zip(chunks, chunk_results):
             source_chunk, chunk_start, source_offsets = self._align_chunk(
                 text,
                 chunk,
@@ -613,30 +737,6 @@ class GeneralNER:
             if chunk_start > search_start:
                 ner_clean_text.append(text[search_start:chunk_start])
             search_start = chunk_start + len(source_chunk)
-            ner_results = []
-
-            # Primary backend: ONNX or Torch — run each key in the ensemble
-            if self._ner_backend in ('onnx', 'torch', 'ensemble_onnx', 'ensemble_torch'):
-                for key in self._get_ensemble_keys(language or 'MULTILINGUAL'):
-                    self._ensure_loaded(key)
-                    if self._ner_backend in ('onnx', 'ensemble_onnx'):
-                        batch = self._pipelines[key]([chunk])
-                    else:
-                        with self._get_lock(self._model_key(key)):
-                            batch = self._pipelines[key]([chunk])
-                    ner_results.extend(self.ner_data(batch[0], positional_tags))
-
-            # GLiNER backend
-            if self._ner_backend in ('gliner', 'ensemble_onnx', 'ensemble_torch') \
-                    and self._gliner_pipe:
-                gliner_lock = self._get_lock('gliner')
-                with gliner_lock:
-                    gliner_batch = self._gliner_pipe([chunk])
-                if gliner_all_tags is not None:
-                    ner_results.extend(self.ner_data(gliner_batch[0], gliner_all_tags))
-                else:
-                    # Ensemble: filter to positional_tags only
-                    ner_results.extend(self.ner_data(gliner_batch[0], positional_tags))
 
             # Ensemble vote + anonymize
             ensemble_results = self.ner_ensemble(ner_results, ner_confidence_threshold)
@@ -847,20 +947,17 @@ class GeneralNER:
         ner_confidence_threshold: Optional[float] = None,
         language: Optional[str] = None
     ) -> List[str]:
-        """Process multiple texts in batches."""
+        """Process multiple texts, *batch_size* documents per batched model call."""
         batch_size = batch_size if batch_size is not None else self._ner_batch_size
         results = []
         for i in range(0, len(texts), batch_size):
             batch = texts[i:i + batch_size]
-            batch_results = [
-                self.ner_process(
-                    text,
-                    positional_tags=positional_tags,
-                    ner_confidence_threshold=ner_confidence_threshold,
-                    language=language
-                ) for text in batch
-            ]
-            results.extend(batch_results)
+            results.extend(result.text for result in self.ner_process_batch_detailed(
+                batch,
+                [language] * len(batch),
+                positional_tags=positional_tags,
+                ner_confidence_threshold=ner_confidence_threshold,
+            ))
         return results
 
     def __del__(self):

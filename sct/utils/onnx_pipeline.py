@@ -7,6 +7,7 @@ byte-identical entity span and label output.
 
 import json
 import logging
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
@@ -94,10 +95,12 @@ class ONNXNERPipeline:
 
     def __init__(self, session: ort.InferenceSession,
                  tokenizer_wrapper: TokenizerWrapper,
-                 id2label: Dict[int, str]):
+                 id2label: Dict[int, str],
+                 pad_id: int = 0):
         self._session = session
         self._tokenizer = tokenizer_wrapper
         self._id2label = id2label
+        self._pad_id = pad_id
 
         # Detect which inputs the model expects (BERT needs token_type_ids,
         # XLM-RoBERTa does not).
@@ -108,48 +111,64 @@ class ONNXNERPipeline:
     # Public API
     # ------------------------------------------------------------------
 
-    def __call__(self, texts) -> List[List[dict]]:
+    def __call__(self, texts, batch_size: int = 1, max_workers: int = 1) -> List[List[dict]]:
         """Run NER on one or more texts.
 
         Parameters
         ----------
         texts : str | List[str]
             A single string or a list of strings.
+        batch_size : int
+            Texts per ``session.run``. Rows are right-padded to the longest text
+            in the batch; ``1`` runs each text alone with no padding.
+        max_workers : int
+            Threads running batches at once (``session.run`` is thread-safe).
 
         Returns
         -------
         List[List[dict]]
-            One list of entity dicts per input text, each with keys:
+            One list of entity dicts per input text (input order), each with keys:
             ``entity_group``, ``score``, ``word``, ``start``, ``end``.
         """
         if isinstance(texts, str):
             texts = [texts]
 
-        all_results: List[List[dict]] = []
-        for text in texts:
-            encoding = self._tokenizer.encode_for_inference(text)
+        encodings = [self._tokenizer.encode_for_inference(text) for text in texts]
+        all_results: List[List[dict]] = [[] for _ in texts]
+        # Similar lengths share a batch, which keeps padding small.
+        order = sorted(range(len(texts)), key=lambda i: len(encodings[i].ids))
+        batch_size = max(1, batch_size)
 
-            # Build ONNX input feeds
-            input_ids = np.array([encoding.ids], dtype=np.int64)
-            attention_mask = np.array([encoding.attention_mask], dtype=np.int64)
+        def run_batch(rows):
+            width = max(len(encodings[i].ids) for i in rows)
 
-            feeds: Dict[str, np.ndarray] = {
-                'input_ids': input_ids,
-                'attention_mask': attention_mask,
-            }
-            if self._needs_token_type_ids:
-                feeds['token_type_ids'] = np.array(
-                    [encoding.type_ids], dtype=np.int64
+            def padded(field, pad):
+                return np.array(
+                    [getattr(encodings[i], field) + [pad] * (width - len(encodings[i].ids))
+                     for i in rows],
+                    dtype=np.int64,
                 )
 
-            # Run inference — returns list of output arrays
-            logits = self._session.run(None, feeds)[0]  # (1, seq_len, num_labels)
+            feeds: Dict[str, np.ndarray] = {
+                'input_ids': padded('ids', self._pad_id),
+                'attention_mask': padded('attention_mask', 0),
+            }
+            if self._needs_token_type_ids:
+                feeds['token_type_ids'] = padded('type_ids', 0)
 
-            scores = self._softmax(logits[0])  # (seq_len, num_labels)
-            entities = self._aggregate_simple(
-                text, encoding, scores
-            )
-            all_results.append(entities)
+            logits = self._session.run(None, feeds)[0]  # (rows, width, num_labels)
+
+            for row, i in enumerate(rows):
+                scores = self._softmax(logits[row, :len(encodings[i].ids)])
+                all_results[i] = self._aggregate_simple(texts[i], encodings[i], scores)
+
+        batches = [order[i:i + batch_size] for i in range(0, len(order), batch_size)]
+        if max_workers > 1 and len(batches) > 1:
+            with ThreadPoolExecutor(max_workers=min(max_workers, len(batches))) as pool:
+                list(pool.map(run_batch, batches))
+        else:
+            for rows in batches:
+                run_batch(rows)
 
         return all_results
 
@@ -359,7 +378,15 @@ def load_onnx_ner_model(
         providers=providers,
     )
 
-    pipeline = ONNXNERPipeline(session, wrapper, id2label)
+    # Pad id for batched inference: config, else the tokenizer's pad token, else 0.
+    pad_id = model_config.get('pad_token_id')
+    if pad_id is None:
+        pad_id = next(
+            (tok_id for tok_id in map(tokenizer.token_to_id, ('[PAD]', '<pad>'))
+             if tok_id is not None),
+            0,
+        )
+    pipeline = ONNXNERPipeline(session, wrapper, id2label, pad_id=pad_id)
 
     logger.info(f"Loaded ONNX NER model: {model_name} (providers: {session.get_providers()})")
 

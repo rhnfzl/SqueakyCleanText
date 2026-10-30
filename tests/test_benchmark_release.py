@@ -65,3 +65,20 @@ def test_predicted_spans_context_changed_by_cleanup():
     assert predicted_spans("Ann x met Ann", "Ann met <PERSON_0>", {"<PERSON_0>": "Ann"}) == [
         EntitySpan("PERSON", 10, 13),
     ]
+
+
+def test_run_batch_reports_throughput_keys(tmp_path):
+    from scripts.benchmark_release import ROOT, run_batch
+    from tests.conftest import TEST_NER_MODELS
+
+    lines = (ROOT / "evaluation" / "release_benchmark.jsonl").read_text(encoding="utf-8").splitlines()
+    dataset = tmp_path / "two.jsonl"
+    dataset.write_text("\n".join(lines[:2]) + "\n", encoding="utf-8")
+
+    result = run_batch(
+        dataset, documents=4, batch_size=2, ner_batch_size=8, intra_op_threads=1,
+        repeats=1, long=False, ner_models=TEST_NER_MODELS,
+    )
+
+    assert {"settings", "seconds", "docs_per_second", "peak_rss_mb", "output_sha256"} <= set(result)
+    assert result["settings"]["documents"] == 4 and len(result["seconds"]) == 1

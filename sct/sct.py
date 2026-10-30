@@ -253,6 +253,50 @@ class TextCleaner:
         Returns:
             ProcessResult (unpacks as 3-tuple for backward compat).
         """
+        state = self._before_ner(text)
+        current_text, language, anon_map = state[0], state[1], state[2]
+
+        # NER processing
+        findings = ()
+        if self.cfg.check_ner_process and self.GeneralNER is not None:
+            if (
+                self._privacy_policy is not None
+                or self._include_entities
+                or self._metrics_callback is not None
+            ):
+                detailed = self.GeneralNER.ner_process_detailed(
+                    current_text,
+                    positional_tags=self.cfg.positional_tags,
+                    ner_confidence_threshold=self.cfg.ner_confidence_threshold,
+                    language=language,
+                    anon_map=anon_map,
+                    privacy_policy=self._privacy_policy,
+                )
+                current_text = detailed.text
+                findings = detailed.findings
+            else:
+                current_text = self.GeneralNER.ner_process(
+                    current_text,
+                    positional_tags=self.cfg.positional_tags,
+                    ner_confidence_threshold=self.cfg.ner_confidence_threshold,
+                    language=language,
+                    anon_map=anon_map,
+                )
+        return self._after_ner(state, current_text, findings)
+
+    def _before_ner_isolated(self, text: str) -> tuple:
+        """``_before_ner`` that clears the per-thread document context afterwards."""
+        try:
+            return self._before_ner(text)
+        finally:
+            self._document_context.anon_map = None
+            self._document_context.protected = None
+
+    def _before_ner(self, text: str) -> tuple:
+        """Every step before NER.
+
+        Returns ``(text, language, anon_map, doc_classes, started_at)``.
+        """
         started_at = time.perf_counter()
 
         # Reset per-document synthetic consistency cache (thread-safe via threading.local)
@@ -294,32 +338,11 @@ class TextCleaner:
         for step in self._post_fuzzy_pipeline:
             current_text = step(current_text)
 
-        # NER processing
-        findings = ()
-        if self.cfg.check_ner_process and self.GeneralNER is not None:
-            if (
-                self._privacy_policy is not None
-                or self._include_entities
-                or self._metrics_callback is not None
-            ):
-                detailed = self.GeneralNER.ner_process_detailed(
-                    current_text,
-                    positional_tags=self.cfg.positional_tags,
-                    ner_confidence_threshold=self.cfg.ner_confidence_threshold,
-                    language=language,
-                    anon_map=anon_map,
-                    privacy_policy=self._privacy_policy,
-                )
-                current_text = detailed.text
-                findings = detailed.findings
-            else:
-                current_text = self.GeneralNER.ner_process(
-                    current_text,
-                    positional_tags=self.cfg.positional_tags,
-                    ner_confidence_threshold=self.cfg.ner_confidence_threshold,
-                    language=language,
-                    anon_map=anon_map,
-                )
+        return current_text, language, anon_map, doc_classes, started_at
+
+    def _after_ner(self, state: tuple, current_text: str, findings) -> ProcessResult:
+        """Every step after NER, for the document *state* from ``_before_ner``."""
+        _, language, anon_map, doc_classes, started_at = state
 
         # Statistical model processing (always returns stext, even if None)
         stext = None
@@ -424,22 +447,46 @@ class TextCleaner:
         if not to_process:
             return [r for r in results if r is not None]
 
-        # Parallel processing: each text goes through the full pipeline independently.
-        # ONNX Runtime releases the GIL during C++ inference ops, so threads
-        # achieve real concurrency for the NER inference bottleneck.
+        # Parallel processing: ONNX Runtime releases the GIL during C++ inference
+        # ops, so threads achieve real concurrency for the NER inference bottleneck.
         worker_limit = batch_size if batch_size is not None else (os.cpu_count() or 4)
         max_workers = min(len(to_process), worker_limit)
-        if max_workers > 1:
+
+        def run(fn):
+            if max_workers <= 1:
+                return [fn(text) for _, text in to_process]
             with ThreadPoolExecutor(max_workers=max_workers) as executor:
-                futures = {
-                    executor.submit(self._process_single, text): i
-                    for i, text in to_process
-                }
-                for future in futures:
-                    results[futures[future]] = future.result()
+                return list(executor.map(fn, [text for _, text in to_process]))
+
+        if (
+            self.cfg.check_ner_process
+            and self.GeneralNER is not None
+            and self.cfg.ner_batch_size > 1
+        ):
+            # Batched NER: pre-NER steps per document in threads, one NER call over
+            # all documents (model calls batch chunks across documents), then the rest.
+            states = run(self._before_ner_isolated)
+
+            def reset_synthetic(_index):
+                if self._synthetic_replacer:
+                    self._synthetic_replacer.reset_cache()
+
+            ner_results = self.GeneralNER.ner_process_batch_detailed(
+                [state[0] for state in states],
+                [state[1] for state in states],
+                positional_tags=self.cfg.positional_tags,
+                ner_confidence_threshold=self.cfg.ner_confidence_threshold,
+                anon_maps=[state[2] for state in states],
+                privacy_policy=self._privacy_policy,
+                before_finalize=reset_synthetic,
+                max_workers=max_workers,
+            )
+            for (i, _), state, ner_result in zip(to_process, states, ner_results):
+                results[i] = self._after_ner(state, ner_result.text, ner_result.findings)
         else:
-            for i, text in to_process:
-                results[i] = self._process_single(text)
+            # Each text goes through the full pipeline independently.
+            for (i, _), result in zip(to_process, run(self._process_single)):
+                results[i] = result
 
         return [r for r in results if r is not None]
 
