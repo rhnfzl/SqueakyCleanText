@@ -1,0 +1,39 @@
+# Release benchmark: SCT 0.8.0 (unreleased; branch perf/v0.8.0-speed, sct.__version__ still 0.7.1)
+
+Commit `c88e3caecbec7dc30ac83d69f760b752bb2d6f31`, macOS-27.2-arm64-arm-64bit-Mach-O, Python 3.13.12.
+Dataset `release_benchmark.jsonl`: 30 documents, 84 entities. Exact label + span match.
+
+Speed (default config, single process): **7.524 docs/s**, mean 132.9 ms, p95 879.483 ms.
+Leaks: **0 / 67** PII values still in output (partial: 0).
+
+## By label
+
+| | TP | FP | FN | P | R | F1 |
+|---|---|---|---|---|---|---|
+| **overall** | 82 | 2 | 2 | 0.98 | 0.98 | 0.98 |
+| EMAIL | 6 | 1 | 1 | 0.86 | 0.86 | 0.86 |
+| IP | 9 | 0 | 0 | 1.00 | 1.00 | 1.00 |
+| LOCATION | 5 | 1 | 1 | 0.83 | 0.83 | 0.83 |
+| NUMBER | 8 | 0 | 0 | 1.00 | 1.00 | 1.00 |
+| ORGANISATION | 2 | 0 | 0 | 1.00 | 1.00 | 1.00 |
+| PERSON | 25 | 0 | 0 | 1.00 | 1.00 | 1.00 |
+| PHONE_NUMBER | 16 | 0 | 0 | 1.00 | 1.00 | 1.00 |
+| URL | 2 | 0 | 0 | 1.00 | 1.00 | 1.00 |
+| YEAR | 9 | 0 | 0 | 1.00 | 1.00 | 1.00 |
+
+## By language
+
+| | TP | FP | FN | P | R | F1 |
+|---|---|---|---|---|---|---|
+| bn | 2 | 0 | 0 | 1.00 | 1.00 | 1.00 |
+| de | 9 | 0 | 0 | 1.00 | 1.00 | 1.00 |
+| en | 33 | 0 | 0 | 1.00 | 1.00 | 1.00 |
+| es | 8 | 0 | 0 | 1.00 | 1.00 | 1.00 |
+| hi | 10 | 0 | 0 | 1.00 | 1.00 | 1.00 |
+| ja | 4 | 0 | 0 | 1.00 | 1.00 | 1.00 |
+| nl | 8 | 0 | 0 | 1.00 | 1.00 | 1.00 |
+| ta | 2 | 0 | 0 | 1.00 | 1.00 | 1.00 |
+| zh | 6 | 2 | 2 | 0.75 | 0.75 | 0.75 |
+
+## Leaks
+
