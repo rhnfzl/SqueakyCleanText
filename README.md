@@ -513,6 +513,8 @@ new_cfg = dataclasses.replace(cfg, check_ner_process=False)
 | `check_replace_html` | `True` | Strip/replace HTML tags |
 | `check_replace_urls` | `True` | Replace URLs with token |
 | `check_replace_emails` | `True` | Replace emails with token |
+| `check_replace_ips` | `True` | Replace IPv4/IPv6 addresses (runs before dates, phones, years) |
+| `replace_ips_public_only` | `False` | Keep private, loopback and reserved IPs; replace only public ones |
 | `check_replace_years` | `True` | Replace years (1900-2099) |
 | `check_replace_dates` | `False` | Replace full dates (ISO 8601, month names) |
 | `check_fuzzy_replace_dates` | `False` | Fuzzy match misspelled months (requires `[fuzzy]`) |
@@ -540,6 +542,7 @@ new_cfg = dataclasses.replace(cfg, check_ner_process=False)
 | `replace_with_url` | `"<URL>"` |
 | `replace_with_html` | `"<HTML>"` |
 | `replace_with_email` | `"<EMAIL>"` |
+| `replace_with_ips` | `"<IP>"` |
 | `replace_with_years` | `"<YEAR>"` |
 | `replace_with_dates` | `"<DATE>"` |
 | `replace_with_phone_numbers` | `"<PHONE>"` |

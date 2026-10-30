@@ -30,6 +30,11 @@ def build_browser_manifest(config: TextCleanerConfig) -> dict[str, Any]:
             "Browser export currently supports placeholder replacement only"
         )
 
+    if config.check_replace_ips and config.replace_ips_public_only:
+        raise ValueError(
+            "Browser export does not support replace_ips_public_only=True"
+        )
+
     model_revisions = config.ner_model_revisions or {}
     unpinned_models = sorted(
         key
@@ -54,7 +59,7 @@ def build_browser_manifest(config: TextCleanerConfig) -> dict[str, Any]:
         "runtime": "onnxruntime-web",
         "models": models,
         "rule_order": [
-            "html", "url", "email", "date", "year", "phone", "number",
+            "html", "url", "email", "ip", "date", "phone", "year", "number",
             "currency",
         ],
         "rules": {
@@ -72,6 +77,11 @@ def build_browser_manifest(config: TextCleanerConfig) -> dict[str, Any]:
                 constants.EMAIL_REGEX,
                 config.replace_with_email,
                 config.check_replace_emails,
+            ),
+            "ip": _rule(
+                constants.IP_REGEX,
+                config.replace_with_ips,
+                config.check_replace_ips,
             ),
             "date": _rule(
                 constants.DATE_REGEX,

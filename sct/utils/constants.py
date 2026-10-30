@@ -39,14 +39,40 @@ EMAIL_REGEX = re.compile(
     flags=re.IGNORECASE | re.UNICODE,
 )
 
+# Digit boundaries are "not next to a digit", so numbers glued to letters of
+# any script (``电话9876543210``, ``फोन9876543210पर``) are still found.
 PHONE_REGEX = re.compile(
-    r"((?:^|(?<=[^\w)]))((\+?\d+|0{1,2}\d*?)[ .-]?)?(\(?\d{3,4}\)?/?[ .-]?)?"
-    r"(\d{3}[ .-]?\d{4})(\s?(?:ext\.?|[#x-])\s?\d{2,6})?(?:$|(?=\W)))|\+?\d{4,5}[ .-/]\d{6,9}"
+    # A leading year group ("1999 2000", "2019 555-1234") stays for the year step.
+    r"((?<![\d_)])(?!(?:19|20)\d\d[ .-])((\+?\d+|0{1,2}\d*?)[ .-]?)?(\(?\d{3,4}\)?/?[ .-]?)?"
+    r"(\d{3}[ .-]?\d{4})(\s?(?:ext\.?|[#x-])\s?\d{2,6})?(?![\d_]))|\+?\d{4,5}[ .-/]\d{6,9}"
+    # Indian mobile: 98765 43210, 098765-43210
+    r"|(?<![\d_)])0?[6-9]\d{4}[ -]?\d{5}(?![\d_])"
+    # International: "+" then at least 8 digits in groups (+34 612 345 678, +91 98765 43210)
+    r"|(?<![\d+])\+(?=(?:[ .()-]{0,2}\d){8})\d{1,3}(?:[ .-]?\(?\d{1,5}\)?){1,5}"
+    r"(?:\s?(?:ext\.?|[#x])\s?\d{2,6})?(?![\d_(])"
+)
+
+# IPv4 and IPv6 (incl. "::" forms and IPv4-mapped tails). Runs before the
+# date/year/phone steps so "2001:4860:4860::8888" is not read as a year.
+_IPV4 = r"(?:(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])\.){3}(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])"
+_H16 = r"[0-9A-Fa-f]{1,4}"
+_IPV6 = "|".join([
+    rf"(?:{_H16}:){{6}}{_IPV4}",
+    rf"::(?:[fF]{{4}}(?::0{{1,4}})?:)?{_IPV4}",
+    rf"(?:{_H16}:){{1,4}}:{_IPV4}",
+    rf"(?:{_H16}:){{7}}{_H16}",
+    rf"(?:{_H16}:){{1,6}}(?::{_H16}){{1,6}}",
+    rf"(?:{_H16}:){{1,7}}:",
+    rf"::{_H16}(?::{_H16}){{0,6}}",
+])
+IP_REGEX = re.compile(
+    rf"(?<![\w:.])(?:{_IPV6})(?![\w:]|\.[0-9])"
+    rf"|(?<![0-9.])(?:{_IPV4})(?![0-9]|\.[0-9])"
 )
 
 NUMBERS_REGEX = re.compile(
-    r"(?:^|(?<=[^\w,.]))[+–-]?(([1-9]\d{0,2}(,\d{3})+(\.\d*)?)"
-    r"|([1-9]\d{0,2}([ .]\d{3})+(,\d*)?)|(\d*?[.,]\d+)|\d+)(?:$|(?=\b))"
+    r"(?<![\d_,.])[+–-]?(([1-9]\d{0,2}(,\d{3})+(\.\d*)?)"
+    r"|([1-9]\d{0,2}([ .]\d{3})+(,\d*)?)|(\d*?[.,]\d+)|\d+)(?![\d_])"
 )
 
 LINEBREAK_REGEX = re.compile(r"((\r\n)|[\n\v])+")
@@ -98,7 +124,7 @@ strange_single_quotes = ["'", "‛", "\u2019", "❛", "❜", "`", "´", "\u2018"
 DOUBLE_QUOTE_REGEX = re.compile("|".join(strange_double_quotes))
 SINGLE_QUOTE_REGEX = re.compile("|".join(strange_single_quotes))
 
-YEAR_REGEX = re.compile(r"\b(19|20)\d{2}\b")
+YEAR_REGEX = re.compile(r"(?<![\d_])(19|20)\d{2}(?![\d_])")
 
 # ---------------------------------------------------------------------------
 # Multilingual month name vocabulary (EN, NL, DE, ES, FR, PT, IT)

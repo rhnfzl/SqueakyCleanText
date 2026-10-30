@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.7.1 - Unreleased
+
+### Fixes
+
+- Phone, number and year rules now find digits glued to letters in any script (for example `电话9876543210`, `वर्ष2023में`).
+- IPv4 and IPv6 addresses (public and private) are replaced with `<IP>` before the date, phone and year steps. Set `replace_ips_public_only=True` to keep private, loopback and reserved addresses, or `check_replace_ips=False` to turn the step off.
+- Phones now run before years, so `+31 6 1234 2019` and `2001:4860:4860::8888` are no longer split by the year rule. The browser manifest uses the same order.
+- Phone detection covers more international formats (`+34 612 345 678`, `+91 98765 43210`) and Indian mobiles (`98765 43210`, `098765-43210`).
+- Languages the `stop-words` package does not support (for example `THAI`) no longer crash `TextCleaner` creation.
+
 ## 0.7.0 - 2026-09-19
 
 SqueakyCleanText now supports privacy workflows beyond single-text cleanup.

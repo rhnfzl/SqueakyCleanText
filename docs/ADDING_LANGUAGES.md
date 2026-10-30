@@ -299,7 +299,7 @@ The `stop-words` package supports 33 languages. If the new language is among the
 ```python
 from stop_words import get_stop_words
 print(get_stop_words('fr'))  # French: works
-print(get_stop_words('ja'))  # Japanese: KeyError
+print(get_stop_words('th'))  # Thai: raises StopWordError (SCT falls back to no stopwords)
 ```
 
 If the package doesn't support the language, users can provide `custom_stopwords`, or you can add a built-in set.

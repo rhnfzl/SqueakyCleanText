@@ -79,6 +79,7 @@ def is_sensitive_result(
         cleaner.cfg.replace_with_url,
         cleaner.cfg.replace_with_html,
         cleaner.cfg.replace_with_email,
+        cleaner.cfg.replace_with_ips,
         cleaner.cfg.replace_with_years,
         cleaner.cfg.replace_with_dates,
         cleaner.cfg.replace_with_phone_numbers,

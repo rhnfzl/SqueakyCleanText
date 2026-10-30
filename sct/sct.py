@@ -181,14 +181,17 @@ class TextCleaner:
             self._pipeline.append(self._replace_urls)
         if cfg.check_replace_emails:
             self._pipeline.append(self._replace_emails)
+        if cfg.check_replace_ips:
+            self._pipeline.append(self._replace_ips)
         if cfg.check_replace_dates:
             self._pipeline.append(self._replace_dates)
         # fuzzy_replace_dates runs here (between replace_dates and replace_years)
         # but is called explicitly in _process_single with language context.
-        if cfg.check_replace_years:
-            self._post_fuzzy_pipeline.append(self._replace_years)
+        # Phones before years, so a year step cannot split "+31 6 1234 2019".
         if cfg.check_replace_phone_numbers:
             self._post_fuzzy_pipeline.append(self._replace_phone_numbers)
+        if cfg.check_replace_years:
+            self._post_fuzzy_pipeline.append(self._replace_years)
         if cfg.check_replace_numbers:
             self._post_fuzzy_pipeline.append(self._replace_numbers)
         if cfg.check_replace_currency_symbols:
@@ -267,7 +270,7 @@ class TextCleaner:
 
         current_text = text
 
-        # Pre-fuzzy pipeline steps (unicode fix → html → urls → emails → dates)
+        # Pre-fuzzy pipeline steps (unicode fix → html → urls → emails → ips → dates)
         for step in self._pipeline:
             current_text = step(current_text)
 
@@ -281,7 +284,7 @@ class TextCleaner:
                 language=language,
             )
 
-        # Post-fuzzy pipeline steps (years → phones → numbers → symbols → whitespace)
+        # Post-fuzzy pipeline steps (phones → years → numbers → symbols → whitespace)
         for step in self._post_fuzzy_pipeline:
             current_text = step(current_text)
 
@@ -468,12 +471,14 @@ class TextCleaner:
 
     # --- Pipeline step methods (private, used by _init_pipeline) ---
 
-    def _replace_reversible(self, text, pattern, entity_type):
+    def _replace_reversible(self, text, pattern, entity_type, keep=None):
         anon_map = getattr(self._document_context, 'anon_map', None)
         if anon_map is None:
             return None
 
         def replace(match):
+            if keep is not None and keep(match.group()):
+                return match.group()
             placeholder = anon_map.next_placeholder(entity_type)
             anon_map.add(
                 placeholder,
@@ -532,6 +537,25 @@ class TextCleaner:
                 text, lambda orig: self._synthetic_replacer.get_replacement('EMAIL', orig),
             )
         return self.ProcessContacts.replace_emails(text, replace_with=self.cfg.replace_with_email)
+
+    def _replace_ips(self, text):
+        public_only = self.cfg.replace_ips_public_only
+        reversible = self._replace_reversible(
+            text,
+            constants.IP_REGEX,
+            'IP_ADDRESS',
+            keep=lambda orig: not contact.is_replaceable_ip(orig, public_only),
+        )
+        if reversible is not None:
+            return reversible
+        if self._synthetic_replacer:
+            return self.ProcessContacts.replace_ips_with_fn(
+                text, lambda orig: self._synthetic_replacer.get_replacement('IP_ADDRESS', orig),
+                public_only,
+            )
+        return self.ProcessContacts.replace_ips(
+            text, replace_with=self.cfg.replace_with_ips, public_only=public_only,
+        )
 
     def _replace_dates(self, text):
         reversible = self._replace_reversible(
