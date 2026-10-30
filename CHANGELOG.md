@@ -16,7 +16,8 @@ and leaked PII values from 6 of 67 to 0.
 
 ### Fixes
 
-- Phone, number and year rules now find digits glued to letters in any script (for example `电话9876543210`, `वर्ष2023में`).
+- Phone and year rules now find digits glued to letters in any script (for example `电话9876543210`, `वर्ष2023में`).
+- The number rule now finds numbers glued to letters in scripts written without spaces (`金额5000元`). Digits inside Latin, Greek and Cyrillic words stay as they are (`GPT-4o`, `Qwen3-8B`, `H2O`). Set `replace_numbers_in_words=True` to replace those too (`GPT4` becomes `GPT<NUMBER>`).
 - IPv4 and IPv6 addresses (public and private) are replaced with `<IP>` before the date, phone and year steps. Set `replace_ips_public_only=True` to keep private, loopback and reserved addresses, or `check_replace_ips=False` to turn the step off.
 - Phones now run before years, so `+31 6 1234 2019` and `2001:4860:4860::8888` are no longer split by the year rule. The browser manifest uses the same order.
 - IPv6 is matched in every valid compressed form, including IPv4 tails (`::abcd:192.0.2.1`, `1:2:3:4:5::192.0.2.1`), and invalid forms are not matched, also in the browser rule.

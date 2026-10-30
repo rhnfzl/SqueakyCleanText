@@ -520,6 +520,7 @@ new_cfg = dataclasses.replace(cfg, check_ner_process=False)
 | `check_fuzzy_replace_dates` | `False` | Fuzzy match misspelled months (requires `[fuzzy]`) |
 | `check_replace_phone_numbers` | `True` | Replace phone numbers |
 | `check_replace_numbers` | `True` | Replace standalone numbers |
+| `replace_numbers_in_words` | `False` | Also replace digits inside Latin/Greek/Cyrillic words (`GPT4` to `GPT<NUMBER>`) |
 | `check_replace_currency_symbols` | `True` | Replace currency symbols |
 | `check_ner_process` | `True` | Run NER entity recognition |
 | `check_remove_isolated_letters` | `True` | Remove single letters |

@@ -7,6 +7,7 @@ from typing import Any
 
 from sct.config import TextCleanerConfig
 from sct.utils import constants
+from sct.utils.contact import numbers_regex
 
 
 def _rule(pattern, replacement, enabled: bool) -> dict[str, Any]:
@@ -62,7 +63,7 @@ def build_browser_manifest(config: TextCleanerConfig) -> dict[str, Any]:
         ("phone", constants.PHONE_REGEX, config.replace_with_phone_numbers,
          config.check_replace_phone_numbers),
         ("year", constants.YEAR_REGEX, config.replace_with_years, config.check_replace_years),
-        ("number", constants.NUMBERS_REGEX, config.replace_with_numbers,
+        ("number", numbers_regex(config.replace_numbers_in_words), config.replace_with_numbers,
          config.check_replace_numbers),
         ("currency", constants.CURRENCY_REGEX, config.replace_with_currency_symbols,
          config.check_replace_currency_symbols),
@@ -139,7 +140,7 @@ def build_browser_manifest(config: TextCleanerConfig) -> dict[str, Any]:
                 config.check_replace_phone_numbers,
             ),
             "number": _rule(
-                constants.NUMBERS_REGEX,
+                numbers_regex(config.replace_numbers_in_words),
                 config.replace_with_numbers,
                 config.check_replace_numbers,
             ),

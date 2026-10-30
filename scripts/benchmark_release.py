@@ -107,7 +107,7 @@ def _leak_summary(items: list[dict], total: int) -> dict:
 def _git_commit() -> str | None:
     try:
         return subprocess.run(
-            ["git", "rev-parse", "HEAD"], cwd=ROOT,  # noqa: S607 capture_output=True,
+            ["git", "rev-parse", "HEAD"], cwd=ROOT, capture_output=True,  # noqa: S607
             text=True, check=True,
         ).stdout.strip()
     except (OSError, subprocess.CalledProcessError):

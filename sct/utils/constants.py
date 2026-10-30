@@ -84,10 +84,25 @@ IP_REGEX = re.compile(
     rf"|(?<![0-9.])(?:{_IPV4})(?![0-9]|\.[0-9])"
 )
 
-NUMBERS_REGEX = re.compile(
-    r"(?<![\d_,.])[+–-]?(([1-9]\d{0,2}(,\d{3})+(\.\d*)?)"
-    r"|([1-9]\d{0,2}([ .]\d{3})+(,\d*)?)|(\d*?[.,]\d+)|\d+)(?![\d_])"
+_NUMBER_BODY = (
+    r"[+–-]?(([1-9]\d{0,2}(,\d{3})+(\.\d*)?)"
+    r"|([1-9]\d{0,2}([ .]\d{3})+(,\d*)?)|(\d*?[.,]\d+)|\d+)"
 )
+# Latin, Greek and Cyrillic put spaces between words, so a digit glued to their
+# letters is part of a word (GPT4, Qwen3-8B, H2O) and is kept by default.
+# Scripts without spaces (``金额5000元``) still get the number replaced.
+_SPACED_LETTERS = "A-Za-z\u00C0-\u024F\u0370-\u03FF\u0400-\u04FF"
+# shortcut: common ISO 4217 codes only (EUR4500 is an amount, GPT4 is a name); add codes as needed.
+_CURRENCY_CODES = (
+    "EUR|USD|GBP|JPY|CNY|INR|CHF|CAD|AUD|NZD|SEK|NOK|DKK|PLN|CZK|HUF|RUB|UAH|TRY|"
+    "BRL|MXN|ARS|ZAR|KRW|SGD|HKD|THB|IDR|MYR|PHP|VND|PKR|BDT|LKR|NPR|AED|SAR|ILS|EGP|NGN|KES"
+)
+NUMBERS_REGEX = re.compile(
+    rf"(?:(?<![\d_,.{_SPACED_LETTERS}])|(?<=\b(?:{_CURRENCY_CODES})))"
+    rf"{_NUMBER_BODY}(?![\d_{_SPACED_LETTERS}])"
+)
+# Strict mode (replace_numbers_in_words=True): only an adjacent digit blocks a match.
+NUMBERS_IN_WORDS_REGEX = re.compile(rf"(?<![\d_,.]){_NUMBER_BODY}(?![\d_])")
 
 LINEBREAK_REGEX = re.compile(r"((\r\n)|[\n\v])+")
 TWO_LINEBREAK_REGEX = re.compile(r"((\r\n)|[\n\v])+((\r\n)|[\n\v])+")

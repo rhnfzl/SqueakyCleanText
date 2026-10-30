@@ -298,3 +298,37 @@ def test_browser_export_rejects_tokens_later_rules_rewrite(field, token, later):
     # A disabled later rule cannot rewrite the token.
     off = {"email": "check_replace_emails", "url": "check_replace_urls"}[later]
     build_browser_manifest(TextCleanerConfig(**{field: token, off: False}))
+
+
+@pytest.mark.parametrize("text", [
+    "We use GPT-4o and GPT4.",
+    "Qwen3-8B and Mistral7B.",
+    "Phi4, H2O, mp3, ΑΒΓ2, Яндекс3",
+])
+def test_numbers_in_spaced_script_words_kept_by_default(text):
+    assert _cleaner(check_replace_years=False).process(text).lm_text == text
+
+
+def test_numbers_in_words_flag_replaces_glued_digits():
+    out = _cleaner(replace_numbers_in_words=True).process("GPT4 and mp3").lm_text
+    assert out == "GPT<NUMBER> and mp<NUMBER>"
+
+
+def test_numbers_in_words_default_still_replaces_spaceless_scripts():
+    assert CONTACTS.replace_numbers("金额5000元") == "金额<NUMBER>元"
+    assert CONTACTS.replace_numbers("Llama-3.1-70B") == "Llama-<NUMBER>-70B"  # same as 0.7.0
+    assert CONTACTS.replace_numbers("total EUR4500, INR5000") == "total EUR<NUMBER>, INR<NUMBER>"
+    assert CONTACTS.replace_numbers("XEUR4500") == "XEUR4500"
+
+
+def test_numbers_in_words_legacy_global(monkeypatch):
+    from sct import config
+    monkeypatch.setattr(config, "REPLACE_NUMBERS_IN_WORDS", True)
+    assert config._config_from_module_globals().replace_numbers_in_words is True
+
+
+def test_browser_number_rule_follows_flag():
+    default = build_browser_manifest(TextCleanerConfig(check_ner_process=False))
+    strict = build_browser_manifest(
+        TextCleanerConfig(check_ner_process=False, replace_numbers_in_words=True))
+    assert default != strict

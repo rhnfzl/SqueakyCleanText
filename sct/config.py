@@ -291,6 +291,7 @@ class TextCleanerConfig:
     check_replace_ips: bool = True
     replace_ips_public_only: bool = False  # True keeps private/loopback/reserved IPs
     replace_with_ips: str = "<IP>"
+    replace_numbers_in_words: bool = False  # True also replaces digits glued to Latin/Greek/Cyrillic letters (GPT4)
 
     def __post_init__(self):
         if self.gliclass_onnx:
@@ -589,6 +590,7 @@ def _config_from_module_globals() -> TextCleanerConfig:
         fuzzy_date_score_cutoff=getattr(m, 'FUZZY_DATE_SCORE_CUTOFF', 85),
         check_replace_phone_numbers=m.CHECK_REPLACE_PHONE_NUMBERS,
         check_replace_numbers=m.CHECK_REPLACE_NUMBERS,
+        replace_numbers_in_words=getattr(m, 'REPLACE_NUMBERS_IN_WORDS', False),
         check_replace_currency_symbols=m.CHECK_REPLACE_CURRENCY_SYMBOLS,
         check_ner_process=m.CHECK_NER_PROCESS,
         check_remove_isolated_letters=m.CHECK_REMOVE_ISOLATED_LETTERS,
@@ -643,6 +645,7 @@ CHECK_FUZZY_REPLACE_DATES = False
 FUZZY_DATE_SCORE_CUTOFF = 85
 CHECK_REPLACE_PHONE_NUMBERS = True
 CHECK_REPLACE_NUMBERS = True
+REPLACE_NUMBERS_IN_WORDS = False
 CHECK_REPLACE_CURRENCY_SYMBOLS = True
 CHECK_NER_PROCESS = True
 CHECK_REMOVE_ISOLATED_LETTERS = True

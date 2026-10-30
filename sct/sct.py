@@ -629,7 +629,7 @@ class TextCleaner:
             text = placeholder_pattern.sub(protect, text)
             reversible = self._replace_reversible(
                 text,
-                constants.NUMBERS_REGEX,
+                contact.numbers_regex(self.cfg.replace_numbers_in_words),
                 'NUMBER',
             )
             for key, placeholder in protected.items():
@@ -638,8 +638,11 @@ class TextCleaner:
         if self._synthetic_replacer:
             return self.ProcessContacts.replace_numbers_with_fn(
                 text, lambda orig: self._synthetic_replacer.get_replacement('NUMBER', orig),
+                in_words=self.cfg.replace_numbers_in_words,
             )
-        return self.ProcessContacts.replace_numbers(text, replace_with=self.cfg.replace_with_numbers)
+        return self.ProcessContacts.replace_numbers(
+            text, replace_with=self.cfg.replace_with_numbers, in_words=self.cfg.replace_numbers_in_words,
+        )
 
     def _replace_currency_symbols(self, text):
         reversible = self._replace_reversible(
