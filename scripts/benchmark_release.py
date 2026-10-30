@@ -29,30 +29,51 @@ DATASET = ROOT / "evaluation" / "release_benchmark.jsonl"
 RESULTS = ROOT / "evaluation" / "results"
 PLACEHOLDER_REGEX = re.compile(r"<([A-Z][A-Z_]*?)_\d+>")
 NON_PII_LABELS = frozenset({"YEAR", "NUMBER"})
+# Reversible placeholder type -> dataset label.
+LABEL_ALIASES = {"IP_ADDRESS": "IP"}
+ANY_PLACEHOLDER_REGEX = re.compile(r"<[A-Z][A-Z_]*(?:_\d+)?>")
 SPEED_REPEATS = 3
 CORRECTNESS_OVERRIDES = {"replacement_mode": "reversible", "check_to_ascii_unicode": False}
 
 
 def predicted_spans(source: str, output: str, originals: dict[str, str]) -> list[EntitySpan]:
     """Map each ``<TAG_n>`` placeholder in output order to the source span it replaced."""
-    spans, cursor = [], 0
+    spans, cursor, previous_end = [], 0, 0
     for match in PLACEHOLDER_REGEX.finditer(output):
+        # Skip past the unchanged output text before this placeholder, so an
+        # untouched earlier copy of the value ("Ann met <PERSON_0>") is not reused.
+        context = output[previous_end:match.start()]
+        previous_end = match.end()
+        found = source.find(context, cursor) if context else -1
+        if found >= 0:
+            cursor = found + len(context)
+        label = LABEL_ALIASES.get(match.group(1), match.group(1))
         value = originals.get(match.group(0), "")
         start = source.find(value, cursor) if value else -1
         if start < 0 and value:
             start = source.find(value)
         if start < 0:
             # The replaced value is not in the source (an earlier step changed it): never matches.
-            spans.append(EntitySpan(match.group(1), -1, -1))
+            spans.append(EntitySpan(label, -1, -1))
             continue
-        spans.append(EntitySpan(match.group(1), start, start + len(value)))
+        spans.append(EntitySpan(label, start, start + len(value)))
         cursor = start + len(value)
     return spans
 
 
 def find_leaks(example, output: str) -> tuple[list[dict], list[dict]]:
-    """Return PII values still fully present, and values with a 3+ char piece left."""
+    """Return PII values still fully present, and values with a piece left.
+
+    A piece is a 3+ char word of the value still in the output, or text glued
+    to a placeholder with 3+ letters or digits that is part of the value, so
+    split values (``98765<NUMBER>``, ``<NUMBER>.1.10``) count.
+    """
     leaks, partial = [], []
+    visible = ANY_PLACEHOLDER_REGEX.sub("\0", output)
+    fragments = [
+        fragment.rstrip(".,;:!?)'\"")
+        for fragment in re.findall(r"[^\s\0]+(?=\0)|(?<=\0)[^\s\0]+", visible)
+    ]
     for span in example.expected:
         if span.label in NON_PII_LABELS:
             continue
@@ -60,7 +81,12 @@ def find_leaks(example, output: str) -> tuple[list[dict], list[dict]]:
         item = {"id": example.id, "label": span.label, "value": value}
         if value in output:
             leaks.append(item)
-        elif any(len(token) >= 3 and token in output for token in re.findall(r"\w+", value)):
+        elif any(
+            len(token) >= 3 and token in visible for token in re.findall(r"\w+", value)
+        ) or any(
+            len(re.findall(r"\w", fragment)) >= 3 and fragment in value
+            for fragment in fragments
+        ):
             partial.append(item)
     return leaks, partial
 

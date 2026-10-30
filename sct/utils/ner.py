@@ -462,6 +462,11 @@ class GeneralNER:
         search_start: int,
     ) -> tuple[str, int, list[int]]:
         """Locate a whitespace-normalized chunk and map its offsets to source."""
+        # Chunks are normally exact source slices; a greedy \s+ match would eat
+        # whitespace that belongs to the next chunk (hard cuts, blank chunks).
+        start = source.find(chunk, search_start)
+        if start >= 0:
+            return chunk, start, list(range(len(chunk) + 1))
         parts = re.split(r'(\s+)', chunk)
         pattern = ''.join(
             r'\s+' if part.isspace() else re.escape(part)

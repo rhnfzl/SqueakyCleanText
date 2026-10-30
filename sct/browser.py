@@ -35,6 +35,16 @@ def build_browser_manifest(config: TextCleanerConfig) -> dict[str, Any]:
             "Browser export does not support replace_ips_public_only=True"
         )
 
+    # The browser runs rules in order with nothing protecting emitted tokens,
+    # so a digit in one ("<EMAIL1>") would be rewritten by the number rules.
+    tokens = (
+        config.replace_with_html, config.replace_with_url, config.replace_with_email,
+        config.replace_with_ips, config.replace_with_dates,
+        config.replace_with_phone_numbers, config.replace_with_years,
+    )
+    if any(ch.isdigit() for token in tokens for ch in token):
+        raise ValueError("Browser export requires replacement tokens without digits")
+
     model_revisions = config.ner_model_revisions or {}
     unpinned_models = sorted(
         key

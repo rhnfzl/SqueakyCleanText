@@ -166,8 +166,6 @@ class TextCleanerConfig:
     check_replace_html: bool = True
     check_replace_urls: bool = True
     check_replace_emails: bool = True
-    check_replace_ips: bool = True
-    replace_ips_public_only: bool = False  # True keeps private/loopback/reserved IPs
     check_replace_years: bool = True
     check_replace_dates: bool = False
     check_fuzzy_replace_dates: bool = False
@@ -200,7 +198,6 @@ class TextCleanerConfig:
     replace_with_url: str = "<URL>"
     replace_with_html: str = "<HTML>"
     replace_with_email: str = "<EMAIL>"
-    replace_with_ips: str = "<IP>"
     replace_with_years: str = "<YEAR>"
     replace_with_dates: str = "<DATE>"
     replace_with_phone_numbers: str = "<PHONE>"
@@ -289,6 +286,11 @@ class TextCleanerConfig:
 
     # Computed at __post_init__ — union of all language sources
     supported_languages: frozenset = frozenset()
+
+    # Added in 0.7.1; kept last so existing positional arguments keep their meaning.
+    check_replace_ips: bool = True
+    replace_ips_public_only: bool = False  # True keeps private/loopback/reserved IPs
+    replace_with_ips: str = "<IP>"
 
     def __post_init__(self):
         if self.gliclass_onnx:
@@ -447,14 +449,17 @@ class TextCleanerConfig:
                     f"ner_models must include {sorted(REQUIRED_NER_KEYS)}, "
                     f"missing: {sorted(missing)}"
                 )
-            # A frozen map is a normalized config's own output (replace(),
-            # copying another config): fill only LANG_KEYS so it stays exact.
-            defaults = (
-                {k: DEFAULT_NER_MODELS[k] for k in LANG_KEYS}
-                if isinstance(self.ner_models, MappingProxyType)
-                else DEFAULT_NER_MODELS
+            # A frozen map of exactly LANG_KEYS matching ner_models_list is a
+            # normalized legacy/default config (replace(), copy): keep it exact.
+            derived = (
+                isinstance(self.ner_models, MappingProxyType)
+                and set(self.ner_models) == set(LANG_KEYS)
+                and tuple(self.ner_models[k] for k in LANG_KEYS) == self.ner_models_list
             )
-            merged = {**defaults, **self.ner_models}
+            merged = (
+                dict(self.ner_models) if derived
+                else {**DEFAULT_NER_MODELS, **self.ner_models}
+            )
             object.__setattr__(self, 'ner_models', MappingProxyType(merged))
             object.__setattr__(
                 self, 'ner_models_list',

@@ -196,6 +196,8 @@ class TextCleaner:
             self._post_fuzzy_pipeline.append(self._replace_numbers)
         if cfg.check_replace_currency_symbols:
             self._post_fuzzy_pipeline.append(self._replace_currency_symbols)
+        # Emitted tokens and kept IPs are hidden from the steps above; put them back.
+        self._post_fuzzy_pipeline.append(self._restore_protected)
         if cfg.check_remove_isolated_letters:
             self._post_fuzzy_pipeline.append(self._remove_isolated_letters)
         if cfg.check_remove_isolated_special_symbols:
@@ -241,6 +243,7 @@ class TextCleaner:
             return self._process_single_with_context(text)
         finally:
             self._document_context.anon_map = None
+            self._document_context.protected = None
 
     def _process_single_with_context(self, text: str) -> ProcessResult:
         """Process a single text through the entire pipeline.
@@ -259,6 +262,7 @@ class TextCleaner:
         if self.cfg.replacement_mode == 'reversible':
             anon_map = AnonymizationMap()
         self._document_context.anon_map = anon_map
+        self._document_context.protected = {}
 
         # Document-level classification (before any text modification)
         doc_classes = None
@@ -471,6 +475,19 @@ class TextCleaner:
 
     # --- Pipeline step methods (private, used by _init_pipeline) ---
 
+    def _protect(self, value):
+        """Hide an emitted value from later regex steps (``<EMAIL1>``, kept IPs)."""
+        protected = getattr(self._document_context, 'protected', None)
+        if protected is None:
+            return value
+        # Private-use plane 15: no digit, letter or space for later steps to match.
+        return protected.setdefault(value, f"\ue002{chr(0xF0000 + len(protected))}\ue003")
+
+    def _restore_protected(self, text):
+        for value, key in (getattr(self._document_context, 'protected', None) or {}).items():
+            text = text.replace(key, value)
+        return text
+
     def _replace_reversible(self, text, pattern, entity_type, keep=None):
         anon_map = getattr(self._document_context, 'anon_map', None)
         if anon_map is None:
@@ -478,7 +495,7 @@ class TextCleaner:
 
         def replace(match):
             if keep is not None and keep(match.group()):
-                return match.group()
+                return self._protect(match.group())
             placeholder = anon_map.next_placeholder(entity_type)
             anon_map.add(
                 placeholder,
@@ -508,7 +525,7 @@ class TextCleaner:
         )
         if reversible is not None:
             return reversible
-        return self.ProcessContacts.replace_html(text, replace_with=self.cfg.replace_with_html)
+        return self.ProcessContacts.replace_html(text, replace_with=self._protect(self.cfg.replace_with_html))
 
     def _replace_urls(self, text):
         reversible = self._replace_reversible(
@@ -520,9 +537,9 @@ class TextCleaner:
             return reversible
         if self._synthetic_replacer:
             return self.ProcessContacts.replace_urls_with_fn(
-                text, lambda orig: self._synthetic_replacer.get_replacement('URL', orig),
+                text, lambda orig: self._protect(self._synthetic_replacer.get_replacement('URL', orig)),
             )
-        return self.ProcessContacts.replace_urls(text, replace_with=self.cfg.replace_with_url)
+        return self.ProcessContacts.replace_urls(text, replace_with=self._protect(self.cfg.replace_with_url))
 
     def _replace_emails(self, text):
         reversible = self._replace_reversible(
@@ -534,9 +551,9 @@ class TextCleaner:
             return reversible
         if self._synthetic_replacer:
             return self.ProcessContacts.replace_emails_with_fn(
-                text, lambda orig: self._synthetic_replacer.get_replacement('EMAIL', orig),
+                text, lambda orig: self._protect(self._synthetic_replacer.get_replacement('EMAIL', orig)),
             )
-        return self.ProcessContacts.replace_emails(text, replace_with=self.cfg.replace_with_email)
+        return self.ProcessContacts.replace_emails(text, replace_with=self._protect(self.cfg.replace_with_email))
 
     def _replace_ips(self, text):
         public_only = self.cfg.replace_ips_public_only
@@ -549,12 +566,16 @@ class TextCleaner:
         if reversible is not None:
             return reversible
         if self._synthetic_replacer:
-            return self.ProcessContacts.replace_ips_with_fn(
-                text, lambda orig: self._synthetic_replacer.get_replacement('IP_ADDRESS', orig),
-                public_only,
-            )
-        return self.ProcessContacts.replace_ips(
-            text, replace_with=self.cfg.replace_with_ips, public_only=public_only,
+            def emit(orig):
+                return self._synthetic_replacer.get_replacement('IP_ADDRESS', orig)
+        else:
+            def emit(orig):
+                return self.cfg.replace_with_ips
+        return self.ProcessContacts.replace_ips_with_fn(
+            text,
+            lambda orig: self._protect(
+                emit(orig) if contact.is_replaceable_ip(orig, public_only) else orig
+            ),
         )
 
     def _replace_dates(self, text):
@@ -565,7 +586,7 @@ class TextCleaner:
         )
         if reversible is not None:
             return reversible
-        return self.ProcessDateTime.replace_dates(text, replace_with=self.cfg.replace_with_dates)
+        return self.ProcessDateTime.replace_dates(text, replace_with=self._protect(self.cfg.replace_with_dates))
 
     def _fuzzy_replace_dates(self, text, language=None):
         return self.ProcessDateTime.fuzzy_replace_dates(
@@ -583,7 +604,7 @@ class TextCleaner:
         )
         if reversible is not None:
             return reversible
-        return self.ProcessDateTime.replace_years(text, replace_with=self.cfg.replace_with_years)
+        return self.ProcessDateTime.replace_years(text, replace_with=self._protect(self.cfg.replace_with_years))
 
     def _replace_phone_numbers(self, text):
         reversible = self._replace_reversible(
@@ -595,9 +616,11 @@ class TextCleaner:
             return reversible
         if self._synthetic_replacer:
             return self.ProcessContacts.replace_phone_numbers_with_fn(
-                text, lambda orig: self._synthetic_replacer.get_replacement('PHONE_NUMBER', orig),
+                text, lambda orig: self._protect(self._synthetic_replacer.get_replacement('PHONE_NUMBER', orig)),
             )
-        return self.ProcessContacts.replace_phone_numbers(text, replace_with=self.cfg.replace_with_phone_numbers)
+        return self.ProcessContacts.replace_phone_numbers(
+            text, replace_with=self._protect(self.cfg.replace_with_phone_numbers),
+        )
 
     def _replace_numbers(self, text):
         anon_map = getattr(self._document_context, 'anon_map', None)

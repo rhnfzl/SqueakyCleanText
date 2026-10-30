@@ -116,3 +116,24 @@ def test_reversible_map_offsets_are_document_relative(text, name):
     finding = result.findings[-1].entity
     assert (finding.start, finding.end) == (entry.start, entry.end)
     assert anon_map.deanonymize(result.text) == text
+
+
+@pytest.mark.parametrize("text", [
+    " " * 400 + "王小明",                  # hard cuts leave whitespace-only chunks
+    "王小明" + " " * 400 + "王小明",       # chunk ends and next starts in one gap
+    "\n" + "x" * 179 + " " * 300 + "王小明",
+])
+def test_whitespace_at_hard_cuts_keeps_alignment(text):
+    anon_map = AnonymizationMap()
+    result = _gliner_ner("reversible").ner_process_detailed(
+        text, positional_tags=("PER",), ner_confidence_threshold=0.5, anon_map=anon_map,
+    )
+    assert "王小明" not in result.text
+    assert all(text[f.entity.start:f.entity.end] == "王小明" for f in result.findings)
+    assert anon_map.deanonymize(result.text) == text
+
+
+def test_align_chunk_maps_normalized_whitespace():
+    source_chunk, start, offsets = GeneralNER._align_chunk("x  a\t\tb", "a b", 0)
+    assert (source_chunk, start) == ("a\t\tb", 3)
+    assert offsets[2] == 3 and offsets[3] == 4

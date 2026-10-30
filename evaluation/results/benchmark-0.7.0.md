@@ -4,7 +4,7 @@ Commit `c3a44461cc365b4aa7d1bcf9f83aabb502d6b1a3`, macOS-27.2-arm64-arm-64bit-Ma
 Dataset `release_benchmark.jsonl`: 30 documents, 84 entities. Exact label + span match.
 
 Speed (default config, single process): **7.708 docs/s**, mean 129.73 ms, p95 844.744 ms.
-Leaks: **6 / 67** PII values still in output (partial: 2).
+Leaks: **6 / 67** PII values still in output (partial: 4).
 
 ## By label
 
@@ -44,5 +44,7 @@ Leaks: **6 / 67** PII values still in output (partial: 2).
 - `hi-glued-001` PHONE_NUMBER: 9876543210
 - `bn-glued-001` PHONE_NUMBER: 9876543210
 - `ta-glued-001` PHONE_NUMBER: 9876543210
+- `en-ip-001` IP (partial): 192.168.1.10
 - `en-ip-002` IP (partial): fd12:3456:789a::1
 - `en-ip-002` IP (partial): fe80::1
+- `en-ip-003` IP (partial): 172.16.5.20

@@ -33,3 +33,28 @@ def test_find_leaks_reports_full_and_partial_pii_only():
 
     assert leaks == [{"id": "doc", "label": "IP", "value": "8.8.8.8"}]
     assert partial == [{"id": "doc", "label": "PERSON", "value": "Bram de Vries"}]
+
+
+def test_predicted_spans_skip_untouched_earlier_copy():
+    assert predicted_spans("Ann met Ann", "Ann met <PERSON_0>", {"<PERSON_0>": "Ann"}) == [
+        EntitySpan("PERSON", 8, 11),
+    ]
+
+
+def test_predicted_spans_map_ip_address_to_dataset_label():
+    assert predicted_spans("at 8.8.8.8", "at <IP_ADDRESS_0>", {"<IP_ADDRESS_0>": "8.8.8.8"}) == [
+        EntitySpan("IP", 3, 10),
+    ]
+
+
+def test_find_leaks_catches_split_values():
+    text = "Call 9876543210 from 192.168.1.10"
+    example = EvaluationExample(
+        id="doc", text=text, language="en", domain="test",
+        expected=(EntitySpan("PHONE_NUMBER", 5, 15), EntitySpan("IP", 21, 33)),
+    )
+
+    leaks, partial = find_leaks(example, "Call 98765<NUMBER> from <NUMBER_0>.1.10")
+
+    assert leaks == []
+    assert [item["label"] for item in partial] == ["PHONE_NUMBER", "IP"]

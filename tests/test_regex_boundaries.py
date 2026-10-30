@@ -171,3 +171,75 @@ def test_browser_rule_order_matches_python_pipeline():
 def test_stopwords_unsupported_language_does_not_crash():
     sw = ProcessStopwords(supported_languages=frozenset({"ENGLISH", "THAI"}))
     assert sw.get_stop_words("THAI") == set()
+
+
+# --- Review round 1 regressions ---
+
+@pytest.mark.parametrize("ip", [
+    "::abcd:192.0.2.1",
+    "1:2:3:4:5::192.0.2.1",
+    "1:2::3:192.0.2.1",
+    "::ffff:0:192.0.2.1",
+    "2001:db8::",
+    "1::8",
+    "1:2:3:4:5:6:7::",
+])
+@pytest.mark.parametrize("mode", ["placeholder", "synthetic", "reversible"])
+def test_ipv6_replaced_whole_in_every_mode(ip, mode):
+    cleaner = _cleaner(replacement_mode=mode)
+    result = cleaner.process(f"host {ip} up")
+    assert ip not in result.lm_text
+    leftover = constants.IP_REGEX.sub("", result.lm_text)
+    assert ":" not in leftover  # no IPv6 prefix or IPv4 tail left behind
+    if mode == "reversible":
+        assert result.metadata["anon_map"].deanonymize(result.lm_text) == f"host {ip} up"
+
+
+@pytest.mark.parametrize("text", ["1:2:3:4:5:6::7:8", "a::b::c", "x :: y"])
+def test_ip_regex_rejects_invalid_ipv6_like_python(text):
+    # The browser uses this regex without ipaddress validation, so it must be exact.
+    assert CONTACTS.replace_ips(text) == text
+    assert constants.IP_REGEX.search(text) is None
+
+
+def test_emitted_tokens_with_digits_survive_later_steps():
+    cleaner = _cleaner(
+        replace_with_email="<EMAIL1>",
+        replace_with_url="<URL2>",
+        replace_with_html="<HTML3>",
+        replace_with_ips="<IP4>",
+        replace_with_phone_numbers="<PHONE2023>",
+        replace_with_years="<YEAR5>",
+        check_replace_dates=True,
+        replace_with_dates="<DATE2024>",
+    )
+    text = "<b>x</b> a@b.com https://x.io 8.8.8.8 +1-202-555-0147 1999 2023-01-01"
+    assert cleaner.process(text).lm_text == (
+        "<HTML3>x<HTML3> <EMAIL1> <URL2> <IP4> <PHONE2023> <YEAR5> <DATE2024>"
+    )
+
+
+def test_synthetic_ip_and_phone_not_rewritten_by_number_step():
+    out = _cleaner(replacement_mode="synthetic").process(
+        "Host 8.8.8.8 or 2001:4860::8888"
+    ).lm_text
+    assert len(constants.IP_REGEX.findall(out)) == 2
+
+
+@pytest.mark.parametrize("mode, public", [
+    ("placeholder", "<IP>"),
+    ("synthetic", None),
+    ("reversible", "<IP_ADDRESS_0>"),
+])
+def test_public_only_kept_ips_survive_default_later_steps(mode, public):
+    text = "Host 10.0.0.1 and fd00::1 and 8.8.8.8 in 2023"
+    out = _cleaner(replacement_mode=mode, replace_ips_public_only=True).process(text).lm_text
+    assert out.startswith("Host 10.0.0.1 and fd00::1 and ")
+    assert "8.8.8.8" not in out
+    if public:
+        assert public in out
+
+
+def test_browser_export_rejects_digit_tokens():
+    with pytest.raises(ValueError, match="without digits"):
+        build_browser_manifest(TextCleanerConfig(replace_with_email="<EMAIL1>"))
