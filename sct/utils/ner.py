@@ -297,14 +297,15 @@ class GeneralNER:
                 (p for k, p in self._pipelines.items()
                  if self._model_key(k) == model_key), None
             )
+            # Tokenizer first: a pipeline in _pipelines marks the key ready for lock-free readers.
             if shared_pipe is not None:
-                self._pipelines[lang_key] = shared_pipe
                 shared_tok = next(
                     (t for k, t in self._tokenizers.items()
                      if self._model_key(k) == model_key), None
                 )
                 if shared_tok is not None:
                     self._tokenizers[lang_key] = shared_tok
+                self._pipelines[lang_key] = shared_pipe
                 return
             try:
                 pipeline_obj: object
@@ -324,8 +325,8 @@ class GeneralNER:
                         intra_op_threads=self._onnx_intra_op_threads,
                         inter_op_threads=self._onnx_inter_op_threads,
                     )
-                self._pipelines[lang_key] = pipeline_obj
                 self._tokenizers[lang_key] = tok
+                self._pipelines[lang_key] = pipeline_obj
             except Exception as e:
                 logger.error("Failed to load model for %s: %s", lang_key, e)
                 raise ModelLoadError(
@@ -844,7 +845,9 @@ class GeneralNER:
                     with self._get_lock(self._model_key(key)):
                         batch = self._pipelines[key](key_chunks, batch_size=self._ner_batch_size)
                 for i, data in zip(indices, batch):
-                    per_key[i][key] = self.ner_data(data, positional_tags)
+                    per_key[i][key] = [
+                        {**item, 'model': key} for item in self.ner_data(data, positional_tags)
+                    ]
 
         results = [
             [item for key in keys for item in per_key[i][key]]
@@ -865,7 +868,7 @@ class GeneralNER:
             with self._get_lock('gliner'):
                 gliner_batch = self._gliner_pipe(chunks, batch_size=self._ner_batch_size)
             for i, data in enumerate(gliner_batch):
-                results[i].extend(self.ner_data(data, gliner_tags))
+                results[i].extend({**item, 'model': 'gliner'} for item in self.ner_data(data, gliner_tags))
         return results
 
     def _finalize(
@@ -886,27 +889,32 @@ class GeneralNER:
                 span = {**item, 'start': start, 'end': end,
                         'word': text[start:end], 'key': f"{start}:{end}"}
                 (spans if own_start <= start < own_end else foreign).append(span)
-        # A neighbour's copy counts only where the owning window found nothing eligible covering it.
         if foreign:
-            spans = self.ner_ensemble(spans, ner_confidence_threshold)
-        spans += [
-            span for span in foreign
-            if not any(o['start'] <= span['start'] and span['end'] <= o['end'] for o in spans)
-        ]
+            # Windows repeat context, not models: one vote per model, label and span, its best score.
+            best = {}
+            for span in spans + foreign:
+                vote = (span['model'], span['key'], span['entity_group'])
+                if vote not in best or span['score'] > best[vote]['score']:
+                    best[vote] = span
+            owned = {(s['model'], s['key'], s['entity_group']) for s in spans}
+            foreign = [span for vote, span in best.items() if vote not in owned]
+            spans = self.ner_ensemble(
+                [span for vote, span in best.items() if vote in owned], ner_confidence_threshold)
+            # A neighbour's copy counts only where an eligible owned span covering it is concealed.
+            covers = [
+                o for o in spans
+                if privacy_policy is None
+                or privacy_policy.evaluate((self._entity(o),))[0].action in ('placeholder', 'redact')
+            ]
+            spans += [
+                span for span in foreign
+                if not any(o['start'] <= span['start'] and span['end'] <= o['end'] for o in covers)
+            ]
 
         ensemble_results = self.ner_ensemble(spans, ner_confidence_threshold)
         if not ensemble_results:
             return NERProcessingResult(text=text, findings=())
-        entities = tuple(
-            DetectedEntity(
-                entity_type=ENTITY_TYPE_MAP.get(item['entity_group'], item['entity_group']),
-                score=item['score'],
-                text=item['word'],
-                start=item['start'],
-                end=item['end'],
-            )
-            for item in ensemble_results
-        )
+        entities = tuple(self._entity(item) for item in ensemble_results)
         if privacy_policy is not None:
             findings = privacy_policy.evaluate(entities)
             return NERProcessingResult(
@@ -921,6 +929,16 @@ class GeneralNER:
             for entity in entities
         )
         return NERProcessingResult(text=result.text, findings=findings)
+
+    @staticmethod
+    def _entity(item) -> DetectedEntity:
+        return DetectedEntity(
+            entity_type=ENTITY_TYPE_MAP.get(item['entity_group'], item['entity_group']),
+            score=item['score'],
+            text=item['word'],
+            start=item['start'],
+            end=item['end'],
+        )
 
     def ner_process(
         self,
