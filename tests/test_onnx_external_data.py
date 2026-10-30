@@ -10,6 +10,7 @@ import json
 import os
 import shutil
 import struct
+from pathlib import Path
 
 import pytest
 from tokenizers import Tokenizer, models, pre_tokenizers
@@ -66,19 +67,20 @@ def _model_bytes():
     return _f(1, 8) + _f(8, _f(2, 13)) + _f(7, graph)
 
 
-def _hub_cache(tmp_path):
+def _hub_cache(tmp_path, rev="rev1", weights=WEIGHTS):
     """Snapshot symlinks -> repo blobs -> sharded shared store, as huggingface-hub 1.32 lays it out."""
     hub = tmp_path / "hub"
     repo = hub / "models--test--tiny-external-onnx"
-    snap = repo / "snapshots" / "rev1"
+    snap = repo / "snapshots" / rev
     snap.mkdir(parents=True)
-    (repo / "blobs").mkdir()
-    for name, data in (("model.onnx", _model_bytes()), ("model.onnx_data", WEIGHTS)):
+    (repo / "blobs").mkdir(exist_ok=True)
+    for name, data in (("model.onnx", _model_bytes()), ("model.onnx_data", weights)):
         digest = hashlib.sha256(data).hexdigest()
         shard = hub / "blobs" / digest[:2]
         shard.mkdir(parents=True, exist_ok=True)
-        (shard / digest).write_bytes(data)
-        os.symlink(f"../../blobs/{digest[:2]}/{digest}", repo / "blobs" / digest)
+        if not (shard / digest).exists():
+            (shard / digest).write_bytes(data)
+            os.symlink(f"../../blobs/{digest[:2]}/{digest}", repo / "blobs" / digest)
         os.symlink(f"../../blobs/{digest}", snap / name)
     (snap / "config.json").write_text(json.dumps({"id2label": {"0": "O", "1": "B-PER"}}))
     tok = Tokenizer(models.WordLevel({"<pad>": 0, "john": 2}))
@@ -102,8 +104,9 @@ def snapshot(tmp_path, monkeypatch):
     return snap
 
 
-def _linked(tmp_path):
-    return tmp_path / "cache" / "sct_linked" / "test__tiny-external-onnx"
+def _linked(tmp_path, rev="rev1"):
+    digest = hashlib.sha256(rev.encode()).hexdigest()[:16]
+    return tmp_path / "cache" / "sct_linked" / f"test__tiny-external-onnx@{digest}"
 
 
 def test_sharded_blob_store_loads_and_runs(tmp_path, snapshot):
@@ -207,5 +210,51 @@ def test_copy_from_older_blob_is_replaced(tmp_path, snapshot, monkeypatch):
     copied = _linked(tmp_path) / "model.onnx_data"
     copied.write_bytes(struct.pack("<2f", 5.0, 5.0))  # same size, stale content
     os.utime(copied, (0, 0))  # older than the blob, as if the snapshot moved to a new blob
+    pipe, _ = onnx_pipeline.load_onnx_ner_model(REPO, cache_dir=str(tmp_path / "cache"))
+    assert copied.read_bytes() == WEIGHTS
+
+
+@pytest.mark.parametrize("hard_links", [True, False])
+def test_branch_moving_between_cached_snapshots_loads_each_snapshots_weights(
+        tmp_path, snapshot, monkeypatch, hard_links):
+    other = _hub_cache(tmp_path, "rev2", struct.pack("<2f", 1.0, -1.0))  # same size, no PER
+    blob = (other / "model.onnx_data").resolve()
+    os.utime(blob, (blob.stat().st_mtime + 10,) * 2)  # rev2 blob is newer
+    current = [snapshot]
+    monkeypatch.setattr(onnx_pipeline, "hf_hub_download",
+                        lambda repo_id, filename, **kw: str(current[0] / filename))
+    if not hard_links:
+        monkeypatch.setattr(onnx_pipeline.os, "link", lambda *a: (_ for _ in ()).throw(OSError("xdev")))
+    loaded = []
+
+    def record(path, **kw):  # one process per load in practice; read the files ORT would get
+        loaded.append((Path(path).parent / "model.onnx_data").read_bytes())
+        raise RuntimeError("recorded")
+
+    monkeypatch.setattr(onnx_pipeline.ort, "InferenceSession", record)
+    for snap in (snapshot, other, snapshot):  # main moves to rev2, then back to cached rev1
+        current[0] = snap
+        with pytest.raises(RuntimeError, match="recorded"):
+            onnx_pipeline.load_onnx_ner_model(REPO, cache_dir=str(tmp_path / "cache"))
+    assert loaded == [WEIGHTS, struct.pack("<2f", 1.0, -1.0), WEIGHTS]
+
+
+def test_stale_directory_removed_by_concurrent_loader(tmp_path, snapshot, monkeypatch):
+    def no_link(*args):
+        raise OSError("cross-device link")
+
+    monkeypatch.setattr(onnx_pipeline.os, "link", no_link)
+    onnx_pipeline.load_onnx_ner_model(REPO, cache_dir=str(tmp_path / "cache"))
+    copied = _linked(tmp_path) / "model.onnx_data"
+    copied.write_bytes(struct.pack("<2f", 5.0, 5.0))
+    os.utime(copied, (0, 0))  # stale
+    real_rmtree = shutil.rmtree
+
+    def other_loader_first(path, *args, **kwargs):
+        if path == _linked(tmp_path) and path.exists():
+            real_rmtree(path)  # another loader saw the same stale directory and removed it
+        return real_rmtree(path, *args, **kwargs)
+
+    monkeypatch.setattr(onnx_pipeline.shutil, "rmtree", other_loader_first)
     pipe, _ = onnx_pipeline.load_onnx_ner_model(REPO, cache_dir=str(tmp_path / "cache"))
     assert copied.read_bytes() == WEIGHTS

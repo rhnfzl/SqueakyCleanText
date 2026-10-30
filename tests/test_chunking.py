@@ -99,6 +99,20 @@ def test_split_text_ignores_tokenizer_file_truncation():
     assert tok.truncation is not None  # inference tokenizer keeps its own setting
 
 
+def test_split_text_ignores_tokenizer_file_padding():
+    from tokenizers import Regex, Tokenizer, models, pre_tokenizers
+
+    from sct.utils.onnx_pipeline import TokenizerWrapper
+
+    tok = Tokenizer(models.WordLevel({"[UNK]": 0, "x": 1}, unk_token="[UNK]"))  # noqa: S106
+    tok.pre_tokenizer = pre_tokenizers.Split(Regex("."), "isolated")
+    tok.enable_padding(length=64)  # fixed padding, as in some tokenizer.json files
+    wrapper = TokenizerWrapper(tok, model_max_length=20)
+
+    assert len(wrapper("xx").input_ids) == 2
+    assert _ner().split_text("x" * 30, 20, wrapper) == ["x" * 20, "x" * 10]
+
+
 class _FakeGLiNER:
     """Finds every occurrence of NAMES in a chunk, like a perfect detector."""
 

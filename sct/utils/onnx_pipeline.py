@@ -62,6 +62,7 @@ class TokenizerWrapper:
         # hide the text past max_length and leave it out of model input.
         self._counter = Tokenizer.from_str(tokenizer.to_str())
         self._counter.no_truncation()
+        self._counter.no_padding()  # fixed padding would count every text as max_length tokens
 
     @property
     def max_len_single_sentence(self) -> int:
@@ -330,7 +331,7 @@ def _colocate_external_data(model_path: str, data_path: str, link_dir: Path) -> 
                     logger.warning("Cannot hard-link %s, copying it to %s", src, link_dir)
                     shutil.copyfile(src, tmp / name)
             if link_dir.exists() and not ready():
-                shutil.rmtree(link_dir)  # stale: the snapshot moved to other blobs
+                shutil.rmtree(link_dir, ignore_errors=True)  # stale; a concurrent loader may remove it first
             try:
                 os.rename(tmp, link_dir)  # complete directory appears atomically
             except OSError:
@@ -394,7 +395,8 @@ def load_onnx_ner_model(
         link_base = Path(cache_dir) if cache_dir else Path.home() / ".cache"
         model_path = _colocate_external_data(
             model_path, data_path,
-            link_base / "sct_linked" / _quantized_dir(model_name, revision),
+            # Keyed by snapshot commit: a moving branch must not reuse another commit's files.
+            link_base / "sct_linked" / _quantized_dir(model_name, Path(model_path).parent.name),
         )
 
     # Try to get tokenizer_config.json for model_max_length
