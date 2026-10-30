@@ -164,3 +164,48 @@ def test_flat_layout_is_loaded_in_place(tmp_path, monkeypatch):
     onnx_pipeline.load_onnx_ner_model(REPO, cache_dir=str(tmp_path / "cache"))
     assert seen == [str(snap / "model.onnx")]
     assert not (tmp_path / "cache").exists()
+
+
+def test_copied_cache_is_reused(tmp_path, snapshot, monkeypatch):
+    copies = []
+    real_copy = shutil.copyfile
+
+    def no_link(*args):
+        raise OSError("cross-device link")
+
+    monkeypatch.setattr(onnx_pipeline.os, "link", no_link)
+    monkeypatch.setattr(onnx_pipeline.shutil, "copyfile",
+                        lambda src, dst: copies.append(src) or real_copy(src, dst))
+    for _ in range(2):
+        onnx_pipeline.load_onnx_ner_model(REPO, cache_dir=str(tmp_path / "cache"))
+    assert len(copies) == 2  # second load reuses the copies
+
+
+def test_concurrent_loader_accepts_winners_copy(tmp_path, snapshot, monkeypatch):
+    def no_link(*args):
+        raise OSError("cross-device link")
+
+    real_rename = os.rename
+
+    def winner_first(src, dst):
+        shutil.copytree(src, dst)  # another process published its copy first
+        return real_rename(src, dst)
+
+    monkeypatch.setattr(onnx_pipeline.os, "link", no_link)
+    monkeypatch.setattr(onnx_pipeline.os, "rename", winner_first)
+    pipe, _ = onnx_pipeline.load_onnx_ner_model(REPO, cache_dir=str(tmp_path / "cache"))
+    assert pipe(["john"])[0][0]["entity_group"] == "PER"
+    assert sorted(p.name for p in _linked(tmp_path).parent.iterdir()) == [_linked(tmp_path).name]
+
+
+def test_copy_from_older_blob_is_replaced(tmp_path, snapshot, monkeypatch):
+    def no_link(*args):
+        raise OSError("cross-device link")
+
+    monkeypatch.setattr(onnx_pipeline.os, "link", no_link)
+    onnx_pipeline.load_onnx_ner_model(REPO, cache_dir=str(tmp_path / "cache"))
+    copied = _linked(tmp_path) / "model.onnx_data"
+    copied.write_bytes(struct.pack("<2f", 5.0, 5.0))  # same size, stale content
+    os.utime(copied, (0, 0))  # older than the blob, as if the snapshot moved to a new blob
+    pipe, _ = onnx_pipeline.load_onnx_ner_model(REPO, cache_dir=str(tmp_path / "cache"))
+    assert copied.read_bytes() == WEIGHTS

@@ -306,9 +306,16 @@ def _colocate_external_data(model_path: str, data_path: str, link_dir: Path) -> 
         return model_path
     pairs = [(real_model, 'model.onnx'), (real_data, 'model.onnx_data')]
 
+    def same(src: Path, dst: Path) -> bool:
+        if os.path.samefile(src, dst):
+            return True
+        # A copy is published only when complete; a source blob newer than it means the snapshot moved.
+        s, d = src.stat(), dst.stat()
+        return s.st_size == d.st_size and d.st_mtime >= s.st_mtime
+
     def ready() -> bool:
         try:
-            return all(os.path.samefile(src, link_dir / name) for src, name in pairs)
+            return all(same(src, link_dir / name) for src, name in pairs)
         except OSError:
             return False
 
