@@ -5,6 +5,7 @@ eliminating the torch and transformers dependencies (~2 GB) while producing
 byte-identical entity span and label output.
 """
 
+import hashlib
 import json
 import logging
 from concurrent.futures import ThreadPoolExecutor
@@ -285,7 +286,8 @@ def _quantized_dir(model_name: str, revision: Optional[str]) -> str:
         quote(model_name, safe="").replace("_", "%5F") if "__" in model_name
         else model_name.replace("/", "__")
     )
-    return name + (f"@{quote(revision, safe='')}" if revision else "")
+    # Lowercase digest: revisions differing only in case must not alias on case-insensitive disks.
+    return name + (f"@{hashlib.sha256(revision.encode()).hexdigest()[:16]}" if revision else "")
 
 
 def load_onnx_ner_model(

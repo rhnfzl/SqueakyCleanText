@@ -139,7 +139,7 @@ def test_quantized_cache_dirs_do_not_collide():
     from sct.utils.onnx_pipeline import _quantized_dir
 
     assert _quantized_dir("org/model", None) == "org__model"  # 0.7.1 layout kept
-    assert _quantized_dir("org/model", "abc123") == "org__model@abc123"
+    assert _quantized_dir("org/model", "abc123").startswith("org__model@")
     assert _quantized_dir("o/m", "release/v1") != _quantized_dir("o/m", "release__v1")
     assert _quantized_dir("a/b__c", None) != _quantized_dir("a__b/c", None)
     assert _quantized_dir("a__b", None) != _quantized_dir("a/b", None)

@@ -747,8 +747,9 @@ class GeneralNER:
         Windows fit the models in *keys* (the document's ensemble; None: every
         loaded model), so other documents' models never change this one.
 
-        Core chunks come from the chunker with ``2 * ner_chunk_overlap`` tokens
-        less budget; each window adds up to ``ner_chunk_overlap`` tokens of the
+        A document that fits one window is one unchanged window. Otherwise core
+        chunks come from the chunker with ``2 * ner_chunk_overlap`` tokens less
+        budget; each window adds up to ``ner_chunk_overlap`` tokens of the
         neighbouring text on both sides (GLiNER-only: 2 chars per token, as in
         ``_simple_chunk``). ``win_start + offsets[i]`` is the document position of
         window position *i*. A span belongs to the window whose core owns its
@@ -760,10 +761,17 @@ class GeneralNER:
         budget = self._chunk_budget(keys)
         if overlap:
             self._check_overlap(budget)  # a model loaded after construction can shrink it
-        budget -= 2 * overlap
         # lock-free: HF fast tokenizer Rust backend is thread-safe
         if self.tokenizer is not None:
             counter = self._window_tokenizer(keys)
+        # A document that fits one window is never split: overlap applies only when chunking.
+        if overlap and (
+            self._token_count(text, counter) <= budget if self.tokenizer is not None
+            else len(text) <= budget * 2
+        ):
+            overlap = 0
+        budget -= 2 * overlap
+        if self.tokenizer is not None:
             chunks = self.split_text(text, budget, counter)
         else:
             chunks = self._simple_chunk(text, max_tokens=budget)
@@ -890,13 +898,13 @@ class GeneralNER:
                         'word': text[start:end], 'key': f"{start}:{end}"}
                 (spans if own_start <= start < own_end else foreign).append(span)
         if foreign:
-            # Windows repeat context, not models: one vote per model, label and span, its best score.
+            # Windows repeat context, not models: one vote per model and span, its best score.
             best = {}
             for span in spans + foreign:
-                vote = (span['model'], span['key'], span['entity_group'])
+                vote = (span['model'], span['key'])
                 if vote not in best or span['score'] > best[vote]['score']:
                     best[vote] = span
-            owned = {(s['model'], s['key'], s['entity_group']) for s in spans}
+            owned = {(s['model'], s['key']) for s in spans}
             foreign = [span for vote, span in best.items() if vote not in owned]
             spans = self.ner_ensemble(
                 [span for vote, span in best.items() if vote in owned], ner_confidence_threshold)
