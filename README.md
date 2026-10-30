@@ -94,7 +94,7 @@ The base install uses **ONNX Runtime** for NER inference - no PyTorch or Transfo
 
 | Extra | Command | What it adds |
 |-------|---------|--------------|
-| GPU | `pip install SqueakyCleanText[gpu]` | CUDA-accelerated ONNX inference |
+| GPU | `pip install SqueakyCleanText[gpu]` | CUDA-accelerated ONNX inference (see [docs/PERFORMANCE.md](docs/PERFORMANCE.md) for CUDA setup and speed by hardware) |
 | Fuzzy dates | `pip install SqueakyCleanText[fuzzy]` | Fuzzy month name matching ([rapidfuzz](https://github.com/rapidfuzz/RapidFuzz)) |
 | PyTorch NER | `pip install SqueakyCleanText[torch]` | PyTorch/Transformers NER backend |
 | GLiNER | `pip install SqueakyCleanText[gliner]` | [GLiNER](https://github.com/urchade/GLiNER) zero-shot NER |

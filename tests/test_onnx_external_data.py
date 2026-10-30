@@ -258,3 +258,16 @@ def test_stale_directory_removed_by_concurrent_loader(tmp_path, snapshot, monkey
     monkeypatch.setattr(onnx_pipeline.shutil, "rmtree", other_loader_first)
     pipe, _ = onnx_pipeline.load_onnx_ner_model(REPO, cache_dir=str(tmp_path / "cache"))
     assert copied.read_bytes() == WEIGHTS
+
+
+def test_warns_when_cuda_silently_falls_back_to_cpu(tmp_path, snapshot, monkeypatch, caplog):
+    real_session = onnx_pipeline.ort.InferenceSession
+    monkeypatch.setattr(onnx_pipeline.ort, "get_available_providers",
+                        lambda: ["CUDAExecutionProvider", "CPUExecutionProvider"])
+    # ORT keeps only CPU when the CUDA libraries cannot be loaded.
+    monkeypatch.setattr(onnx_pipeline.ort, "InferenceSession",
+                        lambda path, **kw: real_session(path, sess_options=kw.get("sess_options"),
+                                                        providers=["CPUExecutionProvider"]))
+    with caplog.at_level("WARNING", logger=onnx_pipeline.logger.name):
+        onnx_pipeline.load_onnx_ner_model(REPO, cache_dir=str(tmp_path / "cache"), device="cuda")
+    assert "runs on CPU: CUDA was requested" in caplog.text

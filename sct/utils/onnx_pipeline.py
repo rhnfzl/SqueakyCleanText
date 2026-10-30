@@ -463,6 +463,14 @@ def load_onnx_ner_model(
         )
     pipeline = ONNXNERPipeline(session, wrapper, id2label, pad_id=pad_id)
 
+    if 'CUDAExecutionProvider' in providers and 'CUDAExecutionProvider' not in session.get_providers():
+        # ORT drops CUDA silently when the CUDA/cuDNN libraries or the driver do not match.
+        logger.warning(
+            "ONNX NER model %s runs on CPU: CUDA was requested but could not be loaded. "
+            "Check that the onnxruntime-gpu CUDA version matches your driver and that CUDA/cuDNN "
+            "libraries are found (onnxruntime-gpu[cuda,cudnn] plus onnxruntime.preload_dlls()).",
+            model_name,
+        )
     logger.info(f"Loaded ONNX NER model: {model_name} (providers: {session.get_providers()})")
 
     return pipeline, wrapper
