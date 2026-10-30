@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.8.0 - unreleased
+
+### Behaviour changes
+
+- Python 3.11 is no longer supported; 0.8.0 needs Python 3.12 or newer. pip on Python 3.11 keeps resolving to 0.7.1.
+- `lingua-language-detector` minimum raised from 2.1.0 to 2.2. Lingua 2.2 can detect the language of some texts differently from 2.1.1, which changes the language-specific NER model, stopwords and date handling chosen for those texts.
+
 ## 0.7.1 - 2026-10-30
 
 This release fixes PII that 0.7.0 left in the output. On the release benchmark
