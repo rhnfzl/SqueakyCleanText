@@ -1,10 +1,14 @@
 """Chunker regressions: hard size cap, CJK/Indic sentence ends, exact rejoin,
 document-relative reversible map offsets. No model download needed."""
 
+import re
 import threading
 from types import SimpleNamespace
 
 import pytest
+from hypothesis import given, settings
+from hypothesis import strategies as st
+from presidio_anonymizer import AnonymizerEngine
 
 from sct.utils.anonymization_map import AnonymizationMap
 from sct.utils.ner import GeneralNER
@@ -168,3 +172,165 @@ def test_align_chunk_maps_normalized_whitespace():
     source_chunk, start, offsets = GeneralNER._align_chunk("x  a\t\tb", "a b", 0)
     assert (source_chunk, start) == ("a\t\tb", 3)
     assert offsets[2] == 3 and offsets[3] == 4
+
+
+# --- ner_chunk_overlap: token windows, document-level merge, replace once ---
+
+def _word_tokenizer(text, **kwargs):
+    spans = [m.span() for m in re.finditer(r"\S+", text)]
+    return SimpleNamespace(input_ids=spans, offset_mapping=spans)
+
+
+class _FakeRunDetector(_FakeGLiNER):
+    """Tags capitalised words as PER; with min_words=2 only runs of two or more."""
+
+    def __init__(self, min_words=1):
+        self.pattern = re.compile(r"[A-Z][a-z]+(?: [A-Z][a-z]+){%d,}" % (min_words - 1))
+
+    def __call__(self, texts, batch_size=1):
+        return [
+            [{"entity_group": "PER", "score": 0.99, "word": m.group(),
+              "start": m.start(), "end": m.end()} for m in self.pattern.finditer(text)]
+            for text in texts
+        ]
+
+
+def _word_ner(overlap, detector, budget=12, mode="placeholder"):
+    ner = _gliner_ner(mode)
+    ner._gliner_pipe = detector
+    ner.tokenizer = _word_tokenizer
+    ner.min_token_length = budget
+    ner._ner_chunk_overlap = overlap
+    ner.engine = AnonymizerEngine()
+    return ner
+
+
+def _words(n, names):
+    words = [f"w{i}" for i in range(n)]
+    for index, name in names.items():
+        words[index] = name
+    return " ".join(words)
+
+
+def test_overlap_finds_name_split_between_chunks():
+    # Cores of 12 (overlap 0) and 8 (overlap 2) words both end right after "John".
+    text = _words(40, {23: "John", 24: "Smith"})
+    old = _word_ner(0, _FakeRunDetector(min_words=2)).ner_process_detailed(
+        text, positional_tags=("PER",), ner_confidence_threshold=0.5)
+    assert "John Smith" in old.text and not old.findings  # the 0.7.1 limit
+
+    result = _word_ner(2, _FakeRunDetector(min_words=2)).ner_process_detailed(
+        text, positional_tags=("PER",), ner_confidence_threshold=0.5)
+    assert result.text == text.replace("John Smith", "<PERSON>")
+    [finding] = result.findings
+    assert text[finding.entity.start:finding.entity.end] == "John Smith"
+
+
+def test_overlap_keeps_one_copy_of_a_span_seen_by_two_windows():
+    # Window 3 (core w16..w23) also sees "Paul Smith" in its left overlap.
+    text = _words(40, {13: "John", 14: "Paul", 15: "Smith"})
+    anon_map = AnonymizationMap()
+    ner = _word_ner(2, _FakeRunDetector(min_words=2), mode="reversible")
+    result = ner.ner_process_detailed(
+        text, positional_tags=("PER",), ner_confidence_threshold=0.5, anon_map=anon_map)
+    [finding] = result.findings
+    assert finding.entity.text == "John Paul Smith"
+    [entry] = anon_map.entries
+    assert text[entry.start:entry.end] == "John Paul Smith"
+    assert anon_map.deanonymize(result.text) == text
+
+
+def test_overlap_windows_fit_the_budget_at_hard_cuts():
+    def bert_like(text, **kwargs):
+        return SimpleNamespace(
+            input_ids=[0] * (len(text) + 2),
+            offset_mapping=[(0, 0)] + [(i, i + 1) for i in range(len(text))] + [(0, 0)],
+        )
+
+    ner = _word_ner(3, _FakeRunDetector(), budget=20)
+    ner.tokenizer = bert_like
+    windows = ner._plan_windows("x" * 100)
+    assert all(ner._token_count(w[0], bert_like) <= 20 for w in windows)
+    assert any(w[1] > 0 and len(w[0]) > 14 for w in windows)  # overlap was added
+    owned = [(w[3], w[4]) for w in windows]
+    assert owned[0][0] == 0 and all(a[1] == b[0] for a, b in zip(owned, owned[1:]))
+
+    gliner = _gliner_ner("placeholder")
+    gliner._ner_chunk_overlap = 10
+    budget = gliner._chunk_budget()
+    windows = gliner._plan_windows("张" * 2841)
+    assert len(windows) > 1 and all(len(w[0]) <= budget * 2 for w in windows)
+    assert "".join(w[0][w[3] - w[1]:w[4] - w[1]] for w in windows) == "张" * 2841
+
+
+def _finalize_071(ner, text, threshold):
+    """Frozen 0.7.1 path: vote and replace chunk by chunk (placeholder mode)."""
+    chunks = ner.split_text(text, ner.min_token_length, ner.tokenizer)
+    out, findings, search_start = [], [], 0
+    for chunk, results in zip(chunks, ner._detect(chunks, [None] * len(chunks), ("PER",))):
+        source_chunk, chunk_start, offsets = ner._align_chunk(text, chunk, search_start)
+        out.append(text[search_start:chunk_start])
+        search_start = chunk_start + len(source_chunk)
+        voted = [
+            {**item, "start": offsets[item["start"]], "end": offsets[item["end"]]}
+            for item in ner.ner_ensemble(results, threshold)
+        ]
+        out.append(ner.anonymize_text(source_chunk, voted).text if voted else source_chunk)
+        findings += [(i["start"] + chunk_start, i["end"] + chunk_start) for i in voted]
+    out.append(text[search_start:])
+    return "".join(out), findings
+
+
+@settings(max_examples=60, deadline=None)
+@given(
+    words=st.lists(st.sampled_from(["lorem", "ipsum", "dolor", "Ann,", "Bob.", "Eve,"]),
+                   min_size=1, max_size=60),
+    seps=st.lists(st.sampled_from([" ", "  ", "\n", "\n\n", ". ", "! "]), min_size=60, max_size=60),
+)
+def test_overlap_zero_matches_071_per_chunk_replacement(words, seps):
+    text = "".join(word + sep for word, sep in zip(words, seps))
+    ner = _word_ner(0, _FakeRunDetector(), budget=6)
+    result = ner.ner_process_detailed(text, positional_tags=("PER",), ner_confidence_threshold=0.5)
+    expected_text, expected_spans = _finalize_071(ner, text, 0.5)
+    assert result.text == expected_text
+    assert [(f.entity.start, f.entity.end) for f in result.findings] == expected_spans
+
+
+def test_whole_document_replacement_merges_names_across_chunk_boundary():
+    # Deliberate 0.8.0 change: Presidio merges same-type spans split only by
+    # spaces, now also when a chunk boundary falls between them.
+    text = _words(30, {11: "Ann", 12: "Bob"})
+    ner = _word_ner(0, _FakeRunDetector())
+    result = ner.ner_process_detailed(text, positional_tags=("PER",), ner_confidence_threshold=0.5)
+    assert result.text == text.replace("Ann Bob", "<PERSON>")
+    assert _finalize_071(ner, text, 0.5)[0] == text.replace("Ann Bob", "<PERSON> <PERSON>")
+    assert len(result.findings) == 2
+
+
+def test_overlap_config_validation_and_module_global(monkeypatch):
+    from sct import config
+    from sct.config import TextCleanerConfig
+
+    with pytest.raises(ValueError, match="ner_chunk_overlap"):
+        TextCleanerConfig(check_ner_process=False, ner_chunk_overlap=-1)
+    assert TextCleanerConfig(check_ner_process=False).ner_chunk_overlap == 0
+    monkeypatch.setattr(config, "NER_CHUNK_OVERLAP", 16)
+    assert config._config_from_module_globals().ner_chunk_overlap == 16
+
+
+def test_overlap_with_real_tokenizer():
+    from tests.conftest import TEST_NER_MODELS
+
+    with pytest.raises(ValueError, match="ner_chunk_overlap"):
+        GeneralNER(model_names=TEST_NER_MODELS, ner_chunk_overlap=200)
+    ner = GeneralNER(model_names=TEST_NER_MODELS, ner_chunk_overlap=32,
+                     replacement_mode="reversible")
+    text = "Marie Curie worked in Paris with Pierre Curie. " * 80
+    windows = ner._plan_windows(text)
+    assert len(windows) > 1
+    assert all(ner._token_count(w[0], ner.tokenizer) <= ner.min_token_length for w in windows)
+    anon_map = AnonymizationMap()
+    result = ner.ner_process_detailed(text, ("PER", "LOC"), 0.85, "ENGLISH", anon_map)
+    assert "Paris" not in result.text
+    assert len({(f.entity.start, f.entity.end) for f in result.findings}) == len(result.findings)
+    assert anon_map.deanonymize(result.text) == text

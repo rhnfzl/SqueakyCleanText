@@ -296,6 +296,7 @@ class TextCleanerConfig:
     # Added in 0.8.0; kept last so existing positional arguments keep their meaning.
     onnx_intra_op_threads: Optional[int] = None  # None = ONNX Runtime default (all cores)
     onnx_inter_op_threads: Optional[int] = None  # None = ONNX Runtime default
+    ner_chunk_overlap: int = 0  # tokens of neighbouring text each NER window adds per side; 0 = 0.7.1 chunks
 
     def __post_init__(self):
         if self.gliclass_onnx:
@@ -396,6 +397,8 @@ class TextCleanerConfig:
             value = getattr(self, name)
             if value is not None and value < 1:
                 raise ValueError(f"{name} must be None or >= 1, got {value}")
+        if self.ner_chunk_overlap < 0:
+            raise ValueError(f"ner_chunk_overlap must be >= 0, got {self.ner_chunk_overlap}")
 
         # GLiNER fields required for gliner/ensemble backends
         needs_gliner = self.ner_backend in GLINER_BACKENDS
@@ -601,6 +604,7 @@ def _config_from_module_globals() -> TextCleanerConfig:
         replace_numbers_in_words=getattr(m, 'REPLACE_NUMBERS_IN_WORDS', False),
         onnx_intra_op_threads=getattr(m, 'ONNX_INTRA_OP_THREADS', None),
         onnx_inter_op_threads=getattr(m, 'ONNX_INTER_OP_THREADS', None),
+        ner_chunk_overlap=getattr(m, 'NER_CHUNK_OVERLAP', 0),
         check_replace_currency_symbols=m.CHECK_REPLACE_CURRENCY_SYMBOLS,
         check_ner_process=m.CHECK_NER_PROCESS,
         check_remove_isolated_letters=m.CHECK_REMOVE_ISOLATED_LETTERS,
@@ -658,6 +662,7 @@ CHECK_REPLACE_NUMBERS = True
 REPLACE_NUMBERS_IN_WORDS = False
 ONNX_INTRA_OP_THREADS = None
 ONNX_INTER_OP_THREADS = None
+NER_CHUNK_OVERLAP = 0
 CHECK_REPLACE_CURRENCY_SYMBOLS = True
 CHECK_NER_PROCESS = True
 CHECK_REMOVE_ISOLATED_LETTERS = True

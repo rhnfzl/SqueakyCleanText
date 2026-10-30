@@ -44,7 +44,7 @@ def test_onnx_batch_runs_once_per_slice(onnx_ner, monkeypatch):
     monkeypatch.setattr(pipe, '_session', counter)
     monkeypatch.setattr(onnx_ner, '_ner_batch_size', 4)
     text = DOCS[3] * 2
-    chunks = onnx_ner._chunk_text(text)
+    chunks = onnx_ner._plan_windows(text)
     assert len(chunks) >= 5
     keys = onnx_ner._get_ensemble_keys('ENGLISH')
     onnx_ner.ner_process_detailed(text, TAGS, 0.85, 'ENGLISH')

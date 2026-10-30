@@ -1,4 +1,5 @@
 import math
+from bisect import bisect_left, bisect_right
 import gc
 import re
 import threading
@@ -60,6 +61,7 @@ class GeneralNER:
     """
 
     _ner_batch_size = 8  # chunks per model call; __init__ sets the configured value
+    _ner_chunk_overlap = 0  # tokens of context each window adds per side; __init__ sets it
 
     def __init__(self, cache_dir: Optional[Path] = None, device: Optional[str] = None,
                  model_names: Optional[Union[Dict[str, str], List[str]]] = None,
@@ -74,7 +76,8 @@ class GeneralNER:
                  replacement_mode: str = 'placeholder',
                  synthetic_replacer=None,
                  onnx_intra_op_threads: Optional[int] = None,
-                 onnx_inter_op_threads: Optional[int] = None):
+                 onnx_inter_op_threads: Optional[int] = None,
+                 ner_chunk_overlap: int = 0):
         """Initialize NER processor.
 
         Args:
@@ -91,9 +94,12 @@ class GeneralNER:
             synthetic_replacer: Shared SyntheticReplacer instance (from TextCleaner).
             onnx_intra_op_threads, onnx_inter_op_threads: ONNX Runtime session
                 thread counts; None keeps the ONNX Runtime default.
+            ner_chunk_overlap: Tokens of neighbouring text each NER window adds on
+                both sides of its chunk; 0 keeps the 0.7.1 chunks.
         """
         self._ner_backend = ner_backend
         self._ner_batch_size = ner_batch_size
+        self._ner_chunk_overlap = ner_chunk_overlap
         self._replacement_mode = replacement_mode
         self._synthetic_replacer = synthetic_replacer
         self._model_revisions = dict(model_revisions or {})
@@ -190,6 +196,14 @@ class GeneralNER:
                 device=self.device,
                 onnx=gliner_config.get('onnx', False),
             )
+
+        if ner_backend != 'presidio_gliner' and ner_chunk_overlap:
+            budget = self._chunk_budget()
+            if not 0 < 2 * ner_chunk_overlap < budget // 2:
+                raise ValueError(
+                    f"ner_chunk_overlap must be >= 0 and 2 * overlap < {budget // 2} "
+                    f"(half the {budget}-token window), got {ner_chunk_overlap}"
+                )
 
     def _init_tokenizer_props(self):
         """Set min_token_length and tokenizer from loaded ENGLISH/MULTILINGUAL models."""
@@ -450,7 +464,7 @@ class GeneralNER:
                 chunks.extend(self._simple_chunk(chunk, max_tokens))
             return chunks
 
-        # shortcut: hard cut can split an entity; window overlap fixes this in 0.8.0
+        # shortcut: hard cut can split an entity; ner_chunk_overlap > 0 covers it
         return [text[i:i + max_chars] for i in range(0, len(text), max_chars)]
 
     @staticmethod
@@ -581,12 +595,14 @@ class GeneralNER:
             )
             return NERProcessingResult(text=result.text, findings=findings)
 
-        chunks = self._chunk_text(text)
-        if not chunks:
+        windows = self._plan_windows(text)
+        if not windows:
             return NERProcessingResult(text=text, findings=())
-        chunk_results = self._detect(chunks, [language] * len(chunks), positional_tags)
+        window_results = self._detect(
+            [window[0] for window in windows], [language] * len(windows), positional_tags,
+        )
         return self._finalize(
-            text, chunks, chunk_results, ner_confidence_threshold, anon_map, privacy_policy,
+            text, windows, window_results, ner_confidence_threshold, anon_map, privacy_policy,
         )
 
     def ner_process_batch_detailed(
@@ -602,8 +618,8 @@ class GeneralNER:
     ) -> List[NERProcessingResult]:
         """``ner_process_detailed`` for many documents, batching model calls across them.
 
-        Chunks of all documents go through each model in calls of up to
-        ``ner_batch_size`` chunks; replacement then runs per document exactly as
+        Windows of all documents go through each model in calls of up to
+        ``ner_batch_size`` windows; replacement then runs per document exactly as
         in ``ner_process_detailed``. *before_finalize(i)* runs just before
         document *i* is replaced (TextCleaner resets the synthetic cache there).
         *max_workers* ONNX batches run at once.
@@ -624,37 +640,95 @@ class GeneralNER:
                 ))
             return results
 
-        doc_chunks = [self._chunk_text(text) for text in texts]
-        flat_chunks = [chunk for chunks in doc_chunks for chunk in chunks]
+        doc_windows = [self._plan_windows(text) for text in texts]
+        flat_windows = [window[0] for windows in doc_windows for window in windows]
         flat_languages = [
-            languages[i] for i, chunks in enumerate(doc_chunks) for _ in chunks
+            languages[i] for i, windows in enumerate(doc_windows) for _ in windows
         ]
-        flat_results = self._detect(flat_chunks, flat_languages, positional_tags, max_workers)
+        flat_results = self._detect(flat_windows, flat_languages, positional_tags, max_workers)
 
         results = []
         offset = 0
-        for i, (text, chunks) in enumerate(zip(texts, doc_chunks)):
-            chunk_results = flat_results[offset:offset + len(chunks)]
-            offset += len(chunks)
+        for i, (text, windows) in enumerate(zip(texts, doc_windows)):
+            window_results = flat_results[offset:offset + len(windows)]
+            offset += len(windows)
             if before_finalize is not None:
                 before_finalize(i)
-            if not chunks:
+            if not windows:
                 results.append(NERProcessingResult(text=text, findings=()))
                 continue
             results.append(self._finalize(
-                text, chunks, chunk_results, ner_confidence_threshold,
+                text, windows, window_results, ner_confidence_threshold,
                 anon_maps[i], privacy_policy,
             ))
         return results
 
-    def _chunk_text(self, text: str) -> List[str]:
-        """Split *text* into model-sized chunks."""
-        # lock-free: HF fast tokenizer Rust backend is thread-safe
+    def _chunk_budget(self) -> int:
+        """Token budget of one NER window (GLiNER-only: of its context window)."""
         if self.tokenizer is not None:
-            return self.split_text(text, self.min_token_length, self.tokenizer)
+            return self.min_token_length
         # Use GLiNER adapter's dynamic context window when available
         gliner_max = self._gliner_pipe.max_context_length if self._gliner_pipe else 384
-        return self._simple_chunk(text, max_tokens=int(gliner_max * 0.9))
+        return int(gliner_max * 0.9)
+
+    def _plan_windows(self, text: str) -> List[tuple]:
+        """Split *text* into model windows ``(window, win_start, offsets, own_start, own_end)``.
+
+        Core chunks come from the chunker with ``2 * ner_chunk_overlap`` tokens
+        less budget; each window adds up to ``ner_chunk_overlap`` tokens of the
+        neighbouring text on both sides (GLiNER-only: 2 chars per token, as in
+        ``_simple_chunk``). ``win_start + offsets[i]`` is the document position of
+        window position *i*. A span belongs to the window whose core owns its
+        start (``own_start <= start < own_end``); copies seen by other windows are
+        dropped. With overlap 0 windows are the 0.7.1 chunks and own everything.
+        """
+        overlap = self._ner_chunk_overlap
+        budget = self._chunk_budget() - 2 * overlap
+        # lock-free: HF fast tokenizer Rust backend is thread-safe
+        if self.tokenizer is not None:
+            chunks = self.split_text(text, budget, self.tokenizer)
+        else:
+            chunks = self._simple_chunk(text, max_tokens=budget)
+
+        cores = []
+        search_start = 0
+        for chunk in chunks:
+            source_chunk, start, offsets = self._align_chunk(text, chunk, search_start)
+            search_start = start + len(source_chunk)
+            cores.append((chunk, start, start + len(source_chunk), offsets))
+        if not overlap:
+            return [(chunk, start, offsets, 0, len(text) + 1) for chunk, start, _, offsets in cores]
+
+        if self.tokenizer is not None:
+            tokens = [
+                (start, end)
+                for start, end in self.tokenizer(text, return_offsets_mapping=True).offset_mapping
+                if end > start
+            ]
+            starts = [start for start, _ in tokens]
+            ends = [end for _, end in tokens]
+
+        windows = []
+        for k, (_, core_start, core_end, _) in enumerate(cores):
+            if self.tokenizer is not None:
+                before = bisect_right(ends, core_start)  # tokens ending at or before the core
+                after = bisect_left(starts, core_end)  # first token starting at or after its end
+                win_start = min(core_start, starts[max(0, before - overlap)]) if before else core_start
+                win_end = (
+                    max(core_end, ends[min(len(ends), after + overlap) - 1])
+                    if after < len(ends) else core_end
+                )
+            else:
+                win_start = max(0, core_start - overlap * 2)
+                win_end = min(len(text), core_end + overlap * 2)
+            windows.append((
+                text[win_start:win_end],
+                win_start,
+                range(win_end - win_start + 1),
+                core_start if k else 0,
+                cores[k + 1][1] if k + 1 < len(cores) else len(text) + 1,
+            ))
+        return windows
 
     def _detect(
         self,
@@ -718,106 +792,51 @@ class GeneralNER:
     def _finalize(
         self,
         text: str,
-        chunks: List[str],
-        chunk_results: List[list],
+        windows: List[tuple],
+        window_results: List[list],
         ner_confidence_threshold: float,
         anon_map: Optional['AnonymizationMap'],
         privacy_policy: Optional[PrivacyPolicy],
     ) -> NERProcessingResult:
-        """Vote and replace chunk by chunk; offsets come back document-relative."""
-        ner_clean_text = []
-        all_findings = []
-        search_start = 0
-        for chunk, ner_results in zip(chunks, chunk_results):
-            source_chunk, chunk_start, source_offsets = self._align_chunk(
-                text,
-                chunk,
-                search_start,
+        """Merge window spans in document coordinates, vote, and replace once."""
+        spans = []
+        for (_, win_start, offsets, own_start, own_end), ner_results in zip(windows, window_results):
+            for item in ner_results:
+                start = win_start + offsets[item['start']]
+                if own_start <= start < own_end:
+                    end = win_start + offsets[item['end']]
+                    spans.append({
+                        **item, 'start': start, 'end': end,
+                        'word': text[start:end], 'key': f"{start}:{end}",
+                    })
+
+        ensemble_results = self.ner_ensemble(spans, ner_confidence_threshold)
+        if not ensemble_results:
+            return NERProcessingResult(text=text, findings=())
+        entities = tuple(
+            DetectedEntity(
+                entity_type=ENTITY_TYPE_MAP.get(item['entity_group'], item['entity_group']),
+                score=item['score'],
+                text=item['word'],
+                start=item['start'],
+                end=item['end'],
             )
-            if chunk_start > search_start:
-                ner_clean_text.append(text[search_start:chunk_start])
-            search_start = chunk_start + len(source_chunk)
-
-            # Ensemble vote + anonymize
-            ensemble_results = self.ner_ensemble(ner_results, ner_confidence_threshold)
-
-            if ensemble_results:
-                ensemble_results = [
-                    {
-                        **item,
-                        'start': source_offsets[item['start']],
-                        'end': source_offsets[item['end']],
-                        'word': source_chunk[
-                            source_offsets[item['start']]:
-                            source_offsets[item['end']]
-                        ],
-                    }
-                    for item in ensemble_results
-                ]
-                local_entities = tuple(
-                    DetectedEntity(
-                        entity_type=ENTITY_TYPE_MAP.get(
-                            item['entity_group'], item['entity_group']
-                        ),
-                        score=item['score'],
-                        text=source_chunk[item['start']:item['end']],
-                        start=item['start'],
-                        end=item['end'],
-                    )
-                    for item in ensemble_results
-                )
-                if privacy_policy is not None:
-                    local_findings = privacy_policy.evaluate(local_entities)
-                    ner_text = privacy_policy.transform(
-                        source_chunk,
-                        local_findings,
-                    )
-                else:
-                    map_size = len(anon_map.entries) if anon_map is not None else 0
-                    result = self.anonymize_text(
-                        source_chunk,
-                        ensemble_results,
-                        self._replacement_mode,
-                        anon_map=anon_map,
-                    )
-                    ner_text = result.text
-                    # Map entries were recorded in chunk coordinates; make them document-relative.
-                    for entry in (anon_map.entries[map_size:] if anon_map is not None else ()):
-                        entry.start += chunk_start
-                        entry.end += chunk_start
-                    local_findings = tuple(
-                        EntityFinding(
-                            entity,
-                            self._replacement_mode,
-                            'detector-threshold',
-                        )
-                        for entity in local_entities
-                    )
-                all_findings.extend(
-                    EntityFinding(
-                        DetectedEntity(
-                            entity_type=finding.entity.entity_type,
-                            score=finding.entity.score,
-                            text=finding.entity.text,
-                            start=finding.entity.start + chunk_start,
-                            end=finding.entity.end + chunk_start,
-                        ),
-                        finding.action,
-                        finding.reason,
-                    )
-                    for finding in local_findings
-                )
-            else:
-                ner_text = source_chunk
-
-            ner_clean_text.append(ner_text)
-
-        if search_start < len(text):
-            ner_clean_text.append(text[search_start:])
-        return NERProcessingResult(
-            text=''.join(ner_clean_text),
-            findings=tuple(all_findings),
+            for item in ensemble_results
         )
+        if privacy_policy is not None:
+            findings = privacy_policy.evaluate(entities)
+            return NERProcessingResult(
+                text=privacy_policy.transform(text, findings),
+                findings=findings,
+            )
+        result = self.anonymize_text(
+            text, ensemble_results, self._replacement_mode, anon_map=anon_map,
+        )
+        findings = tuple(
+            EntityFinding(entity, self._replacement_mode, 'detector-threshold')
+            for entity in entities
+        )
+        return NERProcessingResult(text=result.text, findings=findings)
 
     def ner_process(
         self,

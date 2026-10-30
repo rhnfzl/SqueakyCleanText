@@ -143,6 +143,7 @@ class TextCleaner:
                 synthetic_replacer=self._synthetic_replacer,
                 onnx_intra_op_threads=self.cfg.onnx_intra_op_threads,
                 onnx_inter_op_threads=self.cfg.onnx_inter_op_threads,
+                ner_chunk_overlap=self.cfg.ner_chunk_overlap,
             )
         # GLiClass document-level pre-classification (optional, lazy-loaded)
         self._gliclass: Any = None

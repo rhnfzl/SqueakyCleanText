@@ -562,6 +562,7 @@ new_cfg = dataclasses.replace(cfg, check_ner_process=False)
 | `ner_batch_size` | `8` | NER chunks per model forward pass, batched across the documents of a `process_batch` call (must be >= 1). `1` = 0.7.1 call pattern and exact scores; on CPU with many workers and long documents `1` can be faster and uses less memory |
 | `onnx_intra_op_threads` | `None` | ONNX Runtime threads per inference (`None` = ORT default, all cores). With `process_batch`, aim for workers x threads ~= physical cores |
 | `onnx_inter_op_threads` | `None` | ONNX Runtime inter-op threads (`None` = ORT default). Only matters with ORT parallel execution mode, so `onnx_intra_op_threads` is the usual knob |
+| `ner_chunk_overlap` | `0` | Tokens of neighbouring text each NER window adds on both sides, for documents longer than one window (about 460 tokens with the default models). Finds entities that a chunk boundary would split (`John \| Smith`); costs about `2 * overlap / window` more inference and can change recall either way. `0` = 0.7.1 chunks. Must stay below a quarter of the window |
 | `ner_models` | `None` | Language-keyed dict of ONNX model repo IDs |
 | `torch_ner_models` | `None` | Language-keyed dict of PyTorch model repo IDs |
 | `gliner_model` | `None` | GLiNER model ID (required for gliner/ensemble backends) |
