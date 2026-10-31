@@ -329,6 +329,16 @@ class TextCleanerTest(unittest.TestCase):
         elapsed = time.time() - start
         self.assertLess(elapsed, 2.0, "ACRONYM_REGEX took too long - possible ReDoS")
 
+    def test_host_regex_no_redos(self):
+        """A dotted host with no TLD fails fast (each label used to split every way: ~5 s / 10 s here)."""
+        import time
+        host = ".".join(["1" * 20] * 5) + " "
+        for name, rx, sample in (("EMAIL_REGEX", constants.EMAIL_REGEX, "a@" + host),
+                                 ("URL_REGEX", constants.URL_REGEX, "http://" + host)):
+            start = time.time()
+            rx.search(sample)
+            self.assertLess(time.time() - start, 1.0, f"{name} took too long - possible ReDoS")
+
     # --- Consistent return type tests ---
 
     def test_process_returns_3tuple(self):

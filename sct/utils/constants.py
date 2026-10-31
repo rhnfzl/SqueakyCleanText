@@ -107,7 +107,8 @@ _TLD = rf"(?:xn--[a-z0-9-]*[a-z0-9]|(?:{_NO_GLUE}[{_IDN_LETTER}]){{2,}})"
 EMAIL_REGEX = re.compile(
     rf"(?:^|(?<=[^\w@.){MARKS}])|(?={_GLUE}))[\w+-]"
     rf"(?:{_NO_GLUE}[\w!#$%&'*+{MARKS}\u200c\u200d-]|\.(?!\.))*?(?<!\.)(@|[(<{{\[]at[)>}}\]])"
-    rf"(?:(?:[{_IDN_CHAR}]-*)*[{_IDN_CHAR}]+)(?:\.(?:[{_IDN_CHAR}]-*)*[{_IDN_CHAR}]+)*(?:\.{_TLD})",
+    # Host labels as X+(-+X+)*: one way to split a label, so a host with no TLD fails in linear time.
+    rf"[{_IDN_CHAR}]+(?:-+[{_IDN_CHAR}]+)*(?:\.[{_IDN_CHAR}]+(?:-+[{_IDN_CHAR}]+)*)*(?:\.{_TLD})",
     flags=re.IGNORECASE | re.UNICODE,
 )
 
@@ -220,9 +221,10 @@ URL_REGEX = re.compile(
     rf"{_IPV4}(?![0-9]|\.[0-9a-z])"
     r"|"
     # host name (with proper Unicode support, beyond the BMP too)
-    rf"(?:(?:[a-z\u00a1-\uffff0-9{_SUPPLEMENTARY_ALNUM}]-*)*[a-z\u00a1-\uffff0-9{_SUPPLEMENTARY_ALNUM}]+)"
+    # (labels as X+(-+X+)*, as in EMAIL_REGEX, so a host with no TLD fails in linear time)
+    rf"[a-z\u00a1-\uffff0-9{_SUPPLEMENTARY_ALNUM}]+(?:-+[a-z\u00a1-\uffff0-9{_SUPPLEMENTARY_ALNUM}]+)*"
     # domain name
-    rf"(?:\.(?:[a-z\u00a1-\uffff0-9{_SUPPLEMENTARY_ALNUM}]-*)*[a-z\u00a1-\uffff0-9{_SUPPLEMENTARY_ALNUM}]+)*"
+    rf"(?:\.[a-z\u00a1-\uffff0-9{_SUPPLEMENTARY_ALNUM}]+(?:-+[a-z\u00a1-\uffff0-9{_SUPPLEMENTARY_ALNUM}]+)*)*"
     # TLD identifier (punycode first, so ".xn" alone never ends the host)
     rf"(?:\.(?:xn--[a-z0-9-]*[a-z0-9]|(?:{_NO_GLUE}[a-z\u00a1-\uffff{_SUPPLEMENTARY_ALNUM}]){{2,}}))"
     r"|" r"(?:(localhost))" r")"
