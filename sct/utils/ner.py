@@ -1,4 +1,6 @@
 import math
+import os
+import weakref
 from bisect import bisect_left, bisect_right
 import gc
 import re
@@ -42,6 +44,20 @@ ENTITY_TYPE_MAP = {
     'ORG': 'ORGANISATION',
     'MISC': 'MISC',
 }
+
+
+# Freeing an inherited ONNX session in a forked child crashes or hangs, so children pin every live
+# GeneralNER for their whole life instead of ever destroying one.
+_LIVE_NER: "weakref.WeakSet[GeneralNER]" = weakref.WeakSet()
+_FORK_PINNED: list = []
+
+
+def _pin_live_ner_in_child():
+    _FORK_PINNED.extend(_LIVE_NER)
+
+
+if hasattr(os, "register_at_fork"):
+    os.register_at_fork(after_in_child=_pin_live_ner_in_child)
 
 
 class ModelLoadError(Exception):
@@ -101,6 +117,7 @@ class GeneralNER:
             cuda_device_id: GPU index used when *device* resolves to CUDA.
             onnx_cuda_provider_options: Extra ``CUDAExecutionProvider`` options.
         """
+        _LIVE_NER.add(self)
         self._ner_backend = ner_backend
         self._ner_batch_size = ner_batch_size
         self._ner_chunk_overlap = ner_chunk_overlap

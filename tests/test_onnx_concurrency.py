@@ -139,3 +139,13 @@ def test_thread_config_module_globals(monkeypatch):
     monkeypatch.setattr(config, "ONNX_INTER_OP_THREADS", 1)
     cfg = config._config_from_module_globals()
     assert (cfg.onnx_intra_op_threads, cfg.onnx_inter_op_threads) == (2, 1)
+
+
+def test_fork_child_pins_live_ner(monkeypatch):
+    # A forked child must never free an inherited GeneralNER (ONNX teardown crashes there);
+    # the at-fork hook keeps a strong reference to every live one. Called directly: no real fork on macOS.
+    monkeypatch.setattr(ner_module, "_FORK_PINNED", [])
+    ner = GeneralNER(model_names=TEST_NER_MODELS)
+    assert ner in ner_module._LIVE_NER
+    ner_module._pin_live_ner_in_child()
+    assert any(p is ner for p in ner_module._FORK_PINNED)

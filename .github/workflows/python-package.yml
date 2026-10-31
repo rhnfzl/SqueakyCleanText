@@ -76,10 +76,10 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install -e ".[dev,test,datasets,datatrove]" --no-cache-dir
+        pip install -e ".[dev,test,datasets,datatrove,langchain,haystack]" --no-cache-dir
 
     - name: Test worker processes and adapters
       env:
         SCT_MP_START: ${{ matrix.start }}
       run: |
-        pytest tests/test_linux_workers.py tests/test_integrations_*.py -v -rs --cov=sct.integrations --cov-config=.coveragerc-integrations --cov-fail-under=85
+        pytest tests/test_linux_workers.py tests/test_integrations_*.py -v -rs --cov=sct/integrations --cov-config=.coveragerc-integrations --cov-fail-under=85
