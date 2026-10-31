@@ -9,6 +9,11 @@ from sct.utils import constants
 _DIGIT_VIEW = {cp: str(unicodedata.decimal(chr(cp))) for cp in range(0x80, 0x20000)
                if unicodedata.category(chr(cp)) == 'Nd'}
 _DIGIT_VIEW.update({0xFF0E: '.', 0xFF0D: '-', 0x3000: ' '})
+# fold_styled_characters: phones also see every other space (Zs: no-break, thin, narrow no-break) as
+# " " and every dash (Pd: hyphen, non-breaking hyphen, en dash) as "-", as word processors and PDFs
+# set digit groups (06\u00a012\u00a034, 06\u201112345678); the source text keeps them.
+SEPARATOR_VIEW = {**_DIGIT_VIEW, **{cp: ' ' if unicodedata.category(chr(cp)) == 'Zs' else '-'
+                                    for cp in range(0x80, 0x20000) if unicodedata.category(chr(cp)) in ('Zs', 'Pd')}}
 
 
 class _SourceMatch:
@@ -35,11 +40,11 @@ class _SourceMatch:
 class DigitView:
     """*pattern* matched on the digit view of a text; replacements land in the source text."""
 
-    def __init__(self, pattern):
-        self.pattern = pattern
+    def __init__(self, pattern, table=_DIGIT_VIEW):
+        self.pattern, self.table = pattern, table
 
     def sub(self, repl, text):
-        view = text if text.isascii() else text.translate(_DIGIT_VIEW)
+        view = text if text.isascii() else text.translate(self.table)
         if view == text:
             return self.pattern.sub(repl, text)
         out, last = [], 0
@@ -51,7 +56,8 @@ class DigitView:
         return ''.join(out)
 
 
-PHONE_VIEW = DigitView(constants.PHONE_REGEX)
+PHONE_VIEW = DigitView(constants.PHONE_REGEX, SEPARATOR_VIEW)
+PHONE_DIGIT_VIEW = DigitView(constants.PHONE_REGEX)  # fold_styled_characters=False
 IP_VIEW = DigitView(constants.IP_REGEX)
 
 
@@ -119,9 +125,9 @@ class ProcessContacts:
             text,
         )
 
-    def replace_phone_numbers_with_fn(self, text, replace_fn):
+    def replace_phone_numbers_with_fn(self, text, replace_fn, view=PHONE_VIEW):
         """Replace phone numbers using a callable: replace_fn(matched_text) -> replacement."""
-        return PHONE_VIEW.sub(lambda m: replace_fn(m.group()), text)
+        return view.sub(lambda m: replace_fn(m.group()), text)
 
     def replace_numbers_with_fn(self, text, replace_fn, in_words=False):
         """Replace numbers using a callable: replace_fn(matched_text) -> replacement."""

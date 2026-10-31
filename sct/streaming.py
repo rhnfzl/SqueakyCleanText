@@ -6,7 +6,7 @@ import unicodedata
 
 from sct.sct import TextCleaner
 from sct.utils import constants
-from sct.utils.contact import _DIGIT_VIEW
+from sct.utils.contact import _DIGIT_VIEW, SEPARATOR_VIEW
 from sct.utils.normtext import _STYLED_SEP
 
 _CONTACT_REGEXES = (
@@ -82,6 +82,7 @@ class WindowedStreamingRedactor:
         # digit, space and contact punctuation NFKC-folded ("０６ １２") with any decimal digit as
         # ASCII ("٠٦ ١٢", as the cleaner's digit view); starts/ends map view offsets back to the buffer.
         view, starts, ends = [], [], []
+        table = SEPARATOR_VIEW if self._cleaner.cfg.fold_styled_characters else _DIGIT_VIEW  # as the phone step
         for unit in _VIEW_UNIT.finditer(self._buffer):
             decoded = html.unescape(unit.group())
             if len(decoded) != 1:  # an unknown entity stays as its raw characters
@@ -91,10 +92,11 @@ class WindowedStreamingRedactor:
             for character, end in zip(decoded, unit_ends):
                 if unicodedata.category(character) == "Cf":
                     continue  # invisible ("06\u00ad12"): the cleaner's fold drops it inside a contact run
-                folded = unicodedata.normalize("NFKC", character).translate(_DIGIT_VIEW)
-                # punctuation folds only where the cleaner's styled fold does (contact punctuation),
-                # so a "（" glued after a phone stays wide and does not end the match early
-                if not (folded.isalnum() or folded.isspace()) and character not in _STYLED_SEP:
+                folded = unicodedata.normalize("NFKC", character).translate(table)
+                # punctuation folds only where the cleaner does (contact punctuation, the phone view's
+                # dashes), so a "（" glued after a phone stays wide and does not end the match early
+                if not (folded.isalnum() or folded.isspace()) and character not in _STYLED_SEP \
+                        and ord(character) not in table:
                     folded = character
                 # styled multi-character folds ("⑫" -> "12") keep every character, all on one source span
                 if len(folded) != 1 and not (folded.isascii() and folded.isalnum()):
@@ -128,7 +130,8 @@ class WindowedStreamingRedactor:
             )
 
         prefix = self._buffer[:split_at]
-        separator = self._buffer[split_at]
+        # the cleaner's whitespace step turns any space (\u00a0, \u202f) into " "; the separator follows it
+        separator = " " if self._cleaner.cfg.check_normalize_whitespace else self._buffer[split_at]
         self._buffer = self._buffer[split_at + 1:]
         return self._cleaner.process(prefix).lm_text + separator
 

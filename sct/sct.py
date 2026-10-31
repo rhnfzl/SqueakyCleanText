@@ -861,9 +861,10 @@ class TextCleaner:
         )
 
     def _replace_phone_numbers(self, text):
+        phone_view = contact.PHONE_VIEW if self.cfg.fold_styled_characters else contact.PHONE_DIGIT_VIEW
         reversible = self._replace_reversible(
             text,
-            contact.PHONE_VIEW,
+            phone_view,
             self._phone_type,
         )
         if reversible is not None:
@@ -872,10 +873,11 @@ class TextCleaner:
             return self.ProcessContacts.replace_phone_numbers_with_fn(
                 text, lambda orig: self._emit(
                     self._phone_type, orig, self._synthetic_replacer.get_replacement(self._phone_type, orig),
-                ),
+                ), view=phone_view,
             )
         return self.ProcessContacts.replace_phone_numbers_with_fn(
             text, lambda orig: self._emit(self._phone_type, orig, self.cfg.replace_with_phone_numbers),
+            view=phone_view,
         )
 
     def _replace_numbers(self, text):

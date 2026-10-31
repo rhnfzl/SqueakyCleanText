@@ -8,6 +8,7 @@ same value: full-width and small-form characters, mathematical styled letters
 and digits, circled/squared letters and digits, native decimal digits of any
 script, decomposed letters (base + combining mark), zero-width characters where
 they are legal, invisible break hints (ZWSP, WJ, soft hyphen) inside the value,
+typeset phone and date separators (no-break or thin space, non-breaking hyphen, en dash),
 and glued to CJK/Thai prose without a space. Every variant comes from Unicode
 data (decomposition tag, NFKC, decimal value, category), and every
 rendered value folds back to the plain value (NFKC, Cf removed, Nd -> ASCII).
@@ -50,6 +51,9 @@ TYPE_FLAG = {
 }
 # Zero-width characters (all category Cf, removed by the oracle fold).
 ZWSP, ZWNJ, ZWJ, WJ, SHY = "​", "‌", "‍", "⁠", "\u00ad"
+# Typeset digit-group separators: no-break, figure, thin and narrow no-break space (Zs, NFKC is a
+# space) and hyphen, non-breaking hyphen, figure dash, en dash (Pd), as word processors and PDFs write them.
+TYPO_SPACES, TYPO_DASHES = "\u00a0\u2007\u2009\u202f", "\u2010\u2011\u2012\u2013"
 # Decomposition tags whose NFKC fold is the styled character's plain reading.
 STYLE_TAGS = {"wide": "wide", "small": "small", "font": "font", "circle": "enclosed", "square": "enclosed"}
 # Script letter ranges for context prose and non-ASCII PII (letters picked by category).
@@ -100,9 +104,10 @@ _DIGIT_FOLD = {cp: str(unicodedata.decimal(chr(cp))) for zero in DIGIT_ZEROS for
 
 
 def fold(text: str) -> str:
-    """The oracle fold: drop Cf, NFKC, any decimal digit -> ASCII, casefold."""
+    """The oracle fold: drop Cf, NFKC, any decimal digit -> ASCII, any dash (Pd) -> "-", casefold."""
     text = "".join(ch for ch in text if unicodedata.category(ch) != "Cf")
-    return unicodedata.normalize("NFKC", text).translate(_DIGIT_FOLD).casefold()
+    text = unicodedata.normalize("NFKC", text).translate(_DIGIT_FOLD)
+    return "".join("-" if unicodedata.category(ch) == "Pd" else ch for ch in text).casefold()
 
 
 # --- document generation ---
@@ -299,6 +304,19 @@ def _zw_inside(rng, plain, inserts, kinds):
     return sorted(kinds + ["zw_inside"])
 
 
+def _typo_sep(rng, plain, slots, kinds):
+    """Phone and date group separators typeset as another space or dash (06\u00a012\u00a034,
+    1987\u201105\u201112); own RNG so the cases of earlier rounds stay the same."""
+    free = [index for index, ch in enumerate(plain) if ch in " -" and slots[index] is None]
+    if not free or rng.random() >= 0.25:
+        return kinds
+    density = rng.choice((1.0, 0.5))
+    for index in free:
+        if rng.random() < density:
+            slots[index] = ("typo_sep", rng.choice(TYPO_SPACES if plain[index] == " " else TYPO_DASHES))
+    return sorted(set(kinds) | {"typo_sep"}) if any(slot and slot[0] == "typo_sep" for slot in slots) else kinds
+
+
 def make_case(seed: int) -> dict:
     rng = random.Random(seed)  # noqa: S311  # reproducible test data, not crypto
     scripts = rng.sample(sorted(SCRIPT_RANGES), rng.choice((1, 2)))
@@ -308,6 +326,8 @@ def make_case(seed: int) -> dict:
         plain, cores = GENERATORS[typ](rng)
         slots, inserts, kinds = _plan(rng, plain, _legal_join(plain, typ))
         kinds = _zw_inside(random.Random(f"{seed}-{len(values)}-zw"), plain, inserts, kinds)  # noqa: S311
+        if typ in ("PHONE", "DATE"):
+            kinds = _typo_sep(random.Random(f"{seed}-{len(values)}-sep"), plain, slots, kinds)  # noqa: S311
         glue = rng.random() < 0.5
         values.append({"type": typ, "plain": plain, "cores": cores, "slots": slots, "inserts": inserts,
                        "kinds": kinds + (["glue"] if glue else []), "glue": glue})

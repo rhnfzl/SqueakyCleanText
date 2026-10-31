@@ -91,7 +91,9 @@ _STYLED_EMAIL_RUN_JOINER = str.maketrans({ch: plain for ch, plain in _STYLED_SEP
 # between Thai words).
 _INVISIBLE_REGEX = re.compile(
     '[%s]+' % re.escape(''.join(chr(cp) for cp in range(0x110000) if unicodedata.category(chr(cp)) == 'Cf')))
-_RUN_CHAR = re.compile('[A-Za-z\\d%s%s]' % (''.join(map(chr, _CIRCLED_ALNUM)), _PUNCT_ANY))
+# Dashes of any form (Pd: hyphen, non-breaking hyphen, en dash) join phone groups like "-" (06\u2011 12).
+_DASHES = re.escape(''.join(chr(cp) for cp in range(0x110000) if unicodedata.category(chr(cp)) == 'Pd'))
+_RUN_CHAR = re.compile('[A-Za-z\\d%s%s%s]' % (''.join(map(chr, _CIRCLED_ALNUM)), _PUNCT_ANY, _DASHES))
 _LETTER = re.compile(rf'[^\W_]|[{constants.MARKS}]')
 
 
@@ -109,8 +111,10 @@ def _drop_invisible(m):
 # A lone circled number between space-separated digit groups (06 ⑬ 01 68) or after two or more of
 # them (06 73 86 88 ㊺) is one group of them; a lone one before a number (① 2024年) is a list marker.
 _DIGIT_GROUP = '(?:\\d|[%s])' % ''.join(chr(cp) for cp, plain in _CIRCLED_ALNUM.items() if plain.isdigit())
-_DIGIT_BEFORE, _DIGIT_AFTER = re.compile(_DIGIT_GROUP + ' '), re.compile(' ' + _DIGIT_GROUP)
-_GROUPS_BEFORE = re.compile(rf'(?:{_DIGIT_GROUP}+ ){{2,}}\Z')
+# Groups may be set off by any space (Zs: no-break, thin, narrow no-break, ideographic), as the phone view reads them.
+_SPACE = '[%s]' % ''.join(chr(cp) for cp in range(0x110000) if unicodedata.category(chr(cp)) == 'Zs')
+_DIGIT_BEFORE, _DIGIT_AFTER = re.compile(_DIGIT_GROUP + _SPACE), re.compile(_SPACE + _DIGIT_GROUP)
+_GROUPS_BEFORE = re.compile(rf'(?:{_DIGIT_GROUP}+{_SPACE}){{2,}}\Z')
 
 
 def _fold_circled_run(m):

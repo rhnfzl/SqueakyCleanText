@@ -11,7 +11,7 @@ from scripts.fuzz_styled_pii import check_case, fold, make_case, render
 
 # Open clusters (research/0.8.0-fuzz-round*.md) -> first seed that still shows them; xfail(strict=True).
 KNOWN_CLUSTERS = {}
-# Fixed clusters (rounds 0-5) -> first seed that showed them on the old code; they must stay fixed.
+# Fixed clusters (rounds 0-6) -> first seed that showed them on the old code; they must stay fixed.
 FIXED_CLUSTERS = {
     "leak|EMAIL|glue|placeholder": 300345,
     "leak|EMAIL|glue|reversible": 300345,
@@ -59,6 +59,14 @@ FIXED_CLUSTERS = {
     "leak|URL|zw_inside|synthetic": 166,
     "stream_mismatch|sct|PHONE:zw_inside": 1240,
     "stream_mismatch|training|PHONE:zw_inside": 101250,
+    "leak|PHONE|typo_sep|placeholder": 600026,
+    "leak|PHONE|typo_sep|reversible": 600026,
+    "leak|PHONE|typo_sep|stream": 600026,
+    "leak|PHONE|typo_sep|synthetic": 600026,
+    "leak|PHONE|enclosed_pair+typo_sep|stream": 402783,
+    "leak|PHONE|typo_sep+zw_boundary|stream": 302044,
+    "stream_mismatch|sct|PHONE:glue+PHONE:typo_sep": 600947,
+    "stream_mismatch|sct|PHONE:typo_sep": 601870,
     "leak|IP|enclosed_alnum+native_digit+wide_sep|placeholder": 2579,
     "leak|IP|enclosed_alnum+native_digit+wide_sep|reversible": 2579,
     "leak|IP|enclosed_alnum+native_digit+wide_sep|stream": 2579,
