@@ -49,7 +49,8 @@ PHONE_REGEX = re.compile(
     # Indian mobile: 98765 43210, 098765-43210
     r"|(?<![\d_)])0?[6-9]\d{4}[ -]?\d{5}(?![\d_])"
     # International: "+" then at least 8 digits in groups (+34 612 345 678, +91 98765 43210)
-    r"|(?<![\d+])\+(?=(?:[ .()-]{0,2}\d){8})\d{1,3}(?:[ .-]?\(?\d{1,5}\)?){1,5}"
+    # Area-code parentheses must be balanced, so a closing ")" of the sentence stays.
+    r"|(?<![\d+])\+(?=(?:[ .()-]{0,2}\d){8})\d{1,3}(?:[ .-]?(?:\(\d{1,5}\)|\d{1,5})){1,5}"
     r"(?:\s?(?:ext\.?|[#x])\s?\d{2,6})?(?![\d_(])"
 )
 

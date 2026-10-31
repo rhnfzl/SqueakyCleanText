@@ -39,6 +39,16 @@ def test_phone_glued_to_letters_any_script(text):
 
 
 @pytest.mark.parametrize("text, expected", [
+    ("(tel +31 6 1234 5678)", "(tel <PHONE>)"),
+    ("Ring +91 98765 43210).", "Ring <PHONE>)."),
+    ("+44 (0)20 7946 0958", "<PHONE>"),
+    ("+49 (30) 1234567", "<PHONE>"),
+])
+def test_international_phone_keeps_closing_paren_of_sentence(text, expected):
+    assert CONTACTS.replace_phone_numbers(text) == expected
+
+
+@pytest.mark.parametrize("text, expected", [
     ("राशि5000रुपये", "राशि<NUMBER>रुपये"),
     ("金额5000元", "金额<NUMBER>元"),
 ])
