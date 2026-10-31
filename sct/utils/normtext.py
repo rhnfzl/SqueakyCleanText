@@ -13,16 +13,19 @@ class NormaliseText:
     def __init__(self):
         pass
 
-    def fix_bad_unicode(self, text, normalization="NFC"):
+    def fix_bad_unicode(self, text, normalization="NFC", decode_escapes=True):
         """
         Fix unicode text that's "broken" using `ftfy <http://ftfy.readthedocs.org/>`_;
         this includes mojibake, HTML entities and other code cruft,
         and non-standard forms for display purposes.
+
+        ``decode_escapes=False`` keeps literal backslash escapes (``\\n``, ``\\u00e9``).
         """
-        try:
-            text = text.encode("latin", "backslashreplace").decode("unicode-escape")
-        except (UnicodeDecodeError, UnicodeEncodeError):
-            logger.debug("Unicode escape decoding failed, using original text", exc_info=True)
+        if decode_escapes:
+            try:
+                text = text.encode("latin", "backslashreplace").decode("unicode-escape")
+            except (UnicodeDecodeError, UnicodeEncodeError):
+                logger.debug("Unicode escape decoding failed, using original text", exc_info=True)
 
         return fix_text(text, normalization=normalization)
 

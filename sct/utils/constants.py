@@ -139,8 +139,8 @@ URL_REGEX = re.compile(
     r"(?:\.(?:[a-z\u00a1-\uffff]{2,}))" r"|" r"(?:(localhost))" r")"
     # port number
     r"(?::\d{2,5}\b)?"
-    # resource path
-    r"(?:\/[^\)\]\}\s]*)?",
+    # resource path; " < > are never raw in a URL, so markup around it survives
+    r"(?:\/[^\)\]\}\s\"<>]*)?",
     flags=re.UNICODE | re.IGNORECASE,
 )
 

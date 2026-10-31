@@ -384,19 +384,19 @@ def _gliner_ner_with_score(score):
 
 def test_pii_mode_final_threshold_keeps_what_gliner_keeps():
     cfg = TextCleanerConfig(ner_mode="pii")
-    assert cfg.ner_confidence_threshold == cfg.gliner_threshold == 0.3
+    assert cfg.effective_ner_confidence_threshold == cfg.effective_gliner_threshold == 0.3
     assert TextCleanerConfig(
         ner_mode="pii", gliner_threshold=0.5,
-    ).ner_confidence_threshold == 0.5
+    ).effective_ner_confidence_threshold == 0.5
     assert TextCleanerConfig(
         ner_mode="pii", ner_confidence_threshold=0.9,
-    ).ner_confidence_threshold == 0.9
-    assert TextCleanerConfig().ner_confidence_threshold == 0.85
+    ).effective_ner_confidence_threshold == 0.9
+    assert TextCleanerConfig().effective_ner_confidence_threshold == 0.85
 
     result = _gliner_ner_with_score(0.5).ner_process_detailed(
         "Maria arrived.",
         positional_tags=cfg.positional_tags,
-        ner_confidence_threshold=cfg.ner_confidence_threshold,
+        ner_confidence_threshold=cfg.effective_ner_confidence_threshold,
         language="ENGLISH",
         privacy_policy=_REDACT_PERSON,
     )

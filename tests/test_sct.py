@@ -1534,7 +1534,7 @@ class PIIModeConfigTest(unittest.TestCase):
         self.assertEqual(cfg.ner_backend, 'gliner')
         self.assertEqual(cfg.gliner_model, PII_DEFAULT_MODEL)
         self.assertEqual(cfg.gliner_labels, PII_LABELS)
-        self.assertEqual(cfg.gliner_threshold, PII_DEFAULT_THRESHOLD)
+        self.assertEqual(cfg.effective_gliner_threshold, PII_DEFAULT_THRESHOLD)
         self.assertIsNotNone(cfg.gliner_label_map)
 
     def test_pii_mode_preserves_user_model(self):

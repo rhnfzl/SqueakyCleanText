@@ -90,9 +90,15 @@ a local Tesseract executable when using `TesseractOCRProvider`.
 
 ## TextCleanerConfig — Key Fields
 
+Presets: `preset_config("training", **overrides)` / `TextCleanerConfig.from_preset()` = PII-only cleaning
+for training/RAG text (URLs, emails, phones, IPs, NER entities replaced; numbers, dates, HTML,
+brackets, case, punctuation, whitespace, code escapes kept; no stat_text). `"sct"` = library defaults.
+Adapters default to `"training"`.
+
 ```
 check_ner_process=True              # NER entity anonymization
 check_replace_urls=True             # Replace URLs with <URL>
+check_decode_unicode_escapes=True   # With check_fix_bad_unicode: decode literal \u00e9 / \n escapes; False keeps them (code)
 check_replace_emails=True           # Replace emails with <EMAIL>
 check_replace_ips=True              # Replace IPv4/IPv6 with <IP> (replace_ips_public_only=False)
 check_replace_phone_numbers=True    # Replace phones with <PHONE>
@@ -107,7 +113,8 @@ check_classify_document=False       # GLiClass zero-shot pre-classification
 ner_backend='onnx'                  # 'onnx'|'torch'|'gliner'|'ensemble_onnx'|'ensemble_torch'|'presidio_gliner'
 ner_mode='standard'                 # 'standard'|'pii' (auto-configures GLiNER for 60+ PII entity types)
 replacement_mode='placeholder'      # 'placeholder' | 'synthetic' | 'reversible' (indexed placeholders + deanonymize map)
-ner_confidence_threshold=0.85       # Min confidence for entity tagging
+ner_confidence_threshold=None       # Min confidence (0..1); None = 0.85, or the GLiNER threshold in PII mode
+gliner_threshold=None               # GLiNER cut (0..1); None = 0.4, or 0.3 in PII mode
 ner_batch_size=8                    # NER chunks per forward pass, batched across process_batch docs; 1 = 0.7.1 pattern
 onnx_intra_op_threads=None          # ONNX Runtime threads per inference (None = ORT default, all cores); set to cap CPU use
 onnx_inter_op_threads=None          # ONNX Runtime inter-op threads (None = ORT default; rarely needed)

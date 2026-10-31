@@ -155,6 +155,23 @@ cfg = TextCleanerConfig(
 cleaner = TextCleaner(cfg=cfg)
 ```
 
+#### Presets
+
+`preset_config("training")` (also `TextCleanerConfig.from_preset()`) only removes PII and
+repairs broken unicode, for LLM training and RAG corpora: URLs, emails, phones, IPs and NER
+entities become placeholders; numbers, years, dates, HTML, brackets, case, punctuation,
+line breaks, indentation and backslash escapes in code are kept, and no `stat_text` is made.
+`"sct"` is the library default config. Any config field overrides the preset:
+
+```python
+from sct import TextCleaner, preset_config
+
+cleaner = TextCleaner(cfg=preset_config("training", check_replace_numbers=True))
+```
+
+The data-pipeline adapters use `"training"` when no config is given. GLiNER PII stays opt-in
+(`ner_mode="pii"`).
+
 #### Language Specification
 
 All language parameters accept Lingua names (`'ENGLISH'`), ISO 639-1 (`'en'`), or ISO 639-3 (`'eng'`) codes:
@@ -240,7 +257,7 @@ lm_text, stat_text, lang = cleaner.process(
 # Entities are anonymized: names, SSNs, emails, dates of birth, and 50+ more PII types
 ```
 
-PII mode auto-configures: `ner_backend='gliner'`, uses [`knowledgator/gliner-pii-base-v1.0`](https://huggingface.co/knowledgator/gliner-pii-base-v1.0), sets `gliner_threshold` and the final `ner_confidence_threshold` to 0.3 (recall-focused), and expands positional tags. User-provided values always take priority.
+PII mode auto-configures: `ner_backend='gliner'`, uses [`knowledgator/gliner-pii-base-v1.0`](https://huggingface.co/knowledgator/gliner-pii-base-v1.0), uses `gliner_threshold` 0.3 and the same final `ner_confidence_threshold` (recall-focused), and expands positional tags. Both thresholds default to `None` ("not set"); any value you pass, even 0.85 or 0.4, is used as given. `cfg.effective_ner_confidence_threshold` and `cfg.effective_gliner_threshold` give the values that run.
 
 **Alternative PII models** (pass as `gliner_model`):
 
@@ -520,6 +537,7 @@ new_cfg = dataclasses.replace(cfg, check_ner_process=False)
 |-------|---------|-------------|
 | `check_detect_language` | `True` | Auto-detect language |
 | `check_fix_bad_unicode` | `True` | Fix encoding issues via ftfy |
+| `check_decode_unicode_escapes` | `True` | Part of `check_fix_bad_unicode`: decode literal backslash escapes (`\u00e9` to `é`, `\n` to a line break). `False` keeps them as written (code, JSON) |
 | `check_to_ascii_unicode` | `True` | Transliterate to ASCII |
 | `check_replace_html` | `True` | Strip/replace HTML tags |
 | `check_replace_urls` | `True` | Replace URLs with token |
@@ -569,7 +587,7 @@ new_cfg = dataclasses.replace(cfg, check_ner_process=False)
 | `ner_mode` | `'standard'` | `'standard'` or `'pii'` (auto-configures GLiNER for PII detection) |
 | `replacement_mode` | `'placeholder'` | `'placeholder'`, `'synthetic'` (Faker), or `'reversible'` (indexed placeholders + deanonymize map) |
 | `positional_tags` | `('PER', 'LOC', 'ORG', 'MISC')` | Entity types to recognize |
-| `ner_confidence_threshold` | `0.85` | Minimum confidence score |
+| `ner_confidence_threshold` | `None` | Minimum confidence score (0..1). `None` = 0.85, or the GLiNER threshold in PII mode; an explicit value is always used as given |
 | `ner_batch_size` | `8` | NER chunks per model forward pass, batched across the documents of a `process_batch` call (must be >= 1). `1` = 0.7.1 call pattern and exact scores, and less memory; which is faster depends on the CPU, so measure |
 | `onnx_intra_op_threads` | `None` | ONNX Runtime threads per inference (`None` = ORT default: every physical core, ignoring CPU affinity). Set it to cap CPU use; fewer threads is usually slower |
 | `onnx_inter_op_threads` | `None` | ONNX Runtime inter-op threads (`None` = ORT default). Only matters with ORT parallel execution mode, so `onnx_intra_op_threads` is the usual knob |
@@ -580,7 +598,7 @@ new_cfg = dataclasses.replace(cfg, check_ner_process=False)
 | `gliner_variant` | `'gliner'` | `'gliner'` or `'gliner2'` |
 | `gliner_labels` | `('person', 'organization', 'location')` | GLiNER entity labels |
 | `gliner_label_map` | `None` | Maps GLiNER labels to NER tags |
-| `gliner_threshold` | `0.4` | GLiNER confidence threshold |
+| `gliner_threshold` | `None` | GLiNER confidence threshold (0..1). `None` = 0.4, or 0.3 in PII mode |
 | `gliner_label_descriptions` | `None` | ZERONER-style: `{label: "description"}` for improved zero-shot accuracy |
 | `fuzzy_date_score_cutoff` | `85` | Fuzzy matching threshold (0-100) for misspelled months |
 | `custom_pipeline_steps` | `()` | Tuple of `(text: str) -> str` callables appended after all built-in steps |

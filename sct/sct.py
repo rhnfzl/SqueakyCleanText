@@ -104,7 +104,7 @@ class TextCleaner:
                     'revision': self.cfg.gliner_revision,
                     'variant': self.cfg.gliner_variant,
                     'labels': self.cfg.gliner_labels,
-                    'threshold': self.cfg.gliner_threshold,
+                    'threshold': self.cfg.effective_gliner_threshold,
                     'label_map': (
                         dict(self.cfg.gliner_label_map)
                         if self.cfg.gliner_label_map else None
@@ -274,7 +274,7 @@ class TextCleaner:
             detailed = self.GeneralNER.ner_process_detailed(
                 current_text,
                 positional_tags=self.cfg.positional_tags,
-                ner_confidence_threshold=self.cfg.ner_confidence_threshold,
+                ner_confidence_threshold=self.cfg.effective_ner_confidence_threshold,
                 language=language,
                 anon_map=anon_map,
                 privacy_policy=self._privacy_policy,
@@ -505,7 +505,7 @@ class TextCleaner:
                 [state[0] for state in states],
                 [state[1] for state in states],
                 positional_tags=self.cfg.positional_tags,
-                ner_confidence_threshold=self.cfg.ner_confidence_threshold,
+                ner_confidence_threshold=self.cfg.effective_ner_confidence_threshold,
                 anon_maps=[state[2] for state in states],
                 privacy_policy=self._privacy_policy,
                 before_finalize=restore_synthetic,
@@ -598,7 +598,8 @@ class TextCleaner:
         return pattern.sub(replace, text)
 
     def _fix_bad_unicode(self, text):
-        return self.NormaliseText.fix_bad_unicode(text)
+        return self.NormaliseText.fix_bad_unicode(
+            text, decode_escapes=self.cfg.check_decode_unicode_escapes)
 
     def _to_ascii_unicode(self, text):
         return self.NormaliseText.to_ascii_unicode(text)

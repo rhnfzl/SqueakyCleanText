@@ -206,7 +206,7 @@ class TextCleanerConfig:
 
     # NER settings
     positional_tags: Tuple[str, ...] = ('PER', 'LOC', 'ORG', 'MISC')
-    ner_confidence_threshold: float = 0.85
+    ner_confidence_threshold: Optional[float] = None  # None = effective_ner_confidence_threshold
     ner_batch_size: int = 8
     language: Optional[Union[str, Tuple[str, ...]]] = None
 
@@ -255,7 +255,7 @@ class TextCleanerConfig:
     gliner_variant: str = 'gliner'  # 'gliner' or 'gliner2'
     gliner_labels: Tuple[str, ...] = ('person', 'organization', 'location')
     gliner_label_map: Optional[Mapping[str, str]] = None
-    gliner_threshold: float = 0.4
+    gliner_threshold: Optional[float] = None  # None = effective_gliner_threshold
 
     # Entity description labels (ZERONER-style): maps labels to natural-language descriptions.
     # When provided, descriptions are sent to GLiNER for inference, results mapped back to labels.
@@ -299,6 +299,7 @@ class TextCleanerConfig:
     ner_chunk_overlap: int = 0  # tokens of neighbouring text each NER window adds per side; 0 = 0.7.1 chunks
     detect_all_languages: bool = True  # False = 0.7 detector over supported_languages only
     language_confidence_warning: float = 0.5  # below this, metadata warns language_low_confidence
+    check_decode_unicode_escapes: bool = True  # False keeps literal \n, \u00e9 escapes (code, JSON)
 
     def __post_init__(self):
         if self.gliclass_onnx:
@@ -368,13 +369,6 @@ class TextCleanerConfig:
                 )
             if self.gliner_labels == ('person', 'organization', 'location'):
                 object.__setattr__(self, 'gliner_labels', PII_LABELS)
-            if self.gliner_threshold == 0.4:
-                object.__setattr__(self, 'gliner_threshold', PII_DEFAULT_THRESHOLD)
-            # The final ensemble filter must not drop what GLiNER kept.
-            if self.ner_confidence_threshold == 0.85:
-                object.__setattr__(
-                    self, 'ner_confidence_threshold', self.gliner_threshold,
-                )
             if self.gliner_label_map is None:
                 object.__setattr__(self, 'gliner_label_map', PII_LABEL_MAP)
             # Expand positional_tags to include all PII label tags
@@ -401,6 +395,10 @@ class TextCleanerConfig:
                 raise ValueError(f"{name} must be None or >= 1, got {value}")
         if self.ner_chunk_overlap < 0:
             raise ValueError(f"ner_chunk_overlap must be >= 0, got {self.ner_chunk_overlap}")
+        for name in ('ner_confidence_threshold', 'gliner_threshold'):
+            value = getattr(self, name)
+            if value is not None and not 0.0 <= value <= 1.0:
+                raise ValueError(f"{name} must be None or in [0, 1], got {value}")
         if not 0.0 <= self.language_confidence_warning <= 1.0:
             raise ValueError(
                 "language_confidence_warning must be in [0, 1], "
@@ -557,6 +555,27 @@ class TextCleanerConfig:
         # supported_languages only means "has stopwords/dates/NER key".
         object.__setattr__(self, 'supported_languages', frozenset(langs))
 
+    @property
+    def effective_gliner_threshold(self) -> float:
+        """GLiNER score cut: explicit value, else 0.3 in PII mode, else 0.4."""
+        if self.gliner_threshold is not None:
+            return self.gliner_threshold
+        return PII_DEFAULT_THRESHOLD if self.ner_mode == 'pii' else 0.4
+
+    @property
+    def effective_ner_confidence_threshold(self) -> float:
+        """Final NER filter: explicit value, else the GLiNER cut in PII mode, else 0.85."""
+        if self.ner_confidence_threshold is not None:
+            return self.ner_confidence_threshold
+        # PII mode: the final ensemble filter must not drop what GLiNER kept.
+        return self.effective_gliner_threshold if self.ner_mode == 'pii' else 0.85
+
+    @classmethod
+    def from_preset(cls, name: str = "training", **overrides) -> "TextCleanerConfig":
+        """Build a config from a named preset (see ``sct.presets.PRESETS``)."""
+        from sct.presets import preset_config
+        return preset_config(name, **overrides)
+
     def __getstate__(self):
         # Restore the exact normalized state; never re-run __post_init__.
         state = dict(self.__dict__)
@@ -600,6 +619,7 @@ def _config_from_module_globals() -> TextCleanerConfig:
         ner_chunk_overlap=getattr(m, 'NER_CHUNK_OVERLAP', 0),
         detect_all_languages=getattr(m, 'DETECT_ALL_LANGUAGES', True),
         language_confidence_warning=getattr(m, 'LANGUAGE_CONFIDENCE_WARNING', 0.5),
+        check_decode_unicode_escapes=getattr(m, 'CHECK_DECODE_UNICODE_ESCAPES', True),
         check_replace_currency_symbols=m.CHECK_REPLACE_CURRENCY_SYMBOLS,
         check_ner_process=m.CHECK_NER_PROCESS,
         check_remove_isolated_letters=m.CHECK_REMOVE_ISOLATED_LETTERS,
@@ -624,7 +644,7 @@ def _config_from_module_globals() -> TextCleanerConfig:
         replace_with_numbers=m.REPLACE_WITH_NUMBERS,
         replace_with_currency_symbols=m.REPLACE_WITH_CURRENCY_SYMBOLS,
         positional_tags=tuple(m.POSITIONAL_TAGS),
-        ner_confidence_threshold=m.NER_CONFIDENCE_THRESHOLD,
+        ner_confidence_threshold=getattr(m, 'NER_CONFIDENCE_THRESHOLD', None),
         ner_mode=getattr(m, 'NER_MODE', 'standard'),
         replacement_mode=getattr(m, 'REPLACEMENT_MODE', 'placeholder'),
         gliner_onnx=getattr(m, 'GLINER_ONNX', False),
@@ -660,6 +680,7 @@ ONNX_INTER_OP_THREADS = None
 NER_CHUNK_OVERLAP = 0
 DETECT_ALL_LANGUAGES = True
 LANGUAGE_CONFIDENCE_WARNING = 0.5
+CHECK_DECODE_UNICODE_ESCAPES = True
 CHECK_REPLACE_CURRENCY_SYMBOLS = True
 CHECK_NER_PROCESS = True
 CHECK_REMOVE_ISOLATED_LETTERS = True
@@ -686,7 +707,7 @@ REPLACE_WITH_NUMBERS = "<NUMBER>"
 REPLACE_WITH_CURRENCY_SYMBOLS = None
 
 POSITIONAL_TAGS = ['PER', 'LOC', 'ORG', 'MISC']
-NER_CONFIDENCE_THRESHOLD = 0.85
+NER_CONFIDENCE_THRESHOLD = None  # None = 0.85, or the GLiNER threshold in PII mode
 NER_MODE = 'standard'
 REPLACEMENT_MODE = 'placeholder'
 GLINER_ONNX = False

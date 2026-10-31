@@ -1,0 +1,9 @@
+def greet(name):
+    # Say hello in two languages
+    message = "Caf\u00e9 says:\n" + name
+    if len(name) > 3:
+        return {"text": message, "id": 42}
+    return [message, 2024]
+
+
+ADMIN_EMAIL = "ops@example.org"
