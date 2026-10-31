@@ -132,3 +132,14 @@ def test_wordpiece_entity_ends_on_a_whole_word():
     spans = [(e["start"], e["end"]) for e in pipe(text)[0] if e["entity_group"] == "PER"]
     assert spans and all(text[end] in " ." for _, end in spans)
     assert any(text[s:e].endswith("Doe") for s, e in spans)
+
+
+# --- Mac F: an MCP root that does not exist fails at start-up, not on every call ---
+
+def test_mcp_missing_root_fails_at_start(tmp_path):
+    pytest.importorskip("fastmcp")
+    from sct.mcp_server import create_mcp_server
+
+    with pytest.raises(ValueError, match="SCT_MCP_ROOT"):
+        create_mcp_server(TextCleaner(TextCleanerConfig(check_ner_process=False)),
+                          root=str(tmp_path / "missing"))

@@ -216,6 +216,8 @@ def create_mcp_server(
         ) from exc
 
     root = root or os.environ.get("SCT_MCP_ROOT") or None
+    if root is not None and not os.path.isdir(root):
+        raise ValueError("SCT_MCP_ROOT must be an existing directory")  # fail at start-up, not per call
     if max_bytes is None:
         max_bytes = int(os.environ.get("SCT_MCP_MAX_BYTES") or DEFAULT_MAX_BYTES)
     if max_bytes < 0:
