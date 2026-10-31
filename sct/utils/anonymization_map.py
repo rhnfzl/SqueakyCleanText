@@ -15,7 +15,7 @@ class MapEntry:
     """A single entity replacement record."""
 
     placeholder: str   # e.g. "<PERSON_0>"
-    original: str      # e.g. "John Smith"
+    original: str = field(repr=False)  # e.g. "John Smith"; kept out of repr
     entity_type: str   # e.g. "PERSON"
     # Offsets index the text the replacing stage saw: for NER entries that is
     # the whole post-regex document (not the raw input, not a chunk).
@@ -35,6 +35,9 @@ class AnonymizationMap:
 
     # Per-entity-type counter (tracks how many of each type have been seen).
     _counter: dict = field(default_factory=dict, repr=False)
+
+    def __repr__(self):
+        return f"AnonymizationMap(entries={len(self.entries)})"
 
     def next_placeholder(self, entity_type: str) -> str:
         """Generate the next indexed placeholder for *entity_type*.

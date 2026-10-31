@@ -453,7 +453,7 @@ class TestNERBackends:
         assert isinstance(result, ProcessResult)
         # Placeholder mode: only the value-free counts (no anon_map, no classes)
         assert set(result.metadata) == {
-            "regex_counts", "entity_counts", "language_confidence", "language_source", "warnings",
+            "source_chars", "regex_counts", "entity_counts", "language_confidence", "language_source", "warnings",
             "provenance",
         }
 

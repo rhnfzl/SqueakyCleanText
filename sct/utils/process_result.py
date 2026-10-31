@@ -16,8 +16,12 @@ class ProcessResult:
     features.
 
     Always present (from ``TextCleaner``; value-free):
+        ``source_chars``  — ``len`` of the input text
         ``regex_counts``  — ``{TYPE: {"count": int, "chars": int}}`` per regex replacement
         ``entity_counts`` — same shape, per NER entity type
+        ``language_confidence``, ``language_source``, ``warnings``, ``provenance``
+
+    ``.signals`` is the value-free public view of these (see :mod:`sct.signals`).
 
     Metadata keys (all optional, ``None`` when feature is inactive):
         ``anon_map``  — :class:`AnonymizationMap` when ``replacement_mode='reversible'``
@@ -39,7 +43,13 @@ class ProcessResult:
         self.lm_text = lm_text
         self.stat_text = stat_text
         self.language = language
-        self.metadata = metadata
+        self.metadata = {} if metadata is None else metadata
+
+    @property
+    def signals(self) -> dict:
+        """Value-free view: counts, shares, types, language, models; never entity text."""
+        from sct.signals import public_view
+        return public_view(self)
 
     # --- 3-tuple protocol (backward compat) ---
 
@@ -55,11 +65,10 @@ class ProcessResult:
         return (self.lm_text, self.stat_text, self.language)[idx]
 
     def __repr__(self):
-        meta = f', metadata={self.metadata!r}' if self.metadata else ''
+        # Never findings, anon_map or stat_text: they can hold the replaced values.
         return (
             f'ProcessResult(lm_text={self.lm_text!r}, '
-            f'stat_text={self.stat_text!r}, '
-            f'language={self.language!r}{meta})'
+            f'language={self.language!r}, signals={self.signals!r})'
         )
 
     def __eq__(self, other):

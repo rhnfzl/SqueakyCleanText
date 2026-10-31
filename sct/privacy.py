@@ -1,6 +1,6 @@
 """Policy and audit types for sensitive-data processing."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from types import MappingProxyType
 from typing import Mapping, Optional, Protocol
 
@@ -50,7 +50,7 @@ class DetectedEntity:
 
     entity_type: str
     score: float
-    text: str
+    text: str = field(repr=False)  # the raw entity value; kept out of repr
     start: int
     end: int
 

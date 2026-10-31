@@ -38,13 +38,14 @@ class FakeCleaner:
 
     def process(self, text):
         if text not in ("Alice", "alice@example.com"):
-            return ProcessResult(text, None, "ENGLISH", metadata={})
+            return ProcessResult(text, None, "ENGLISH", metadata={"source_chars": len(text)})
         label = "PERSON" if text == "Alice" else "EMAIL"
         return ProcessResult(
             f"<{label}>",
             "stat " + text,
             "ENGLISH",
             metadata={
+                "source_chars": len(text),
                 "entity_counts": {label: {"count": 1, "chars": len(text)}},
                 "language_confidence": 0.9,
                 "language_source": "detected",
@@ -128,6 +129,7 @@ def test_json_language_is_char_weighted():
         def process(self, text):
             language = "HINDI" if len(text) > 3 else "ENGLISH"
             return ProcessResult(text, None, language, metadata={
+                "source_chars": len(text),
                 "language_confidence": 0.5 if len(text) > 5 else 1.0,
                 "language_source": "detected",
             })

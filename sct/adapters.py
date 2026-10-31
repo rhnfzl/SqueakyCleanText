@@ -1,10 +1,11 @@
 """Boundary adapters for structured data and retrieval pipelines."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Iterable, Mapping, Optional
 
 from sct.privacy import EntityFinding
 from sct.sct import TextCleaner
+from sct.signals import merge_views
 
 
 @dataclass(frozen=True)
@@ -22,6 +23,8 @@ class StructuredResult:
     value: Any
     findings: tuple[PathFinding, ...]
     sensitive: bool
+    # merge_views over every string leaf, keys included.
+    signals: dict = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -74,13 +77,12 @@ def process_json(cleaner: TextCleaner, value: Any) -> StructuredResult:
     """Process every string in a JSON-compatible value."""
     _require_adapter_mode(cleaner)
     findings = []
-    sensitive = False
+    views = []
 
     def visit(item: Any, path: tuple[str | int, ...]) -> Any:
-        nonlocal sensitive
         if isinstance(item, str):
             result = cleaner.process(item)
-            sensitive = sensitive or is_sensitive_result(result)
+            views.append(result.signals)
             if result.metadata:
                 findings.extend(
                     PathFinding(path, finding)
@@ -111,10 +113,13 @@ def process_json(cleaner: TextCleaner, value: Any) -> StructuredResult:
             ]
         return item
 
+    cleaned = visit(value, ())
+    signals = merge_views(views)
     return StructuredResult(
-        value=visit(value, ()),
+        value=cleaned,
         findings=tuple(findings),
-        sensitive=sensitive,
+        sensitive=signals["sensitive"],
+        signals=signals,
     )
 
 
@@ -140,6 +145,7 @@ def process_rag_chunks(
             is_sensitive_result(result)
             or processed_metadata.sensitive
         )
+        metadata["sct"] = result.signals
         processed.append(ProcessedRAGChunk(
             id=chunk.id,
             text=result.lm_text,

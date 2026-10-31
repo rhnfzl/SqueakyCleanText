@@ -15,6 +15,7 @@ from typing import Any, Literal, NotRequired, Optional, TypedDict
 from sct.adapters import process_json
 from sct.config import TextCleanerConfig
 from sct.sct import TextCleaner
+from sct.signals import public_view
 
 try:
     from fastmcp.exceptions import ToolError
@@ -22,13 +23,7 @@ except ImportError:  # the helpers below stay usable (and testable) without the 
     class ToolError(Exception):
         """Stand-in for ``fastmcp.exceptions.ToolError``."""
 
-try:
-    from sct.signals import merge_views, public_view
-except ImportError:  # shortcut: pre-K1 fallback built from metadata, delete once sct/signals.py is merged
-    merge_views = public_view = None
-
 DEFAULT_MAX_BYTES = 1_048_576
-PII_REGEX_TYPES = frozenset({"EMAIL", "URL", "IP_ADDRESS", "PHONE_NUMBER"})
 # path needs a dir-fd walk with O_NOFOLLOW; without it (Windows) path stays off.
 PATH_SUPPORTED = os.open in os.supports_dir_fd and hasattr(os, "O_NOFOLLOW")
 
@@ -76,87 +71,6 @@ def _public_finding(finding) -> Finding:
     }
 
 
-def _fallback_view(result, chars: int) -> dict[str, Any]:
-    metadata = result.metadata or {}
-    regex_counts = {k: dict(v) for k, v in sorted(metadata.get("regex_counts", {}).items())}
-    entity_counts = {k: dict(v) for k, v in sorted(metadata.get("entity_counts", {}).items())}
-    pii_types: dict[str, int] = {}
-    pii_chars = 0
-    pii_items = [(k, v) for k, v in regex_counts.items() if k in PII_REGEX_TYPES]
-    for name, entry in pii_items + list(entity_counts.items()):
-        pii_types[name] = pii_types.get(name, 0) + entry["count"]
-        pii_chars += entry["chars"]
-    provenance = metadata.get("provenance") or {}
-    warnings = set(metadata.get("warnings", ()))
-    if not provenance.get("backend"):
-        warnings.add("ner_off")
-    if chars == 0:
-        warnings.add("empty_input")
-    return {
-        "language": result.language,
-        "language_confidence": metadata.get("language_confidence"),
-        "language_source": metadata.get("language_source", "none"),
-        "chars": chars,
-        "pii_count": sum(pii_types.values()),
-        "pii_chars": pii_chars,
-        "pii_share": min(1.0, pii_chars / chars) if chars else 0.0,
-        "pii_types": dict(sorted(pii_types.items())),
-        "regex_counts": regex_counts,
-        "entity_counts": entity_counts,
-        "sensitive": bool(regex_counts or entity_counts),
-        "warnings": sorted(warnings),
-        "models": [
-            {k: model.get(k) for k in ("key", "id", "revision", "provider")}
-            for model in provenance.get("models", ())
-        ],
-    }
-
-
-def _fallback_merge(views: list[dict[str, Any]]) -> dict[str, Any]:
-    if not views:
-        return _fallback_view(type("Empty", (), {"metadata": {}, "language": None})(), 0)
-    # Start from the longest leaf so language_source follows it.
-    merged = dict(max(views, key=lambda v: v["chars"]))
-    lang_chars: dict[Any, int] = {}
-    for view in views:
-        lang_chars[view["language"]] = lang_chars.get(view["language"], 0) + view["chars"]
-    language = max(lang_chars, key=lang_chars.get)
-    same = [v for v in views if v["language"] == language and v["language_confidence"] is not None]
-    weight = sum(v["chars"] for v in same)
-    merged["language"] = language
-    merged["language_confidence"] = (
-        sum(v["language_confidence"] * v["chars"] for v in same) / weight if weight else None
-    )
-    for key in ("chars", "pii_count", "pii_chars"):
-        merged[key] = sum(v[key] for v in views)
-    for key in ("regex_counts", "entity_counts"):
-        totals: dict[str, dict[str, int]] = {}
-        for view in views:
-            for name, entry in view[key].items():
-                slot = totals.setdefault(name, {"count": 0, "chars": 0})
-                slot["count"] += entry["count"]
-                slot["chars"] += entry["chars"]
-        merged[key] = dict(sorted(totals.items()))
-    types: dict[str, int] = {}
-    for view in views:
-        for name, count in view["pii_types"].items():
-            types[name] = types.get(name, 0) + count
-    merged["pii_types"] = dict(sorted(types.items()))
-    merged["pii_share"] = min(1.0, merged["pii_chars"] / merged["chars"]) if merged["chars"] else 0.0
-    merged["sensitive"] = any(v["sensitive"] for v in views)
-    merged["warnings"] = sorted({w for v in views for w in v["warnings"]})
-    merged["models"] = list({m["key"]: m for v in views for m in v["models"]}.values())
-    return merged
-
-
-def _signals(result, chars: int) -> dict[str, Any]:
-    return public_view(result) if public_view else _fallback_view(result, chars)
-
-
-def _merge(views: list[dict[str, Any]]) -> dict[str, Any]:
-    return merge_views(views) if merge_views else _fallback_merge(views)
-
-
 def summarize(signals: dict[str, Any]) -> str:
     """One value-free sentence, e.g. ``2 PII items (EMAIL, PERSON), 4% of text, language HINDI 0.93``."""
     count = signals["pii_count"]
@@ -181,7 +95,7 @@ def sanitize_text(
 ) -> TextOutput:
     """Return a JSON-safe, value-free text cleaning result."""
     result = cleaner.process(text)
-    signals = _signals(result, len(text))
+    signals = public_view(result)
     output: TextOutput = {
         "warnings": signals["warnings"],
         "summary": summarize(signals),
@@ -202,21 +116,11 @@ def sanitize_json(
     detail: Literal["concise", "full"] = "concise",
 ) -> JsonOutput:
     """Clean every string in a JSON value; key findings use the ``@key`` index path."""
-
-    class Recorder:
-        cfg = cleaner.cfg
-
-        def process(self, text):
-            result = cleaner.process(text)
-            views.append(_signals(result, len(text)))
-            return result
-
-    views: list[dict[str, Any]] = []
     try:
-        result = process_json(Recorder(), value)
+        result = process_json(cleaner, value)
     except ValueError as exc:
         raise ToolError(f"{exc}. Pass a JSON value whose keys stay unique after cleaning.") from None
-    signals = _merge(views)
+    signals = result.signals
     output: JsonOutput = {
         "warnings": signals["warnings"],
         "summary": summarize(signals),

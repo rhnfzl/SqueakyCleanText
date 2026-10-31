@@ -304,7 +304,7 @@ class TextCleaner:
         """Every step before NER.
 
         Returns ``(text, language, anon_map, doc_classes, started_at, regex_counts,
-        language_confidence, language_source)``.
+        language_confidence, language_source, source_chars)``.
         """
         started_at = time.perf_counter()
 
@@ -351,12 +351,12 @@ class TextCleaner:
             current_text = step(current_text)
 
         return (current_text, language, anon_map, doc_classes, started_at, regex_counts,
-                language_confidence, language_source)
+                language_confidence, language_source, len(text))
 
     def _after_ner(self, state: tuple, current_text: str, findings) -> ProcessResult:
         """Every step after NER, for the document *state* from ``_before_ner``."""
         (_, language, anon_map, doc_classes, started_at, regex_counts,
-         language_confidence, language_source) = state
+         language_confidence, language_source, source_chars) = state
 
         # Statistical model processing (always returns stext, even if None)
         stext = None
@@ -387,6 +387,7 @@ class TextCleaner:
                 and self.GeneralNER.device == 'cuda':
             warnings.add('cuda_fallback')
         metadata: Dict[str, Any] = {
+            'source_chars': source_chars,
             'regex_counts': regex_counts,
             'entity_counts': entity_counts,
             'language_confidence': language_confidence,
@@ -441,7 +442,7 @@ class TextCleaner:
             if not isinstance(text, str):
                 raise ValueError(f"Input must be string, got {type(text)}")
             if not text or text.isspace():
-                results[i] = ProcessResult("", "", None)
+                results[i] = ProcessResult("", "", None, metadata=self._empty_metadata(text))
             else:
                 to_process.append((i, text))
 
@@ -498,6 +499,19 @@ class TextCleaner:
                 results[i] = result
 
         return [r for r in results if r is not None]
+
+    def _empty_metadata(self, text: str) -> Dict[str, Any]:
+        """Metadata for empty or whitespace input (nothing ran)."""
+        ner_on = self.cfg.check_ner_process and self.GeneralNER is not None
+        return {
+            'source_chars': len(text),
+            'regex_counts': {},
+            'entity_counts': {},
+            'language_confidence': None,
+            'language_source': 'none',
+            'warnings': ['empty_input'],
+            'provenance': {'backend': self.cfg.ner_backend if ner_on else None, 'models': []},
+        }
 
     async def aprocess_batch(self, texts: List[str], batch_size: Optional[int] = None) -> List[ProcessResult]:
         """Async version of process_batch for use with asyncio-based frameworks (FastAPI, aiohttp).

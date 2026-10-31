@@ -2136,11 +2136,11 @@ class ProcessResultTest(unittest.TestCase):
         self.assertEqual(r[1], 'b')
         self.assertEqual(r[2], 'c')
 
-    def test_process_result_metadata_none_by_default(self):
-        """metadata should be None when no extended features active."""
+    def test_process_result_metadata_empty_by_default(self):
+        """metadata is an empty dict (never None) when none is given."""
         from sct.utils.process_result import ProcessResult
         r = ProcessResult('a', None, None)
-        self.assertIsNone(r.metadata)
+        self.assertEqual(r.metadata, {})
 
     def test_process_result_metadata_accessible(self):
         """metadata should carry anon_map and other keys."""
