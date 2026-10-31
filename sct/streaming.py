@@ -1,6 +1,11 @@
 """Streaming interfaces with explicit privacy guarantees."""
 
 from sct.sct import TextCleaner
+from sct.utils import constants
+
+_CONTACT_REGEXES = (
+    constants.EMAIL_REGEX, constants.PHONE_REGEX, constants.URL_REGEX, constants.IP_REGEX,
+)
 
 
 class BufferedStreamingRedactor:
@@ -60,17 +65,24 @@ class WindowedStreamingRedactor:
             return ""
 
         cutoff = len(self._buffer) - self._overlap_chars
+        # Never split inside a contact token that holds spaces ("06 12 34 56 78").
+        inside = {
+            index
+            for regex in _CONTACT_REGEXES
+            for match in regex.finditer(self._buffer)
+            for index in range(match.start() + 1, match.end())
+        }
         split_at = max(
             (
                 index
                 for index, character in enumerate(self._buffer[:cutoff + 1])
-                if character.isspace()
+                if character.isspace() and index not in inside
             ),
             default=-1,
         )
         if split_at < 0:
             raise BufferError(
-                "Streaming buffer exceeded max_buffer_chars without whitespace. "
+                "Streaming buffer exceeded max_buffer_chars without a safe whitespace split. "
                 "Increase the limit or use BufferedStreamingRedactor."
             )
 

@@ -35,8 +35,10 @@ ACRONYM_REGEX = re.compile(
 )
 
 # Fixed: Unicode ranges use actual Unicode escapes (not literal \\u in raw strings)
+# Local part takes RFC 5322 punctuation (o'connor, jo&co, alice!) after a word start,
+# so no prefix of the address stays visible; it never ends in a dot.
 EMAIL_REGEX = re.compile(
-    r"(?:^|(?<=[^\w@.)]))([\w+-](\.(?!\.))?)*?[\w+-](@|[(<{\[]at[)>}\]])(?:(?:[a-z\u00a1-\uffff0-9]-?)*[a-z\u00a1-\uffff0-9]+)(?:\.(?:[a-z\u00a1-\uffff0-9]-?)*[a-z\u00a1-\uffff0-9]+)*(?:\.(?:[a-z\u00a1-\uffff]{2,}))",
+    r"(?:^|(?<=[^\w@.)]))[\w+-](?:[\w!#$%&'*+-]|\.(?!\.))*?(?<!\.)(@|[(<{\[]at[)>}\]])(?:(?:[a-z\u00a1-\uffff0-9]-?)*[a-z\u00a1-\uffff0-9]+)(?:\.(?:[a-z\u00a1-\uffff0-9]-?)*[a-z\u00a1-\uffff0-9]+)*(?:\.(?:[a-z\u00a1-\uffff]{2,}))",
     flags=re.IGNORECASE | re.UNICODE,
 )
 

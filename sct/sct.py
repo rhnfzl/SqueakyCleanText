@@ -365,13 +365,23 @@ class TextCleaner:
             stext = self._statistical_model_processing(current_text, language)
 
         # Value-free counts are always present; entity text only on opt-in below.
+        # Overlapping findings count once, as their union labelled by the highest
+        # score: the same rule NER uses when it replaces them.
+        spans: List[list] = []
+        for finding in sorted(findings, key=lambda f: (f.entity.start, -f.entity.end)):
+            e = finding.entity
+            if spans and e.start < spans[-1][3]:
+                last = spans[-1]
+                if e.score > last[1]:
+                    last[0], last[1] = e.entity_type, e.score
+                last[3] = max(last[3], e.end)
+            else:
+                spans.append([e.entity_type, e.score, e.start, e.end])
         entity_counts: Dict[str, Dict[str, int]] = {}
-        for finding in findings:
-            entry = entity_counts.setdefault(
-                finding.entity.entity_type, {'count': 0, 'chars': 0},
-            )
+        for entity_type, _, start, end in spans:
+            entry = entity_counts.setdefault(entity_type, {'count': 0, 'chars': 0})
             entry['count'] += 1
-            entry['chars'] += finding.entity.end - finding.entity.start
+            entry['chars'] += end - start
         warnings = set()
         if language is None and language_source == 'none' and self._language_needed():
             warnings.add('language_unknown')

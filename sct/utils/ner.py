@@ -420,7 +420,8 @@ class GeneralNER:
         """Provenance of the loaded models that NER runs for *language* (copies)."""
         keys: tuple = ()
         if self._ner_backend in ('onnx', 'torch', 'ensemble_onnx', 'ensemble_torch'):
-            keys = self._get_ensemble_keys(language or 'MULTILINGUAL')
+            # tuple(): a configured list route must not grow on every call.
+            keys = tuple(self._get_ensemble_keys(language or 'MULTILINGUAL'))
         if 'GLINER' in self._provenance:
             keys += ('GLINER',)
         return [dict(self._provenance[k]) for k in keys if k in self._provenance]
