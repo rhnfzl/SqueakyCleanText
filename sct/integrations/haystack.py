@@ -10,6 +10,15 @@ from sct.config import TextCleanerConfig
 from sct.integrations._runtime import CleanerHandle, as_columns, clean_records
 
 
+def _plain(value: Any) -> Any:
+    """Mappings and sets, at any depth, become types Haystack can serialize."""
+    if isinstance(value, Mapping):
+        return {key: _plain(item) for key, item in value.items()}
+    if isinstance(value, (set, frozenset)):
+        return sorted(value)
+    return value
+
+
 @component
 class SCTDocumentCleaner:
     """Clean ``content`` (and listed ``meta`` keys); ``meta["sct"]`` gets the signals.
@@ -37,7 +46,7 @@ class SCTDocumentCleaner:
         if isinstance(config, TextCleanerConfig):
             default = TextCleanerConfig()
             config = {
-                f.name: dict(value) if isinstance(value, Mapping) else value
+                f.name: _plain(value)
                 for f in fields(config)
                 # supported_languages is recomputed by __post_init__.
                 if f.name != "supported_languages"

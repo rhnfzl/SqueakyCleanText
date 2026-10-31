@@ -150,8 +150,10 @@ URL_REGEX = re.compile(
     r"(?:\.(?:[a-z\u00a1-\uffff]{2,}))" r"|" r"(?:(localhost))" r")"
     # port number
     r"(?::\d{2,5}\b)?"
-    # resource path; " < > are never raw in a URL, so markup around it survives
-    r"(?:\/[^\)\]\}\s\"<>]*)?",
+    # resource path, or a query/fragment right after the host ("?id=", "#token=");
+    # " < > are never raw in a URL, so markup around it survives. A bare trailing "?"
+    # stays punctuation.
+    r"(?:\/[^\)\]\}\s\"<>]*|[?#][^\)\]\}\s\"<>]+)?",
     flags=re.UNICODE | re.IGNORECASE,
 )
 

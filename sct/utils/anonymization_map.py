@@ -35,6 +35,9 @@ class AnonymizationMap:
 
     # Per-entity-type counter (tracks how many of each type have been seen).
     _counter: dict = field(default_factory=dict, repr=False)
+    # Placeholder spellings already in the source text; never allocated, so a
+    # literal "<EMAIL_0>" cannot collide with a generated one.
+    reserved: set = field(default_factory=set, repr=False)
 
     def __repr__(self):
         return f"AnonymizationMap(entries={len(self.entries)})"
@@ -45,6 +48,8 @@ class AnonymizationMap:
         Example: first PERSON → ``<PERSON_0>``, second → ``<PERSON_1>``.
         """
         idx = self._counter.get(entity_type, 0)
+        while f"<{entity_type}_{idx}>" in self.reserved:
+            idx += 1
         self._counter[entity_type] = idx + 1
         return f"<{entity_type}_{idx}>"
 

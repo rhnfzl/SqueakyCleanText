@@ -1,5 +1,7 @@
 """Streaming interfaces with explicit privacy guarantees."""
 
+import unicodedata
+
 from sct.sct import TextCleaner
 from sct.utils import constants
 
@@ -65,11 +67,16 @@ class WindowedStreamingRedactor:
             return ""
 
         cutoff = len(self._buffer) - self._overlap_chars
-        # Never split inside a contact token that holds spaces ("06 12 34 56 78").
+        # Never split inside a contact token that holds spaces ("06 12 34 56 78"). Match
+        # on a per-character NFKC view (same offsets) so fullwidth "０６ １２" counts too.
+        view = "".join(
+            folded if len(folded := unicodedata.normalize("NFKC", character)) == 1 else character
+            for character in self._buffer
+        )
         inside = {
             index
             for regex in _CONTACT_REGEXES
-            for match in regex.finditer(self._buffer)
+            for match in regex.finditer(view)
             for index in range(match.start() + 1, match.end())
         }
         split_at = max(

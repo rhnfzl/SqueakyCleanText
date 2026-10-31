@@ -199,16 +199,18 @@ def process_dataframe(
 
     output = frame.copy(deep=True)
     findings = []
-    for row in output.index:
-        for column in columns:
-            value = output.at[row, column]
+    # Positional access: a duplicate row or column label makes .at return a Series.
+    selected = [j for j, name in enumerate(output.columns) if name in columns]
+    for i, row in enumerate(output.index):
+        for j in selected:
+            value = output.iat[i, j]
             if not isinstance(value, str):
                 continue
             result = cleaner.process(value)
-            output.at[row, column] = result.lm_text
+            output.iat[i, j] = result.lm_text
             if result.metadata:
                 findings.extend(
-                    PathFinding((row, column), finding)
+                    PathFinding((row, output.columns[j]), finding)
                     for finding in result.metadata.get("findings", ())
                 )
     return DataFrameResult(output, tuple(findings))

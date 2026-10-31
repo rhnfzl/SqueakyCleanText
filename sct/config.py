@@ -545,7 +545,7 @@ class TextCleanerConfig:
 
         # Validate and freeze custom_stopwords (keys must be valid language names)
         if self.custom_stopwords:
-            resolved_sw = {resolve_language(k): v for k, v in self.custom_stopwords.items()}
+            resolved_sw = {resolve_language(k): frozenset(v) for k, v in self.custom_stopwords.items()}
             object.__setattr__(self, 'custom_stopwords',
                                MappingProxyType(resolved_sw))
 

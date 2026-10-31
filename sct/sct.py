@@ -188,6 +188,8 @@ class TextCleaner:
             self._pipeline.append(self._to_ascii_unicode)
         if cfg.check_remove_emoji:
             self._pipeline.append(self._remove_emoji)
+        # Steps before this index only normalise; markers they surface are source text.
+        self._normalise_steps = len(self._pipeline)
         if cfg.check_replace_html:
             self._pipeline.append(self._replace_html)
         if cfg.check_replace_urls:
@@ -286,7 +288,7 @@ class TextCleaner:
                 language=language,
                 anon_map=anon_map,
                 privacy_policy=self._privacy_policy,
-                source_markers=frozenset(ner._PLACEHOLDER_TOKEN.findall(text)),
+                source_markers=state[9],
             )
             current_text = detailed.text
             findings = detailed.findings
@@ -305,7 +307,7 @@ class TextCleaner:
         """Every step before NER.
 
         Returns ``(text, language, anon_map, doc_classes, started_at, regex_counts,
-        language_confidence, language_source, source_chars)``.
+        language_confidence, language_source, source_chars, source_markers)``.
         """
         started_at = time.perf_counter()
 
@@ -334,7 +336,16 @@ class TextCleaner:
         current_text = text
 
         # Pre-fuzzy pipeline steps (unicode fix → html → urls → emails → ips → dates)
-        for step in self._pipeline:
+        for step in self._pipeline[:self._normalise_steps]:
+            current_text = step(current_text)
+        # Placeholder spellings the source holds, raw or once normalised ("＜LONDON＞",
+        # "&lt;LONDON&gt;"): NER gives them no protection and reversible mode never
+        # allocates them.
+        source_markers = frozenset(ner._PLACEHOLDER_TOKEN.findall(text)) | frozenset(
+            ner._PLACEHOLDER_TOKEN.findall(current_text))
+        if anon_map is not None:
+            anon_map.reserved.update(source_markers)
+        for step in self._pipeline[self._normalise_steps:]:
             current_text = step(current_text)
 
         # Fuzzy date replacement — requires language context, called explicitly
@@ -352,12 +363,12 @@ class TextCleaner:
             current_text = step(current_text)
 
         return (current_text, language, anon_map, doc_classes, started_at, regex_counts,
-                language_confidence, language_source, len(text))
+                language_confidence, language_source, len(text), source_markers)
 
     def _after_ner(self, state: tuple, current_text: str, findings) -> ProcessResult:
         """Every step after NER, for the document *state* from ``_before_ner``."""
         (_, language, anon_map, doc_classes, started_at, regex_counts,
-         language_confidence, language_source, source_chars) = state
+         language_confidence, language_source, source_chars, _) = state
 
         # Statistical model processing (always returns stext, even if None)
         stext = None
@@ -501,9 +512,7 @@ class TextCleaner:
                 privacy_policy=self._privacy_policy,
                 before_finalize=restore_synthetic,
                 max_workers=max_workers,
-                source_markers=[
-                    frozenset(ner._PLACEHOLDER_TOKEN.findall(text)) for _, text in to_process
-                ],
+                source_markers=[state[9] for state in states],
             )
             for (i, _), state, ner_result in zip(to_process, states, ner_results):
                 results[i] = self._after_ner(state, ner_result.text, ner_result.findings)
@@ -517,7 +526,7 @@ class TextCleaner:
     def _empty_metadata(self, text: str) -> Dict[str, Any]:
         """Metadata for empty or whitespace input (nothing ran)."""
         ner_on = self.cfg.check_ner_process and self.GeneralNER is not None
-        return {
+        metadata = {
             'source_chars': len(text),
             'regex_counts': {},
             'entity_counts': {},
@@ -526,6 +535,13 @@ class TextCleaner:
             'warnings': ['empty_input'],
             'provenance': {'backend': self.cfg.ner_backend if ner_on else None, 'models': []},
         }
+        # Reversible results always carry a (here empty) map, like non-empty input.
+        if self.cfg.replacement_mode == 'reversible':
+            if self._token_store is not None:
+                metadata['anon_map_reference'] = self._token_store.save(AnonymizationMap())
+            else:
+                metadata['anon_map'] = AnonymizationMap()
+        return metadata
 
     async def aprocess_batch(self, texts: List[str], batch_size: Optional[int] = None) -> List[ProcessResult]:
         """Async version of process_batch for use with asyncio-based frameworks (FastAPI, aiohttp).

@@ -60,6 +60,11 @@ class TokenizerWrapper:
 
     def __init__(self, tokenizer: Tokenizer, model_max_length: int = 512):
         self._tokenizer = tokenizer
+        # A saved truncation shorter than model_max_length still cuts inference input,
+        # so windows are planned within the smaller of the two.
+        truncation = tokenizer.truncation
+        if truncation and truncation.get("max_length"):
+            model_max_length = min(model_max_length, truncation["max_length"])
         self._model_max_length = model_max_length
         # Chunk planning must see every token: a truncating tokenizer.json would
         # hide the text past max_length and leave it out of model input.
