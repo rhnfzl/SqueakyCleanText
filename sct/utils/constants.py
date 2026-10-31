@@ -102,8 +102,10 @@ _IDN_LETTER = (r"a-z\u00a1-\u1fff\u2070-\u2fff\u3040-\ufeff\uff21-\uff3a\uff41-\
                + _CJK_SYMBOL_LETTERS + _SUPPLEMENTARY_ALNUM)
 # ZWNJ/ZWJ (U+200C/D) join letters inside IDNA labels (Persian, Devanagari conjuncts).
 _IDN_CHAR = _IDN_LETTER + r"0-9\uff10-\uff19\u200c\u200d"
-# A punycode TLD (xn--p1ai) is tried first, so ".xn" alone never ends the match.
-_TLD = rf"(?:xn--[a-z0-9-]*[a-z0-9]|(?:{_NO_GLUE}[{_IDN_LETTER}]){{2,}})"
+# A punycode TLD (xn--p1ai) is tried first, so ".xn" alone never ends the match; ZWNJ/ZWJ join
+# letters inside it as in any other label.
+_TLD = (rf"(?:xn--[a-z0-9-]*[a-z0-9]"
+        rf"|{_NO_GLUE}[{_IDN_LETTER}](?:[\u200c\u200d]*{_NO_GLUE}[{_IDN_LETTER}])+)")
 EMAIL_REGEX = re.compile(
     rf"(?:^|(?<=[^\w@.){MARKS}])|(?={_GLUE}))[\w+-]"
     rf"(?:{_NO_GLUE}[\w!#$%&'*+{MARKS}\u200c\u200d-]|\.(?!\.))*?(?<!\.)(@|[(<{{\[]at[)>}}\]])"

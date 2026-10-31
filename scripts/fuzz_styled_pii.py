@@ -3,7 +3,7 @@
 
 Each seed builds one document: random prose in Latin, CJK, Arabic, Devanagari,
 Thai or Cyrillic, plus 1-3 PII values (email, phone, IPv4, URL with a query,
-also www-introduced or on a host of non-Latin labels, date, number). Each value
+also www-introduced; email and URL also on a host of non-Latin labels, date, number). Each value
 is then rendered in forms a reader still reads as the same value: full-width and
 small-form characters, mathematical styled letters and digits, circled/squared
 letters and digits, native decimal digits of any script, decomposed letters
@@ -330,6 +330,17 @@ def _url_shape(rng, plain):
     return intro + host + path + rest
 
 
+def _email_shape(rng, plain, cores):
+    """A mail host of two labels in one non-Latin script (نامه.ایران, क्ष.भारत, as IDNA allows), so a
+    join control in the label meets a styled dot with no ASCII beside it; own RNG so the cases of
+    earlier rounds stay the same."""
+    if rng.random() >= 0.25:
+        return plain, cores
+    script = rng.choice(("cyrillic", "arabic", "devanagari", "thai", "cjk"))
+    label = _script_token(rng, script)
+    return f"{plain.rsplit('@', 1)[0]}@{label}.{_word(rng, script, 2, 4)}", cores[:-1] + [("str", label)]
+
+
 def make_case(seed: int) -> dict:
     rng = random.Random(seed)  # noqa: S311  # reproducible test data, not crypto
     scripts = rng.sample(sorted(SCRIPT_RANGES), rng.choice((1, 2)))
@@ -339,6 +350,8 @@ def make_case(seed: int) -> dict:
         plain, cores = GENERATORS[typ](rng)
         if typ == "URL":
             plain = _url_shape(random.Random(f"{seed}-{len(values)}-url"), plain)  # noqa: S311
+        if typ == "EMAIL":
+            plain, cores = _email_shape(random.Random(f"{seed}-{len(values)}-mail"), plain, cores)  # noqa: S311
         slots, inserts, kinds = _plan(rng, plain, _legal_join(plain, typ))
         kinds = _zw_inside(random.Random(f"{seed}-{len(values)}-zw"), plain, inserts, kinds)  # noqa: S311
         if typ in ("PHONE", "DATE"):

@@ -22,11 +22,23 @@ logger = logging.getLogger(__name__)
 # Some locale providers (th_TH, uk_UA ssn; uk_UA plates) draw from the module-level
 # random, which seed_instance() leaves alone; seeded calls hold this lock.
 _GLOBAL_RANDOM_LOCK = threading.Lock()
-if hasattr(os, "register_at_fork"):
-    # A child forked while another thread held the lock must not inherit it held.
-    os.register_at_fork(after_in_child=lambda: globals().update(_GLOBAL_RANDOM_LOCK=threading.Lock(),
-                                                                  _CLOCK_LOCK=threading.Lock()))
 _CLOCK_LOCK = threading.Lock()
+# (module, name, original) of the clock patch the _CLOCK_LOCK holder has applied, if any.
+_CLOCK_PATCHES = []
+
+
+def _after_fork_in_child():
+    # A child forked while another thread held a lock must not inherit it held, nor keep the
+    # held clock that thread would have restored (it does not exist in the child).
+    global _GLOBAL_RANDOM_LOCK, _CLOCK_LOCK
+    for mod, name, value in _CLOCK_PATCHES:
+        setattr(mod, name, value)
+    _CLOCK_PATCHES.clear()
+    _GLOBAL_RANDOM_LOCK, _CLOCK_LOCK = threading.Lock(), threading.Lock()
+
+
+if hasattr(os, "register_at_fork"):
+    os.register_at_fork(after_in_child=_after_fork_in_child)
 
 
 class _HeldClock(type):
@@ -64,6 +76,7 @@ def _clock_at(reference, modules):
     with _CLOCK_LOCK:
         saved = [(mod, name, value) for mod in modules for name, value in vars(mod).items()
                  if id(value) in held]
+        _CLOCK_PATCHES[:] = saved
         for mod, name, value in saved:
             setattr(mod, name, held[id(value)])
         try:
@@ -71,6 +84,7 @@ def _clock_at(reference, modules):
         finally:
             for mod, name, value in saved:
                 setattr(mod, name, value)
+            _CLOCK_PATCHES.clear()
 
 # Maps entity tags to Faker method names
 FAKER_GENERATORS: Dict[str, str] = {

@@ -19,9 +19,13 @@ _WORD_END = rf'(?<=[^\W_]|[{constants.MARKS}])'
 _FULLWIDTH_JOINER_REGEX = re.compile(r'(?<=[0-9A-Za-z])[＠．－＿＋\u3000](?=[0-9A-Za-z])|＋(?=[0-9])'
                                      rf'|{_WORD_END}＠(?=[^\W_])|{_WORD_END}．(?=[0-9A-Za-z])|(?<=[0-9A-Za-z])．(?=[^\W_])')
 _FULLWIDTH_JOINER = {'＠': '@', '．': '.', '－': '-', '＿': '_', '＋': '+', '\u3000': ' '}
+# Invisible format characters (category Cf: ZWNJ/ZWJ, ZWSP, soft hyphen, bidi marks).
+_FORMAT_CHARS = re.escape(''.join(chr(cp) for cp in range(0x110000) if unicodedata.category(chr(cp)) == 'Cf'))
 # Inside an address-shaped run (word characters around an @), full-width . - _ + fold whatever
 # script sits beside them (john@例え．テスト, josé＿smith@...); prose without an @ keeps them.
-_EMAIL_RUN_REGEX = re.compile(rf'\w[\w．－＿＋{constants.MARKS}]*[@＠][\w．－＿{constants.MARKS}]*\w')
+# Format characters inside a word (ZWNJ in نامه\u200cای, ZWJ in क्\u200dष) continue the run and stay.
+_EMAIL_RUN_REGEX = re.compile(
+    rf'\w[\w．－＿＋{constants.MARKS}{_FORMAT_CHARS}]*[@＠][\w．－＿{constants.MARKS}{_FORMAT_CHARS}]*\w')
 _EMAIL_RUN_JOINER = str.maketrans('＠．－＿＋', '@.-_+')
 
 
@@ -90,7 +94,8 @@ def _fold_url_run(m):
     return _URL_AUTHORITY.sub(lambda a: a.group().translate(_DOT_JOINER), m.group().translate(_URL_RUN_JOINER))
 # Inside an address-shaped run every styled form of @ . - _ + folds (the full-width-only rule above, widened).
 _STYLED_EMAIL_RUN_REGEX = re.compile(
-    rf'\w[\w{_forms(".-_+")}{constants.MARKS}]*[@{_forms("@")}][\w{_forms(".-_")}{constants.MARKS}]*\w')
+    rf'\w[\w{_forms(".-_+")}{constants.MARKS}{_FORMAT_CHARS}]*[@{_forms("@")}]'
+    rf'[\w{_forms(".-_")}{constants.MARKS}{_FORMAT_CHARS}]*\w')
 _STYLED_EMAIL_RUN_JOINER = str.maketrans({ch: plain for ch, plain in _STYLED_SEP.items() if plain in '@.-_+'})
 
 
@@ -100,8 +105,7 @@ _STYLED_EMAIL_RUN_JOINER = str.maketrans({ch: plain for ch, plain in _STYLED_SEP
 # them drops when its other side is a run character, a letter of any script (例え\u200b．jp), a space
 # ("06\u200b 12") or the text edge. Between two other letters they stay (ZWNJ in Persian, ZWSP
 # between Thai words).
-_INVISIBLE_REGEX = re.compile(
-    '[%s]+' % re.escape(''.join(chr(cp) for cp in range(0x110000) if unicodedata.category(chr(cp)) == 'Cf')))
+_INVISIBLE_REGEX = re.compile(f'[{_FORMAT_CHARS}]+')
 # Dashes of any form (Pd: hyphen, non-breaking hyphen, en dash) join phone groups like "-" (06\u2011 12).
 _DASHES = re.escape(''.join(chr(cp) for cp in range(0x110000) if unicodedata.category(chr(cp)) == 'Pd'))
 _RUN_CHAR = re.compile('[A-Za-z\\d%s%s%s]' % (''.join(map(chr, _CIRCLED_ALNUM)), _PUNCT_ANY, _DASHES))
