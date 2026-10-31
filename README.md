@@ -605,6 +605,8 @@ new_cfg = dataclasses.replace(cfg, check_ner_process=False)
 | `replace_with_numbers` | `"<NUMBER>"` |
 | `replace_with_currency_symbols` | `None` |
 
+**Type names**: each PII type has one name on every surface: the tag (`<PHONE>`), the reversible placeholder (`<PHONE_0>`), `metadata['regex_counts']` / `entity_counts`, `signals['pii_types']`, score columns, DataTrove `pii_<TYPE>` stats, MCP output and PII-mode NER tags. Regex types: `URL`, `HTML`, `EMAIL`, `IP`, `DATE`, `YEAR`, `PHONE`, `NUMBER`, `CURRENCY`; NER types: `PERSON`, `LOCATION`, `ORGANISATION`, `MISC` (PII mode adds the upper-cased GLiNER label, e.g. `CREDIT_CARD_NUMBER`). `legacy_type_names=True` restores the pre-0.8.0 names `PHONE_NUMBER` / `IP_ADDRESS` everywhere except the tag text (set that with `replace_with_*`).
+
 **NER settings**:
 
 | Field | Default | Description |
@@ -643,6 +645,7 @@ new_cfg = dataclasses.replace(cfg, check_ner_process=False)
 | `detect_all_languages` | `True` | Auto-detect over all 75 Lingua languages. `False` = 0.7 detector over `supported_languages` only (EN/NL/DE/ES plus extras). A `language` tuple always restricts detection to its entries |
 | `language_confidence_warning` | `0.0` | Adds `language_low_confidence` to `metadata['warnings']` when the detected language's confidence is below this (0..1). Off by default: Lingua's top-1 confidence is low for many correct texts (English with names often 0.2-0.5). `0.5` = early 0.8.0. Warning only, never changes routing |
 | `language_margin_warning` | `0.15` | Adds `language_low_confidence` when the detected language leads the runner-up by less than this (0..1), i.e. detection is ambiguous (Dutch vs English, Hindi vs Marathi). `0` turns it off. Warning only, never changes routing |
+| `legacy_type_names` | `False` | `True` names the phone and IP types `PHONE_NUMBER` / `IP_ADDRESS` (0.7) in reversible placeholders (`<PHONE_NUMBER_0>`), metadata, signals and PII-mode NER tags. `False` = `PHONE` / `IP`, the same name as the `<PHONE>` / `<IP>` tags. See "Type names" |
 | `fix_character_width` | `False` | Part of `check_fix_bad_unicode`. `False` keeps full-width CJK punctuation (`，` `！` `：`) and half-width katakana as written, so Chinese text no longer mixes `,` with `。`; full-width ASCII letters and digits (and `＠ ． － ＿ ＋` inside them) still become ASCII, so `０６１２３４５６７８` and `ｊｏｈｎ＠ｅｘａｍｐｌｅ．ｃｏｍ` are still replaced. `True` = ftfy's full width fix (0.7) |
 | `extra_languages` | `()` | Additional language names/codes for detection |
 | `custom_stopwords` | `None` | `{LANG: frozenset({...})}` custom stopword sets |

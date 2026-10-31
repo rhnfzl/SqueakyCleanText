@@ -41,9 +41,12 @@ def test_predicted_spans_skip_untouched_earlier_copy():
     ]
 
 
-def test_predicted_spans_map_ip_address_to_dataset_label():
+def test_predicted_spans_map_legacy_type_names_to_dataset_label():
     assert predicted_spans("at 8.8.8.8", "at <IP_ADDRESS_0>", {"<IP_ADDRESS_0>": "8.8.8.8"}) == [
         EntitySpan("IP", 3, 10),
+    ]
+    assert predicted_spans("t 112", "t <PHONE_NUMBER_0>", {"<PHONE_NUMBER_0>": "112"}) == [
+        EntitySpan("PHONE", 2, 5),
     ]
 
 
@@ -51,13 +54,13 @@ def test_find_leaks_catches_split_values():
     text = "Call 9876543210 from 192.168.1.10"
     example = EvaluationExample(
         id="doc", text=text, language="en", domain="test",
-        expected=(EntitySpan("PHONE_NUMBER", 5, 15), EntitySpan("IP", 21, 33)),
+        expected=(EntitySpan("PHONE", 5, 15), EntitySpan("IP", 21, 33)),
     )
 
     leaks, partial = find_leaks(example, "Call 98765<NUMBER> from <NUMBER_0>.1.10")
 
     assert leaks == []
-    assert [item["label"] for item in partial] == ["PHONE_NUMBER", "IP"]
+    assert [item["label"] for item in partial] == ["PHONE", "IP"]
 
 
 def test_predicted_spans_context_changed_by_cleanup():

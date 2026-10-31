@@ -28,14 +28,15 @@ import time
 from pathlib import Path
 
 from sct.evaluation import EntitySpan, evaluate_pii, load_evaluation_jsonl
+from sct.utils.constants import LEGACY_TYPE_NAMES
 
 ROOT = Path(__file__).resolve().parents[1]
 DATASET = ROOT / "evaluation" / "release_benchmark.jsonl"
 RESULTS = ROOT / "evaluation" / "results"
 PLACEHOLDER_REGEX = re.compile(r"<([A-Z][A-Z_]*?)_\d+>")
 NON_PII_LABELS = frozenset({"YEAR", "NUMBER"})
-# Reversible placeholder type -> dataset label.
-LABEL_ALIASES = {"IP_ADDRESS": "IP"}
+# Pre-0.8.0 reversible type names (legacy_type_names=True) -> dataset label.
+LABEL_ALIASES = {old: new for new, old in LEGACY_TYPE_NAMES.items()}
 ANY_PLACEHOLDER_REGEX = re.compile(r"<[A-Z][A-Z_]*(?:_\d+)?>")
 SPEED_REPEATS = 3
 CORRECTNESS_OVERRIDES = {"replacement_mode": "reversible", "check_to_ascii_unicode": False}

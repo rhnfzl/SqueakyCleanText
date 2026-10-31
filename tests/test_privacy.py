@@ -316,7 +316,7 @@ def test_reversible_mode_restores_contact_values():
     anon_map = result.metadata["anon_map"]
 
     assert "<EMAIL_0>" in result.lm_text
-    assert "<PHONE_NUMBER_0>" in result.lm_text
+    assert "<PHONE_0>" in result.lm_text
     assert anon_map.deanonymize(result.lm_text) == source
 
 

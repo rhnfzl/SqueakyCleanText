@@ -132,10 +132,10 @@ def test_ip_reversible_mode_restores_and_respects_public_only():
     cleaner = _cleaner(replacement_mode="reversible", replace_ips_public_only=True)
     result = cleaner.process("Host 10.0.0.1 and 8.8.8.8")
     anon_map = result.metadata["anon_map"]
-    assert "<IP_ADDRESS_0>" in result.lm_text
+    assert "<IP_0>" in result.lm_text
     assert "8.8.8.8" not in result.lm_text
-    assert anon_map.deanonymize("<IP_ADDRESS_0>") == "8.8.8.8"
-    assert len([e for e in anon_map.entries if e.entity_type == "IP_ADDRESS"]) == 1
+    assert anon_map.deanonymize("<IP_0>") == "8.8.8.8"
+    assert len([e for e in anon_map.entries if e.entity_type == "IP"]) == 1
 
 
 def test_ip_synthetic_mode_replaces_address():
@@ -239,7 +239,7 @@ def test_synthetic_ip_and_phone_not_rewritten_by_number_step():
 @pytest.mark.parametrize("mode, public", [
     ("placeholder", "<IP>"),
     ("synthetic", None),
-    ("reversible", "<IP_ADDRESS_0>"),
+    ("reversible", "<IP_0>"),
 ])
 def test_public_only_kept_ips_survive_default_later_steps(mode, public):
     text = "Host 10.0.0.1 and fd00::1 and 8.8.8.8 in 2023"

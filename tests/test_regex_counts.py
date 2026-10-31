@@ -41,7 +41,7 @@ def test_kept_private_ip_is_not_counted():
     )
 
     assert "192.168.1.4" in result.lm_text
-    assert result.metadata["regex_counts"]["IP_ADDRESS"] == {"count": 1, "chars": 7}
+    assert result.metadata["regex_counts"]["IP"] == {"count": 1, "chars": 7}
 
 
 def test_each_step_type_counted():
@@ -52,7 +52,7 @@ def test_each_step_type_counted():
     assert counts["URL"]["count"] == 1
     assert counts["DATE"] == {"count": 1, "chars": 10}
     assert counts["YEAR"] == {"count": 1, "chars": 4}
-    assert counts["PHONE_NUMBER"]["count"] == 1
+    assert counts["PHONE"]["count"] == 1
     assert counts["NUMBER"] == {"count": 1, "chars": 2}
     assert counts["CURRENCY"] == {"count": 1, "chars": 1}
 

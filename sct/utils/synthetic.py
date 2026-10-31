@@ -17,8 +17,8 @@ FAKER_GENERATORS: Dict[str, str] = {
     'LOC': 'city', 'LOCATION': 'city',
     'ORG': 'company', 'ORGANISATION': 'company',
     # PII contact
-    'EMAIL': 'email', 'PHONE_NUMBER': 'phone_number',
-    'URL': 'url', 'IP_ADDRESS': 'ipv4',
+    'EMAIL': 'email', 'PHONE': 'phone_number', 'PHONE_NUMBER': 'phone_number',
+    'URL': 'url', 'IP': 'ipv4', 'IP_ADDRESS': 'ipv4',
     # PII financial
     'CREDIT_CARD_NUMBER': 'credit_card_number',
     'SOCIAL_SECURITY_NUMBER': 'ssn',

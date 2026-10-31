@@ -11,7 +11,8 @@ PUBLIC_VIEW_KEYS: tuple[str, ...] = (
     "pii_count", "pii_chars", "pii_share", "pii_types",
     "regex_counts", "entity_counts", "sensitive", "warnings", "models",
 )
-PII_REGEX_TYPES = frozenset({"EMAIL", "URL", "IP_ADDRESS", "PHONE_NUMBER"})
+# IP_ADDRESS / PHONE_NUMBER: the names under legacy_type_names=True.
+PII_REGEX_TYPES = frozenset({"EMAIL", "URL", "IP", "PHONE", "IP_ADDRESS", "PHONE_NUMBER"})
 WARNING_CODES = frozenset({
     "language_unknown", "language_fallback", "language_low_confidence",
     "ner_fallback_models", "ner_off", "cuda_fallback", "empty_input",

@@ -37,7 +37,7 @@ GLINER_LABELS = {
     "location": "LOCATION",
     "organization": "ORGANISATION",
     "email": "EMAIL",
-    "phone number": "PHONE_NUMBER",
+    "phone number": "PHONE",
     "ip address": "IP",
 }
 

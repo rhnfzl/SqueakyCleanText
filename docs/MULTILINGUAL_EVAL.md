@@ -3,7 +3,7 @@
 `evaluation/multilingual_pii.jsonl`: 220 synthetic records, 20 per language for
 en, nl, de, es, zh, ja, th, ar, hi, bn, ta (660 entities). Same schema as
 `evaluation/release_benchmark.jsonl`. Labels: PERSON, LOCATION, ORGANISATION, EMAIL,
-PHONE_NUMBER, IP (the names SCT emits). Names and places are in native script; 30
+PHONE, IP (the names SCT emits). Names and places are in native script; 30
 records put a Latin-script name inside non-Latin text (slice `code-switch`).
 
 Rebuild (deterministic, byte-identical; a test checks the committed file):
@@ -53,7 +53,7 @@ Commit `39a5ca3`, macOS arm64, Python 3.13, CPU. Raw report and predictions:
 | LOCATION | 0.49 / 0.93 | 0.42 / 0.90 | 0.97 / 0.92 |
 | ORGANISATION | 0.47 / 0.76 | 0.48 / 0.83 | 0.68 / 0.88 |
 | EMAIL | 0.16 / 0.37 | 0.82 / 0.99 | 0.82 / 0.82 |
-| PHONE_NUMBER | 0.67 / 0.55 | 0.88 / 0.97 | 0.65 / 0.73 |
+| PHONE | 0.67 / 0.55 | 0.88 / 0.97 | 0.65 / 0.73 |
 | IP | 0.00 / 0.00 | 0.18 / 0.73 | 0.93 / 1.00 |
 Code-switch slice, sct-default: recall 0.76, precision 0.82.
 
@@ -84,7 +84,7 @@ parts, URL and source-marker fixes), same machine and settings. Raw report and p
 | LOCATION | 0.97 / 0.92 | 0.95 / 0.92 |
 | ORGANISATION | 0.68 / 0.88 | 0.68 / 0.88 |
 | EMAIL | 0.82 / 0.82 | 0.82 / 0.82 |
-| PHONE_NUMBER | 0.65 / 0.73 | 0.86 / 0.93 |
+| PHONE | 0.65 / 0.73 | 0.86 / 0.93 |
 | IP | 0.93 / 1.00 | 1.00 / 1.00 |
 
 Code-switch slice: recall 0.84, precision 0.90 (was 0.76 / 0.82).
@@ -94,7 +94,7 @@ Code-switch slice: recall 0.84, precision 0.90 (was 0.76 / 0.82).
 - **EMAIL in zh / ja**: the email regex takes the CJK text glued before the address
   (`请发送至wangfang@example.com` becomes one EMAIL). In ar it takes the Arabic comma `،`
   after the address. Regex boundary bugs, not model gaps; still open in 0.8.0.
-- **PHONE_NUMBER**: grouped national numbers (`010-6552 1234`, `699 123 456`,
+- **PHONE**: grouped national numbers (`010-6552 1234`, `699 123 456`,
   `06 12 34 56 78`) are matched whole since 0.8.0; `06-12345678` still loses its `06-`.
 - **ORGANISATION**: weakest label (0.68 recall); in ar, bn, ja, th, zh, ta the multilingual
   model misses or splits organisation names.

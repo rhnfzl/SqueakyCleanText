@@ -34,6 +34,10 @@ ACRONYM_REGEX = re.compile(
     flags=re.UNICODE,
 )
 
+# Canonical PII type name -> its pre-0.8.0 name in reversible placeholders and metadata
+# (legacy_type_names=True). Every other type already had one name on every surface.
+LEGACY_TYPE_NAMES = {'PHONE': 'PHONE_NUMBER', 'IP': 'IP_ADDRESS'}
+
 # Fixed: Unicode ranges use actual Unicode escapes (not literal \\u in raw strings)
 # Local part takes RFC 5322 punctuation (o'connor, jo&co, alice!) after a word start,
 # so no prefix of the address stays visible; it never ends in a dot.

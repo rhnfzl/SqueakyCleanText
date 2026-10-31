@@ -36,6 +36,8 @@ class TextCleaner:
                  config variables (backward compatible).
         """
         self.cfg = cfg or _config_from_module_globals()
+        names = constants.LEGACY_TYPE_NAMES if self.cfg.legacy_type_names else {}
+        self._phone_type, self._ip_type = names.get('PHONE', 'PHONE'), names.get('IP', 'IP')
         if (
             privacy_policy is not None
             and self.cfg.replacement_mode != 'placeholder'
@@ -686,21 +688,21 @@ class TextCleaner:
         reversible = self._replace_reversible(
             text,
             constants.IP_REGEX,
-            'IP_ADDRESS',
+            self._ip_type,
             keep=lambda orig: not contact.is_replaceable_ip(orig, public_only),
         )
         if reversible is not None:
             return reversible
         if self._synthetic_replacer:
             def emit(orig):
-                return self._synthetic_replacer.get_replacement('IP_ADDRESS', orig)
+                return self._synthetic_replacer.get_replacement(self._ip_type, orig)
         else:
             def emit(orig):
                 return self.cfg.replace_with_ips
         return self.ProcessContacts.replace_ips_with_fn(
             text,
             lambda orig: (
-                self._emit('IP_ADDRESS', orig, emit(orig))
+                self._emit(self._ip_type, orig, emit(orig))
                 if contact.is_replaceable_ip(orig, public_only) else self._protect(orig)
             ),
         )
@@ -733,18 +735,18 @@ class TextCleaner:
         reversible = self._replace_reversible(
             text,
             constants.PHONE_REGEX,
-            'PHONE_NUMBER',
+            self._phone_type,
         )
         if reversible is not None:
             return reversible
         if self._synthetic_replacer:
             return self.ProcessContacts.replace_phone_numbers_with_fn(
                 text, lambda orig: self._emit(
-                    'PHONE_NUMBER', orig, self._synthetic_replacer.get_replacement('PHONE_NUMBER', orig),
+                    self._phone_type, orig, self._synthetic_replacer.get_replacement(self._phone_type, orig),
                 ),
             )
         return self.ProcessContacts.replace_phone_numbers_with_fn(
-            text, lambda orig: self._emit('PHONE_NUMBER', orig, self.cfg.replace_with_phone_numbers),
+            text, lambda orig: self._emit(self._phone_type, orig, self.cfg.replace_with_phone_numbers),
         )
 
     def _replace_numbers(self, text):

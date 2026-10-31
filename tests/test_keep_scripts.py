@@ -57,7 +57,7 @@ def test_ipv4_in_other_digit_scripts_is_replaced(mode):
     for text, ip in (("IP ١٩٢.١٦٨.١.١ ok", "١٩٢.١٦٨.١.١"), ("आईपी ८.८.८.८ है", "८.८.८.८")):
         result = cleaner.process(text)
         assert not any(part in result.lm_text for part in ip.split(".")), result.lm_text
-        assert result.metadata["regex_counts"]["IP_ADDRESS"]["count"] == 1
+        assert result.metadata["regex_counts"]["IP"]["count"] == 1
 
 
 def test_non_ascii_digit_runs_that_are_not_ips_are_kept():

@@ -123,6 +123,8 @@ PII_LABEL_MAP: dict[str, str] = {
     'spouse_name': 'PER', 'child_name': 'PER', 'emergency_contact': 'PER',
     'company_name': 'ORG', 'court_name': 'ORG', 'school_name': 'ORG',
     'city': 'LOC', 'state': 'LOC', 'country': 'LOC',
+    # One name per type on every surface: the regex steps emit <PHONE> / <IP> too.
+    'phone_number': 'PHONE', 'ip_address': 'IP',
 }
 
 PII_DEFAULT_MODEL = 'knowledgator/gliner-pii-base-v1.0'
@@ -317,6 +319,9 @@ class TextCleanerConfig:
     # Part of check_fix_bad_unicode. False keeps full-width CJK punctuation (，！：) and half-width
     # katakana, converting only full-width ASCII letters/digits; True = ftfy's full width fix (0.7)
     fix_character_width: bool = False
+    # True: phone and IP types use their pre-0.8.0 names PHONE_NUMBER / IP_ADDRESS in reversible
+    # placeholders, metadata, signals and PII-mode NER tags; False = PHONE / IP everywhere
+    legacy_type_names: bool = False
 
     def __post_init__(self):
         if self.gliclass_onnx:
@@ -392,11 +397,14 @@ class TextCleanerConfig:
             if self.gliner_labels == ('person', 'organization', 'location'):
                 object.__setattr__(self, 'gliner_labels', PII_LABELS)
             if self.gliner_label_map is None:
-                object.__setattr__(self, 'gliner_label_map', PII_LABEL_MAP)
+                object.__setattr__(self, 'gliner_label_map', {
+                    k: v for k, v in PII_LABEL_MAP.items()
+                    if not (self.legacy_type_names and v in ('PHONE', 'IP'))
+                })
             # Expand positional_tags to include all PII label tags
             pii_tags = set(self.positional_tags)
             for label in self.gliner_labels:
-                pii_tags.add(PII_LABEL_MAP.get(label, label.upper()))
+                pii_tags.add(self.gliner_label_map.get(label, label.upper()))
             object.__setattr__(self, 'positional_tags', tuple(sorted(pii_tags)))
 
         # --- NER backend validation ---
@@ -662,6 +670,7 @@ def _config_from_module_globals() -> TextCleanerConfig:
         synthetic_per_document=getattr(m, 'SYNTHETIC_PER_DOCUMENT', True),
         language_margin_warning=getattr(m, 'LANGUAGE_MARGIN_WARNING', 0.15),
         fix_character_width=getattr(m, 'FIX_CHARACTER_WIDTH', False),
+        legacy_type_names=getattr(m, 'LEGACY_TYPE_NAMES', False),
         check_replace_currency_symbols=m.CHECK_REPLACE_CURRENCY_SYMBOLS,
         check_ner_process=m.CHECK_NER_PROCESS,
         check_remove_isolated_letters=m.CHECK_REMOVE_ISOLATED_LETTERS,
@@ -761,6 +770,7 @@ SYNTHETIC_SEED = 42
 SYNTHETIC_PER_DOCUMENT = True
 LANGUAGE_MARGIN_WARNING = 0.15
 FIX_CHARACTER_WIDTH = False
+LEGACY_TYPE_NAMES = False
 GLINER_ONNX = False
 LANGUAGE = None
 

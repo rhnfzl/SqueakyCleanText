@@ -1583,7 +1583,8 @@ class PIIModeConfigTest(unittest.TestCase):
         self.assertIn('ORG', tags)
         # PII-specific tags should be added (uppercased label names)
         self.assertIn('EMAIL', tags)
-        self.assertIn('PHONE_NUMBER', tags)
+        self.assertIn('PHONE', tags)
+        self.assertIn('IP', tags)
         self.assertIn('CREDIT_CARD_NUMBER', tags)
 
     def test_pii_mode_invalid_value(self):
@@ -1613,8 +1614,8 @@ class PIIModeConfigTest(unittest.TestCase):
         self.assertGreater(len(PII_LABELS), 50)
 
     def test_pii_label_map_coverage(self):
-        """All PII_LABEL_MAP keys should map to standard NER tags."""
-        valid_tags = {'PER', 'LOC', 'ORG'}
+        """PII_LABEL_MAP keys map to standard NER tags or a regex step's type name."""
+        valid_tags = {'PER', 'LOC', 'ORG', 'PHONE', 'IP'}
         for label, tag in PII_LABEL_MAP.items():
             self.assertIn(tag, valid_tags, f"Label '{label}' maps to unexpected tag '{tag}'")
 
