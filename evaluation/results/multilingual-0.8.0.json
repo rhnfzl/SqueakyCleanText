@@ -3,7 +3,7 @@
   "dataset_sha256": "d946043dc567a8246657f7cbb443aa773d038c5ca1c7fc6f44e68981bd2540c1",
   "documents": 220,
   "entities": 660,
-  "git_commit": "3f3242e8d801532dc6f6516c7ebe1b0cf3648775",
+  "git_commit": "4b7e9f99d3d72f07e147afbce22633d7cfd4e1ba",
   "models": {
     "sct-default": {
       "config": "TextCleanerConfig(**{'replacement_mode': 'reversible', 'check_to_ascii_unicode': False})",
@@ -19,7 +19,7 @@
           {
             "end": 34,
             "label": "ORGANISATION",
-            "start": 22
+            "start": 29
           },
           {
             "end": 64,
@@ -62,6 +62,11 @@
           }
         ],
         "ar-billing-020": [
+          {
+            "end": 34,
+            "label": "ORGANISATION",
+            "start": 29
+          },
           {
             "end": 64,
             "label": "EMAIL",
@@ -468,6 +473,11 @@
         ],
         "bn-office-004": [
           {
+            "end": 4,
+            "label": "LOCATION",
+            "start": 0
+          },
+          {
             "end": 42,
             "label": "PERSON",
             "start": 27
@@ -526,11 +536,6 @@
             "start": 0
           },
           {
-            "end": 32,
-            "label": "LOCATION",
-            "start": 29
-          },
-          {
             "end": 52,
             "label": "IP",
             "start": 42
@@ -541,6 +546,11 @@
             "end": 13,
             "label": "PERSON",
             "start": 0
+          },
+          {
+            "end": 46,
+            "label": "ORGANISATION",
+            "start": 29
           },
           {
             "end": 58,
@@ -555,6 +565,11 @@
             "start": 0
           },
           {
+            "end": 28,
+            "label": "ORGANISATION",
+            "start": 25
+          },
+          {
             "end": 49,
             "label": "IP",
             "start": 38
@@ -565,6 +580,11 @@
             "end": 12,
             "label": "PERSON",
             "start": 0
+          },
+          {
+            "end": 45,
+            "label": "ORGANISATION",
+            "start": 28
           },
           {
             "end": 57,
@@ -2120,6 +2140,11 @@
         ],
         "ja-office-009": [
           {
+            "end": 2,
+            "label": "LOCATION",
+            "start": 0
+          },
+          {
             "end": 14,
             "label": "PERSON",
             "start": 10
@@ -2174,6 +2199,11 @@
             "end": 23,
             "label": "PERSON",
             "start": 19
+          },
+          {
+            "end": 37,
+            "label": "ORGANISATION",
+            "start": 30
           }
         ],
         "ja-security-008": [
@@ -2230,11 +2260,6 @@
             "end": 35,
             "label": "ORGANISATION",
             "start": 31
-          },
-          {
-            "end": 45,
-            "label": "PERSON",
-            "start": 44
           }
         ],
         "ja-support-001": [
@@ -2678,6 +2703,11 @@
         ],
         "ta-billing-020": [
           {
+            "end": 16,
+            "label": "ORGANISATION",
+            "start": 0
+          },
+          {
             "end": 65,
             "label": "EMAIL",
             "start": 44
@@ -2839,6 +2869,11 @@
             "end": 96,
             "label": "ORGANISATION",
             "start": 77
+          },
+          {
+            "end": 115,
+            "label": "ORGANISATION",
+            "start": 114
           }
         ],
         "ta-security-008": [
@@ -2863,16 +2898,6 @@
             "end": 50,
             "label": "IP",
             "start": 40
-          },
-          {
-            "end": 80,
-            "label": "LOCATION",
-            "start": 76
-          },
-          {
-            "end": 102,
-            "label": "PERSON",
-            "start": 101
           }
         ],
         "ta-security-018": [
@@ -3604,12 +3629,12 @@
       "report": {
         "by_domain": {
           "billing": {
-            "f1": 0.8093385214007782,
-            "false_negatives": 28,
-            "false_positives": 21,
-            "precision": 0.832,
-            "recall": 0.7878787878787878,
-            "true_positives": 104
+            "f1": 0.8108108108108109,
+            "false_negatives": 27,
+            "false_positives": 22,
+            "precision": 0.8267716535433071,
+            "recall": 0.7954545454545454,
+            "true_positives": 105
           },
           "hr": {
             "f1": 0.9034749034749034,
@@ -3620,20 +3645,20 @@
             "true_positives": 117
           },
           "office": {
-            "f1": 0.9538461538461539,
-            "false_negatives": 8,
+            "f1": 0.9618320610687022,
+            "false_negatives": 6,
             "false_positives": 4,
-            "precision": 0.96875,
-            "recall": 0.9393939393939394,
-            "true_positives": 124
+            "precision": 0.9692307692307692,
+            "recall": 0.9545454545454546,
+            "true_positives": 126
           },
           "security": {
-            "f1": 0.8949416342412451,
-            "false_negatives": 17,
-            "false_positives": 10,
-            "precision": 0.92,
-            "recall": 0.8712121212121212,
-            "true_positives": 115
+            "f1": 0.9147286821705426,
+            "false_negatives": 14,
+            "false_positives": 8,
+            "precision": 0.9365079365079365,
+            "recall": 0.8939393939393939,
+            "true_positives": 118
           },
           "support": {
             "f1": 0.921875,
@@ -3662,26 +3687,26 @@
             "true_positives": 44
           },
           "LOCATION": {
-            "f1": 0.9340659340659342,
-            "false_negatives": 3,
-            "false_positives": 9,
-            "precision": 0.9042553191489362,
-            "recall": 0.9659090909090909,
-            "true_positives": 85
-          },
-          "ORGANISATION": {
-            "f1": 0.7565217391304347,
-            "false_negatives": 45,
-            "false_positives": 11,
-            "precision": 0.8877551020408163,
-            "recall": 0.6590909090909091,
+            "f1": 0.9560439560439561,
+            "false_negatives": 1,
+            "false_positives": 7,
+            "precision": 0.925531914893617,
+            "recall": 0.9886363636363636,
             "true_positives": 87
           },
+          "ORGANISATION": {
+            "f1": 0.7679324894514767,
+            "false_negatives": 41,
+            "false_positives": 14,
+            "precision": 0.8666666666666667,
+            "recall": 0.6893939393939394,
+            "true_positives": 91
+          },
           "PERSON": {
-            "f1": 0.9661399548532731,
+            "f1": 0.9705215419501134,
             "false_negatives": 6,
-            "false_positives": 9,
-            "precision": 0.9596412556053812,
+            "false_positives": 7,
+            "precision": 0.9683257918552036,
             "recall": 0.9727272727272728,
             "true_positives": 214
           },
@@ -3696,20 +3721,20 @@
         },
         "by_language": {
           "ar": {
-            "f1": 0.7758620689655172,
+            "f1": 0.7692307692307692,
             "false_negatives": 15,
-            "false_positives": 11,
-            "precision": 0.8035714285714286,
+            "false_positives": 12,
+            "precision": 0.7894736842105263,
             "recall": 0.75,
             "true_positives": 45
           },
           "bn": {
-            "f1": 0.8545454545454546,
-            "false_negatives": 13,
+            "f1": 0.8849557522123894,
+            "false_negatives": 10,
             "false_positives": 3,
-            "precision": 0.94,
-            "recall": 0.7833333333333333,
-            "true_positives": 47
+            "precision": 0.9433962264150944,
+            "recall": 0.8333333333333334,
+            "true_positives": 50
           },
           "de": {
             "f1": 0.9915966386554621,
@@ -3744,12 +3769,12 @@
             "true_positives": 57
           },
           "ja": {
-            "f1": 0.7241379310344827,
-            "false_negatives": 18,
-            "false_positives": 14,
-            "precision": 0.75,
-            "recall": 0.7,
-            "true_positives": 42
+            "f1": 0.7521367521367521,
+            "false_negatives": 16,
+            "false_positives": 13,
+            "precision": 0.7719298245614035,
+            "recall": 0.7333333333333333,
+            "true_positives": 44
           },
           "nl": {
             "f1": 0.9333333333333333,
@@ -3760,12 +3785,12 @@
             "true_positives": 56
           },
           "ta": {
-            "f1": 0.8739495798319329,
-            "false_negatives": 8,
-            "false_positives": 7,
-            "precision": 0.8813559322033898,
-            "recall": 0.8666666666666667,
-            "true_positives": 52
+            "f1": 0.8907563025210085,
+            "false_negatives": 7,
+            "false_positives": 6,
+            "precision": 0.8983050847457628,
+            "recall": 0.8833333333333333,
+            "true_positives": 53
           },
           "th": {
             "f1": 0.8888888888888888,
@@ -3786,41 +3811,41 @@
         },
         "by_slice": {
           "code-switch": {
-            "f1": 0.8571428571428571,
-            "false_negatives": 15,
-            "false_positives": 10,
-            "precision": 0.8823529411764706,
-            "recall": 0.8333333333333334,
-            "true_positives": 75
+            "f1": 0.8587570621468928,
+            "false_negatives": 14,
+            "false_positives": 11,
+            "precision": 0.8735632183908046,
+            "recall": 0.8444444444444444,
+            "true_positives": 76
           },
           "multilingual": {
-            "f1": 0.8968192397207136,
-            "false_negatives": 82,
-            "false_positives": 51,
-            "precision": 0.918918918918919,
-            "recall": 0.8757575757575757,
-            "true_positives": 578
+            "f1": 0.9026275115919631,
+            "false_negatives": 76,
+            "false_positives": 50,
+            "precision": 0.9211356466876972,
+            "recall": 0.8848484848484849,
+            "true_positives": 584
           },
           "synthetic": {
-            "f1": 0.8968192397207136,
-            "false_negatives": 82,
-            "false_positives": 51,
-            "precision": 0.918918918918919,
-            "recall": 0.8757575757575757,
-            "true_positives": 578
+            "f1": 0.9026275115919631,
+            "false_negatives": 76,
+            "false_positives": 50,
+            "precision": 0.9211356466876972,
+            "recall": 0.8848484848484849,
+            "true_positives": 584
           }
         },
         "model": "sct-default",
         "overall": {
-          "f1": 0.8968192397207136,
-          "false_negatives": 82,
-          "false_positives": 51,
-          "precision": 0.918918918918919,
-          "recall": 0.8757575757575757,
-          "true_positives": 578
+          "f1": 0.9026275115919631,
+          "false_negatives": 76,
+          "false_positives": 50,
+          "precision": 0.9211356466876972,
+          "recall": 0.8848484848484849,
+          "true_positives": 584
         }
       },
-      "seconds": 22.9
+      "seconds": 25.5
     }
   },
   "platform": "macOS-27.2-arm64-arm-64bit-Mach-O",

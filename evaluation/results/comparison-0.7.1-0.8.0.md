@@ -15,6 +15,11 @@ instead of `<PHONE_NUMBER_n>` / `<IP_ADDRESS_n>` (18 documents) and `，` kept i
 `benchmark-0.8.0.json` / `.md` are from that run; its speed line (7.5 docs/s) was measured on a
 loaded machine (load average 9 to 16; paired runs of the code before and after the last commit
 were within noise of each other) and is not comparable to the 10.3 docs/s of `5f56bec`.
+The final Mac check at `4b7e9f9` (styled-character folding, same-script widening, per-language
+synthetic fakes, NER reading placeholder-mode tags) gives the same TP/FP/FN, leaks and 30 of 30
+byte-identical outputs as `3a01635`; only the speed line changed (9.6 docs/s, mean 104 ms, same
+machine at lower load, not a code speed-up claim). `benchmark-0.8.0.json` / `.md` are now from
+that run.
 
 ## Headline
 

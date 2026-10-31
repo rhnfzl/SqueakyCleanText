@@ -59,7 +59,7 @@ Code-switch slice, sct-default: recall 0.76, precision 0.82.
 
 ## Final 0.8.0 re-run (sct-default)
 
-Three runs on the same machine and settings; GLiNER rows were not re-run. Cells are recall / precision.
+Four runs on the same machine and settings; GLiNER rows were not re-run. Cells are recall / precision.
 
 - `371a873`: 0.8.0 code before the last review fixes (grouped national phone numbers, RFC
   email local parts, URL and source-marker fixes).
@@ -69,48 +69,53 @@ Three runs on the same machine and settings; GLiNER rows were not re-run. Cells 
   `นครราชสีมา` became `ย้ายไปนครราชสีมาเมื่อปีที่แล้ว...` as one LOCATION. (2)
   `fix_character_width=False` kept `（` `：` in `seikyu@example.com（担当：鈴木花子）`, and
   the email domain took them, hiding the name inside.
-- `3a01635` (final, `evaluation/results/multilingual-0.8.0.json`): email domains stop at
+- `3a01635`: email domains stop at
   general, CJK and full-width punctuation; isolated-symbol removal keeps a hyphen between
   letters of any script (`ইসলাম-এর` stayed `ইসলামএর` before, and the name widened over the
   suffix); widening is bounded by `ner_subword_widen` (default `1.0`: the added text may be
   at most as long as the tagged span).
+- `4b7e9f9` (final, `evaluation/results/multilingual-0.8.0.json`): two NER changes.
+  (1) `ner_subword_widen_same_script` (default `True`): widening stops where the letters'
+  Unicode script changes, so a Latin name glued to kana or a Thai prefix (`David Millerは`,
+  `ถึงคุณSarah Lee`) keeps its own span: 573/56/87 to 578/51/82, 5 documents (ja, th) whose
+  PERSON span lost the kana/Thai. (2) `ner_sees_tags` (default `True`): in reversible and
+  synthetic mode NER reads `<EMAIL>` / `<PHONE>` like placeholder mode instead of `<EMAIL_0>`;
+  this eval runs reversible mode, so it now scores what placeholder mode finds: 578/51/82 to
+  584/50/76, 13 documents (ar, bn, ja, ta): +6 TP (4 ORGANISATION, 2 LOCATION), 5 FP fewer,
+  4 FP more (ORGANISATION fragments, 2 of them the same Arabic company name cut short).
+  `fold_styled_characters` and `synthetic_locale` do not change this eval.
 
-| language | 371a873 | 28ed3a2 | 0.8.0 final |
-|---|---|---|---|
-| ar | 0.77 / 0.78 | 0.75 / 0.82 | 0.75 / 0.80 |
-| bn | 0.82 / 0.96 | 0.72 / 0.90 | 0.78 / 0.94 |
-| de | 0.98 / 1.00 | 0.98 / 1.00 | 0.98 / 1.00 |
-| en | 1.00 / 1.00 | 1.00 / 1.00 | 1.00 / 1.00 |
-| es | 0.98 / 0.98 | 1.00 / 1.00 | 1.00 / 1.00 |
-| hi | 0.88 / 0.93 | 0.93 / 1.00 | 0.95 / 1.00 |
-| ja | 0.70 / 0.78 | 0.57 / 0.71 | 0.63 / 0.68 |
-| nl | 0.93 / 0.93 | 0.93 / 0.93 | 0.93 / 0.93 |
-| ta | 0.85 / 0.94 | 0.83 / 0.88 | 0.87 / 0.88 |
-| th | 0.90 / 0.93 | 0.65 / 0.76 | 0.85 / 0.89 |
-| zh | 0.80 / 0.86 | 0.67 / 0.77 | 0.80 / 0.87 |
-| overall | 0.87 / 0.92 | 0.82 / 0.89 | 0.87 / 0.91 |
+| language | 371a873 | 28ed3a2 | 3a01635 | 0.8.0 final |
+|---|---|---|---|---|
+| ar | 0.77 / 0.78 | 0.75 / 0.82 | 0.75 / 0.80 | 0.75 / 0.79 |
+| bn | 0.82 / 0.96 | 0.72 / 0.90 | 0.78 / 0.94 | 0.83 / 0.94 |
+| de | 0.98 / 1.00 | 0.98 / 1.00 | 0.98 / 1.00 | 0.98 / 1.00 |
+| en | 1.00 / 1.00 | 1.00 / 1.00 | 1.00 / 1.00 | 1.00 / 1.00 |
+| es | 0.98 / 0.98 | 1.00 / 1.00 | 1.00 / 1.00 | 1.00 / 1.00 |
+| hi | 0.88 / 0.93 | 0.93 / 1.00 | 0.95 / 1.00 | 0.95 / 1.00 |
+| ja | 0.70 / 0.78 | 0.57 / 0.71 | 0.63 / 0.68 | 0.73 / 0.77 |
+| nl | 0.93 / 0.93 | 0.93 / 0.93 | 0.93 / 0.93 | 0.93 / 0.93 |
+| ta | 0.85 / 0.94 | 0.83 / 0.88 | 0.87 / 0.88 | 0.88 / 0.90 |
+| th | 0.90 / 0.93 | 0.65 / 0.76 | 0.85 / 0.89 | 0.87 / 0.91 |
+| zh | 0.80 / 0.86 | 0.67 / 0.77 | 0.80 / 0.87 | 0.80 / 0.87 |
+| overall | 0.87 / 0.92 | 0.82 / 0.89 | 0.87 / 0.91 | 0.88 / 0.92 |
 
-| label | 371a873 | 28ed3a2 | 0.8.0 final |
-|---|---|---|---|
-| PERSON | 0.96 / 0.95 | 0.87 / 0.92 | 0.95 / 0.94 |
-| LOCATION | 0.95 / 0.92 | 0.89 / 0.86 | 0.97 / 0.90 |
-| ORGANISATION | 0.68 / 0.88 | 0.64 / 0.91 | 0.66 / 0.89 |
-| EMAIL | 0.82 / 0.82 | 0.77 / 0.77 | 0.82 / 0.82 |
-| PHONE | 0.86 / 0.93 | 0.86 / 0.93 | 0.86 / 0.93 |
-| IP | 1.00 / 1.00 | 1.00 / 1.00 | 1.00 / 1.00 |
+| label | 371a873 | 28ed3a2 | 3a01635 | 0.8.0 final |
+|---|---|---|---|---|
+| PERSON | 0.96 / 0.95 | 0.87 / 0.92 | 0.95 / 0.94 | 0.97 / 0.97 |
+| LOCATION | 0.95 / 0.92 | 0.89 / 0.86 | 0.97 / 0.90 | 0.99 / 0.93 |
+| ORGANISATION | 0.68 / 0.88 | 0.64 / 0.91 | 0.66 / 0.89 | 0.69 / 0.87 |
+| EMAIL | 0.82 / 0.82 | 0.77 / 0.77 | 0.82 / 0.82 | 0.82 / 0.82 |
+| PHONE | 0.86 / 0.93 | 0.86 / 0.93 | 0.86 / 0.93 | 0.86 / 0.93 |
+| IP | 1.00 / 1.00 | 1.00 / 1.00 | 1.00 / 1.00 | 1.00 / 1.00 |
 
-Overall TP/FP/FN: 577/51/83 at `371a873`, 542/64/118 at `28ed3a2`, 573/56/87 final.
-Code-switch slice: 0.84 / 0.90, 0.76 / 0.83, 0.78 / 0.82.
+Overall TP/FP/FN: 577/51/83 at `371a873`, 542/64/118 at `28ed3a2`, 573/56/87 at `3a01635`,
+584/50/76 final. Code-switch slice: 0.84 / 0.90, 0.76 / 0.83, 0.78 / 0.82, 0.84 / 0.87.
 
-What still differs from `371a873` (all from WordPiece widening, which hides a name's last
-subword and so is kept on by default):
+What still differs from `371a873` (WordPiece widening, which hides a name's last subword and
+so is kept on by default):
 
-- A Latin name glued to kana or a Thai prefix widened over it (`David Millerは`,
-  `ถึงคุณSarah Lee`). Fixed after `3a01635` by `ner_subword_widen_same_script` (default
-  `True`): widening stops where the letters' Unicode script changes. 573/56/87 to 578/51/82,
-  code-switch 0.78 / 0.82 to 0.83 / 0.88, ja 0.70 / 0.75, th 0.87 / 0.91, PERSON
-  0.97 / 0.96; the tables above are the `3a01635` numbers.
-- 5 organisation names in ar, bn and ta are no longer masked, and 1 Thai name. Widening makes
+- Some organisation names in ar, bn and ta are no longer masked, and 1 Thai name. Widening makes
   the mBERT span equal to the XLM-RoBERTa span, so the two scores are averaged; a weak mBERT
   score (0.63) pulls an agreed span below the 0.85 threshold, where the XLM-RoBERTa span
   alone passed before. Taking the best score per span instead of the mean gives 581/62/79
@@ -126,14 +131,14 @@ subword and so is kept on by default):
   full-width punctuation after the address is fixed).
 - **PHONE**: grouped national numbers (`010-6552 1234`, `699 123 456`,
   `06 12 34 56 78`) are matched whole since 0.8.0; `06-12345678` still loses its `06-`.
-- **ORGANISATION**: weakest label (0.68 recall); in ar, bn, ja, th, zh, ta the multilingual
+- **ORGANISATION**: weakest label (0.69 recall); in ar, bn, ja, th, zh, ta the multilingual
   model misses or splits organisation names.
 - **Span edges in bn / ta**: names cut a few characters short (`সুমাইয়া আক্ত`) or run into the
   next word (`கோயம்புத்தூர் நக`), likely subword-to-character offset mapping.
 
 ## Recommendation
 
-Keep today's default ensemble: it wins overall (0.84 / 0.89 at `39a5ca3`, 0.87 / 0.91 in
+Keep today's default ensemble: it wins overall (0.84 / 0.89 at `39a5ca3`, 0.88 / 0.92 in
 0.8.0) and in every language.
 GLiNER multi v2.1 is far behind outside Latin scripts. GLiNER multi PII v1 has the best
 EMAIL / PHONE precision and the best Arabic row, but recall in hi, bn, ta, ja, zh is
