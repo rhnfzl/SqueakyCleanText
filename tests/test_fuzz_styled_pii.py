@@ -11,8 +11,12 @@ from scripts.fuzz_styled_pii import check_case, fold, make_case, render
 
 # Open clusters (research/0.8.0-fuzz-round*.md) -> first seed that still shows them; xfail(strict=True).
 KNOWN_CLUSTERS = {}
-# Fixed clusters (rounds 0-2) -> first seed that showed them on the old code; they must stay fixed.
+# Fixed clusters (rounds 0-3) -> first seed that showed them on the old code; they must stay fixed.
 FIXED_CLUSTERS = {
+    "leak|EMAIL|glue|placeholder": 300345,
+    "leak|EMAIL|glue|reversible": 300345,
+    "leak|EMAIL|glue|stream": 300345,
+    "leak|EMAIL|glue|synthetic": 300345,
     "leak|PHONE|enclosed_pair|placeholder": 48,
     "leak|PHONE|enclosed_pair|reversible": 48,
     "leak|PHONE|enclosed_pair|stream": 48,
@@ -131,7 +135,10 @@ FIXED_CLUSTERS = {
     "stream_mismatch|training|NUMBER:glue+PHONE:glue": 1364,
     "stream_mismatch|training|PHONE:glue": 283,
 }
-SEEDS = sorted(set(range(10)) | set(KNOWN_CLUSTERS.values()) | set(FIXED_CLUSTERS.values()))
+# Extra seeds (round 3): PHONE|glue leaking again by another root cause, and URLs whose query holds a
+# percent-encoded email with a Thai/CJK domain (%40ถมยฌฒ.in), which the round-3 fix must keep whole.
+EXTRA_SEEDS = {301478, 301690, 115, 100322, 200040, 300221, 202031, 202264, 300758}
+SEEDS = sorted(set(range(10)) | set(KNOWN_CLUSTERS.values()) | set(FIXED_CLUSTERS.values()) | EXTRA_SEEDS)
 
 
 @pytest.fixture(scope="module")

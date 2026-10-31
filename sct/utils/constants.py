@@ -66,18 +66,47 @@ def _class_ranges(categories, *spans):
     return ''.join(out)
 
 
+def _cp_spans(cps):
+    """(first, last) spans of consecutive code points in the ascending iterable *cps*."""
+    spans = []
+    for cp in cps:
+        if spans and spans[-1][1] == cp - 1:
+            spans[-1][1] = cp
+        else:
+            spans.append([cp, cp])
+    return spans
+
+
 # Combining marks of every script (Mn/Mc/Me: the vowel signs of প্রিয়া, संपर्क), which \w leaves out.
 MARKS = _class_ranges('M', (0x300, 0x3FFFF), (0xE0000, 0xE0FFF))
 # Letters, marks and digits beyond the BMP (𠮷野.jp): the BMP ranges below stop at U+FFFF.
 _SUPPLEMENTARY_ALNUM = _class_ranges('LMN', (0x10000, 0x3FFFF))
+# Latin, Greek and Cyrillic letters, which sit between spaces in prose.
+_SPACED_LETTERS = "A-Za-z\u00C0-\u024F\u0370-\u03FF\u0400-\u04FF"
+# Letters and marks of scripts written without spaces between words (Thai, Lao, Khmer, Myanmar, CJK, kana:
+# Unicode line-break class SA, ID or CJ; not full-width Latin). Where one touches a Latin/Greek/Cyrillic letter or a digit, a
+# word ends, so prose glued to an address ("ดูa@b.jpกขค", "https://x.com/aปถว06 10") stays outside it.
+_SPACELESS_CHAR = regex.compile(r'(?V1)[[\p{Line_Break=SA}\p{Line_Break=ID}\p{Line_Break=CJ}]--\p{Script=Latin}]')
+_SPACELESS = ''.join(
+    f"{chr(lo)}-{chr(hi)}" if hi > lo else chr(lo) for lo, hi in _cp_spans(
+        cp for cp in range(0x110000)
+        if unicodedata.category(chr(cp))[0] in 'LM' and _SPACELESS_CHAR.match(chr(cp))))
+# A percent escape is one character (?email=a%40ตัวอย่าง.ไทย, its digits in any script), so it glues to nothing.
+_DECIMAL = ''.join(f"{chr(lo)}-{chr(hi)}" if hi > lo else chr(lo) for lo, hi in _cp_spans(
+    cp for cp in range(0x110000) if unicodedata.category(chr(cp)) == 'Nd'))
+_GLUE = (rf"(?<=[0-9{_SPACED_LETTERS}])(?<!%[{_DECIMAL}A-Fa-f]{{2}})[{_SPACELESS}]"
+         rf"|(?<=[{_SPACELESS}])[0-9{_SPACED_LETTERS}]")
+# Before each character of a local part, TLD or URL path: it does not start a new word.
+_NO_GLUE = rf"(?!{_GLUE})"
 _IDN_LETTER = (r"a-z\u00a1-\u1fff\u2070-\u2fff\u3040-\ufeff\uff21-\uff3a\uff41-\uff5a\uff66-\uffff"
                + _CJK_SYMBOL_LETTERS + _SUPPLEMENTARY_ALNUM)
 # ZWNJ/ZWJ (U+200C/D) join letters inside IDNA labels (Persian, Devanagari conjuncts).
 _IDN_CHAR = _IDN_LETTER + r"0-9\uff10-\uff19\u200c\u200d"
 # A punycode TLD (xn--p1ai) is tried first, so ".xn" alone never ends the match.
-_TLD = rf"(?:xn--[a-z0-9-]*[a-z0-9]|[{_IDN_LETTER}]{{2,}})"
+_TLD = rf"(?:xn--[a-z0-9-]*[a-z0-9]|(?:{_NO_GLUE}[{_IDN_LETTER}]){{2,}})"
 EMAIL_REGEX = re.compile(
-    rf"(?:^|(?<=[^\w@.){MARKS}]))[\w+-](?:[\w!#$%&'*+{MARKS}\u200c\u200d-]|\.(?!\.))*?(?<!\.)(@|[(<{{\[]at[)>}}\]])"
+    rf"(?:^|(?<=[^\w@.){MARKS}])|(?={_GLUE}))[\w+-]"
+    rf"(?:{_NO_GLUE}[\w!#$%&'*+{MARKS}\u200c\u200d-]|\.(?!\.))*?(?<!\.)(@|[(<{{\[]at[)>}}\]])"
     rf"(?:(?:[{_IDN_CHAR}]-*)*[{_IDN_CHAR}]+)(?:\.(?:[{_IDN_CHAR}]-*)*[{_IDN_CHAR}]+)*(?:\.{_TLD})",
     flags=re.IGNORECASE | re.UNICODE,
 )
@@ -146,7 +175,6 @@ _NUMBER_BODY = (
 # Latin, Greek and Cyrillic put spaces between words, so a digit glued to their
 # letters is part of a word (GPT4, Qwen3-8B, H2O) and is kept by default.
 # Scripts without spaces (``金额5000元``) still get the number replaced.
-_SPACED_LETTERS = "A-Za-z\u00C0-\u024F\u0370-\u03FF\u0400-\u04FF"
 # shortcut: common ISO 4217 codes only (EUR4500 is an amount, GPT4 is a name); add codes as needed.
 _CURRENCY_CODES = (
     "EUR|USD|GBP|JPY|CNY|INR|CHF|CAD|AUD|NZD|SEK|NOK|DKK|PLN|CZK|HUF|RUB|UAH|TRY|"
@@ -196,7 +224,8 @@ URL_REGEX = re.compile(
     # domain name
     rf"(?:\.(?:[a-z\u00a1-\uffff0-9{_SUPPLEMENTARY_ALNUM}]-*)*[a-z\u00a1-\uffff0-9{_SUPPLEMENTARY_ALNUM}]+)*"
     # TLD identifier (punycode first, so ".xn" alone never ends the host)
-    rf"(?:\.(?:xn--[a-z0-9-]*[a-z0-9]|[a-z\u00a1-\uffff{_SUPPLEMENTARY_ALNUM}]{{2,}}))" r"|" r"(?:(localhost))" r")"
+    rf"(?:\.(?:xn--[a-z0-9-]*[a-z0-9]|(?:{_NO_GLUE}[a-z\u00a1-\uffff{_SUPPLEMENTARY_ALNUM}]){{2,}}))"
+    r"|" r"(?:(localhost))" r")"
     # port number
     r"(?::\d{2,5}\b)?"
     # resource path, or a query/fragment right after the host ("?id=", "#token=");
@@ -204,8 +233,8 @@ URL_REGEX = re.compile(
     # stays punctuation. CJK and full-width punctuation (，。！（ ・) ends it, as in an email
     # domain, so CJK prose glued after a URL stays. ) ] } belong to the URL only when more URL text follows
     # ("?f=(a)&email=..."), so a closing bracket around a URL stays outside it.
-    rf"(?:\/(?:[^\)\]\}}\s\"<>{_WIDE_PUNCT}]|[\)\]\}}](?=[\w&=/?#%+~-]))*"
-    rf"|[?#](?:[^\)\]\}}\s\"<>{_WIDE_PUNCT}]|[\)\]\}}](?=[\w&=/?#%+~-]))+)?",
+    rf"(?:\/(?:{_NO_GLUE}[^\)\]\}}\s\"<>{_WIDE_PUNCT}]|[\)\]\}}](?=[\w&=/?#%+~-]))*"
+    rf"|[?#](?:{_NO_GLUE}[^\)\]\}}\s\"<>{_WIDE_PUNCT}]|[\)\]\}}](?=[\w&=/?#%+~-]))+)?",
     flags=re.UNICODE | re.IGNORECASE,
 )
 
