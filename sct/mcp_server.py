@@ -13,6 +13,7 @@ Server settings come from the environment only:
 
 import os
 import stat
+import threading
 from typing import Any, Literal, NotRequired, Optional, TypedDict
 
 from sct.adapters import process_json
@@ -230,6 +231,7 @@ def create_mcp_server(
         ),
     )
     cleaners: dict[bool, TextCleaner] = {}
+    cleaners_lock = threading.Lock()  # sync tools run on worker threads
 
     def get_cleaner(pii: bool) -> TextCleaner:
         if cleaner is not None:
@@ -240,10 +242,12 @@ def create_mcp_server(
                 )
             return cleaner
         if pii not in cleaners:
-            cleaners[pii] = TextCleaner(
-                cfg=preset_config(preset, ner_mode="pii" if pii else "standard"),
-                include_entities=True,
-            )
+            with cleaners_lock:
+                if pii not in cleaners:
+                    cleaners[pii] = TextCleaner(
+                        cfg=preset_config(preset, ner_mode="pii" if pii else "standard"),
+                        include_entities=True,
+                    )
         return cleaners[pii]
 
     @server.tool(title="Clean text", annotations={**_ANNOTATIONS, "title": "Clean text"})

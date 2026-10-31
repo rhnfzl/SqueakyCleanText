@@ -817,19 +817,16 @@ class GeneralNER:
     def _window_tokenizer(self, keys=None):
         """Tokenizer the chunker counts with: a window must fit every model in *keys*.
 
-        Offsets still come from ``self.tokenizer``; counts are the largest any
-        model tokenizer gives, so no model truncates a window.
+        Counts (and offsets) come from whichever of those models' tokenizers gives
+        the most tokens, so no model truncates a window; ``self.tokenizer`` is used
+        only when none is loaded, so a route without it is not split by its count.
         """
-        primary = self.tokenizer
-        tokenizers = [tok for tok in self._model_tokenizers(keys) if tok is not primary]
-        if not tokenizers:
-            return primary
-        tokenizers.append(primary)
+        tokenizers = self._model_tokenizers(keys) or [self.tokenizer]
+        if len(tokenizers) == 1:
+            return tokenizers[0]
 
         def strictest(text, **kwargs):
-            if kwargs:
-                return primary(text, **kwargs)
-            return max((tok(text) for tok in tokenizers), key=lambda r: len(r.input_ids))
+            return max((tok(text, **kwargs) for tok in tokenizers), key=lambda r: len(r.input_ids))
         return strictest
 
     def _chunk_budget(self, keys=None) -> int:

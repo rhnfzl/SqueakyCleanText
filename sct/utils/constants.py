@@ -131,8 +131,9 @@ URL_REGEX = re.compile(
     r"(?:^|(?<![\w\/\.]))"
     # protocol identifier
     r"(?:(?:https?:\/\/|ftp:\/\/|www\d{0,3}\.))"
-    # user:pass authentication
-    r"(?:\S+(?::\S*)?@)?" r"(?:"
+    # user:pass authentication; never across / ? # " < > so a later "@" in the
+    # query or the markup is not taken as user info
+    r"(?:[^\s/?#\"<>@]+(?::[^\s/?#\"<>@]*)?@)?" r"(?:"
     # IP address exclusion - private & local networks
     r"(?!(?:10|127)(?:\.\d{1,3}){3})"
     r"(?!(?:169\.254|192\.168)(?:\.\d{1,3}){2})"
