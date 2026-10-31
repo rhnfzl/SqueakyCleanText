@@ -1,9 +1,9 @@
 # Release benchmark: SCT 0.8.0
 
-Commit `ef3f2450cd72ca892440ab50ae9071a8e53f63b3`, macOS-27.2-arm64-arm-64bit-Mach-O, Python 3.13.12.
+Commit `5f56bec64e642e40e7e87d1f18bde7e2b38d0e8d`, macOS-27.2-arm64-arm-64bit-Mach-O, Python 3.13.12.
 Dataset `release_benchmark.jsonl`: 30 documents, 84 entities. Exact label + span match.
 
-Speed (default config, single process): **7.462 docs/s**, mean 134.011 ms, p95 663.62 ms.
+Speed (default config, single process): **10.256 docs/s**, mean 97.505 ms, p95 538.899 ms.
 Leaks: **0 / 67** PII values still in output (partial: 0).
 
 ## By label

@@ -145,12 +145,22 @@ Haystack), score columns and data cards (`sct-report`), a reworked MCP server an
 - NER windows respect a tokenizer's saved truncation `max_length` when it is below `model_max_length`, so inference never cuts a planned window.
 - A language route given as a list (`["ENGLISH", ...]`) is no longer changed in place when GLiNER is added to it.
 - `scripts/benchmark_release.py` imports on Windows (no `resource` module); peak RSS is reported as `null` there.
-- Isolated-symbol removal (library default, off in `training`) only removes symbols with whitespace or a text edge on both sides. Before, a `)` or full stop after a placeholder or bracket was dropped: `(born 1980).` became `(born <YEAR>`, `bel +31 20 123 4567.` lost its full stop (0.7.1 did the same).
+- Isolated-symbol removal (library default, off in `training`) only removes symbols with whitespace or a text edge on both sides. Before, a `)` or full stop after a placeholder or bracket was dropped: `(born 1980).` became `(born <YEAR>`, `bel +31 20 123 4567.` lost its full stop, and a Chinese `，` after a word was dropped (0.7.1 did the same). On the release benchmark 11 of 30 outputs now keep such a `.` or comma; scores are unchanged.
 - `replacement_mode='synthetic'` with NER: the model no longer rewrites a fake email or phone that a regex step just inserted (`anna@beispiel.de` became `James Howard@Bernard LLC`); those fakes are protected like placeholders.
 - WordPiece NER models (any tokenizer with a `##` continuation prefix, such as `protectai/bert-base-NER-onnx`): entities widen to whole words, so `John Doe` no longer becomes `<PERSON>e`. SentencePiece models (the defaults) are unchanged.
 - Worker processes no longer call the Hub when the cache is warm. After `model.onnx` resolves, the other files load from that commit (served from the cache with no request) and the missing `model.onnx_data` probe uses the Hub's cached "no such file" answer (the default ensemble made one HEAD per load, an unpinned model eight). A `CleanerHandle` that is forked or pickled after loading pins unpinned models to the commits the parent loaded. A forked worker on Linux could hang forever in DNS (`getaddrinfo`) during that request.
 - `language_confidence` is rounded to 6 decimals. Lingua's value differed in the last digit between processes, so worker and in-process metadata did not match.
 - `import sct` no longer imports `presidio_anonymizer` (which pulls `presidio_analyzer`, GLiNER and torch when installed); it loads on first NER replacement.
+- MCP: an `SCT_MCP_ROOT` / `create_mcp_server(root=...)` that is not an existing directory raises `ValueError` at start-up instead of failing on every call.
+- `WindowedStreamingRedactor` checks for a split contact token on HTML-entity-decoded text too, so a phone written with `&#32;`, `&#x20;` or `&nbsp;` between its digit groups is no longer cut between windows.
+- `ner_chunk_overlap`: window offsets come from the tokenizer of the document's language route, not always the primary model's tokenizer.
+- A worker forked while another thread was building the language detector gets a fresh detector lock instead of inheriting it held (a possible hang).
+- URLs whose host is a private or loopback IPv4 address (`10.x`, `127.x`, `172.16-31.x`, `169.254.x`, `192.168.x`) or a bracketed IPv6 address (`[::1]:8080`) become one `<URL>`. Before, such a URL was not matched as a URL and query values such as `?email=alice%40example.com` stayed in the text.
+- URLs keep interior `)`, `]` and `}` when more URL text follows (`?f=(a)&email=...`), so the rest of the query is replaced too; a bracket closing around a URL still stays outside it.
+- NER: when one model gives two labels for the same span (repeated window context, WordPiece widening), it is one vote with its best score and that score's label, also without `ner_chunk_overlap`. Before, the two labels could average a 0.99 `PER` below the confidence threshold.
+- `sct.integrations.hf.clean_dataset` declares the output column features, so a first batch of only `None` or `[]` no longer types a column as null and fails on the next batch.
+- `assess_reidentification_risk` type-tags values inside tuples and frozensets too, so `(1,)` and `(True,)` are different quasi-identifier values.
+- Merged signals of a JSON value: `language_source` comes from the longest leaf of the chosen language, not the longest leaf overall.
 
 ### Known limits
 

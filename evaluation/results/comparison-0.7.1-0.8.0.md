@@ -5,6 +5,9 @@ Correctness and output parity were re-run at `ef3f245` (`sct.__version__` 0.8.0)
 speed runs were made earlier at `c88e3ca`. Default config unless a row says otherwise.
 A final re-run at `371a873` (all 0.8.0 features and fixes) gave the same TP/FP/FN, leaks
 and 30 of 30 byte-identical outputs as `ef3f245`.
+The final check at `5f56bec` gives the same TP/FP/FN and leaks; 11 of 30 outputs differ from
+`ef3f245` only by a sentence-final `.` or a comma after a word (`，`, written `,`) that is now kept (isolated-symbol
+fix, CHANGELOG). `benchmark-0.8.0.json` / `.md` are from that run.
 
 ## Headline
 
