@@ -96,6 +96,8 @@ def test_clean_columns_validation():
         clean_columns(handle, {"text": []}, ())
 
 
+@pytest.mark.skipif(not hasattr(ProcessResult, "signals"),
+                    reason="needs ProcessResult.signals (K1)")
 def test_clean_columns_score_adds_score_a_columns():
     score = pytest.importorskip("sct.score")
     out = clean_columns(CleanerHandle(FAST), {"text": [EMAIL, None]}, score=True)

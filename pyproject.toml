@@ -54,6 +54,7 @@ Changelog = "https://github.com/rhnfzl/SqueakyCleanText/releases"
 [project.scripts]
 sct-clean = "sct.cli:main"
 sct-mcp = "sct.mcp_server:main"
+sct-report = "sct.report_cli:main"
 
 [project.optional-dependencies]
 gpu = [
@@ -101,6 +102,9 @@ test = [
 ]
 mcp = [
     "fastmcp>=4.0.5",
+]
+score = [
+    "datasketch>=1.6",
 ]
 ocr = [
     "pillow>=12.3.0",
