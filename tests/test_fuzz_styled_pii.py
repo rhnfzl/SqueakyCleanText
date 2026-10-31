@@ -11,7 +11,7 @@ from scripts.fuzz_styled_pii import check_case, fold, make_case, render
 
 # Open clusters (research/0.8.0-fuzz-round*.md) -> first seed that still shows them; xfail(strict=True).
 KNOWN_CLUSTERS = {}
-# Fixed clusters (rounds 0-3) -> first seed that showed them on the old code; they must stay fixed.
+# Fixed clusters (rounds 0-5) -> first seed that showed them on the old code; they must stay fixed.
 FIXED_CLUSTERS = {
     "leak|EMAIL|glue|placeholder": 300345,
     "leak|EMAIL|glue|reversible": 300345,
@@ -41,6 +41,24 @@ FIXED_CLUSTERS = {
     "leak|EMAIL|zw_join|reversible": 258,
     "leak|EMAIL|zw_join|stream": 258,
     "leak|EMAIL|zw_join|synthetic": 258,
+    "leak|EMAIL|zw_inside|placeholder": 9,
+    "leak|EMAIL|zw_inside|reversible": 9,
+    "leak|EMAIL|zw_inside|stream": 9,
+    "leak|EMAIL|zw_inside|synthetic": 9,
+    "leak|IP|zw_inside|placeholder": 2,
+    "leak|IP|zw_inside|reversible": 2,
+    "leak|IP|zw_inside|stream": 2,
+    "leak|IP|zw_inside|synthetic": 2,
+    "leak|PHONE|zw_inside|placeholder": 19,
+    "leak|PHONE|zw_inside|reversible": 19,
+    "leak|PHONE|zw_inside|stream": 19,
+    "leak|PHONE|zw_inside|synthetic": 19,
+    "leak|URL|zw_inside|placeholder": 166,
+    "leak|URL|zw_inside|reversible": 166,
+    "leak|URL|zw_inside|stream": 166,
+    "leak|URL|zw_inside|synthetic": 166,
+    "stream_mismatch|sct|PHONE:zw_inside": 1240,
+    "stream_mismatch|training|PHONE:zw_inside": 101250,
     "leak|IP|enclosed_alnum+native_digit+wide_sep|placeholder": 2579,
     "leak|IP|enclosed_alnum+native_digit+wide_sep|reversible": 2579,
     "leak|IP|enclosed_alnum+native_digit+wide_sep|stream": 2579,

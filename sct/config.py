@@ -333,7 +333,8 @@ class TextCleanerConfig:
     # too), 0 = never (0.7)
     ner_subword_widen: Optional[float] = 1.0
     # Part of check_fix_bad_unicode. True folds math-alphanumeric (𝐞𝐱), circled (ⓙ) and full-width
-    # URL punctuation (：／？) inside ASCII runs so styled emails/URLs/phones are replaced without
+    # URL punctuation (：／？) inside ASCII runs and drops invisible Cf characters (ZWSP, soft hyphen)
+    # inside them, so styled emails/URLs/phones are replaced without
     # check_to_ascii_unicode; False = earlier 0.8.0 (full-width letters/digits and ＠．－＿＋ only)
     fold_styled_characters: bool = True
     # WordPiece NER widening stops where the Unicode script of the letters changes, so a Latin

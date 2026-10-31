@@ -89,6 +89,8 @@ class WindowedStreamingRedactor:
             else:
                 unit_ends = (unit.end(),)
             for character, end in zip(decoded, unit_ends):
+                if unicodedata.category(character) == "Cf":
+                    continue  # invisible ("06\u00ad12"): the cleaner's fold drops it inside a contact run
                 folded = unicodedata.normalize("NFKC", character).translate(_DIGIT_VIEW)
                 # punctuation folds only where the cleaner's styled fold does (contact punctuation),
                 # so a "（" glued after a phone stays wide and does not end the match early

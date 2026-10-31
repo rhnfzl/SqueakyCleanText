@@ -7,8 +7,9 @@ date, number). Each value is then rendered in forms a reader still reads as the
 same value: full-width and small-form characters, mathematical styled letters
 and digits, circled/squared letters and digits, native decimal digits of any
 script, decomposed letters (base + combining mark), zero-width characters where
-they are legal, and glued to CJK/Thai prose without a space. Every variant comes
-from Unicode data (decomposition tag, NFKC, decimal value, category), and every
+they are legal, invisible break hints (ZWSP, WJ, soft hyphen) inside the value,
+and glued to CJK/Thai prose without a space. Every variant comes from Unicode
+data (decomposition tag, NFKC, decimal value, category), and every
 rendered value folds back to the plain value (NFKC, Cf removed, Nd -> ASCII).
 
 The cleaner runs with NER off on the ``training`` preset and the default
@@ -48,7 +49,7 @@ TYPE_FLAG = {
     "URL": "check_replace_urls", "DATE": "check_replace_dates", "NUMBER": "check_replace_numbers",
 }
 # Zero-width characters (all category Cf, removed by the oracle fold).
-ZWSP, ZWNJ, ZWJ, WJ = "​", "‌", "‍", "⁠"
+ZWSP, ZWNJ, ZWJ, WJ, SHY = "​", "‌", "‍", "⁠", "\u00ad"
 # Decomposition tags whose NFKC fold is the styled character's plain reading.
 STYLE_TAGS = {"wide": "wide", "small": "small", "font": "font", "circle": "enclosed", "square": "enclosed"}
 # Script letter ranges for context prose and non-ASCII PII (letters picked by category).
@@ -285,6 +286,19 @@ def _legal_join(plain, typ):
     return legal
 
 
+def _zw_inside(rng, plain, inserts, kinds):
+    """Invisible line-break hints (ZWSP, WJ, soft hyphen) between characters of a value, as copied
+    from wrapped or hyphenated text; own RNG so the cases of earlier rounds stay the same. Not between
+    two non-ASCII characters: there a ZWSP is a Thai word break and ZWNJ a Persian letter form, not a hint."""
+    free = [index for index in range(1, len(plain)) if index not in inserts
+            and (plain[index - 1].isascii() or plain[index].isascii())]
+    if not free or rng.random() >= 0.25:
+        return kinds
+    for index in rng.sample(free, rng.randint(1, min(3, len(free)))):
+        inserts[index] = ("zw_inside", rng.choice((ZWSP, WJ, SHY)))
+    return sorted(kinds + ["zw_inside"])
+
+
 def make_case(seed: int) -> dict:
     rng = random.Random(seed)  # noqa: S311  # reproducible test data, not crypto
     scripts = rng.sample(sorted(SCRIPT_RANGES), rng.choice((1, 2)))
@@ -293,6 +307,7 @@ def make_case(seed: int) -> dict:
         typ = rng.choice(sorted(GENERATORS))
         plain, cores = GENERATORS[typ](rng)
         slots, inserts, kinds = _plan(rng, plain, _legal_join(plain, typ))
+        kinds = _zw_inside(random.Random(f"{seed}-{len(values)}-zw"), plain, inserts, kinds)  # noqa: S311
         glue = rng.random() < 0.5
         values.append({"type": typ, "plain": plain, "cores": cores, "slots": slots, "inserts": inserts,
                        "kinds": kinds + (["glue"] if glue else []), "glue": glue})

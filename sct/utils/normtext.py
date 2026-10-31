@@ -83,6 +83,29 @@ _STYLED_EMAIL_RUN_REGEX = re.compile(
 _STYLED_EMAIL_RUN_JOINER = str.maketrans({ch: plain for ch, plain in _STYLED_SEP.items() if plain in '@.-_+'})
 
 
+# Invisible format characters (category Cf: ZWSP, word joiner, soft hyphen, bidi marks) beside a
+# contact-run character (ASCII alnum, any decimal digit, circled alnum, contact punctuation in any
+# form) are line-break or layout hints copied with the text ("06\u00ad12" reads "0612"): a run of
+# them drops when its other side is a run character, a letter of any script (例え\u200b．jp), a space
+# ("06\u200b 12") or the text edge. Between two other letters they stay (ZWNJ in Persian, ZWSP
+# between Thai words).
+_INVISIBLE_REGEX = re.compile(
+    '[%s]+' % re.escape(''.join(chr(cp) for cp in range(0x110000) if unicodedata.category(chr(cp)) == 'Cf')))
+_RUN_CHAR = re.compile('[A-Za-z\\d%s%s]' % (''.join(map(chr, _CIRCLED_ALNUM)), _PUNCT_ANY))
+_LETTER = re.compile(rf'[^\W_]|[{constants.MARKS}]')
+
+
+def _drop_invisible(m):
+    s, a, b = m.string, m.start(), m.end()
+    # a text edge counts as a space, so a window of a stream that ends there folds as the whole text does
+    left, right = s[a - 1] if a else ' ', s[b] if b < len(s) else ' '
+    run_left, run_right = _RUN_CHAR.match(left), _RUN_CHAR.match(right)
+    if (run_left and (run_right or right.isspace() or _LETTER.match(right))) or (
+            run_right and (left.isspace() or _LETTER.match(left))):
+        return ''
+    return m.group()
+
+
 # A lone circled number between space-separated digit groups (06 ⑬ 01 68) or after two or more of
 # them (06 73 86 88 ㊺) is one group of them; a lone one before a number (① 2024年) is a list marker.
 _DIGIT_GROUP = '(?:\\d|[%s])' % ''.join(chr(cp) for cp, plain in _CIRCLED_ALNUM.items() if plain.isdigit())
@@ -101,7 +124,8 @@ def _fold_circled_run(m):
 
 def fold_styled(text):
     """Fold styled/compatibility letters, digits and in-run URL punctuation to ASCII."""
-    text = _CIRCLED_RUN_REGEX.sub(_fold_circled_run, text.translate(_STYLED_ALNUM))
+    text = _INVISIBLE_REGEX.sub(_drop_invisible, text.translate(_STYLED_ALNUM))
+    text = _CIRCLED_RUN_REGEX.sub(_fold_circled_run, text)
     text = _STYLED_JOINER_REGEX.sub(lambda m: unicodedata.normalize('NFKC', m.group()), text)
     text = _URL_RUN_REGEX.sub(lambda m: m.group().translate(_URL_RUN_JOINER), text)
     return _STYLED_EMAIL_RUN_REGEX.sub(lambda m: m.group().translate(_STYLED_EMAIL_RUN_JOINER), text)
