@@ -29,7 +29,7 @@ lm_text, stat_text, lang = result  # backward-compatible 3-tuple unpacking
 - `cleaner.process_batch(texts) -> List[ProcessResult]` — thread-parallel batch
 - `cleaner.aprocess_batch(texts) -> List[ProcessResult]` — async (FastAPI/aiohttp)
 - `cleaner.warmup(languages=None)` — pre-load NER models at startup
-- `ProcessResult.metadata` — always a dict: `regex_counts` and `entity_counts` (`{TYPE: {"count", "chars"}}`, value-free), `language_confidence` (float, 1.0 pinned, None unknown), `language_source` (`pinned`/`detected`/`fallback`/`none`), `warnings` (sorted codes: `language_unknown`, `language_fallback`, `language_low_confidence`, `ner_fallback_models`), plus `anon_map` (reversible mode), `classes` (GLiClass), `findings` (opt-in)
+- `ProcessResult.metadata` — always a dict: `regex_counts` and `entity_counts` (`{TYPE: {"count", "chars"}}`, value-free), `language_confidence` (float, 1.0 pinned, None unknown), `language_source` (`pinned`/`detected`/`fallback`/`none`), `warnings` (sorted codes: `language_unknown`, `language_fallback`, `language_low_confidence`, `ner_fallback_models`, `cuda_fallback`), `provenance` (`{"backend", "models": [{"key", "id", "revision", "provider"}]}` of the NER models run), plus `anon_map` (reversible mode), `classes` (GLiClass), `findings` (opt-in)
 - `sct.adapters.is_sensitive_result(result)` — True when any regex replacement or NER finding was counted
 - `AnonymizationMap.deanonymize(text)` — restore original text from reversible placeholders
 - `AnonymizationMap.to_dict()` / `.from_dict(data)` — serialization for storage
@@ -70,8 +70,8 @@ python -m scripts.benchmark_models \
 ## Privacy Policies and Audit Metadata
 
 Pass `privacy_policy=PrivacyPolicy(...)` and `include_entities=True` to
-`TextCleaner`. `ProcessResult.metadata` then includes policy findings and
-detector model revisions.
+`TextCleaner`. `ProcessResult.metadata` then includes policy findings; model
+revisions are always in `metadata['provenance']`.
 
 Pass `token_store=...` in reversible mode to return an opaque
 `anon_map_reference` instead of the map. Reversible output remains
@@ -118,6 +118,9 @@ gliner_threshold=None               # GLiNER cut (0..1); None = 0.4, or 0.3 in P
 ner_batch_size=8                    # NER chunks per forward pass, batched across process_batch docs; 1 = 0.7.1 pattern
 onnx_intra_op_threads=None          # ONNX Runtime threads per inference (None = ORT default, all cores); set to cap CPU use
 onnx_inter_op_threads=None          # ONNX Runtime inter-op threads (None = ORT default; rarely needed)
+ner_device=None                     # None = auto (CUDA when available) | 'cpu' | 'cuda'
+cuda_device_id=0                    # GPU index for ONNX/torch/GLiNER (and GLiClass with ner_device='cuda')
+onnx_cuda_provider_options=None     # extra CUDAExecutionProvider options, e.g. {'gpu_mem_limit': 8 << 30}
 ner_chunk_overlap=0                 # NER window overlap in tokens per side for long docs (0 = 0.7.1 chunks)
 detect_all_languages=True           # Auto-detect over all 75 Lingua languages; False = 0.7 detector (EN/NL/DE/ES + extras)
 language_confidence_warning=0.5     # metadata warning 'language_low_confidence' below this confidence (0..1, never changes routing)

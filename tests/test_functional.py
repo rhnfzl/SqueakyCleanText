@@ -454,6 +454,7 @@ class TestNERBackends:
         # Placeholder mode: only the value-free counts (no anon_map, no classes)
         assert set(result.metadata) == {
             "regex_counts", "entity_counts", "language_confidence", "language_source", "warnings",
+            "provenance",
         }
 
     def test_d33_batch_processing(self):

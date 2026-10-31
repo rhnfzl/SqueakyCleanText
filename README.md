@@ -318,7 +318,7 @@ import json
 json.dumps(anon_map.to_dict())
 ```
 
-> **Note**: `ProcessResult` from `process()` unpacks as a 3-tuple (`lm_text, stat_text, language`) for backward compatibility, but also exposes `.metadata` for reversible maps and document classification. `metadata` is always a dict with value-free counts: `metadata['regex_counts']` (e.g. `{"EMAIL": {"count": 1, "chars": 17}}`, one entry per regex replacement type) and `metadata['entity_counts']` (NER findings per type, same shape). It also holds `language_confidence` (Lingua top-1 confidence, `1.0` when pinned, `None` when unknown), `language_source` (`pinned`, `detected`, `fallback` when a `language` tuple fell back to its first entry, or `none`) and `warnings`, a sorted list of codes: `language_unknown`, `language_fallback`, `language_low_confidence`, `ner_fallback_models` (the language has no own NER model and ran MULTILINGUAL + ENGLISH).
+> **Note**: `ProcessResult` from `process()` unpacks as a 3-tuple (`lm_text, stat_text, language`) for backward compatibility, but also exposes `.metadata` for reversible maps and document classification. `metadata` is always a dict with value-free counts: `metadata['regex_counts']` (e.g. `{"EMAIL": {"count": 1, "chars": 17}}`, one entry per regex replacement type) and `metadata['entity_counts']` (NER findings per type, same shape). It also holds `language_confidence` (Lingua top-1 confidence, `1.0` when pinned, `None` when unknown), `language_source` (`pinned`, `detected`, `fallback` when a `language` tuple fell back to its first entry, or `none`) and `warnings`, a sorted list of codes: `language_unknown`, `language_fallback`, `language_low_confidence`, `ner_fallback_models` (the language has no own NER model and ran MULTILINGUAL + ENGLISH), `cuda_fallback` (CUDA was requested but a model ran on CPU). `metadata['provenance']` is `{"backend", "models"}`, one `{"key", "id", "revision", "provider"}` entry per NER model that runs for the document's language (`revision` is the resolved Hub commit for ONNX models, `provider` the ONNX execution provider or the torch device); `{"backend": None, "models": []}` when NER is off.
 
 ### Document Classification (GLiClass)
 
@@ -591,6 +591,9 @@ new_cfg = dataclasses.replace(cfg, check_ner_process=False)
 | `ner_batch_size` | `8` | NER chunks per model forward pass, batched across the documents of a `process_batch` call (must be >= 1). `1` = 0.7.1 call pattern and exact scores, and less memory; which is faster depends on the CPU, so measure |
 | `onnx_intra_op_threads` | `None` | ONNX Runtime threads per inference (`None` = ORT default: every physical core, ignoring CPU affinity). Set it to cap CPU use; fewer threads is usually slower |
 | `onnx_inter_op_threads` | `None` | ONNX Runtime inter-op threads (`None` = ORT default). Only matters with ORT parallel execution mode, so `onnx_intra_op_threads` is the usual knob |
+| `ner_device` | `None` | NER device: `None` = auto (CUDA when available), `'cpu'`, `'cuda'`. GLiClass moves to the GPU only with `'cuda'` |
+| `cuda_device_id` | `0` | GPU index for ONNX, torch, GLiNER and GLiClass when on CUDA |
+| `onnx_cuda_provider_options` | `None` | Extra `CUDAExecutionProvider` options, e.g. `{"gpu_mem_limit": 8 << 30}`; passed to ONNX Runtime unchecked |
 | `ner_chunk_overlap` | `0` | Tokens of neighbouring text each NER window adds on both sides, for documents longer than one window (about 460 tokens with the default models). Finds entities that a chunk boundary would split (`John \| Smith`); costs about `2 * overlap / window` more inference and can change recall either way. `0` = 0.7.1 chunks. Must stay below a quarter of the window |
 | `ner_models` | `None` | Language-keyed dict of ONNX model repo IDs |
 | `torch_ner_models` | `None` | Language-keyed dict of PyTorch model repo IDs |
@@ -642,7 +645,7 @@ cleaner = TextCleaner(
 result = cleaner.process("Contact Maria Chen for help.")
 
 print(result.metadata["findings"])
-print(result.metadata["detector"])
+print(result.metadata["provenance"])
 ```
 
 Finding offsets (`start`, `end`) and NER entries in the reversible map are

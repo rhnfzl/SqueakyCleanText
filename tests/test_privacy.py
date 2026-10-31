@@ -96,11 +96,16 @@ def test_privacy_policy_redacts_union_of_overlapping_entities():
 
 def test_text_cleaner_returns_policy_findings(monkeypatch):
     class FakeNER:
+        device = "cpu"
+
         def __init__(self, **kwargs):
             pass
 
         def uses_fallback_models(self, language):
             return False
+
+        def models_for(self, language):
+            return [{"key": "ENGLISH", "id": "m", "revision": "r", "provider": "CPUExecutionProvider"}]
 
         def ner_process_detailed(self, text, *, privacy_policy, **kwargs):
             entity = DetectedEntity("PERSON", 0.95, "Maria", 0, 5)
@@ -146,11 +151,10 @@ def test_text_cleaner_returns_policy_findings(monkeypatch):
 
     assert result.lm_text == "<REDACTED> arrived."
     assert result.metadata["policy"] == {"name": "strict", "version": "2026-09"}
-    assert result.metadata["detector"]["backend"] == "onnx"
-    assert (
-        result.metadata["detector"]["models"]["ENGLISH"]["revision"]
-        == "2c10955af9538d6ff8a68316c5dbfcd0b968761e"
-    )
+    assert result.metadata["provenance"] == {
+        "backend": "onnx",
+        "models": [{"key": "ENGLISH", "id": "m", "revision": "r", "provider": "CPUExecutionProvider"}],
+    }
     assert result.metadata["findings"] == (
         EntityFinding(
             DetectedEntity("PERSON", 0.95, "Maria", 0, 5),
@@ -248,11 +252,16 @@ def test_detailed_processing_maps_normalized_chunk_offsets_to_source():
 
 def test_text_cleaner_stores_reversible_map_externally(monkeypatch):
     class FakeNER:
+        device = "cpu"
+
         def __init__(self, **kwargs):
             pass
 
         def uses_fallback_models(self, language):
             return False
+
+        def models_for(self, language):
+            return [{"key": "ENGLISH", "id": "m", "revision": "r", "provider": "CPUExecutionProvider"}]
 
         def ner_process(self, text, *, anon_map, **kwargs):
             anon_map.add("<PERSON_0>", "Maria", "PERSON", 0, 5)

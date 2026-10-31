@@ -23,8 +23,10 @@ class GLiClassAdapter:
         threshold: float = 0.5,
         classification_type: str = 'single-label',
         onnx: bool = False,
+        device: str = 'cpu',
     ):
         self.model_id = model_id
+        self._device = device
         self.labels = list(labels)
         self.threshold = threshold
         self.classification_type = classification_type
@@ -64,7 +66,7 @@ class GLiClassAdapter:
             model=model,
             tokenizer=tokenizer,
             classification_type=self.classification_type,
-            device='cpu',
+            device=self._device,
         )
 
     def classify(self, text: str) -> List[Dict[str, float]]:

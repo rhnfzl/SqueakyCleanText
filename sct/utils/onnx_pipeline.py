@@ -10,12 +10,13 @@ import hashlib
 import json
 import logging
 import os
+import re
 import shutil
 import sys
 import uuid
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 from urllib.parse import quote
 
 import numpy as np
@@ -100,6 +101,9 @@ class ONNXNERPipeline:
     id2label : Dict[int, str]
         Mapping from model output indices to label strings (e.g. ``{0: "O", 1: "B-PER", …}``).
     """
+
+    provider: Optional[str] = None  # set by load_onnx_ner_model
+    revision: Optional[str] = None
 
     def __init__(self, session: ort.InferenceSession,
                  tokenizer_wrapper: TokenizerWrapper,
@@ -365,6 +369,8 @@ def load_onnx_ner_model(
     revision: Optional[str] = None,
     intra_op_threads: Optional[int] = None,
     inter_op_threads: Optional[int] = None,
+    cuda_device_id: int = 0,
+    cuda_provider_options: Optional[Dict[str, Any]] = None,
 ) -> Tuple[ONNXNERPipeline, TokenizerWrapper]:
     """Download and load an ONNX NER model from HuggingFace Hub.
 
@@ -383,11 +389,14 @@ def load_onnx_ner_model(
         Reduces model size ~4× with a small accuracy trade-off.  Default: ``False``.
     intra_op_threads, inter_op_threads : int, optional
         ONNX Runtime session thread counts. ``None`` keeps the ONNX Runtime default.
+    cuda_device_id, cuda_provider_options
+        GPU index and extra ``CUDAExecutionProvider`` options (passed to ORT unvalidated).
 
     Returns
     -------
     (ONNXNERPipeline, TokenizerWrapper)
-        Ready-to-use pipeline and tokenizer.
+        Ready-to-use pipeline and tokenizer. The pipeline carries ``provider`` (the
+        execution provider that runs it) and ``revision`` (resolved snapshot commit).
     """
     download_kwargs = {}
     if cache_dir:
@@ -397,6 +406,8 @@ def load_onnx_ner_model(
 
     # Download required files
     model_path = hf_hub_download(model_name, 'model.onnx', **download_kwargs)
+    # hub cache layout: .../snapshots/<commit>/model.onnx
+    commit = Path(model_path).parent.name
     config_path = hf_hub_download(model_name, 'config.json', **download_kwargs)
     tokenizer_path = hf_hub_download(model_name, 'tokenizer.json', **download_kwargs)
 
@@ -411,7 +422,7 @@ def load_onnx_ner_model(
         model_path = _colocate_external_data(
             model_path, data_path,
             # Keyed by snapshot commit: a moving branch must not reuse another commit's files.
-            link_base / "sct_linked" / _quantized_dir(model_name, Path(model_path).parent.name),
+            link_base / "sct_linked" / _quantized_dir(model_name, commit),
         )
 
     # Try to get tokenizer_config.json for model_max_length
@@ -450,9 +461,11 @@ def load_onnx_ner_model(
         model_path = str(quantized_path)
 
     # Create ONNX session with appropriate providers
-    providers = []
-    if device == 'cuda' and 'CUDAExecutionProvider' in ort.get_available_providers():
-        providers.append('CUDAExecutionProvider')
+    providers: List[Any] = []
+    cuda_requested = device == 'cuda' and 'CUDAExecutionProvider' in ort.get_available_providers()
+    if cuda_requested:
+        providers.append(('CUDAExecutionProvider',
+                          {'device_id': cuda_device_id, **(cuda_provider_options or {})}))
     providers.append('CPUExecutionProvider')
 
     session_options = ort.SessionOptions()
@@ -477,8 +490,10 @@ def load_onnx_ner_model(
             0,
         )
     pipeline = ONNXNERPipeline(session, wrapper, id2label, pad_id=pad_id)
+    pipeline.provider = session.get_providers()[0]
+    pipeline.revision = commit if re.fullmatch(r'[0-9a-f]{40}', commit) else revision
 
-    if 'CUDAExecutionProvider' in providers and 'CUDAExecutionProvider' not in session.get_providers():
+    if cuda_requested and pipeline.provider != 'CUDAExecutionProvider':
         # ORT drops CUDA silently when the CUDA/cuDNN libraries or the driver do not match.
         logger.warning(
             "ONNX NER model %s runs on CPU: CUDA was requested but could not be loaded. "

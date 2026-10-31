@@ -41,7 +41,12 @@ The onnxruntime-gpu build must match your NVIDIA driver: recent PyPI wheels need
 `onnxruntime.preload_dlls()` before creating the cleaner when CUDA comes from pip packages.
 
 If CUDA cannot be loaded, ONNX Runtime runs on CPU. SCT logs a warning
-("runs on CPU: CUDA was requested") when this happens.
+("runs on CPU: CUDA was requested") and adds `cuda_fallback` to `metadata['warnings']` of
+every result. `metadata['provenance']['models']` names the provider each model ran on.
+
+Pick the GPU with `cuda_device_id` (default 0) and force a device with `ner_device`
+(`None` auto, `"cpu"`, `"cuda"`). `onnx_cuda_provider_options` passes extra
+`CUDAExecutionProvider` options, for example `{"gpu_mem_limit": 8 << 30}`.
 
 | Setup | Workload | 0.7.1 | 0.8.0 | GPU memory (0.8.0 peak) |
 |---|---|---|---|---|
@@ -60,8 +65,8 @@ English-only setup needs about 3 to 5 GB.
 
 ## Known limits
 
-- SCT puts every ONNX model on the first GPU (device 0). There is no option yet to choose
-  the GPU or to spread models over several GPUs. The full-ensemble GPU numbers above spread
+- All models of one cleaner run on one GPU (`cuda_device_id`). There is no option to spread
+  models over several GPUs; run one cleaner per GPU instead. The full-ensemble GPU numbers above spread
   the models over 3 GPUs with a test harness, because 7.6 GB of free memory on one GPU was
   not enough.
 - GPU numbers were measured on a shared machine; your numbers on a free GPU can be higher.

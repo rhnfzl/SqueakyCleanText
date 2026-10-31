@@ -15,7 +15,7 @@ Legacy API (backward compatible):
 import sys
 from dataclasses import dataclass
 from types import MappingProxyType
-from typing import Mapping, Optional, Tuple, Union
+from typing import Any, Mapping, Optional, Tuple, Union
 
 
 LANG_KEYS = ('ENGLISH', 'DUTCH', 'GERMAN', 'SPANISH', 'MULTILINGUAL')
@@ -300,6 +300,9 @@ class TextCleanerConfig:
     detect_all_languages: bool = True  # False = 0.7 detector over supported_languages only
     language_confidence_warning: float = 0.5  # below this, metadata warns language_low_confidence
     check_decode_unicode_escapes: bool = True  # False keeps literal \n, \u00e9 escapes (code, JSON)
+    ner_device: Optional[str] = None  # None = auto (CUDA when available), 'cpu', 'cuda'
+    cuda_device_id: int = 0  # GPU index for ONNX, torch and GLiNER when on CUDA
+    onnx_cuda_provider_options: Optional[Mapping[str, Any]] = None  # extra CUDAExecutionProvider options
 
     def __post_init__(self):
         if self.gliclass_onnx:
@@ -395,6 +398,13 @@ class TextCleanerConfig:
                 raise ValueError(f"{name} must be None or >= 1, got {value}")
         if self.ner_chunk_overlap < 0:
             raise ValueError(f"ner_chunk_overlap must be >= 0, got {self.ner_chunk_overlap}")
+        if self.ner_device not in (None, 'cpu', 'cuda'):
+            raise ValueError(f"ner_device must be None, 'cpu' or 'cuda', got {self.ner_device!r}")
+        if self.cuda_device_id < 0:
+            raise ValueError(f"cuda_device_id must be >= 0, got {self.cuda_device_id}")
+        if self.onnx_cuda_provider_options is not None:
+            object.__setattr__(self, 'onnx_cuda_provider_options',
+                               MappingProxyType(dict(self.onnx_cuda_provider_options)))
         for name in ('ner_confidence_threshold', 'gliner_threshold'):
             value = getattr(self, name)
             if value is not None and not 0.0 <= value <= 1.0:
@@ -620,6 +630,9 @@ def _config_from_module_globals() -> TextCleanerConfig:
         detect_all_languages=getattr(m, 'DETECT_ALL_LANGUAGES', True),
         language_confidence_warning=getattr(m, 'LANGUAGE_CONFIDENCE_WARNING', 0.5),
         check_decode_unicode_escapes=getattr(m, 'CHECK_DECODE_UNICODE_ESCAPES', True),
+        ner_device=getattr(m, 'NER_DEVICE', None),
+        cuda_device_id=getattr(m, 'CUDA_DEVICE_ID', 0),
+        onnx_cuda_provider_options=getattr(m, 'ONNX_CUDA_PROVIDER_OPTIONS', None),
         check_replace_currency_symbols=m.CHECK_REPLACE_CURRENCY_SYMBOLS,
         check_ner_process=m.CHECK_NER_PROCESS,
         check_remove_isolated_letters=m.CHECK_REMOVE_ISOLATED_LETTERS,
@@ -681,6 +694,9 @@ NER_CHUNK_OVERLAP = 0
 DETECT_ALL_LANGUAGES = True
 LANGUAGE_CONFIDENCE_WARNING = 0.5
 CHECK_DECODE_UNICODE_ESCAPES = True
+NER_DEVICE = None
+CUDA_DEVICE_ID = 0
+ONNX_CUDA_PROVIDER_OPTIONS = None
 CHECK_REPLACE_CURRENCY_SYMBOLS = True
 CHECK_NER_PROCESS = True
 CHECK_REMOVE_ISOLATED_LETTERS = True

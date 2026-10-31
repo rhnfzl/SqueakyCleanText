@@ -66,7 +66,7 @@ class TorchNERPipeline:
 
     def cleanup(self):
         """Release GPU memory."""
-        if self._device == 'cuda':
+        if self._device.startswith('cuda'):
             try:
                 self._torch.cuda.empty_cache()
             except Exception:  # noqa: S110

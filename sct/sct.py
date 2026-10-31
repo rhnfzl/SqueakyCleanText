@@ -122,6 +122,12 @@ class TextCleaner:
                 torch_model_names = dict(self.cfg.torch_ner_models) if self.cfg.torch_ner_models else None
 
             self.GeneralNER = ner.GeneralNER(
+                device=self.cfg.ner_device,
+                cuda_device_id=self.cfg.cuda_device_id,
+                onnx_cuda_provider_options=(
+                    dict(self.cfg.onnx_cuda_provider_options)
+                    if self.cfg.onnx_cuda_provider_options else None
+                ),
                 model_names=dict(self.cfg.ner_models) if self.cfg.ner_models else None,
                 model_revisions=(
                     dict(self.cfg.ner_model_revisions)
@@ -159,6 +165,8 @@ class TextCleaner:
                 threshold=self.cfg.gliclass_threshold,
                 classification_type=self.cfg.gliclass_classification_type,
                 onnx=self.cfg.gliclass_onnx,
+                # Auto stays on CPU (0.7 behaviour); only an explicit 'cuda' moves GLiClass.
+                device=f"cuda:{self.cfg.cuda_device_id}" if self.cfg.ner_device == 'cuda' else 'cpu',
             )
 
         self._pipeline: List[Callable[[str], str]] = []
@@ -371,15 +379,23 @@ class TextCleaner:
         if (language_source == 'detected'
                 and language_confidence < self.cfg.language_confidence_warning):
             warnings.add('language_low_confidence')
-        if (self.cfg.check_ner_process and self.GeneralNER is not None
-                and self.GeneralNER.uses_fallback_models(language)):
+        ner_on = self.cfg.check_ner_process and self.GeneralNER is not None
+        if ner_on and self.GeneralNER.uses_fallback_models(language):
             warnings.add('ner_fallback_models')
+        models = self.GeneralNER.models_for(language) if ner_on else []
+        if any(m['provider'] == 'CPUExecutionProvider' for m in models) \
+                and self.GeneralNER.device == 'cuda':
+            warnings.add('cuda_fallback')
         metadata: Dict[str, Any] = {
             'regex_counts': regex_counts,
             'entity_counts': entity_counts,
             'language_confidence': language_confidence,
             'language_source': language_source,
             'warnings': sorted(warnings),
+            'provenance': {
+                'backend': self.cfg.ner_backend if ner_on else None,
+                'models': models,
+            },
         }
         if anon_map is not None:
             if self._token_store is not None:
@@ -395,43 +411,6 @@ class TextCleaner:
             }
         if self._include_entities or self._privacy_policy is not None:
             metadata['findings'] = findings
-            detector_models: Dict[str, Dict[str, Optional[str]]] = {}
-            if self.cfg.ner_backend in ('onnx', 'ensemble_onnx'):
-                detector_models.update({
-                    key: {
-                        'id': model_id,
-                        'revision': (
-                            self.cfg.ner_model_revisions or {}
-                        ).get(key),
-                    }
-                    for key, model_id in (
-                        self.cfg.ner_models or {}
-                    ).items()
-                })
-            if self.cfg.ner_backend in ('torch', 'ensemble_torch'):
-                detector_models.update({
-                    key: {
-                        'id': model_id,
-                        'revision': (
-                            self.cfg.torch_ner_model_revisions or {}
-                        ).get(key),
-                    }
-                    for key, model_id in (
-                        self.cfg.torch_ner_models or {}
-                    ).items()
-                })
-            if (
-                self.cfg.ner_backend in GLINER_BACKENDS
-                or self.cfg.ner_backend == 'presidio_gliner'
-            ):
-                detector_models['GLINER'] = {
-                    'id': self.cfg.gliner_model,
-                    'revision': self.cfg.gliner_revision,
-                }
-            metadata['detector'] = {
-                'backend': self.cfg.ner_backend,
-                'models': detector_models,
-            }
 
         if self._metrics_callback is not None:
             self._metrics_callback(ProcessingMetrics(

@@ -77,7 +77,9 @@ class GeneralNER:
                  synthetic_replacer=None,
                  onnx_intra_op_threads: Optional[int] = None,
                  onnx_inter_op_threads: Optional[int] = None,
-                 ner_chunk_overlap: int = 0):
+                 ner_chunk_overlap: int = 0,
+                 cuda_device_id: int = 0,
+                 onnx_cuda_provider_options: Optional[Dict] = None):
         """Initialize NER processor.
 
         Args:
@@ -96,6 +98,8 @@ class GeneralNER:
                 thread counts; None keeps the ONNX Runtime default.
             ner_chunk_overlap: Tokens of neighbouring text each NER window adds on
                 both sides of its chunk; 0 keeps the 0.7.1 chunks.
+            cuda_device_id: GPU index used when *device* resolves to CUDA.
+            onnx_cuda_provider_options: Extra ``CUDAExecutionProvider`` options.
         """
         self._ner_backend = ner_backend
         self._ner_batch_size = ner_batch_size
@@ -106,6 +110,10 @@ class GeneralNER:
         self._torch_model_revisions = dict(torch_model_revisions or {})
         self._onnx_intra_op_threads = onnx_intra_op_threads
         self._onnx_inter_op_threads = onnx_inter_op_threads
+        self._cuda_device_id = cuda_device_id
+        self._onnx_cuda_provider_options = dict(onnx_cuda_provider_options or {})
+        # Per language key: {"key", "id", "revision", "provider"} of the model that key loaded.
+        self._provenance: Dict[str, Dict[str, Optional[str]]] = {}
         self._gliner_pipe = None
         self._ensemble_models: Dict[str, tuple] = ensemble_models if ensemble_models is not None else DEFAULT_NER_ENSEMBLE
         self._ensemble_default_keys: tuple = (
@@ -127,7 +135,9 @@ class GeneralNER:
             self.device = 'cuda'
         else:
             self.device = 'cpu'
-        logger.info("Using device: %s (backend: %s)", self.device, ner_backend)
+        # Torch and GLiNER take an indexed device string; ONNX gets the index as a provider option.
+        self._torch_device = f"cuda:{cuda_device_id}" if self.device == 'cuda' else self.device
+        logger.info("Using device: %s (backend: %s)", self._torch_device, ner_backend)
 
         self.engine = AnonymizerEngine()
         self._cache_args = {"cache_dir": str(cache_dir)} if cache_dir else {}
@@ -193,9 +203,18 @@ class GeneralNER:
                 threshold=gliner_config.get('threshold', 0.4),
                 label_map=gliner_config.get('label_map'),
                 label_descriptions=gliner_config.get('label_descriptions'),
-                device=self.device,
+                device=self._torch_device,
                 onnx=gliner_config.get('onnx', False),
             )
+        if gliner_config and ner_backend in ('gliner', 'ensemble_onnx', 'ensemble_torch',
+                                             'presidio_gliner'):
+            onnx_gliner = self._gliner_pipe is not None and self._gliner_pipe._onnx
+            self._provenance['GLINER'] = {
+                'key': 'GLINER', 'id': gliner_config['model'],
+                'revision': gliner_config.get('revision'),
+                'provider': 'onnx' if onnx_gliner or ner_backend == 'presidio_gliner'
+                else self._torch_device,
+            }
 
         if ner_backend != 'presidio_gliner' and ner_chunk_overlap:
             self._check_overlap(self._chunk_budget())
@@ -331,6 +350,7 @@ class GeneralNER:
                 )
                 if shared_tok is not None:
                     self._tokenizers[lang_key] = shared_tok
+                self._record_provenance(lang_key, shared_pipe)
                 self._pipelines[lang_key] = shared_pipe
                 return
             try:
@@ -338,7 +358,7 @@ class GeneralNER:
                 if self._ner_backend in ('torch', 'ensemble_torch'):
                     from sct.utils.torch_pipeline import load_torch_ner_model
                     pipeline_obj, tok = load_torch_ner_model(
-                        model_name, device=self.device,
+                        model_name, device=self._torch_device,
                         cache_dir=self._cache_args.get("cache_dir"),
                         revision=self._torch_model_revisions.get(lang_key),
                     )
@@ -350,14 +370,37 @@ class GeneralNER:
                         revision=self._model_revisions.get(lang_key),
                         intra_op_threads=self._onnx_intra_op_threads,
                         inter_op_threads=self._onnx_inter_op_threads,
+                        cuda_device_id=self._cuda_device_id,
+                        cuda_provider_options=self._onnx_cuda_provider_options,
                     )
                 self._tokenizers[lang_key] = tok
+                self._record_provenance(lang_key, pipeline_obj)
                 self._pipelines[lang_key] = pipeline_obj
             except Exception as e:
                 logger.error("Failed to load model for %s: %s", lang_key, e)
                 raise ModelLoadError(
                     f"Model loading failed for {lang_key} ({model_name}): {e}"
                 )
+
+    def _record_provenance(self, lang_key: str, pipe) -> None:
+        """Remember which model, revision and provider *lang_key* runs (own dict per key)."""
+        model_name, revision = self._model_key(lang_key)
+        self._provenance[lang_key] = {
+            'key': lang_key,
+            'id': model_name,
+            'revision': getattr(pipe, 'revision', None) or revision,
+            # ONNX pipelines report their execution provider; torch runs on its device.
+            'provider': getattr(pipe, 'provider', None) or self._torch_device,
+        }
+
+    def models_for(self, language: Optional[str]) -> List[Dict[str, Optional[str]]]:
+        """Provenance of the loaded models that NER runs for *language* (copies)."""
+        keys: tuple = ()
+        if self._ner_backend in ('onnx', 'torch', 'ensemble_onnx', 'ensemble_torch'):
+            keys = self._get_ensemble_keys(language or 'MULTILINGUAL')
+        if 'GLINER' in self._provenance:
+            keys += ('GLINER',)
+        return [dict(self._provenance[k]) for k in keys if k in self._provenance]
 
     def _get_pipeline(self, lang_key: str):
         """Get the NER pipeline for a language, loading it if needed."""

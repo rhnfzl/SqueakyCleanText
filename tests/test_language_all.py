@@ -209,6 +209,7 @@ def test_gliner_hindi_pin_runs(monkeypatch):
         ner._ensemble_models = {}
         ner._ensemble_default_keys = ()
         ner._model_names = {}
+        ner._provenance = {}
         ner.tokenizer = None
         return ner
 

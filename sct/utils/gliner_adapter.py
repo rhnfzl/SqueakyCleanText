@@ -66,8 +66,8 @@ class GLiNERAdapter:
                     self._onnx = False
             else:
                 self.model = GLiNER.from_pretrained(model_id, **load_kwargs)
-            if device == 'cuda' and not onnx:
-                self.model = self.model.to('cuda')
+            if device.startswith('cuda') and not onnx:
+                self.model = self.model.to(device)
 
         elif variant == 'gliner2':
             try:
