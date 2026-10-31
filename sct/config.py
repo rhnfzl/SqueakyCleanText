@@ -307,6 +307,10 @@ class TextCleanerConfig:
     # process_json keys: 'pii' = regex PII steps only (NER tags lone words like 'message' out of context),
     # 'pii_ner' = PII steps plus NER, 'full' = whole config (0.7), 'off' = raw
     json_key_cleaning: str = 'pii'
+    synthetic_seed: int = 42  # base seed for replacement_mode='synthetic'
+    # True: fakes seeded per document from synthetic_seed + its text (differ across documents,
+    # same document -> same fakes); False = 0.7 single Faker stream per thread
+    synthetic_per_document: bool = True
 
     def __post_init__(self):
         if self.gliclass_onnx:
@@ -644,6 +648,8 @@ def _config_from_module_globals() -> TextCleanerConfig:
         cuda_device_id=getattr(m, 'CUDA_DEVICE_ID', 0),
         onnx_cuda_provider_options=getattr(m, 'ONNX_CUDA_PROVIDER_OPTIONS', None),
         json_key_cleaning=getattr(m, 'JSON_KEY_CLEANING', 'pii'),
+        synthetic_seed=getattr(m, 'SYNTHETIC_SEED', 42),
+        synthetic_per_document=getattr(m, 'SYNTHETIC_PER_DOCUMENT', True),
         check_replace_currency_symbols=m.CHECK_REPLACE_CURRENCY_SYMBOLS,
         check_ner_process=m.CHECK_NER_PROCESS,
         check_remove_isolated_letters=m.CHECK_REMOVE_ISOLATED_LETTERS,
@@ -739,6 +745,8 @@ POSITIONAL_TAGS = ['PER', 'LOC', 'ORG', 'MISC']
 NER_CONFIDENCE_THRESHOLD = None  # None = 0.85, or the GLiNER threshold in PII mode
 NER_MODE = 'standard'
 REPLACEMENT_MODE = 'placeholder'
+SYNTHETIC_SEED = 42
+SYNTHETIC_PER_DOCUMENT = True
 GLINER_ONNX = False
 LANGUAGE = None
 

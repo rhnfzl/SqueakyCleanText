@@ -3,6 +3,7 @@
 Thread-safe: uses threading.local() for both Faker instances and consistency
 caches, so parallel batch processing in TextCleaner has no shared mutable state.
 """
+import hashlib
 import logging
 import threading
 from typing import Dict, Optional
@@ -48,16 +49,28 @@ FAKER_GENERATORS: Dict[str, str] = {
 }
 
 
+class _DocumentCache(dict):
+    """Per-document ``(entity_group, original) -> fake`` map; ``seed`` set in per-document mode."""
+
+    seed: Optional[int] = None
+
+
 class SyntheticReplacer:
     """Generate synthetic replacements for detected entities using Faker.
 
     Thread-safe: each thread gets its own Faker instance and consistency cache
-    via ``threading.local()``. Call ``reset_cache()`` at the start of each
+    via ``threading.local()``. Call ``reset_cache(text)`` at the start of each
     document to ensure consistency within (but not across) documents.
+
+    ``per_document=True`` derives each fake from *seed*, the document text and
+    the fake's ordinal in the document, so fakes differ across documents yet the
+    same document always gets the same fakes, whatever the thread, worker or
+    batch order. ``False`` is the 0.7 behaviour: one Faker stream per thread.
     """
 
-    def __init__(self, seed: int = 42):
+    def __init__(self, seed: int = 42, per_document: bool = True):
         self._seed = seed
+        self._per_document = per_document
         self._local = threading.local()
 
     def _get_faker(self):
@@ -74,10 +87,15 @@ class SyntheticReplacer:
             self._local.faker.seed_instance(self._seed)
         return self._local.faker
 
-    def reset_cache(self) -> None:
-        """Clear per-document consistency cache. Call at start of each document."""
-        if hasattr(self._local, 'cache'):
-            self._local.cache.clear()
+    def reset_cache(self, text: Optional[str] = None) -> None:
+        """Start a document: fresh consistency cache, fakes seeded from *text*."""
+        self._local.cache = _DocumentCache()
+        if self._per_document and text is not None:
+            digest = hashlib.blake2b(
+                text.encode('utf-8', 'surrogatepass'), digest_size=8,
+                key=str(self._seed).encode(),
+            ).digest()
+            self._local.cache.seed = int.from_bytes(digest, 'big')
 
     def swap_cache(self, cache: Optional[Dict[tuple, str]] = None) -> Dict[tuple, str]:
         """Install *cache* (default: a new one) for this thread; return the previous one.
@@ -85,13 +103,13 @@ class SyntheticReplacer:
         Lets a document's cache move between threads and processing stages.
         """
         previous = self._get_cache()
-        self._local.cache = {} if cache is None else cache
+        self._local.cache = _DocumentCache() if cache is None else cache
         return previous
 
     def _get_cache(self) -> Dict[tuple, str]:
         """Get or create the thread-local consistency cache."""
         if not hasattr(self._local, 'cache'):
-            self._local.cache = {}
+            self._local.cache = _DocumentCache()
         return self._local.cache
 
     def get_replacement(self, entity_group: str, original_text: str) -> str:
@@ -106,6 +124,11 @@ class SyntheticReplacer:
             return cache[cache_key]
 
         fake = self._get_faker()
+        doc_seed = getattr(cache, 'seed', None)
+        if doc_seed is not None:
+            # The ordinal travels with the cache, so a document's fakes do not
+            # depend on which thread or stage generates them.
+            fake.seed_instance(doc_seed + len(cache))
         method_name = FAKER_GENERATORS.get(entity_group)
 
         if method_name and hasattr(fake, method_name):

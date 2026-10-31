@@ -612,6 +612,8 @@ new_cfg = dataclasses.replace(cfg, check_ner_process=False)
 | `ner_backend` | `'onnx'` | Backend: `onnx`, `torch`, `gliner`, `ensemble_onnx`, `ensemble_torch`, `presidio_gliner` |
 | `ner_mode` | `'standard'` | `'standard'` or `'pii'` (auto-configures GLiNER for PII detection) |
 | `replacement_mode` | `'placeholder'` | `'placeholder'`, `'synthetic'` (Faker), or `'reversible'` (indexed placeholders + deanonymize map) |
+| `synthetic_seed` | `42` | Base seed for `replacement_mode='synthetic'` |
+| `synthetic_per_document` | `True` | Seed each document's fakes from `synthetic_seed` + its text: fakes differ across documents, the same document always gets the same fakes (any worker count or order). `False` = 0.7: one Faker stream per thread, so batched documents could all get the same first fake |
 | `positional_tags` | `('PER', 'LOC', 'ORG', 'MISC')` | Entity types to recognize |
 | `ner_confidence_threshold` | `None` | Minimum confidence score (0..1). `None` = 0.85, or the GLiNER threshold in PII mode; an explicit value is always used as given |
 | `ner_batch_size` | `8` | NER chunks per model forward pass, batched across the documents of a `process_batch` call (must be >= 1). `1` = 0.7.1 call pattern and exact scores, and less memory; which is faster depends on the CPU, so measure |

@@ -91,7 +91,9 @@ class TextCleaner:
         self._synthetic_replacer = None
         if self.cfg.replacement_mode == 'synthetic':
             from sct.utils.synthetic import SyntheticReplacer
-            self._synthetic_replacer = SyntheticReplacer()
+            self._synthetic_replacer = SyntheticReplacer(
+                seed=self.cfg.synthetic_seed, per_document=self.cfg.synthetic_per_document,
+            )
 
         self.GeneralNER: Optional[ner.GeneralNER] = None
         if self.cfg.check_ner_process:
@@ -314,7 +316,7 @@ class TextCleaner:
 
         # Reset per-document synthetic consistency cache (thread-safe via threading.local)
         if self._synthetic_replacer:
-            self._synthetic_replacer.reset_cache()
+            self._synthetic_replacer.reset_cache(text)
 
         # Per-document anonymization map (reversible mode only)
         anon_map = None
