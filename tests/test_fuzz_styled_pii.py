@@ -9,17 +9,14 @@ import pytest
 
 from scripts.fuzz_styled_pii import check_case, fold, make_case, render
 
-# Open clusters (fuzz round 1, research/0.8.0-fuzz-round1.md) -> first seed that still shows them.
-# A lone enclosed number at the edge of a digit-group run ("093 622 17 ㉝") reads like a list
-# marker beside a number ("① 2024年"), so it is left unfolded; xfail(strict=True) until fixed.
-KNOWN_CLUSTERS = {
+# Open clusters (research/0.8.0-fuzz-round*.md) -> first seed that still shows them; xfail(strict=True).
+KNOWN_CLUSTERS = {}
+# Fixed clusters (rounds 0-2) -> first seed that showed them on the old code; they must stay fixed.
+FIXED_CLUSTERS = {
     "leak|PHONE|enclosed_pair|placeholder": 48,
     "leak|PHONE|enclosed_pair|reversible": 48,
     "leak|PHONE|enclosed_pair|stream": 48,
     "leak|PHONE|enclosed_pair|synthetic": 48,
-}
-# Fixed clusters (rounds 0-1) -> first seed that showed them on the old code; they must stay fixed.
-FIXED_CLUSTERS = {
     "leak|EMAIL|enclosed_alnum+native_digit+wide_sep|placeholder": 2834,
     "leak|EMAIL|enclosed_alnum+native_digit+wide_sep|reversible": 2834,
     "leak|EMAIL|enclosed_alnum+native_digit+wide_sep|stream": 2834,

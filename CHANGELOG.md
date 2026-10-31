@@ -188,6 +188,7 @@ Haystack), score columns and data cards (`sct-report`), a reworked MCP server an
 - With `ner_sees_tags`, a regex value stays hidden through the cleanup steps, so a tag they remove (`replace_with_email="[EMAIL]"` under bracket removal) no longer loses the value in reversible mode. A forked child gets a fresh synthetic random lock. `llms.txt` lists the current `check_replace_dates`, `language_confidence_warning` and `language_margin_warning` defaults.
 - With `ner_sees_tags` in reversible mode, a display marker that is part of an NER placeholder (`replace_with_email="PERSON"` beside `<PERSON_0>`) is no longer counted inside that placeholder, so the email is restored; before, deanonymize returned the bare marker.
 - Fuzz round 1 (`scripts/fuzz_styled_pii.py`, 6000 seeds; `research/0.8.0-fuzz-round1.md`): with `fold_styled_characters=True` every compatibility form of contact punctuation is folded by one table built from Unicode data (decomposition `<wide>`, `<small>` or `<font>` with NFKC in `@ . - _ + : / ? = & # % ~`), so small forms (`john﹫example﹒com`, `214﹒44﹒189﹒208`, `http﹕//...﹖q﹦...`, `018﹣2896`, `﹢31 ...`) and the font plus `﬩` are replaced like full-width ones; a run may mix forms (`http：/／x`) and folds between digits of any script (`١٩٢．١٦٨`); a word that ends in a combining mark counts as a word before `＠`/`．` (`https://ळौछनै．de/...`); a circled number folds beside any decimal digit or contact punctuation in any form and between space-separated digit groups (`06 ⑬ 01 68 36`); a plus form folds before any decimal digit.
+- Fuzz round 2 (9000 seeds; `research/0.8.0-fuzz-round2.md`): with `fold_styled_characters=True` a lone circled number after two or more space-separated digit groups folds as the last group (`093 622 17 ㉝`, `06 73 86 88 ㊺`), so the phone is replaced; a lone one before a number stays a list marker (`① 2024年`).
 - Email local parts take ZWNJ/ZWJ as domain labels do (`प्\u200dॄघप@example.org` was not matched at all).
 - A URL scheme glued to CJK/Thai letters is matched (`เว็บhttps://...`); only an ASCII letter, digit, `_`, `/` or `.` before it blocks a match.
 - A URL path or query ends at CJK and full-width prose punctuation (`，。！（ ・`; full-width URL syntax `／？＃％＆＠：．－＿` excepted), so CJK prose glued after a URL is no longer swallowed with a phone after it (`...?q=zz（備考）！06 08 66 90 80` left `08 66 90 80`).
@@ -209,7 +210,6 @@ Haystack), score columns and data cards (`sct-report`), a reworked MCP server an
 - An unpinned NER model makes one Hub request per worker when the parent never loaded it before forking; pin `ner_model_revisions` or set `HF_HUB_OFFLINE=1`.
 - With an empty regex marker (`replace_with_email=""`) and `ner_sees_tags`, NER in synthetic/reversible mode reads the indexed placeholder or fake, not the empty text placeholder mode leaves, so its findings can differ there.
 - CI does not install the `mcp` extra; FastMCP-only tests skip there.
-- A lone enclosed number at the edge of a digit-group run (`093 622 17 ㉝`) stays, since it reads like a list marker beside a number (`① 2024年`); the phone leaks its other groups (fuzz round 1, 26 of 6000 seeds).
 
 ## 0.7.1 - 2026-10-30
 

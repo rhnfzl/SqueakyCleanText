@@ -83,15 +83,18 @@ _STYLED_EMAIL_RUN_REGEX = re.compile(
 _STYLED_EMAIL_RUN_JOINER = str.maketrans({ch: plain for ch, plain in _STYLED_SEP.items() if plain in '@.-_+'})
 
 
-# A lone circled number between space-separated digit groups (06 ⑬ 01 68) is one group of them.
+# A lone circled number between space-separated digit groups (06 ⑬ 01 68) or after two or more of
+# them (06 73 86 88 ㊺) is one group of them; a lone one before a number (① 2024年) is a list marker.
 _DIGIT_GROUP = '(?:\\d|[%s])' % ''.join(chr(cp) for cp, plain in _CIRCLED_ALNUM.items() if plain.isdigit())
 _DIGIT_BEFORE, _DIGIT_AFTER = re.compile(_DIGIT_GROUP + ' '), re.compile(' ' + _DIGIT_GROUP)
+_GROUPS_BEFORE = re.compile(rf'(?:{_DIGIT_GROUP}+ ){{2,}}\Z')
 
 
 def _fold_circled_run(m):
     s, a, b = m.string, m.start(), m.end()
     if b - a > 1 or (a and _RUN_NEIGHBOUR.match(s, a - 1)) or (b < len(s) and _RUN_NEIGHBOUR.match(s, b)) or (
-            a > 1 and _DIGIT_BEFORE.match(s, a - 2) and _DIGIT_AFTER.match(s, b)):
+            a > 1 and _DIGIT_BEFORE.match(s, a - 2) and _DIGIT_AFTER.match(s, b)) or (
+            _GROUPS_BEFORE.search(s, max(0, a - 64), a)):
         return m.group().translate(_CIRCLED_ALNUM)
     return m.group()
 
