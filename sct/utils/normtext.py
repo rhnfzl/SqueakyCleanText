@@ -78,6 +78,8 @@ _DASHES = re.escape(''.join(chr(cp) for cp in range(0x110000) if unicodedata.cat
 # A circled run folds beside ASCII alnum, any decimal digit (⑩꤈), any dash (2026\u2013⑩) or contact
 # punctuation in any form.
 _RUN_NEIGHBOUR = re.compile(rf'[0-9A-Za-z{_PUNCT_ANY}{_DASHES}]|\d')
+# Phone parentheses in any form (+49（30）123456).
+_PARENS = re.escape('()' + ''.join(constants.PHONE_PARENS))
 # URL/email/phone/date punctuation in compatibility form folds between ASCII letters or digits of
 # any script (a run may mix forms: http：/／x); contact syntax also beside letters of any script:
 # ＠ between letters/digits, ． with an ASCII side (例え．jp) and a ：／／ scheme after ASCII letters (https：／／例え.jp).
@@ -91,23 +93,25 @@ _STYLED_JOINER_REGEX = re.compile(
 # whatever script the host is in (https://例え.テスト？email=...), and so do dots in the host
 # (https://例え．テスト/), so the whole URL, query values included, is one match.
 # CJK and full-width prose punctuation (，、「) ends the run, as it ends URL_REGEX, so prose glued after keeps
-# its ：; an IDNA dot before an ASCII letter or digit (例え。jp) stays in it.
+# its ：; an IDNA dot before an ASCII letter or digit (例え。jp) and punctuation before an @ (user info
+# https://alice:pass！＠example.com) stay in it.
 _URL_RUN_REGEX = re.compile(
-    rf'(?:[A-Za-z][A-Za-z0-9+.\-]*://|(?<![A-Za-z0-9_/.{_forms(".")}])www\d{{0,3}}(?:[.{_forms(".")}]|{_IDNA_DOT}))(?:[^\s{constants._WIDE_PUNCT}]|{_IDNA_DOT})+',
+    rf'(?:[A-Za-z][A-Za-z0-9+.\-]*://|(?<![A-Za-z0-9_/.{_forms(".")}])www\d{{0,3}}(?:[.{_forms(".")}]|{_IDNA_DOT}))(?:[^\s{constants._WIDE_PUNCT}]|{_IDNA_DOT}|[{constants._WIDE_PUNCT}]+(?=[@{_forms("@")}]))+',
     re.IGNORECASE)
 _URL_RUN_JOINER = str.maketrans({ch: plain for ch, plain in _STYLED_SEP.items() if plain in ':/?=&#%~'})
 # Dots fold only in a host (up to the path), so prose glued after a URL keeps its ．; a run may hold
 # several URLs glued by CJK prose, each with its own host (a host ends where the next scheme starts, so
-# 。 before a glued https:// stays a sentence end).
+# 。 before a glued https:// stays a sentence end). ＠ folds there too, after any userinfo character
+# (https://alice:pass!＠example.com).
 _URL_AUTHORITY = re.compile(rf'(?:[A-Za-z][A-Za-z0-9+.\-]*://|www\d{{0,3}}(?:[.{_forms(".")}]|{_IDNA_DOT}))'
                             r'(?:(?![A-Za-z][A-Za-z0-9+.\-]*://)[^/?#])*', re.IGNORECASE)
-_DOT_JOINER = str.maketrans({ch: plain for ch, plain in _STYLED_SEP.items() if plain == '.'})
+_AUTHORITY_JOINER = str.maketrans({ch: plain for ch, plain in _STYLED_SEP.items() if plain in '.@'})
 
 
 def _fold_url_run(m):
     # layout hints drop in the authority as in a mail domain (https://例\u200bえ.jp)
     return _URL_AUTHORITY.sub(
-        lambda a: _IDNA_DOT_REGEX.sub('.', a.group().translate(_DOT_JOINER)).translate(_DOMAIN_HINTS),
+        lambda a: _IDNA_DOT_REGEX.sub('.', a.group().translate(_AUTHORITY_JOINER)).translate(_DOMAIN_HINTS),
         m.group().translate(_URL_RUN_JOINER))
 # Inside an address-shaped run every styled form of @ . - _ + folds (the full-width-only rule above, widened).
 _STYLED_EMAIL_RUN_REGEX = re.compile(
@@ -127,13 +131,14 @@ def _fold_styled_email_run(m):
 
 
 # Invisible format characters (category Cf: ZWSP, word joiner, soft hyphen, bidi marks) beside a
-# contact-run character (ASCII alnum, any decimal digit, circled alnum, contact punctuation in any
-# form) are line-break or layout hints copied with the text ("06\u00ad12" reads "0612"): a run of
+# contact-run character (ASCII alnum, any decimal digit, circled alnum, contact punctuation or a phone
+# parenthesis in any form) are line-break or layout hints copied with the text ("06\u00ad12" reads "0612"): a run of
 # them drops when its other side is a run character, a letter of any script (例え\u200b．jp), a space
 # ("06\u200b 12") or the text edge. Between two other letters they stay (ZWNJ in Persian, ZWSP
 # between Thai words).
 _INVISIBLE_REGEX = re.compile(f'[{_FORMAT_CHARS}]+')
-_RUN_CHAR = re.compile('[A-Za-z\\d%s%s%s%s]' % (''.join(map(chr, _CIRCLED_ALNUM)), _PUNCT_ANY, _DASHES, _IDNA_DOTS))
+_RUN_CHAR = re.compile('[A-Za-z\\d%s%s%s%s%s]' % (''.join(map(chr, _CIRCLED_ALNUM)), _PUNCT_ANY, _DASHES, _IDNA_DOTS,
+                                                   _PARENS))
 _LETTER = re.compile(rf'[^\W_]|[{constants.MARKS}]')
 
 
@@ -157,12 +162,16 @@ _DIGIT_BEFORE, _DIGIT_AFTER = re.compile(_DIGIT_GROUP + _SPACE), re.compile(_SPA
 _GROUPS_BEFORE = re.compile(rf'(?:{_DIGIT_GROUP}+{_SPACE}){{2,}}\Z')
 # An IDNA dot after a decimal digit is a host label dot (𖭗𖭗｡⑫｡15.example), so a circled run after it folds.
 _IDNA_DOT_AFTER_DIGIT = re.compile(rf'\d[{_IDNA_DOTS}]')
+# A circled run in parentheses glued to a digit group is an area code (+80（⑫）808).
+_OPEN_AFTER_DIGIT = re.compile(rf'{_DIGIT_GROUP}[{_PARENS}]')
+_CLOSE_BEFORE_DIGIT = re.compile(rf'[{_PARENS}]{_DIGIT_GROUP}')
 
 
 def _fold_circled_run(m):
     s, a, b = m.string, m.start(), m.end()
     if b - a > 1 or (a and _RUN_NEIGHBOUR.match(s, a - 1)) or (b < len(s) and _RUN_NEIGHBOUR.match(s, b)) or (
             a > 1 and _IDNA_DOT_AFTER_DIGIT.match(s, a - 2)) or (
+            a > 1 and _OPEN_AFTER_DIGIT.match(s, a - 2)) or _CLOSE_BEFORE_DIGIT.match(s, b) or (
             a > 1 and _DIGIT_BEFORE.match(s, a - 2) and _DIGIT_AFTER.match(s, b)) or (
             _GROUPS_BEFORE.search(s, max(0, a - 64), a)):
         return m.group().translate(_CIRCLED_ALNUM)

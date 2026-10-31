@@ -114,6 +114,12 @@ EMAIL_REGEX = re.compile(
     flags=re.IGNORECASE | re.UNICODE,
 )
 
+# Area-code parentheses in compatibility form (full-width （ ）, small ﹙ ﹚): the phone view reads them as
+# "(" ")" (+49（30）123456) and the styled fold treats them as phone punctuation.
+PHONE_PARENS = {ch: unicodedata.normalize('NFKC', ch) for ch in map(chr, range(0x80, 0x20000))
+                if unicodedata.decomposition(ch).split(' ', 1)[0] in ('<wide>', '<small>')
+                and unicodedata.normalize('NFKC', ch) in '()'}
+
 # Digit boundaries are "not next to a digit", so numbers glued to letters of
 # any script (``电话9876543210``, ``फोन9876543210पर``) are still found.
 PHONE_REGEX = re.compile(
@@ -131,9 +137,10 @@ PHONE_REGEX = re.compile(
     # 3-3-3 national numbers (699 123 456, 912 345 678); a space-grouped 9-digit amount reads as one too
     r"|(?<![\d_)])(?<!\d[ .,])\d{3}[ .-]\d{3}[ .-]\d{3}(?![\d_]|[ .,]\d)"
     # International: "+" then at least 8 digits in groups (+34 612 345 678, +91 98765 43210)
-    # Area-code parentheses must be balanced, so a closing ")" of the sentence stays.
+    # Area-code parentheses must be balanced, so a closing ")" of the sentence stays;
+    # a bracket glued after the number ends it unless digits follow (+49 30 1234567（電話）).
     r"|(?<![\d+])\+(?=(?:[ .()-]{0,2}\d){8})\d{1,3}(?:[ .-]?(?:\(\d{1,5}\)|\d{1,5})){1,5}"
-    r"(?:\s?(?:ext\.?|[#x])\s?\d{2,6})?(?![\d_(])"
+    r"(?:\s?(?:ext\.?|[#x])\s?\d{2,6})?(?![\d_]|\(\d)"
 )
 
 # IPv4 and IPv6 (incl. "::" forms and IPv4-mapped tails). Runs before the

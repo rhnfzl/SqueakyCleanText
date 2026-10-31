@@ -11,9 +11,11 @@ _DIGIT_VIEW = {cp: str(unicodedata.decimal(chr(cp))) for cp in range(0x80, 0x200
 _DIGIT_VIEW.update({0xFF0E: '.', 0xFF0D: '-', 0x3000: ' '})
 # fold_styled_characters: phones also see every other space (Zs: no-break, thin, narrow no-break) as
 # " " and every dash (Pd: hyphen, non-breaking hyphen, en dash) as "-", as word processors and PDFs
-# set digit groups (06\u00a012\u00a034, 06\u201112345678); the source text keeps them.
+# set digit groups (06\u00a012\u00a034, 06\u201112345678), and full-width or small area-code
+# parentheses as "(" ")" (+49（30）123456); the source text keeps them.
 SEPARATOR_VIEW = {**_DIGIT_VIEW, **{cp: ' ' if unicodedata.category(chr(cp)) == 'Zs' else '-'
-                                    for cp in range(0x80, 0x20000) if unicodedata.category(chr(cp)) in ('Zs', 'Pd')}}
+                                    for cp in range(0x80, 0x20000) if unicodedata.category(chr(cp)) in ('Zs', 'Pd')},
+                  **str.maketrans(constants.PHONE_PARENS)}
 
 
 class _SourceMatch:

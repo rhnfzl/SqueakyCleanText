@@ -13,6 +13,8 @@ break hints (ZWSP, WJ, soft hyphen) inside the value,
 typeset phone and date separators (no-break or thin space, non-breaking hyphen, en dash),
 IDNA dot separators (。 ｡) in a mail domain or URL host, upper-case addresses (so squared
 letters 🄹 occur), break hints between non-Latin letters of a mail domain or URL host,
+area-code parentheses glued to the digits (+49(30)123456), URL user info whose password ends
+in punctuation (https://alice:p4ss!@host/),
 and glued to CJK/Thai prose without a space. Every variant comes from Unicode
 data (decomposition tag, NFKC, decimal value, category), and every
 rendered value folds back to the plain value (NFKC, Cf removed, Nd -> ASCII).
@@ -343,6 +345,25 @@ def _url_shape(rng, plain):
     return intro + host + path + rest
 
 
+def _paren_phone(rng, plain, cores):
+    """An international number with the area code in parentheses and no spaces (+49(30)123456), so a
+    styled parenthesis sits between digits; own RNG so the cases of earlier rounds stay the same."""
+    if rng.random() >= 0.2:
+        return plain, cores
+    plain = f"+{rng.randint(30, 99)}({rng.randint(10, 99)}){_digits(rng, rng.randint(6, 8))}"
+    return plain, [("digits", re.sub(r"\D", "", plain))]
+
+
+def _userinfo(rng, plain, cores):
+    """URL user info whose password ends in punctuation (https://alice:p4ss!@host/), so a styled @
+    follows a non-alphanumeric character; own RNG so the cases of earlier rounds stay the same."""
+    if "://" not in plain or rng.random() >= 0.2:
+        return plain, cores
+    user, password = _ascii_token(rng, 4, 7), _ascii_token(rng, 5, 8) + rng.choice("!$*+;=~")
+    scheme, rest = plain.split("://", 1)
+    return f"{scheme}://{user}:{password}@{rest}", cores + [("str", user), ("str", password[:-1])]
+
+
 def _email_shape(rng, plain, cores):
     """A mail host of two labels in one non-Latin script (نامه.ایران, क्ष.भारत, as IDNA allows), so a
     join control in the label meets a styled dot with no ASCII beside it; own RNG so the cases of
@@ -409,6 +430,9 @@ def make_case(seed: int) -> dict:
         if typ == "URL":
             plain = _url_shape(random.Random(f"{seed}-{len(values)}-url"), plain)  # noqa: S311
             cores = [core for core in cores if core[1] in plain]  # a bare host has no query values
+            plain, cores = _userinfo(random.Random(f"{seed}-{len(values)}-userinfo"), plain, cores)  # noqa: S311
+        if typ == "PHONE":
+            plain, cores = _paren_phone(random.Random(f"{seed}-{len(values)}-paren"), plain, cores)  # noqa: S311
         if typ == "EMAIL":
             plain, cores = _email_shape(random.Random(f"{seed}-{len(values)}-mail"), plain, cores)  # noqa: S311
             plain = _upper(random.Random(f"{seed}-{len(values)}-upper"), plain)  # noqa: S311
