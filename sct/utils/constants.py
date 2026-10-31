@@ -134,10 +134,9 @@ URL_REGEX = re.compile(
     # user:pass authentication; never across / ? # " < > so a later "@" in the
     # query or the markup is not taken as user info
     r"(?:[^\s/?#\"<>@]+(?::[^\s/?#\"<>@]*)?@)?" r"(?:"
-    # IP address exclusion - private & local networks
-    r"(?!(?:10|127)(?:\.\d{1,3}){3})"
-    r"(?!(?:169\.254|192\.168)(?:\.\d{1,3}){2})"
-    r"(?!172\.(?:1[6-9]|2\d|3[0-1])(?:\.\d{1,3}){2})"
+    # bracketed IPv6 host; private and loopback IPv4 hosts match too, so the whole
+    # URL (query values included) is replaced, not just the address
+    r"\[[0-9a-f:.]*:[0-9a-f:.]*\]" r"|"
     # IP address dotted notation octets
     r"(?:[1-9]\d?|1\d\d|2[01]\d|22[0-3])"
     r"(?:\.(?:1?\d{1,2}|2[0-4]\d|25[0-5])){2}"

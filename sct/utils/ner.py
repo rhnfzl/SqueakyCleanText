@@ -1003,17 +1003,18 @@ class GeneralNER:
                 span = {**item, 'start': start, 'end': end,
                         'word': text[start:end], 'key': f"{start}:{end}"}
                 (spans if own_start <= start < own_end else foreign).append(span)
+        # Windows repeat context and WordPiece widening can give one model two labels for a
+        # span; neither is another model: one vote per model and span, its best score.
+        best = {}
+        for span in spans + foreign:
+            vote = (span.get('model'), span['key'])
+            if vote not in best or span['score'] > best[vote]['score']:
+                best[vote] = span
+        owned = {(s.get('model'), s['key']) for s in spans}
+        foreign = [span for vote, span in best.items() if vote not in owned]
+        spans = [span for vote, span in best.items() if vote in owned]
         if foreign:
-            # Windows repeat context, not models: one vote per model and span, its best score.
-            best = {}
-            for span in spans + foreign:
-                vote = (span['model'], span['key'])
-                if vote not in best or span['score'] > best[vote]['score']:
-                    best[vote] = span
-            owned = {(s['model'], s['key']) for s in spans}
-            foreign = [span for vote, span in best.items() if vote not in owned]
-            spans = self.ner_ensemble(
-                [span for vote, span in best.items() if vote in owned], ner_confidence_threshold)
+            spans = self.ner_ensemble(spans, ner_confidence_threshold)
             # A neighbour's copy counts only where an eligible owned span covering it is concealed.
             covers = [
                 o for o in spans
