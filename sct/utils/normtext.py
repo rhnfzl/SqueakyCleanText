@@ -105,8 +105,10 @@ _DOT_JOINER = str.maketrans({ch: plain for ch, plain in _STYLED_SEP.items() if p
 
 
 def _fold_url_run(m):
-    return _URL_AUTHORITY.sub(lambda a: _IDNA_DOT_REGEX.sub('.', a.group().translate(_DOT_JOINER)),
-                              m.group().translate(_URL_RUN_JOINER))
+    # layout hints drop in the authority as in a mail domain (https://例\u200bえ.jp)
+    return _URL_AUTHORITY.sub(
+        lambda a: _IDNA_DOT_REGEX.sub('.', a.group().translate(_DOT_JOINER)).translate(_DOMAIN_HINTS),
+        m.group().translate(_URL_RUN_JOINER))
 # Inside an address-shaped run every styled form of @ . - _ + folds (the full-width-only rule above, widened).
 _STYLED_EMAIL_RUN_REGEX = re.compile(
     rf'\w[\w{_forms(".-_+")}{constants.MARKS}{_FORMAT_CHARS}]*[@{_forms("@")}]'

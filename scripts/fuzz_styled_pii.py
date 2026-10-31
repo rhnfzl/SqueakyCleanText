@@ -12,7 +12,7 @@ letters and digits, native decimal digits of any script, decomposed letters
 break hints (ZWSP, WJ, soft hyphen) inside the value,
 typeset phone and date separators (no-break or thin space, non-breaking hyphen, en dash),
 IDNA dot separators (。 ｡) in a mail domain or URL host, upper-case addresses (so squared
-letters 🄹 occur), break hints between non-Latin letters of a mail domain,
+letters 🄹 occur), break hints between non-Latin letters of a mail domain or URL host,
 and glued to CJK/Thai prose without a space. Every variant comes from Unicode
 data (decomposition tag, NFKC, decimal value, category), and every
 rendered value folds back to the plain value (NFKC, Cf removed, Nd -> ASCII).
@@ -382,11 +382,14 @@ def _idna_dot(rng, plain, slots, kinds, typ):
     return sorted(set(kinds) | {"idna_dot"}) if any(slot and slot[0] == "idna_dot" for slot in slots) else kinds
 
 
-def _zw_domain(rng, plain, inserts, kinds):
-    """A break hint (ZWSP, WJ, soft hyphen) between two non-Latin letters of a mail domain (例\u200bえ.jp),
-    copied from wrapped text; own RNG so the cases of earlier rounds stay the same."""
-    start = plain.rindex("@") + 1
-    free = [index for index in range(start + 1, len(plain)) if index not in inserts
+def _zw_domain(rng, plain, inserts, kinds, typ="EMAIL"):
+    """A break hint (ZWSP, WJ, soft hyphen) between two non-Latin letters of a mail domain or a URL host
+    (例\u200bえ.jp), copied from wrapped text; own RNG so the cases of earlier rounds stay the same."""
+    if typ == "EMAIL":
+        start, end = plain.rindex("@") + 1, len(plain)
+    else:
+        start, end = re.match(r"(?:https?://|www\.)([^/?#]*)", plain).span(1)
+    free = [index for index in range(start + 1, end) if index not in inserts
             and not plain[index - 1].isascii() and not plain[index].isascii()
             and plain[index - 1].isalpha() and plain[index].isalpha()]
     if not free or rng.random() >= 0.25:
@@ -415,6 +418,8 @@ def make_case(seed: int) -> dict:
             kinds = _idna_dot(random.Random(f"{seed}-{len(values)}-idna"), plain, slots, kinds, typ)  # noqa: S311
         if typ == "EMAIL":
             kinds = _zw_domain(random.Random(f"{seed}-{len(values)}-zwd"), plain, inserts, kinds)  # noqa: S311
+        if typ == "URL":
+            kinds = _zw_domain(random.Random(f"{seed}-{len(values)}-zwh"), plain, inserts, kinds, typ)  # noqa: S311
         if typ in ("PHONE", "DATE"):
             kinds = _typo_sep(random.Random(f"{seed}-{len(values)}-sep"), plain, slots, kinds)  # noqa: S311
         glue = rng.random() < 0.5

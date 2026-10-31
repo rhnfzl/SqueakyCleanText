@@ -18,6 +18,8 @@ from sct.utils.anonymization_map import AnonymizationMap
 from sct.utils.process_result import ProcessResult
 
 logger = logging.getLogger(__name__)
+# A _protect key (an emitted value hidden from later steps).
+_KEY = re.compile('\U00100000[\U000F0000-\U0010FFFF]\U00100001')
 
 class TextCleaner:
 
@@ -64,6 +66,8 @@ class TextCleaner:
         # Markers that are not <TAG>-shaped ("EMAIL"): NER protects them like <EMAIL> (ner.regex_markers).
         self._custom_markers = tuple(sorted({
             tag for tag in self._tags.values() if tag and not ner._PLACEHOLDER_TOKEN.fullmatch(tag)}))
+        self._marker_regex = re.compile('|'.join([ner._PLACEHOLDER_TOKEN.pattern, *map(
+            re.escape, sorted(self._custom_markers, key=len, reverse=True))]))
 
         # Language detector: tuple restricts; else all 75 Lingua languages unless turned off
         if isinstance(self.cfg.language, tuple):
@@ -395,6 +399,8 @@ class TextCleaner:
             tag for tag in self._custom_markers if tag in text or tag in current_text)
         if anon_map is not None:
             anon_map.reserved.update(source_markers)
+        # (marker, emitted) for each marker occurrence, recorded by _restore_protected
+        self._document_context.marker_order = [] if source_markers else None
         for step in self._pipeline[self._normalise_steps:]:
             current_text = step(current_text)
 
@@ -411,6 +417,7 @@ class TextCleaner:
         # Post-fuzzy pipeline steps (phones → years → numbers → symbols → whitespace)
         for step in self._post_fuzzy_pipeline:
             current_text = step(current_text)
+        source_markers = self._source_marker_spans(current_text, source_markers)
 
         return (current_text, language, anon_map, doc_classes, started_at, regex_counts,
                 language_confidence, language_source, len(text), source_markers, language_margin,
@@ -658,10 +665,39 @@ class TextCleaner:
         protected = getattr(self._document_context, 'protected', None) or {}
         deferred = getattr(self._document_context, 'deferred', None)
         tags = deferred[0] if deferred else {}
+        order = getattr(self._document_context, 'marker_order', None)
+        if order is not None:
+            order += self._marker_occurrences(text, protected, tags)
         for value, key in protected.items():
             if key not in tags:
                 text = text.replace(key, value)
         return text
+
+    def _marker_occurrences(self, text, protected, tags):
+        """(marker, emitted) for each marker in *text*, whose emitted values are still behind keys."""
+        values = {key: tags.get(key, value) for value, key in protected.items()}
+        parts, emitted, pos, size = [], [], 0, 0
+        for m in _KEY.finditer(text):
+            value = values.get(m.group(), m.group())
+            size += m.start() - pos
+            emitted.append((size, size + len(value)))
+            parts += [text[pos:m.start()], value]
+            size, pos = size + len(value), m.end()
+        resolved = ''.join(parts) + text[pos:]
+        return [(m.group(), any(a < m.end() and m.start() < b for a, b in emitted))
+                for m in self._marker_regex.finditer(resolved)]
+
+    def _source_marker_spans(self, text, source_markers):
+        """The spans of source-text markers in *text*, so NER exempts only those and protects every
+        emitted one ("EMAIL" in the source and as a replacement); by text if a step moved markers."""
+        order = getattr(self._document_context, 'marker_order', None)
+        self._document_context.marker_order = None
+        if not source_markers or order is None:
+            return source_markers
+        found = list(self._marker_regex.finditer(text))
+        if [m.group() for m in found] != [marker for marker, _ in order]:
+            return source_markers
+        return frozenset(m.span() for m, (_, emitted) in zip(found, order) if not emitted)
 
     def _restore_deferred(self, text):
         protected = getattr(self._document_context, 'protected', None) or {}

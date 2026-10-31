@@ -7,7 +7,7 @@ import re
 import threading
 from collections import defaultdict
 import logging
-from typing import Collection, Dict, List, Optional, Sequence, Union
+from typing import Any, Collection, Dict, List, Optional, Sequence, Union
 from pathlib import Path
 
 import onnxruntime as ort
@@ -45,7 +45,8 @@ ENTITY_TYPE_MAP = {
 
 # A regex step's placeholder (<PHONE>, <EMAIL_0>); NER spans inside one are dropped,
 # so "call <PHONE>" never becomes "call <<MISC>>". Marker-shaped text already in the
-# source (*source_markers*, e.g. "<LONDON>") gets no protection, so it cannot hide PII.
+# source (*source_markers*: its text, e.g. "<LONDON>", or the (start, end) spans of its occurrences,
+# so an emitted marker of the same text keeps its protection) gets none, so it cannot hide PII.
 # Custom replace_with_* markers ("EMAIL") are protected the same way through *regex_markers*.
 _PLACEHOLDER_TOKEN = re.compile(r"<[A-Z][A-Z0-9_]*>")
 
@@ -692,7 +693,7 @@ class GeneralNER:
         language: Optional[str] = None,
         anon_map: Optional['AnonymizationMap'] = None,
         privacy_policy: Optional[PrivacyPolicy] = None,
-        source_markers: Optional[Collection[str]] = None,
+        source_markers: Optional[Collection[Any]] = None,
     ) -> NERProcessingResult:
         """Process text and return transformed text with entity findings.
 
@@ -775,7 +776,7 @@ class GeneralNER:
         privacy_policy: Optional[PrivacyPolicy] = None,
         before_finalize=None,
         max_workers: int = 1,
-        source_markers: Optional[Sequence[Optional[Collection[str]]]] = None,
+        source_markers: Optional[Sequence[Optional[Collection[Any]]]] = None,
     ) -> List[NERProcessingResult]:
         """``ner_process_detailed`` for many documents, batching model calls across them.
 
@@ -1020,7 +1021,7 @@ class GeneralNER:
         ner_confidence_threshold: float,
         anon_map: Optional['AnonymizationMap'],
         privacy_policy: Optional[PrivacyPolicy],
-        source_markers: Optional[Collection[str]] = None,
+        source_markers: Optional[Collection[Any]] = None,
     ) -> NERProcessingResult:
         """Merge window spans in document coordinates, vote, and replace once."""
         spans, foreign = [], []
@@ -1055,17 +1056,19 @@ class GeneralNER:
             ]
 
         ensemble_results = self.ner_ensemble(spans, ner_confidence_threshold)
-        markers = [
-            m.span() for m in _PLACEHOLDER_TOKEN.finditer(text)
-            if not source_markers or m.group() not in source_markers
-        ]
+        source_markers = source_markers or ()
+        source_spans = [s for s in source_markers if isinstance(s, tuple)]
+
+        def emitted(m):
+            return m.group() not in source_markers and not any(
+                a <= m.start() and m.end() <= b for a, b in source_spans)
+        markers = [m.span() for m in _PLACEHOLDER_TOKEN.finditer(text) if emitted(m)]
         if getattr(self, '_synthetic_replacer', None):  # set only in synthetic mode
             # Fakes the regex steps inserted (emails, phones...) are protected like placeholders.
             for fake in set(self._synthetic_replacer._get_cache().values()):
                 markers += [m.span() for m in re.finditer(re.escape(fake), text)]
         for marker in getattr(self, '_regex_markers', ()):
-            if not source_markers or marker not in source_markers:
-                markers += [m.span() for m in re.finditer(re.escape(marker), text)]
+            markers += [m.span() for m in re.finditer(re.escape(marker), text) if emitted(m)]
         if markers:
             ensemble_results = [
                 item for item in ensemble_results
