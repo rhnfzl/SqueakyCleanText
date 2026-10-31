@@ -34,7 +34,7 @@ def _cleaner(**overrides):
 class FakeCleaner:
     """Turns "Alice" into a PERSON finding and emails into EMAIL findings."""
 
-    cfg = TextCleanerConfig(check_ner_process=False)
+    cfg = TextCleanerConfig(check_ner_process=False, json_key_cleaning="full")  # keys go through process()
 
     def process(self, text):
         if text not in ("Alice", "alice@example.com"):
@@ -124,7 +124,7 @@ def test_json_concise_and_empty_value_keep_the_same_signal_keys():
 
 def test_json_language_is_char_weighted():
     class Mixed:
-        cfg = TextCleanerConfig(check_ner_process=False)
+        cfg = TextCleanerConfig(check_ner_process=False, json_key_cleaning="full")
 
         def process(self, text):
             language = "HINDI" if len(text) > 3 else "ENGLISH"
@@ -222,3 +222,16 @@ def test_tool_calls_return_structured_content_and_tool_errors():
 
     with pytest.raises(FastToolError, match="not configured for PII mode"):
         _client_call(server, pii)
+
+
+def test_preset_picks_the_built_in_cleaner_config(monkeypatch):
+    pytest.importorskip("fastmcp")
+    import sct.mcp_server as mcp_module
+
+    with pytest.raises(ValueError, match="unknown preset"):
+        create_mcp_server(preset="nope")
+    seen = []
+    monkeypatch.setattr(mcp_module, "TextCleaner", lambda cfg, **_: seen.append(cfg) or _cleaner())
+    monkeypatch.setenv("SCT_MCP_PRESET", "training")
+    _client_call(create_mcp_server(), lambda c: c.call_tool("clean_text", {"text": "x"}))
+    assert seen[0].check_to_ascii_unicode is False

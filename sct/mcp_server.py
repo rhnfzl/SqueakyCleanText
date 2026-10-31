@@ -6,6 +6,9 @@ Server settings come from the environment only:
     Folder the ``path`` input may read from. Unset means ``path`` is off.
 ``SCT_MCP_MAX_BYTES``
     Largest file ``path`` may read (default 1 MiB).
+``SCT_MCP_PRESET``
+    Config preset for the built-in cleaners (default ``sct``, the library
+    default; ``training`` keeps text as written apart from PII).
 """
 
 import os
@@ -13,7 +16,7 @@ import stat
 from typing import Any, Literal, NotRequired, Optional, TypedDict
 
 from sct.adapters import process_json
-from sct.config import TextCleanerConfig
+from sct.presets import preset_config
 from sct.sct import TextCleaner
 from sct.signals import public_view
 
@@ -196,10 +199,12 @@ def create_mcp_server(
     *,
     root: Optional[str] = None,
     max_bytes: Optional[int] = None,
+    preset: Optional[str] = None,
 ):
     """Create a FastMCP server without importing FastMCP at package import.
 
-    *root* and *max_bytes* default to ``SCT_MCP_ROOT`` / ``SCT_MCP_MAX_BYTES``.
+    *root*, *max_bytes* and *preset* default to ``SCT_MCP_ROOT`` /
+    ``SCT_MCP_MAX_BYTES`` / ``SCT_MCP_PRESET``.
     """
     try:
         from fastmcp import FastMCP
@@ -214,6 +219,8 @@ def create_mcp_server(
         max_bytes = int(os.environ.get("SCT_MCP_MAX_BYTES") or DEFAULT_MAX_BYTES)
     if max_bytes < 0:
         raise ValueError("SCT_MCP_MAX_BYTES must be zero or more")
+    preset = preset or os.environ.get("SCT_MCP_PRESET") or "sct"
+    preset_config(preset)  # fail at start-up on an unknown name
 
     server = FastMCP(
         "SqueakyCleanText",
@@ -234,7 +241,7 @@ def create_mcp_server(
             return cleaner
         if pii not in cleaners:
             cleaners[pii] = TextCleaner(
-                cfg=TextCleanerConfig(ner_mode="pii" if pii else "standard"),
+                cfg=preset_config(preset, ner_mode="pii" if pii else "standard"),
                 include_entities=True,
             )
         return cleaners[pii]

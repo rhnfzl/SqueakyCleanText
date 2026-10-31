@@ -31,6 +31,9 @@ Keys, in this order:
 There is no `stat_text`. For JSON, a finding inside a key uses the path
 `[..., "@key", <index>]`, so the raw key never appears.
 
+The built-in cleaners use the library default config. Set `SCT_MCP_PRESET=training`
+to keep text as written apart from PII (no ASCII folding, so `日本語` stays `日本語`).
+
 ## Reading files (`path`)
 
 Off by default. Set `SCT_MCP_ROOT` to a folder to let `clean_text` read files

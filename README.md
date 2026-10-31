@@ -681,6 +681,7 @@ The base package includes JSON, DataFrame, retrieval, command-line, and streamin
 from sct import RAGChunk, process_json, process_rag_chunks
 
 cleaned_json = process_json(cleaner, {"message": "Email a@example.com"})
+# Keys get PII replacement only (json_key_cleaning='pii'); 'full' or 'off' to change.
 cleaned_chunks = process_rag_chunks(
     cleaner,
     [RAGChunk(id="1", text="Call +1-202-555-0147", metadata={})],

@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Optional, Sequence, TextIO
 
 from sct.adapters import process_json
-from sct.config import TextCleanerConfig
+from sct.presets import PRESETS, preset_config
 from sct.sct import TextCleaner
 
 
@@ -23,6 +23,12 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--no-ner", action="store_true")
     parser.add_argument("--pii", action="store_true")
     parser.add_argument("--json-input", action="store_true")
+    parser.add_argument(
+        "--preset",
+        choices=sorted(PRESETS),
+        default="sct",
+        help="Config preset: sct (library default) or training (PII only, text kept as written)",
+    )
     parser.add_argument(
         "--replacement-mode",
         choices=("placeholder", "reversible", "synthetic"),
@@ -54,7 +60,8 @@ def main(
         source = Path(args.input).read_text(encoding="utf-8")
 
     try:
-        cleaner = TextCleaner(cfg=TextCleanerConfig(
+        cleaner = TextCleaner(cfg=preset_config(
+            args.preset,
             check_ner_process=not args.no_ner,
             ner_mode="pii" if args.pii else "standard",
             replacement_mode=args.replacement_mode,

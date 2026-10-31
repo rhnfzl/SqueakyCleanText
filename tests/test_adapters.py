@@ -134,3 +134,31 @@ def test_sensitive_from_entity_counts_not_markers():
     )
     assert is_sensitive_result(found) is True
     assert is_sensitive_result(SimpleNamespace(lm_text="<PERSON>", metadata=None)) is False
+
+
+def test_process_json_keys_get_pii_steps_only_by_default():
+    # The library default drops isolated letters and ASCII-folds; that used to
+    # turn {"b": 1, "c": 2} into two "" keys (duplicate-key error) and fold keys.
+    source = {"b": 1, "c": 2, "München 日本語": "x", "to maria@example.com": "k"}
+
+    result = process_json(_regex_cleaner(), source)
+
+    assert list(result.value) == ["b", "c", "München 日本語", "to <EMAIL>"]
+    assert result.signals["regex_counts"]["EMAIL"]["count"] == 1
+
+
+def test_process_json_key_cleaning_full_and_off():
+    def cleaner(mode):
+        return TextCleaner(cfg=TextCleanerConfig(
+            check_ner_process=False,
+            check_detect_language=False,
+            check_statistical_model_processing=False,
+            json_key_cleaning=mode,
+        ))
+
+    with pytest.raises(ValueError, match="duplicate key"):
+        process_json(cleaner("full"), {"b": 1, "c": 2})
+    off = process_json(cleaner("off"), {"to maria@example.com": "k"})
+    assert off.value == {"to maria@example.com": ""}
+    with pytest.raises(ValueError, match="json_key_cleaning"):
+        TextCleanerConfig(json_key_cleaning="raw")

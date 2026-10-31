@@ -1,8 +1,10 @@
 """Boundary adapters for structured data and retrieval pipelines."""
 
-from dataclasses import dataclass, field
+import copy
+from dataclasses import dataclass, field, replace
 from typing import Any, Iterable, Mapping, Optional
 
+from sct.presets import PRESETS
 from sct.privacy import EntityFinding
 from sct.sct import TextCleaner
 from sct.signals import merge_views
@@ -73,15 +75,36 @@ def is_sensitive_result(result: Any) -> bool:
     )
 
 
+def _pii_only_cleaner(cleaner: TextCleaner) -> TextCleaner:
+    """Return a view of *cleaner* that runs only its PII steps, sharing its NER models."""
+    key_cleaner = copy.copy(cleaner)
+    # Everything the training preset turns off (folding, letter/number removal, casefold...).
+    key_cleaner.cfg = replace(
+        cleaner.cfg,
+        **{name: value for name, value in PRESETS['training'].items() if value is False},
+    )
+    key_cleaner._pipeline, key_cleaner._post_fuzzy_pipeline = [], []
+    key_cleaner._init_pipeline()
+    return key_cleaner
+
+
 def process_json(cleaner: TextCleaner, value: Any) -> StructuredResult:
-    """Process every string in a JSON-compatible value."""
+    """Process every string in a JSON-compatible value.
+
+    Keys follow ``cfg.json_key_cleaning``: ``'pii'`` (default) replaces PII
+    only, so short keys such as ``"k"`` survive; ``'full'`` uses the whole
+    config; ``'off'`` keeps keys as written.
+    """
     _require_adapter_mode(cleaner)
     findings = []
     views = []
+    key_mode = cleaner.cfg.json_key_cleaning
+    key_cleaner = None
 
-    def visit(item: Any, path: tuple[str | int, ...]) -> Any:
+    def visit(item: Any, path: tuple[str | int, ...], text_cleaner: TextCleaner = cleaner) -> Any:
+        nonlocal key_cleaner
         if isinstance(item, str):
-            result = cleaner.process(item)
+            result = text_cleaner.process(item)
             views.append(result.signals)
             if result.metadata:
                 findings.extend(
@@ -93,10 +116,16 @@ def process_json(cleaner: TextCleaner, value: Any) -> StructuredResult:
             processed = {}
             for index, (key, child) in enumerate(item.items()):
                 # The raw key may itself be PII, so its path uses the index.
-                processed_key = (
-                    visit(key, path + ("@key", index))
-                    if isinstance(key, str) else key
-                )
+                if isinstance(key, str) and key_mode != 'off':
+                    if key_mode == 'pii' and key_cleaner is None:
+                        key_cleaner = _pii_only_cleaner(cleaner)
+                    processed_key = visit(
+                        key,
+                        path + ("@key", index),
+                        key_cleaner if key_mode == 'pii' else cleaner,
+                    )
+                else:
+                    processed_key = key
                 if processed_key in processed:
                     raise ValueError(
                         "Cleaning JSON keys produced a duplicate key"

@@ -131,6 +131,7 @@ PII_DEFAULT_THRESHOLD = 0.3  # Recall > precision for PII
 
 VALID_NER_MODES = frozenset({'standard', 'pii'})
 VALID_REPLACEMENT_MODES = frozenset({'placeholder', 'synthetic', 'reversible'})
+VALID_JSON_KEY_CLEANING = frozenset({'pii', 'full', 'off'})
 
 # Optional ModernBERT NER models (available when exported via export_onnx_models.py)
 MODERNBERT_NER_MODELS: dict[str, str] = {
@@ -303,6 +304,7 @@ class TextCleanerConfig:
     ner_device: Optional[str] = None  # None = auto (CUDA when available), 'cpu', 'cuda'
     cuda_device_id: int = 0  # GPU index for ONNX, torch and GLiNER when on CUDA
     onnx_cuda_provider_options: Optional[Mapping[str, Any]] = None  # extra CUDAExecutionProvider options
+    json_key_cleaning: str = 'pii'  # process_json keys: 'pii' = PII steps only, 'full' = whole config (0.7), 'off' = raw
 
     def __post_init__(self):
         if self.gliclass_onnx:
@@ -342,6 +344,11 @@ class TextCleanerConfig:
             raise ValueError(
                 f"replacement_mode must be one of {sorted(VALID_REPLACEMENT_MODES)}, "
                 f"got: {self.replacement_mode!r}"
+            )
+        if self.json_key_cleaning not in VALID_JSON_KEY_CLEANING:
+            raise ValueError(
+                f"json_key_cleaning must be one of {sorted(VALID_JSON_KEY_CLEANING)}, "
+                f"got: {self.json_key_cleaning!r}"
             )
         if (
             self.replacement_mode == 'reversible'
@@ -633,6 +640,7 @@ def _config_from_module_globals() -> TextCleanerConfig:
         ner_device=getattr(m, 'NER_DEVICE', None),
         cuda_device_id=getattr(m, 'CUDA_DEVICE_ID', 0),
         onnx_cuda_provider_options=getattr(m, 'ONNX_CUDA_PROVIDER_OPTIONS', None),
+        json_key_cleaning=getattr(m, 'JSON_KEY_CLEANING', 'pii'),
         check_replace_currency_symbols=m.CHECK_REPLACE_CURRENCY_SYMBOLS,
         check_ner_process=m.CHECK_NER_PROCESS,
         check_remove_isolated_letters=m.CHECK_REMOVE_ISOLATED_LETTERS,
@@ -697,6 +705,7 @@ CHECK_DECODE_UNICODE_ESCAPES = True
 NER_DEVICE = None
 CUDA_DEVICE_ID = 0
 ONNX_CUDA_PROVIDER_OPTIONS = None
+JSON_KEY_CLEANING = 'pii'
 CHECK_REPLACE_CURRENCY_SYMBOLS = True
 CHECK_NER_PROCESS = True
 CHECK_REMOVE_ISOLATED_LETTERS = True
