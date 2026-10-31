@@ -39,8 +39,47 @@ jobs:
 
     - name: Lint with ruff
       run: |
-        ruff check sct/ tests/
+        ruff check sct/ tests/ scripts/
 
     - name: Test with pytest and coverage
       run: |
         pytest tests/ --cov=sct --cov-report=xml --cov-fail-under=85 -v
+
+  # Required gate for the adapters (decision 13): real worker processes on Linux.
+  # Mark it required in GitHub branch protection; YAML cannot.
+  linux-workers:
+
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - python-version: "3.13"
+            start: fork
+          - python-version: "3.14"
+            start: forkserver  # 3.14's Linux default
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ matrix.python-version }}
+
+    - name: Cache the test NER model
+      uses: actions/cache@v4
+      with:
+        path: ~/.cache/huggingface
+        key: hf-protectai-bert-base-NER-onnx-${{ runner.os }}
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -e ".[dev,test,datasets,datatrove]" --no-cache-dir
+
+    - name: Test worker processes and adapters
+      env:
+        SCT_MP_START: ${{ matrix.start }}
+      run: |
+        pytest tests/test_linux_workers.py tests/test_integrations_*.py -v -rs --cov=sct.integrations --cov-config=.coveragerc-integrations --cov-fail-under=85
