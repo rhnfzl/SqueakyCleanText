@@ -3,7 +3,9 @@
 Thread-safe: uses threading.local() for both Faker instances and consistency
 caches, so parallel batch processing in TextCleaner has no shared mutable state.
 """
+import functools
 import hashlib
+import locale as _stdlib_locale
 import logging
 import threading
 from typing import Dict, Optional
@@ -49,10 +51,38 @@ FAKER_GENERATORS: Dict[str, str] = {
 }
 
 
+@functools.lru_cache(maxsize=None)
+def faker_locale_for(language: Optional[str]) -> str:
+    """Faker locale for a Lingua language name (``'DUTCH'`` -> ``'nl_NL'``).
+
+    The territory comes from the C library's locale alias table (``locale.normalize``),
+    then Faker's bare language locale, then its first locale of that language; Faker's
+    default (``en_US``) when Faker has none (Norwegian Bokmal/Nynorsk, Malay, Urdu...).
+    """
+    from faker.config import AVAILABLE_LOCALES, DEFAULT_LOCALE
+
+    if not language:
+        return DEFAULT_LOCALE
+    from sct.utils.resources import language_to_iso
+
+    iso = language_to_iso(language)
+    normalized = _stdlib_locale.normalize(iso).split('.')[0].split('@')[0]
+    if normalized in AVAILABLE_LOCALES:
+        return normalized
+    if iso in AVAILABLE_LOCALES:
+        return iso
+    same = sorted(loc for loc in AVAILABLE_LOCALES if loc.split('_')[0] == iso)
+    return same[0] if same else DEFAULT_LOCALE
+
+
 class _DocumentCache(dict):
-    """Per-document ``(entity_group, original) -> fake`` map; ``seed`` set in per-document mode."""
+    """Per-document ``(entity_group, original) -> fake`` map.
+
+    ``seed`` is set in per-document mode; ``language`` is the detected document language.
+    """
 
     seed: Optional[int] = None
+    language: Optional[str] = None
 
 
 class SyntheticReplacer:
@@ -66,16 +96,23 @@ class SyntheticReplacer:
     the fake's ordinal in the document, so fakes differ across documents yet the
     same document always gets the same fakes, whatever the thread, worker or
     batch order. ``False`` is the 0.7 behaviour: one Faker stream per thread.
+
+    ``locale=None`` picks the Faker locale from the document language passed to
+    ``reset_cache``; a string forces that locale (``'en_US'`` = 0.7).
     """
 
-    def __init__(self, seed: int = 42, per_document: bool = True):
+    def __init__(self, seed: int = 42, per_document: bool = True, locale: Optional[str] = None):
         self._seed = seed
         self._per_document = per_document
+        self._locale = locale
         self._local = threading.local()
 
-    def _get_faker(self):
-        """Get or create the thread-local Faker instance."""
-        if not hasattr(self._local, 'faker'):
+    def _get_faker(self, locale: Optional[str] = None):
+        """Get or create the thread-local Faker instance for *locale* (default: en_US)."""
+        fakers = getattr(self._local, 'fakers', None)
+        if fakers is None:
+            fakers = self._local.fakers = {}
+        if locale not in fakers:
             try:
                 from faker import Faker  # noqa: S404
             except ImportError:
@@ -83,13 +120,19 @@ class SyntheticReplacer:
                     "faker is required for synthetic replacement mode. "
                     "Install with: pip install squeakycleantext[synthetic]"
                 )
-            self._local.faker = Faker()
-            self._local.faker.seed_instance(self._seed)
-        return self._local.faker
+            fake = Faker(locale)
+            fake.seed_instance(self._seed)
+            fakers[locale] = fake
+        return fakers[locale]
 
-    def reset_cache(self, text: Optional[str] = None) -> None:
-        """Start a document: fresh consistency cache, fakes seeded from *text*."""
+    def reset_cache(self, text: Optional[str] = None, language: Optional[str] = None) -> None:
+        """Start a document: fresh consistency cache, fakes seeded from *text*.
+
+        *language* is the document's Lingua language name; it picks the Faker locale
+        unless the replacer was given a fixed one.
+        """
         self._local.cache = _DocumentCache()
+        self._local.cache.language = language
         if self._per_document and text is not None:
             digest = hashlib.blake2b(
                 text.encode('utf-8', 'surrogatepass'), digest_size=8,
@@ -123,7 +166,7 @@ class SyntheticReplacer:
         if cache_key in cache:
             return cache[cache_key]
 
-        fake = self._get_faker()
+        fake = self._get_faker(self._locale or faker_locale_for(getattr(cache, 'language', None)))
         doc_seed = getattr(cache, 'seed', None)
         if doc_seed is not None:
             # The ordinal travels with the cache, so a document's fakes do not

@@ -95,6 +95,7 @@ class TextCleaner:
             from sct.utils.synthetic import SyntheticReplacer
             self._synthetic_replacer = SyntheticReplacer(
                 seed=self.cfg.synthetic_seed, per_document=self.cfg.synthetic_per_document,
+                locale=self.cfg.synthetic_locale,
             )
 
         self.GeneralNER: Optional[ner.GeneralNER] = None
@@ -320,10 +321,6 @@ class TextCleaner:
         """
         started_at = time.perf_counter()
 
-        # Reset per-document synthetic consistency cache (thread-safe via threading.local)
-        if self._synthetic_replacer:
-            self._synthetic_replacer.reset_cache(text)
-
         # Per-document anonymization map (reversible mode only)
         anon_map = None
         if self.cfg.replacement_mode == 'reversible':
@@ -341,6 +338,11 @@ class TextCleaner:
 
         # Detect language (pure function, thread-safe)
         language, language_confidence, language_source, language_margin = self._detect_language(text)
+
+        # Reset per-document synthetic consistency cache (thread-safe via threading.local);
+        # the language picks the Faker locale.
+        if self._synthetic_replacer:
+            self._synthetic_replacer.reset_cache(text, language)
 
         current_text = text
 

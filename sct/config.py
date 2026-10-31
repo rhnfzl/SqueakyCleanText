@@ -333,6 +333,10 @@ class TextCleanerConfig:
     # WordPiece NER widening stops where the Unicode script of the letters changes, so a Latin
     # name glued to kana or Thai ("David Millerは") keeps its own span; False = widen across scripts
     ner_subword_widen_same_script: bool = True
+    # Faker locale for replacement_mode='synthetic': None = follow the detected document language
+    # (Dutch text gets Dutch names, en_US when Faker has no locale for it); a string forces that
+    # locale ('en_US' = 0.7)
+    synthetic_locale: Optional[str] = None
 
     def __post_init__(self):
         if self.gliclass_onnx:
@@ -687,6 +691,7 @@ def _config_from_module_globals() -> TextCleanerConfig:
         ner_subword_widen=getattr(m, 'NER_SUBWORD_WIDEN', 1.0),
         fold_styled_characters=getattr(m, 'FOLD_STYLED_CHARACTERS', True),
         ner_subword_widen_same_script=getattr(m, 'NER_SUBWORD_WIDEN_SAME_SCRIPT', True),
+        synthetic_locale=getattr(m, 'SYNTHETIC_LOCALE', None),
         check_replace_currency_symbols=m.CHECK_REPLACE_CURRENCY_SYMBOLS,
         check_ner_process=m.CHECK_NER_PROCESS,
         check_remove_isolated_letters=m.CHECK_REMOVE_ISOLATED_LETTERS,
@@ -790,6 +795,7 @@ LEGACY_TYPE_NAMES = False
 NER_SUBWORD_WIDEN = 1.0
 FOLD_STYLED_CHARACTERS = True
 NER_SUBWORD_WIDEN_SAME_SCRIPT = True
+SYNTHETIC_LOCALE = None
 GLINER_ONNX = False
 LANGUAGE = None
 
