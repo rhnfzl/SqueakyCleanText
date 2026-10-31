@@ -643,6 +643,7 @@ new_cfg = dataclasses.replace(cfg, check_ner_process=False)
 | `detect_all_languages` | `True` | Auto-detect over all 75 Lingua languages. `False` = 0.7 detector over `supported_languages` only (EN/NL/DE/ES plus extras). A `language` tuple always restricts detection to its entries |
 | `language_confidence_warning` | `0.0` | Adds `language_low_confidence` to `metadata['warnings']` when the detected language's confidence is below this (0..1). Off by default: Lingua's top-1 confidence is low for many correct texts (English with names often 0.2-0.5). `0.5` = early 0.8.0. Warning only, never changes routing |
 | `language_margin_warning` | `0.15` | Adds `language_low_confidence` when the detected language leads the runner-up by less than this (0..1), i.e. detection is ambiguous (Dutch vs English, Hindi vs Marathi). `0` turns it off. Warning only, never changes routing |
+| `fix_character_width` | `False` | Part of `check_fix_bad_unicode`. `False` keeps full-width CJK punctuation (`，` `！` `：`) and half-width katakana as written, so Chinese text no longer mixes `,` with `。`; full-width ASCII letters and digits (and `＠ ． － ＿ ＋` inside them) still become ASCII, so `０６１２３４５６７８` and `ｊｏｈｎ＠ｅｘａｍｐｌｅ．ｃｏｍ` are still replaced. `True` = ftfy's full width fix (0.7) |
 | `extra_languages` | `()` | Additional language names/codes for detection |
 | `custom_stopwords` | `None` | `{LANG: frozenset({...})}` custom stopword sets |
 | `custom_month_names` | `None` | `{LANG: ('Jan', 'Feb', ...)}` for date detection |

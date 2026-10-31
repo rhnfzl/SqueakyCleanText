@@ -314,6 +314,9 @@ class TextCleanerConfig:
     # Warn language_low_confidence when the top language leads the runner-up by less than this
     # (ambiguous detection); 0 turns it off. Absolute confidence is low for many correct texts.
     language_margin_warning: float = 0.15
+    # Part of check_fix_bad_unicode. False keeps full-width CJK punctuation (，！：) and half-width
+    # katakana, converting only full-width ASCII letters/digits; True = ftfy's full width fix (0.7)
+    fix_character_width: bool = False
 
     def __post_init__(self):
         if self.gliclass_onnx:
@@ -658,6 +661,7 @@ def _config_from_module_globals() -> TextCleanerConfig:
         synthetic_seed=getattr(m, 'SYNTHETIC_SEED', 42),
         synthetic_per_document=getattr(m, 'SYNTHETIC_PER_DOCUMENT', True),
         language_margin_warning=getattr(m, 'LANGUAGE_MARGIN_WARNING', 0.15),
+        fix_character_width=getattr(m, 'FIX_CHARACTER_WIDTH', False),
         check_replace_currency_symbols=m.CHECK_REPLACE_CURRENCY_SYMBOLS,
         check_ner_process=m.CHECK_NER_PROCESS,
         check_remove_isolated_letters=m.CHECK_REMOVE_ISOLATED_LETTERS,
@@ -756,6 +760,7 @@ REPLACEMENT_MODE = 'placeholder'
 SYNTHETIC_SEED = 42
 SYNTHETIC_PER_DOCUMENT = True
 LANGUAGE_MARGIN_WARNING = 0.15
+FIX_CHARACTER_WIDTH = False
 GLINER_ONNX = False
 LANGUAGE = None
 

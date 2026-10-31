@@ -8,18 +8,29 @@ from sct.utils import constants
 
 logger = logging.getLogger(__name__)
 
+# Full-width ASCII letters/digits (U+FF10..FF5A) map to ASCII by a fixed offset.
+_FULLWIDTH_ALNUM = {c: c - 0xFEE0 for r in ((0xFF10, 0xFF19), (0xFF21, 0xFF3A), (0xFF41, 0xFF5A))
+                    for c in range(r[0], r[1] + 1)}
+# Full-width @ . - _ + and ideographic space become ASCII only inside alphanumeric runs (emails,
+# phones), so CJK punctuation such as ， ： ！ keeps its width.
+_FULLWIDTH_JOINER_REGEX = re.compile(r'(?<=[0-9A-Za-z])[＠．－＿＋\u3000](?=[0-9A-Za-z])|＋(?=[0-9])')
+_FULLWIDTH_JOINER = {'＠': '@', '．': '.', '－': '-', '＿': '_', '＋': '+', '\u3000': ' '}
+
 class NormaliseText:
 
     def __init__(self):
         pass
 
-    def fix_bad_unicode(self, text, normalization="NFC", decode_escapes=True):
+    def fix_bad_unicode(self, text, normalization="NFC", decode_escapes=True, fix_character_width=False):
         """
         Fix unicode text that's "broken" using `ftfy <http://ftfy.readthedocs.org/>`_;
         this includes mojibake, HTML entities and other code cruft,
         and non-standard forms for display purposes.
 
         ``decode_escapes=False`` keeps literal backslash escapes (``\\n``, ``\\u00e9``).
+        ``fix_character_width=False`` keeps full-width CJK punctuation and half-width katakana and
+        only turns full-width ASCII letters/digits (and @ . - _ + inside them) into ASCII, so
+        full-width emails and phones are still found; ``True`` is ftfy's full width fix (0.7).
         """
         if decode_escapes:
             try:
@@ -27,7 +38,11 @@ class NormaliseText:
             except (UnicodeDecodeError, UnicodeEncodeError):
                 logger.debug("Unicode escape decoding failed, using original text", exc_info=True)
 
-        return fix_text(text, normalization=normalization)
+        if fix_character_width:
+            return fix_text(text, normalization=normalization)
+        text = fix_text(text, normalization=normalization, fix_character_width=False)
+        text = text.translate(_FULLWIDTH_ALNUM)
+        return _FULLWIDTH_JOINER_REGEX.sub(lambda m: _FULLWIDTH_JOINER[m.group()], text)
 
     def fix_strange_quotes(self, text):
         """Replace strange quotes with standard single/double quotes."""
