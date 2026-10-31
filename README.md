@@ -137,10 +137,11 @@ text = "Contact John Doe at john.doe@company.com. Meeting on 2023-10-01."
 lm_text, stat_text, lang = cleaner.process(text)
 
 print(f"Language Model format:    {lm_text}")
-# Output: "Contact <PERSON> at <EMAIL>. Meeting on <YEAR>."
+# Output: "Contact <PERSON> at <EMAIL>. Meeting on <YEAR><NUMBER><NUMBER>."
+# (the date step is off by default; check_replace_dates=True keeps the date as one token)
 
 print(f"Statistical Model format: {stat_text}")
-# Output: "contact meeting"
+# Output: "contact person email meeting yearnumbernumber"
 
 print(f"Detected Language: {lang}")
 # Output: "ENGLISH"
@@ -188,6 +189,8 @@ The data-pipeline adapters use `"training"` when no config is given. GLiNER PII 
 All language parameters accept Lingua names (`'ENGLISH'`), ISO 639-1 (`'en'`), or ISO 639-3 (`'eng'`) codes:
 
 ```python
+from sct import TextCleanerConfig
+
 # Pin to one language (skip auto-detection)
 cfg = TextCleanerConfig(language='de', check_ner_process=False)
 
@@ -524,7 +527,8 @@ from sct import TextCleaner
 cleaner = TextCleaner()
 
 # In an async context (FastAPI route, aiohttp handler, etc.)
-results = await cleaner.aprocess_batch(texts)
+async def handler(texts):
+    return await cleaner.aprocess_batch(texts)
 ```
 
 #### `warmup(languages: Optional[List[str]] = None) -> None`
@@ -532,6 +536,8 @@ results = await cleaner.aprocess_batch(texts)
 Pre-loads NER models to avoid first-request latency. Call once during application startup:
 
 ```python
+from sct import TextCleaner
+
 cleaner = TextCleaner()
 cleaner.warmup(['ENGLISH', 'DUTCH'])  # or warmup() for all supported languages
 ```
@@ -542,6 +548,9 @@ Immutable (frozen) dataclass. Create modified copies with `dataclasses.replace()
 
 ```python
 import dataclasses
+from sct import TextCleanerConfig
+
+cfg = TextCleanerConfig()
 new_cfg = dataclasses.replace(cfg, check_ner_process=False)
 ```
 
@@ -696,8 +705,9 @@ should implement `TokenStore` with encryption, access control, expiry, and audit
 The base package includes JSON, DataFrame, retrieval, command-line, and streaming adapters:
 
 ```python
-from sct import RAGChunk, process_json, process_rag_chunks
+from sct import RAGChunk, TextCleaner, process_json, process_rag_chunks
 
+cleaner = TextCleaner()
 cleaned_json = process_json(cleaner, {"message": "Email a@example.com"})
 # Keys get regex PII replacement only (json_key_cleaning='pii'); 'pii_ner', 'full' or 'off' to change.
 cleaned_chunks = process_rag_chunks(
@@ -727,8 +737,10 @@ for selected quasi-identifiers. Reports contain counts only, not source values.
 ### Framework integrations
 
 ```python
+from datasets import Dataset
 from sct.integrations.hf import clean_dataset
 
+ds = Dataset.from_dict({"text": ["Mail jan@example.nl", "Call +31 20 123 4567"]})
 ds = clean_dataset(ds, columns=["text"], num_proc=4)          # Hugging Face datasets
 ```
 
@@ -742,8 +754,11 @@ Polars, DuckDB, dlt, Daft) in [docs/RECIPES.md](docs/RECIPES.md).
 ### Score columns and `sct-report`
 
 ```python
+from sct import TextCleaner
 from sct.score import score_record
-row = score_record(cleaner.process(text))   # sct_language, sct_pii_count, sct_pii_share, ...
+
+cleaner = TextCleaner()
+row = score_record(cleaner.process("Mail jan@example.nl"))   # sct_language, sct_pii_count, sct_pii_share, ...
 ```
 
 ```sh

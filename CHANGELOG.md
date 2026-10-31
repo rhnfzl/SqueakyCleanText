@@ -145,6 +145,12 @@ Haystack), score columns and data cards (`sct-report`), a reworked MCP server an
 - NER windows respect a tokenizer's saved truncation `max_length` when it is below `model_max_length`, so inference never cuts a planned window.
 - A language route given as a list (`["ENGLISH", ...]`) is no longer changed in place when GLiNER is added to it.
 - `scripts/benchmark_release.py` imports on Windows (no `resource` module); peak RSS is reported as `null` there.
+- Isolated-symbol removal (library default, off in `training`) only removes symbols with whitespace or a text edge on both sides. Before, a `)` or full stop after a placeholder or bracket was dropped: `(born 1980).` became `(born <YEAR>`, `bel +31 20 123 4567.` lost its full stop (0.7.1 did the same).
+- `replacement_mode='synthetic'` with NER: the model no longer rewrites a fake email or phone that a regex step just inserted (`anna@beispiel.de` became `James Howard@Bernard LLC`); those fakes are protected like placeholders.
+- WordPiece NER models (any tokenizer with a `##` continuation prefix, such as `protectai/bert-base-NER-onnx`): entities widen to whole words, so `John Doe` no longer becomes `<PERSON>e`. SentencePiece models (the defaults) are unchanged.
+- Worker processes no longer call the Hub when the cache is warm. After `model.onnx` resolves, the other files load from that commit (served from the cache with no request) and the missing `model.onnx_data` probe uses the Hub's cached "no such file" answer (the default ensemble made one HEAD per load, an unpinned model eight). A `CleanerHandle` that is forked or pickled after loading pins unpinned models to the commits the parent loaded. A forked worker on Linux could hang forever in DNS (`getaddrinfo`) during that request.
+- `language_confidence` is rounded to 6 decimals. Lingua's value differed in the last digit between processes, so worker and in-process metadata did not match.
+- `import sct` no longer imports `presidio_anonymizer` (which pulls `presidio_analyzer`, GLiNER and torch when installed); it loads on first NER replacement.
 
 ### Known limits
 

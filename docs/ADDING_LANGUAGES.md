@@ -8,9 +8,9 @@ SqueakyCleanText has 4 language-dependent subsystems:
 
 | Subsystem | What it does | Default languages |
 |-----------|-------------|-------------------|
-| **Lingua detection** | Auto-detects input language | EN, NL, DE, ES |
+| **Lingua detection** | Auto-detects input language | All 75 Lingua languages (`detect_all_languages=True`; `False` = EN, NL, DE, ES + extras) |
 | **Stopwords** | Removes common words for statistical model | EN, NL, DE, ES |
-| **Date patterns** | Regex + fuzzy matching for month names | EN, NL, DE, ES |
+| **Date patterns** | Regex + fuzzy matching for month names | EN, NL, DE, ES, FR, PT, IT |
 | **NER models** | Named entity recognition (ONNX models) | EN, NL, DE, ES + Multilingual |
 
 Each subsystem can be extended independently. A language doesn't need support in all 4 to be useful.
@@ -39,6 +39,8 @@ This applies to: `language`, `extra_languages`, `custom_stopwords` keys, and `cu
 ### Single language vs. tuple of languages
 
 ```python
+from sct import TextCleanerConfig
+
 # Pin to one language (skip auto-detection)
 cfg = TextCleanerConfig(language='en')             # → detects nothing, always ENGLISH
 
@@ -46,7 +48,8 @@ cfg = TextCleanerConfig(language='en')             # → detects nothing, always
 cfg = TextCleanerConfig(language=('en', 'nl'))     # → detect per text, restricted to EN/NL
 
 # Full auto-detection (default — all supported languages)
-cfg = TextCleanerConfig(language=None)             # → detect among EN, NL, DE, ES + extras
+cfg = TextCleanerConfig(language=None)             # → detect among all 75 Lingua languages
+                                                   #   (detect_all_languages=False: EN, NL, DE, ES + extras)
 ```
 
 ---
@@ -80,7 +83,7 @@ cfg = TextCleanerConfig(
     ner_models={
         'ENGLISH': 'rhnfzl/xlm-roberta-large-conll03-english-onnx',
         'MULTILINGUAL': 'rhnfzl/wikineural-multilingual-ner-onnx',
-        'POLISH': 'my-org/polish-ner-onnx',  # Must be ONNX format
+        # 'POLISH': 'your-org/polish-ner-onnx',  # placeholder: your own ONNX NER repo; without it POLISH runs MULTILINGUAL
     },
 )
 
@@ -113,6 +116,8 @@ You don't need to add a language to `extra_languages` if it's already declared i
 
 **Just detection** (no stopwords/dates/NER for the new language):
 ```python
+from sct import TextCleanerConfig
+
 cfg = TextCleanerConfig(
     extra_languages=('FRENCH',),
     check_ner_process=False,
@@ -121,6 +126,8 @@ cfg = TextCleanerConfig(
 
 **Detection + stopwords** (auto-loaded from stop-words package):
 ```python
+from sct import TextCleanerConfig
+
 cfg = TextCleanerConfig(
     extra_languages=('FRENCH',),  # stop-words has French built-in
     check_ner_process=False,
@@ -129,9 +136,10 @@ cfg = TextCleanerConfig(
 
 **Pin language** (skip auto-detection — ISO codes accepted):
 ```python
+from sct import TextCleanerConfig
+
 cfg = TextCleanerConfig(
-    language='fr',                # ISO 639-1 → resolves to 'FRENCH'
-    extra_languages=('FRENCH',),  # Must be in supported set
+    language='fr',                # ISO 639-1 → resolves to 'FRENCH'; any Lingua language works
     check_ner_process=False,
 )
 ```
