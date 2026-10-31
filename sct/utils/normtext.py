@@ -17,6 +17,14 @@ _FULLWIDTH_ALNUM = {c: c - 0xFEE0 for r in ((0xFF10, 0xFF19), (0xFF21, 0xFF3A), 
 _FULLWIDTH_JOINER_REGEX = re.compile(r'(?<=[0-9A-Za-z])[＠．－＿＋\u3000](?=[0-9A-Za-z])|＋(?=[0-9])'
                                      r'|(?<=[^\W_])＠(?=[^\W_])|(?<=[^\W_])．(?=[0-9A-Za-z])|(?<=[0-9A-Za-z])．(?=[^\W_])')
 _FULLWIDTH_JOINER = {'＠': '@', '．': '.', '－': '-', '＿': '_', '＋': '+', '\u3000': ' '}
+# Inside an address-shaped run (word characters around an @), full-width . - _ + fold whatever
+# script sits beside them (john@例え．テスト, josé＿smith@...); prose without an @ keeps them.
+_EMAIL_RUN_REGEX = re.compile(r'\w[\w．－＿＋]*[@＠][\w．－＿]*\w')
+_EMAIL_RUN_JOINER = str.maketrans('＠．－＿＋', '@.-_+')
+
+
+def _fold_email_runs(text):
+    return _EMAIL_RUN_REGEX.sub(lambda m: m.group().translate(_EMAIL_RUN_JOINER), text)
 
 
 def _nfkc_ascii_alnum(tags):
@@ -56,7 +64,7 @@ def _fold_circled_run(m):
 def fold_styled(text):
     """Fold styled/compatibility letters, digits and in-run URL punctuation to ASCII."""
     text = _CIRCLED_RUN_REGEX.sub(_fold_circled_run, text.translate(_STYLED_ALNUM))
-    return _STYLED_JOINER_REGEX.sub(lambda m: unicodedata.normalize('NFKC', m.group()), text)
+    return _fold_email_runs(_STYLED_JOINER_REGEX.sub(lambda m: unicodedata.normalize('NFKC', m.group()), text))
 
 
 class NormaliseText:
@@ -90,7 +98,7 @@ class NormaliseText:
         if fix_character_width:
             return text
         text = text.translate(_FULLWIDTH_ALNUM)
-        return _FULLWIDTH_JOINER_REGEX.sub(lambda m: _FULLWIDTH_JOINER[m.group()], text)
+        return _fold_email_runs(_FULLWIDTH_JOINER_REGEX.sub(lambda m: _FULLWIDTH_JOINER[m.group()], text))
 
     def fix_strange_quotes(self, text):
         """Replace strange quotes with standard single/double quotes."""

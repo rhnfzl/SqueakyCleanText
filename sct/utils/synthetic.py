@@ -7,10 +7,15 @@ import functools
 import hashlib
 import locale as _stdlib_locale
 import logging
+import random
 import threading
 from typing import Dict, Optional
 
 logger = logging.getLogger(__name__)
+
+# Some locale providers (th_TH, uk_UA ssn; uk_UA plates) draw from the module-level
+# random, which seed_instance() leaves alone; seeded calls hold this lock.
+_GLOBAL_RANDOM_LOCK = threading.Lock()
 
 # Maps entity tags to Faker method names
 FAKER_GENERATORS: Dict[str, str] = {
@@ -130,6 +135,11 @@ class SyntheticReplacer:
                 )
             fake = Faker(locale)
             fake.seed_instance(self._seed)
+            for provider in fake.providers:
+                # shortcut: it_IT builds its city list from a set (hash-seed order); sort any
+                # set-built list Faker adds later the same way.
+                if isinstance(getattr(provider, 'cities', None), list):
+                    provider.cities = sorted(provider.cities)
             fakers[locale] = fake
         return fakers[locale]
 
@@ -187,11 +197,17 @@ class SyntheticReplacer:
             fake.seed_instance(doc_seed + len(cache))
         method_name = FAKER_GENERATORS.get(entity_group)
 
-        if method_name and hasattr(fake, method_name):
-            replacement = str(getattr(fake, method_name)())
+        generate = getattr(fake, method_name) if method_name and hasattr(fake, method_name) else fake.name
+        if doc_seed is None:
+            replacement = str(generate())
         else:
-            # Fallback: generate a name-like replacement for unknown types
-            replacement = fake.name()
+            with _GLOBAL_RANDOM_LOCK:
+                state = random.getstate()
+                random.seed(doc_seed + len(cache))
+                try:
+                    replacement = str(generate())
+                finally:
+                    random.setstate(state)
 
         cache[cache_key] = replacement
         return replacement

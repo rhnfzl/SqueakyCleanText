@@ -48,7 +48,8 @@ LEGACY_TYPE_NAMES = {'PHONE': 'PHONE_NUMBER', 'IP': 'IP_ADDRESS'}
 _CJK_SYMBOL_LETTERS = ''.join(chr(c) for c in range(0x3000, 0x3040) if unicodedata.category(chr(c))[0] in 'LN')
 _IDN_LETTER = (r"a-z\u00a1-\u1fff\u2070-\u2fff\u3040-\ufeff\uff21-\uff3a\uff41-\uff5a\uff66-\uffff"
                + _CJK_SYMBOL_LETTERS)
-_IDN_CHAR = _IDN_LETTER + r"0-9\uff10-\uff19"
+# ZWNJ/ZWJ (U+200C/D) join letters inside IDNA labels (Persian, Devanagari conjuncts).
+_IDN_CHAR = _IDN_LETTER + r"0-9\uff10-\uff19\u200c\u200d"
 EMAIL_REGEX = re.compile(
     r"(?:^|(?<=[^\w@.)]))[\w+-](?:[\w!#$%&'*+-]|\.(?!\.))*?(?<!\.)(@|[(<{\[]at[)>}\]])"
     rf"(?:(?:[{_IDN_CHAR}]-?)*[{_IDN_CHAR}]+)(?:\.(?:[{_IDN_CHAR}]-?)*[{_IDN_CHAR}]+)*(?:\.(?:[{_IDN_LETTER}]{{2,}}))",

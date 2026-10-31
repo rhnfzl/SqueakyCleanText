@@ -701,11 +701,17 @@ class TextCleaner:
             for entry in anon_map.entries:
                 if source[entry.start:entry.end] != entry.original:
                     continue  # regex entry: its offsets index another text
-                # shortcut: a tag the span only cuts stays as cut text in the entry.
+                # A tag the span only cuts ("of <EMAIL") goes back whole; its cut-off part
+                # left beside the placeholder in the text is dropped.
                 for a, b, value in sorted(swallowed, reverse=True):
-                    if entry.start <= a and b <= entry.end:
-                        entry.original = (entry.original[:a - entry.start] + originals.get(value, value)
-                                          + entry.original[b - entry.start:])
+                    if a < entry.end and entry.start < b:
+                        entry.original = (entry.original[:max(a, entry.start) - entry.start]
+                                          + originals.get(value, value)
+                                          + entry.original[min(b, entry.end) - entry.start:])
+                        if b > entry.end:
+                            text = text.replace(entry.placeholder + source[entry.end:b], entry.placeholder, 1)
+                        if a < entry.start:
+                            text = text.replace(source[a:entry.start] + entry.placeholder, entry.placeholder, 1)
 
         def put(match):
             tag = match.group()
