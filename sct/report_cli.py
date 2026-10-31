@@ -48,9 +48,8 @@ def _read_rows(path: Path, parser: argparse.ArgumentParser) -> list[dict[str, An
 
 
 def _hashable(value):
-    return value if isinstance(value, (str, int, float, bool, type(None))) else json.dumps(
-        value, sort_keys=True, ensure_ascii=False, default=str,
-    )
+    # Encode every value, so "[1]" vs [1] and True vs 1 stay distinct groups.
+    return json.dumps(value, sort_keys=True, ensure_ascii=False, default=str)
 
 
 def main(argv: Optional[Sequence[str]] = None) -> int:

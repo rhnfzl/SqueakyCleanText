@@ -23,7 +23,10 @@ class SCTMap:
         self.handle = CleanerHandle(config)
 
     def __call__(self, batch: dict) -> dict:
-        return clean_columns(self.handle, batch, self.columns, self.output, score=self.score)
+        out = clean_columns(self.handle, batch, self.columns, self.output, score=self.score)
+        # HF merges the returned columns back after remove_columns, so returning
+        # untouched input columns would resurrect the raw text the caller dropped.
+        return {k: v for k, v in out.items() if k not in batch or (self.output == "overwrite" and k in self.columns)}
 
 
 def clean_dataset(

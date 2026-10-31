@@ -36,7 +36,8 @@ def assess_reidentification_risk(
         missing = set(quasi_identifiers).difference(record)
         if missing:
             raise KeyError(f"Missing quasi-identifiers: {sorted(missing)}")
-        combinations[tuple(record[key] for key in quasi_identifiers)] += 1
+        # Type-tagged, since True == 1 and 1 == 1.0 would merge distinct values.
+        combinations[tuple((type(record[key]), record[key]) for key in quasi_identifiers)] += 1
 
     class_size_counts = Counter(combinations.values())
     at_risk_records = sum(
