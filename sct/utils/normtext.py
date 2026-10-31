@@ -73,10 +73,21 @@ _STYLED_JOINER_REGEX = re.compile(
     rf'|(?<=[0-9A-Za-z])[{_forms(".")}](?=[^\W_])|(?<=[A-Za-z])[:{_forms(":")}][/{_forms("/")}]{{2}}')
 
 
-# After a scheme, full-width query/fragment syntax folds whatever script the host is in
-# (https://例え.テスト？email=...), so the whole URL, query values included, is one match.
-_URL_RUN_REGEX = re.compile(r'[A-Za-z][A-Za-z0-9+.\-]*://\S+')
+# After a scheme or a www introducer (as URL_REGEX accepts), full-width query/fragment syntax folds
+# whatever script the host is in (https://例え.テスト？email=...), and so do dots in the host
+# (https://例え．テスト/), so the whole URL, query values included, is one match.
+_URL_RUN_REGEX = re.compile(
+    rf'(?:[A-Za-z][A-Za-z0-9+.\-]*://|(?<![A-Za-z0-9_/.{_forms(".")}])www\d{{0,3}}[.{_forms(".")}])\S+',
+    re.IGNORECASE)
 _URL_RUN_JOINER = str.maketrans({ch: plain for ch, plain in _STYLED_SEP.items() if plain in ':/?=&#%~'})
+# Dots fold only in a host (up to the path), so prose glued after a URL keeps its ．; a run may hold
+# several URLs glued by CJK prose, each with its own host.
+_URL_AUTHORITY = re.compile(rf'(?:[A-Za-z][A-Za-z0-9+.\-]*://|www\d{{0,3}}[.{_forms(".")}])[^/?#]*', re.IGNORECASE)
+_DOT_JOINER = str.maketrans({ch: plain for ch, plain in _STYLED_SEP.items() if plain == '.'})
+
+
+def _fold_url_run(m):
+    return _URL_AUTHORITY.sub(lambda a: a.group().translate(_DOT_JOINER), m.group().translate(_URL_RUN_JOINER))
 # Inside an address-shaped run every styled form of @ . - _ + folds (the full-width-only rule above, widened).
 _STYLED_EMAIL_RUN_REGEX = re.compile(
     rf'\w[\w{_forms(".-_+")}{constants.MARKS}]*[@{_forms("@")}][\w{_forms(".-_")}{constants.MARKS}]*\w')
@@ -131,7 +142,7 @@ def fold_styled(text):
     text = _INVISIBLE_REGEX.sub(_drop_invisible, text.translate(_STYLED_ALNUM))
     text = _CIRCLED_RUN_REGEX.sub(_fold_circled_run, text)
     text = _STYLED_JOINER_REGEX.sub(lambda m: unicodedata.normalize('NFKC', m.group()), text)
-    text = _URL_RUN_REGEX.sub(lambda m: m.group().translate(_URL_RUN_JOINER), text)
+    text = _URL_RUN_REGEX.sub(_fold_url_run, text)
     return _STYLED_EMAIL_RUN_REGEX.sub(lambda m: m.group().translate(_STYLED_EMAIL_RUN_JOINER), text)
 
 

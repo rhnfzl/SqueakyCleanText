@@ -3,11 +3,12 @@
 
 Each seed builds one document: random prose in Latin, CJK, Arabic, Devanagari,
 Thai or Cyrillic, plus 1-3 PII values (email, phone, IPv4, URL with a query,
-date, number). Each value is then rendered in forms a reader still reads as the
-same value: full-width and small-form characters, mathematical styled letters
-and digits, circled/squared letters and digits, native decimal digits of any
-script, decomposed letters (base + combining mark), zero-width characters where
-they are legal, invisible break hints (ZWSP, WJ, soft hyphen) inside the value,
+also www-introduced or on a host of non-Latin labels, date, number). Each value
+is then rendered in forms a reader still reads as the same value: full-width and
+small-form characters, mathematical styled letters and digits, circled/squared
+letters and digits, native decimal digits of any script, decomposed letters
+(base + combining mark), zero-width characters where they are legal, invisible
+break hints (ZWSP, WJ, soft hyphen) inside the value,
 typeset phone and date separators (no-break or thin space, non-breaking hyphen, en dash),
 and glued to CJK/Thai prose without a space. Every variant comes from Unicode
 data (decomposition tag, NFKC, decimal value, category), and every
@@ -317,6 +318,18 @@ def _typo_sep(rng, plain, slots, kinds):
     return sorted(set(kinds) | {"typo_sep"}) if any(slot and slot[0] == "typo_sep" for slot in slots) else kinds
 
 
+def _url_shape(rng, plain):
+    """A host of two labels in one non-Latin script (例え.テスト, as IDNA allows) and a scheme-less
+    www introducer, which URL_REGEX also accepts; own RNG so the cases of earlier rounds stay the same."""
+    intro, host, path, rest = re.match(r"(https?://)([^/]+)(/[^?#]*)(.*)", plain).groups()
+    if rng.random() < 0.25:
+        script = rng.choice(("cyrillic", "arabic", "devanagari", "thai", "cjk"))
+        host = _script_token(rng, script) + "." + _word(rng, script, 2, 4)
+    if rng.random() < 0.25:
+        intro, path = "www.", rng.choice((path, ""))
+    return intro + host + path + rest
+
+
 def make_case(seed: int) -> dict:
     rng = random.Random(seed)  # noqa: S311  # reproducible test data, not crypto
     scripts = rng.sample(sorted(SCRIPT_RANGES), rng.choice((1, 2)))
@@ -324,6 +337,8 @@ def make_case(seed: int) -> dict:
     for _ in range(rng.randint(1, 3)):
         typ = rng.choice(sorted(GENERATORS))
         plain, cores = GENERATORS[typ](rng)
+        if typ == "URL":
+            plain = _url_shape(random.Random(f"{seed}-{len(values)}-url"), plain)  # noqa: S311
         slots, inserts, kinds = _plan(rng, plain, _legal_join(plain, typ))
         kinds = _zw_inside(random.Random(f"{seed}-{len(values)}-zw"), plain, inserts, kinds)  # noqa: S311
         if typ in ("PHONE", "DATE"):
