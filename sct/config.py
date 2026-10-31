@@ -299,7 +299,7 @@ class TextCleanerConfig:
     onnx_inter_op_threads: Optional[int] = None  # None = ONNX Runtime default
     ner_chunk_overlap: int = 0  # tokens of neighbouring text each NER window adds per side; 0 = 0.7.1 chunks
     detect_all_languages: bool = True  # False = 0.7 detector over supported_languages only
-    language_confidence_warning: float = 0.5  # below this, metadata warns language_low_confidence
+    language_confidence_warning: float = 0.0  # below this confidence, warn language_low_confidence; 0.5 = early 0.8.0
     check_decode_unicode_escapes: bool = True  # False keeps literal \n, \u00e9 escapes (code, JSON)
     ner_device: Optional[str] = None  # None = auto (CUDA when available), 'cpu', 'cuda'
     cuda_device_id: int = 0  # GPU index for ONNX, torch and GLiNER when on CUDA
@@ -311,6 +311,9 @@ class TextCleanerConfig:
     # True: fakes seeded per document from synthetic_seed + its text (differ across documents,
     # same document -> same fakes); False = 0.7 single Faker stream per thread
     synthetic_per_document: bool = True
+    # Warn language_low_confidence when the top language leads the runner-up by less than this
+    # (ambiguous detection); 0 turns it off. Absolute confidence is low for many correct texts.
+    language_margin_warning: float = 0.15
 
     def __post_init__(self):
         if self.gliclass_onnx:
@@ -426,6 +429,10 @@ class TextCleanerConfig:
             raise ValueError(
                 "language_confidence_warning must be in [0, 1], "
                 f"got {self.language_confidence_warning}"
+            )
+        if not 0.0 <= self.language_margin_warning <= 1.0:
+            raise ValueError(
+                f"language_margin_warning must be in [0, 1], got {self.language_margin_warning}"
             )
 
         # GLiNER fields required for gliner/ensemble backends
@@ -642,7 +649,7 @@ def _config_from_module_globals() -> TextCleanerConfig:
         ner_batch_size=getattr(m, 'NER_BATCH_SIZE', 8),
         ner_chunk_overlap=getattr(m, 'NER_CHUNK_OVERLAP', 0),
         detect_all_languages=getattr(m, 'DETECT_ALL_LANGUAGES', True),
-        language_confidence_warning=getattr(m, 'LANGUAGE_CONFIDENCE_WARNING', 0.5),
+        language_confidence_warning=getattr(m, 'LANGUAGE_CONFIDENCE_WARNING', 0.0),
         check_decode_unicode_escapes=getattr(m, 'CHECK_DECODE_UNICODE_ESCAPES', True),
         ner_device=getattr(m, 'NER_DEVICE', None),
         cuda_device_id=getattr(m, 'CUDA_DEVICE_ID', 0),
@@ -650,6 +657,7 @@ def _config_from_module_globals() -> TextCleanerConfig:
         json_key_cleaning=getattr(m, 'JSON_KEY_CLEANING', 'pii'),
         synthetic_seed=getattr(m, 'SYNTHETIC_SEED', 42),
         synthetic_per_document=getattr(m, 'SYNTHETIC_PER_DOCUMENT', True),
+        language_margin_warning=getattr(m, 'LANGUAGE_MARGIN_WARNING', 0.15),
         check_replace_currency_symbols=m.CHECK_REPLACE_CURRENCY_SYMBOLS,
         check_ner_process=m.CHECK_NER_PROCESS,
         check_remove_isolated_letters=m.CHECK_REMOVE_ISOLATED_LETTERS,
@@ -710,7 +718,7 @@ ONNX_INTER_OP_THREADS = None
 NER_BATCH_SIZE = 8
 NER_CHUNK_OVERLAP = 0
 DETECT_ALL_LANGUAGES = True
-LANGUAGE_CONFIDENCE_WARNING = 0.5
+LANGUAGE_CONFIDENCE_WARNING = 0.0
 CHECK_DECODE_UNICODE_ESCAPES = True
 NER_DEVICE = None
 CUDA_DEVICE_ID = 0
@@ -747,6 +755,7 @@ NER_MODE = 'standard'
 REPLACEMENT_MODE = 'placeholder'
 SYNTHETIC_SEED = 42
 SYNTHETIC_PER_DOCUMENT = True
+LANGUAGE_MARGIN_WARNING = 0.15
 GLINER_ONNX = False
 LANGUAGE = None
 

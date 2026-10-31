@@ -1,6 +1,8 @@
 """All-75 language detection, confidence, pins and bring-your-own NER model (0.8.0)."""
 
+import json
 import threading
+from pathlib import Path
 
 import pytest
 from lingua import Language, LanguageDetectorBuilder
@@ -120,9 +122,36 @@ def test_low_confidence_warning_threshold():
     low = TextCleaner(cfg=_cfg()).process(text)
     assert low.metadata["language_confidence"] < 0.5
     assert low.metadata["warnings"] == ["language_low_confidence"]
-    off = TextCleaner(cfg=_cfg(language_confidence_warning=0.0)).process(text)
+    off = TextCleaner(cfg=_cfg(language_margin_warning=0.0)).process(text)
     assert off.language == low.language
     assert off.metadata["warnings"] == []
+
+
+def _eval_text(example_id):
+    path = Path(__file__).parent.parent / "evaluation" / "multilingual_pii.jsonl"
+    return next(json.loads(line)["text"] for line in path.open() if f'"{example_id}"' in line)
+
+
+def test_low_confidence_warns_on_ambiguous_not_low_absolute_confidence():
+    """Correct English with names scores low but clear; a Hindi text read as Marathi scores higher but close."""
+    english = "Maria Chen moved to Toronto last spring to work for Bluefield Bank."
+    hindi = _eval_text("hi-billing-010")
+    cleaner = TextCleaner(cfg=_cfg())
+    clear = cleaner.process(english)
+    assert clear.language == "ENGLISH" and clear.metadata["language_confidence"] < 0.5
+    assert clear.metadata["warnings"] == []
+    close = cleaner.process(hindi)
+    assert close.language == "MARATHI" and close.metadata["language_confidence"] > 0.5
+    assert "language_low_confidence" in close.metadata["warnings"]
+    # Early 0.8.0 rule stays reachable: absolute confidence below 0.5, no margin check.
+    old = TextCleaner(cfg=_cfg(language_confidence_warning=0.5, language_margin_warning=0.0))
+    assert old.process(english).metadata["warnings"] == ["language_low_confidence"]
+    assert "language_low_confidence" not in old.process(hindi).metadata["warnings"]
+
+
+def test_margin_warning_module_global(monkeypatch):
+    monkeypatch.setattr(config_module, "LANGUAGE_MARGIN_WARNING", 0.3)
+    assert config_module._config_from_module_globals().language_margin_warning == 0.3
 
 
 def test_unknown_language_warning():
@@ -145,6 +174,8 @@ def test_no_detection_no_warning():
 def test_confidence_warning_validated(value):
     with pytest.raises(ValueError, match="language_confidence_warning"):
         _cfg(language_confidence_warning=value)
+    with pytest.raises(ValueError, match="language_margin_warning"):
+        _cfg(language_margin_warning=value)
 
 
 def test_bring_your_own_model_routes_hindi(monkeypatch):

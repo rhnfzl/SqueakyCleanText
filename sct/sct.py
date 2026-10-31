@@ -225,11 +225,12 @@ class TextCleaner:
         for step_fn in cfg.custom_pipeline_steps:
             self._post_fuzzy_pipeline.append(step_fn)
 
-    def _detect_language(self, text: str) -> Tuple[Optional[str], Optional[float], str]:
+    def _detect_language(self, text: str) -> Tuple[Optional[str], Optional[float], str, Optional[float]]:
         """Detect language as a pure function (no instance mutation).
 
-        Returns ``(name, confidence, source)``; source is ``pinned``, ``detected``,
-        ``fallback`` (tuple restriction fell back to its first entry) or ``none``.
+        Returns ``(name, confidence, source, margin)``; source is ``pinned``, ``detected``,
+        ``fallback`` (tuple restriction fell back to its first entry) or ``none``;
+        margin is top minus runner-up confidence, only for ``detected``.
 
         Behavior depends on ``cfg.language``:
           - ``str``: pinned to that language (skip detection)
@@ -240,11 +241,11 @@ class TextCleaner:
 
         # Pinned: single string → return immediately (already resolved to uppercase)
         if isinstance(language_config, str):
-            return language_config, 1.0, 'pinned'
+            return language_config, 1.0, 'pinned', None
 
         restricted = isinstance(language_config, tuple)
         if not restricted and not self._language_needed():
-            return None, None, 'none'
+            return None, None, 'none', None
 
         values = self._detector.compute_language_confidence_values(text)
         # Same "unknown" rule as Lingua's detect_language_of: nothing scored, or a tie at the top.
@@ -252,12 +253,13 @@ class TextCleaner:
             top = values[0]
             if not restricted or top.language.name in language_config:
                 # Lingua's sum order varies per process (last-ulp noise); round so workers match.
-                return top.language.name, round(top.value, 6), 'detected'
+                margin = top.value - (values[1].value if len(values) > 1 else 0.0)
+                return top.language.name, round(top.value, 6), 'detected', round(margin, 6)
         if restricted:
             first = language_config[0]
             conf = next((v.value for v in values if v.language.name == first), 0.0)
-            return first, round(conf, 6), 'fallback'
-        return None, None, 'none'
+            return first, round(conf, 6), 'fallback', None
+        return None, None, 'none', None
 
     def _language_needed(self) -> bool:
         """Whether auto-detection runs at all (else no language is expected)."""
@@ -310,7 +312,7 @@ class TextCleaner:
         """Every step before NER.
 
         Returns ``(text, language, anon_map, doc_classes, started_at, regex_counts,
-        language_confidence, language_source, source_chars, source_markers)``.
+        language_confidence, language_source, source_chars, source_markers, language_margin)``.
         """
         started_at = time.perf_counter()
 
@@ -334,7 +336,7 @@ class TextCleaner:
             doc_classes = self._gliclass.classify(text)
 
         # Detect language (pure function, thread-safe)
-        language, language_confidence, language_source = self._detect_language(text)
+        language, language_confidence, language_source, language_margin = self._detect_language(text)
 
         current_text = text
 
@@ -366,12 +368,12 @@ class TextCleaner:
             current_text = step(current_text)
 
         return (current_text, language, anon_map, doc_classes, started_at, regex_counts,
-                language_confidence, language_source, len(text), source_markers)
+                language_confidence, language_source, len(text), source_markers, language_margin)
 
     def _after_ner(self, state: tuple, current_text: str, findings) -> ProcessResult:
         """Every step after NER, for the document *state* from ``_before_ner``."""
         (_, language, anon_map, doc_classes, started_at, regex_counts,
-         language_confidence, language_source, source_chars, _) = state
+         language_confidence, language_source, source_chars, _, language_margin) = state
 
         # Statistical model processing (always returns stext, even if None)
         stext = None
@@ -401,8 +403,9 @@ class TextCleaner:
             warnings.add('language_unknown')
         if language_source == 'fallback':
             warnings.add('language_fallback')
-        if (language_source == 'detected'
-                and language_confidence < self.cfg.language_confidence_warning):
+        if language_source == 'detected' and (
+                language_confidence < self.cfg.language_confidence_warning
+                or language_margin < self.cfg.language_margin_warning):
             warnings.add('language_low_confidence')
         ner_on = self.cfg.check_ner_process and self.GeneralNER is not None
         if ner_on and self.GeneralNER.uses_fallback_models(language):
