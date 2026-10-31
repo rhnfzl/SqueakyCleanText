@@ -337,6 +337,10 @@ class TextCleanerConfig:
     # (Dutch text gets Dutch names, en_US when Faker has no locale for it); a string forces that
     # locale ('en_US' = 0.7)
     synthetic_locale: Optional[str] = None
+    # synthetic/reversible: NER reads the same text as placeholder mode (<EMAIL>, <PHONE>...) and
+    # the fakes / indexed placeholders go in after NER, so every mode finds the same entities;
+    # False = 0.7 order (NER reads the fakes / <EMAIL_0>)
+    ner_sees_tags: bool = True
 
     def __post_init__(self):
         if self.gliclass_onnx:
@@ -692,6 +696,7 @@ def _config_from_module_globals() -> TextCleanerConfig:
         fold_styled_characters=getattr(m, 'FOLD_STYLED_CHARACTERS', True),
         ner_subword_widen_same_script=getattr(m, 'NER_SUBWORD_WIDEN_SAME_SCRIPT', True),
         synthetic_locale=getattr(m, 'SYNTHETIC_LOCALE', None),
+        ner_sees_tags=getattr(m, 'NER_SEES_TAGS', True),
         check_replace_currency_symbols=m.CHECK_REPLACE_CURRENCY_SYMBOLS,
         check_ner_process=m.CHECK_NER_PROCESS,
         check_remove_isolated_letters=m.CHECK_REMOVE_ISOLATED_LETTERS,
@@ -796,6 +801,7 @@ NER_SUBWORD_WIDEN = 1.0
 FOLD_STYLED_CHARACTERS = True
 NER_SUBWORD_WIDEN_SAME_SCRIPT = True
 SYNTHETIC_LOCALE = None
+NER_SEES_TAGS = True
 GLINER_ONNX = False
 LANGUAGE = None
 

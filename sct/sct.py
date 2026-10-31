@@ -7,6 +7,7 @@ import os
 import re
 import threading
 import time
+from collections import Counter
 from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
@@ -50,6 +51,16 @@ class TextCleaner:
         self._include_entities = include_entities
         self._metrics_callback = metrics_callback
         self._document_context = threading.local()
+        # NER reads the placeholder-mode tags; fakes / indexed placeholders go in after NER.
+        self._defer_tags = (self.cfg.ner_sees_tags and self.cfg.check_ner_process
+                            and self.cfg.replacement_mode != 'placeholder')
+        self._tags = {
+            'HTML': self.cfg.replace_with_html, 'URL': self.cfg.replace_with_url,
+            'EMAIL': self.cfg.replace_with_email, self._ip_type: self.cfg.replace_with_ips,
+            'DATE': self.cfg.replace_with_dates, 'YEAR': self.cfg.replace_with_years,
+            self._phone_type: self.cfg.replace_with_phone_numbers,
+            'NUMBER': self.cfg.replace_with_numbers, 'CURRENCY': self.cfg.replace_with_currency_symbols,
+        }
 
         # Language detector: tuple restricts; else all 75 Lingua languages unless turned off
         if isinstance(self.cfg.language, tuple):
@@ -278,6 +289,7 @@ class TextCleaner:
             self._document_context.anon_map = None
             self._document_context.protected = None
             self._document_context.regex_counts = None
+            self._document_context.deferred = None
 
     def _process_single_with_context(self, text: str) -> ProcessResult:
         """Process a single text through the entire pipeline.
@@ -312,6 +324,7 @@ class TextCleaner:
             self._document_context.anon_map = None
             self._document_context.protected = None
             self._document_context.regex_counts = None
+            self._document_context.deferred = None
 
     def _before_ner(self, text: str) -> tuple:
         """Every step before NER.
@@ -330,6 +343,9 @@ class TextCleaner:
         # The dict travels in the returned state, so it survives the context reset.
         regex_counts: Dict[str, Dict[str, int]] = {}
         self._document_context.regex_counts = regex_counts
+        # (protected key -> tag NER reads, [(tag, value or None) in text order])
+        deferred = ({}, []) if self._defer_tags else None
+        self._document_context.deferred = deferred
 
         # Document-level classification (before any text modification)
         doc_classes = None
@@ -374,12 +390,14 @@ class TextCleaner:
             current_text = step(current_text)
 
         return (current_text, language, anon_map, doc_classes, started_at, regex_counts,
-                language_confidence, language_source, len(text), source_markers, language_margin)
+                language_confidence, language_source, len(text), source_markers, language_margin,
+                deferred[1] if deferred else None)
 
     def _after_ner(self, state: tuple, current_text: str, findings) -> ProcessResult:
         """Every step after NER, for the document *state* from ``_before_ner``."""
         (_, language, anon_map, doc_classes, started_at, regex_counts,
-         language_confidence, language_source, source_chars, _, language_margin) = state
+         language_confidence, language_source, source_chars, _, language_margin, deferred) = state
+        current_text = self._swap_deferred(current_text, deferred)
 
         # Statistical model processing (always returns stext, even if None)
         stext = None
@@ -596,7 +614,15 @@ class TextCleaner:
             entry = counts.setdefault(entity_type, {'count': 0, 'chars': 0})
             entry['count'] += 1
             entry['chars'] += len(original)
-        return self._protect(value)
+        key = self._protect(value)
+        deferred = getattr(self._document_context, 'deferred', None)
+        if deferred is not None:
+            tag = (constants.CURRENCIES.get(original)
+                   if entity_type == 'CURRENCY' and self.cfg.replace_with_currency_symbols is None
+                   else self._tags.get(entity_type))
+            if tag and tag != value:
+                deferred[0][key] = tag
+        return key
 
     def _protect(self, value):
         """Hide an emitted value from later regex steps (``<EMAIL1>``, kept IPs)."""
@@ -608,9 +634,49 @@ class TextCleaner:
         return protected.setdefault(value, f"\U00100000{chr(0xF0000 + len(protected))}\U00100001")
 
     def _restore_protected(self, text):
-        for value, key in (getattr(self._document_context, 'protected', None) or {}).items():
-            text = text.replace(key, value)
-        return text
+        protected = getattr(self._document_context, 'protected', None) or {}
+        deferred = getattr(self._document_context, 'deferred', None)
+        if not deferred or not deferred[0]:
+            for value, key in protected.items():
+                text = text.replace(key, value)
+            return text
+        # Deferred keys become their tag; every tag occurrence is recorded in order
+        # (source text and plain tag emits as None) so _swap_deferred can pair them up.
+        tags, order = deferred
+        values = {key: value for value, key in protected.items()}
+        tracked = set(tags.values())
+        pattern = re.compile('|'.join(map(re.escape, sorted({*values, *tracked}, key=len, reverse=True))))
+
+        def put(match):
+            found = match.group()
+            if found in tags:
+                order.append((tags[found], values[found]))
+                return tags[found]
+            value = values.get(found, found)
+            if value in tracked:
+                order.append((value, None))
+            return value
+        return pattern.sub(put, text)
+
+    @staticmethod
+    def _swap_deferred(text, order):
+        """After NER: the k-th occurrence of each tag gets the k-th recorded value."""
+        if not order:
+            return text
+        values: Dict[str, list] = {}
+        for tag, value in order:
+            values.setdefault(tag, []).append(value)
+        pattern = re.compile('|'.join(map(re.escape, sorted(values, key=len, reverse=True))))
+        found = Counter(match.group() for match in pattern.finditer(text))
+        # shortcut: a tag an NER span cut or added changes its count; that tag then stays
+        # as the plain tag everywhere (no value lost to the wrong place, no PII).
+        pending = {tag: iter(v) for tag, v in values.items() if found[tag] == len(v)}
+
+        def put(match):
+            tag = match.group()
+            value = next(pending[tag]) if tag in pending else None
+            return tag if value is None else value
+        return pattern.sub(put, text)
 
     def _replace_reversible(self, text, pattern, entity_type, keep=None):
         anon_map = getattr(self._document_context, 'anon_map', None)
