@@ -302,6 +302,22 @@ def build_month_names_dict(extra_month_names=None):
     return result
 
 
+_DAY = r'(?:0?[1-9]|[12]\d|3[01])'
+_MONTH = r'(?:0?[1-9]|1[0-2])'
+# Numeric dates with a 4-digit year and one separator (-, / or .), optional time:
+# 2024-01-15, 2024/1/15, 2024.01.15, 15.01.2024, 01/15/2024, 2024-01-15T10:30:00Z, 15-01-2024 10:30.
+# Year-first with dots needs 2-digit month/day so CalVer "2024.1.5" stays; a digit
+# joined by . or , on either side means a version, IP or decimal ("10.1.12.2024").
+_NUMERIC_DATE = (
+    r'(?<!\d[.,])(?:'
+    r'\d{4}(?:([-/])' + _MONTH + r'\1' + _DAY + r'|\.(?:0[1-9]|1[0-2])\.(?:0[1-9]|[12]\d|3[01]))'
+    r'|' + _DAY + r'([-/.])' + _DAY + r'\2\d{4}'
+    r')'
+    r'(?:[T ]\d{1,2}:\d{2}(?::\d{2})?(?:[.,]\d+)?(?:\s?Z|\s?[+-]\d{2}:?\d{2})?)?'
+    r'(?![.,]\d)'
+)
+
+
 def build_date_regex(month_names_dict=None):
     """Build DATE_REGEX from a month-names dict.
 
@@ -315,9 +331,7 @@ def build_date_regex(month_names_dict=None):
     alt = '|'.join(sorted(names.keys(), key=len, reverse=True))
     return re.compile(
         r'\b(?:'
-        r'\d{4}-\d{2}-\d{2}(?:T\d{2}:\d{2}(?::\d{2})?(?:\.\d+)?(?:Z|[+-]\d{2}:?\d{2})?)?'
-        r'|'
-        r'\d{1,2}[/.-]\d{1,2}[/.-]\d{4}'
+        + _NUMERIC_DATE +
         r'|'
         r'(?:' + alt + r')'
         r'\.?\s+\d{1,2}(?:st|nd|rd|th)?,?\s+\d{4}'
@@ -348,25 +362,8 @@ def build_fuzzy_vocabulary(month_names_dict=None, lang_to_vocab=None):
         )
     return all_vocab, by_lang
 
-# Date patterns: ISO 8601, common formats, multilingual month names
-DATE_REGEX = re.compile(
-    r'\b(?:'
-    # ISO 8601: 2024-01-15 or 2024-01-15T10:30:00Z
-    r'\d{4}-\d{2}-\d{2}(?:T\d{2}:\d{2}(?::\d{2})?(?:\.\d+)?(?:Z|[+-]\d{2}:?\d{2})?)?'
-    r'|'
-    # Common formats: 01/15/2024, 15.01.2024, 15-01-2024
-    r'\d{1,2}[/.-]\d{1,2}[/.-]\d{4}'
-    r'|'
-    # Month name first: January 15, 2024 or Jan 15 2024 (all 4 langs)
-    r'(?:' + _MONTH_ALTERNATION + r')'
-    r'\.?\s+\d{1,2}(?:st|nd|rd|th)?,?\s+\d{4}'
-    r'|'
-    # Day first: 15 January 2024, 15. Januar 2024, 15 de enero de 2024
-    r'\d{1,2}\.?\s+(?:de\s+)?(?:' + _MONTH_ALTERNATION + r')'
-    r'(?:\s+de)?\s+\d{4}'
-    r')\b',
-    flags=re.IGNORECASE,
-)
+# Date patterns: numeric dates and date-times, multilingual month names
+DATE_REGEX = build_date_regex()
 
 # Candidate pattern for fuzzy date matching: a word near a number that could be a date.
 # Matches patterns like "Janury 15, 2024" or "15 Feburary 2024" where the month is misspelled.

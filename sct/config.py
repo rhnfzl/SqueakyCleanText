@@ -168,7 +168,7 @@ class TextCleanerConfig:
     check_replace_urls: bool = True
     check_replace_emails: bool = True
     check_replace_years: bool = True
-    check_replace_dates: bool = False
+    check_replace_dates: bool = True
     check_fuzzy_replace_dates: bool = False
     check_replace_phone_numbers: bool = True
     check_replace_numbers: bool = True
@@ -638,7 +638,7 @@ def _config_from_module_globals() -> TextCleanerConfig:
         check_replace_ips=getattr(m, 'CHECK_REPLACE_IPS', True),
         replace_ips_public_only=getattr(m, 'REPLACE_IPS_PUBLIC_ONLY', False),
         check_replace_years=m.CHECK_REPLACE_YEARS,
-        check_replace_dates=getattr(m, 'CHECK_REPLACE_DATES', False),
+        check_replace_dates=getattr(m, 'CHECK_REPLACE_DATES', True),
         check_fuzzy_replace_dates=getattr(m, 'CHECK_FUZZY_REPLACE_DATES', False),
         fuzzy_date_score_cutoff=getattr(m, 'FUZZY_DATE_SCORE_CUTOFF', 85),
         check_replace_phone_numbers=m.CHECK_REPLACE_PHONE_NUMBERS,
@@ -707,7 +707,7 @@ CHECK_REPLACE_EMAILS = True
 CHECK_REPLACE_IPS = True
 REPLACE_IPS_PUBLIC_ONLY = False
 CHECK_REPLACE_YEARS = True
-CHECK_REPLACE_DATES = False
+CHECK_REPLACE_DATES = True
 CHECK_FUZZY_REPLACE_DATES = False
 FUZZY_DATE_SCORE_CUTOFF = 85
 CHECK_REPLACE_PHONE_NUMBERS = True

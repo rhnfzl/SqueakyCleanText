@@ -137,11 +137,11 @@ text = "Contact John Doe at john.doe@company.com. Meeting on 2023-10-01."
 lm_text, stat_text, lang = cleaner.process(text)
 
 print(f"Language Model format:    {lm_text}")
-# Output: "Contact <PERSON> at <EMAIL>. Meeting on <YEAR><NUMBER><NUMBER>."
-# (the date step is off by default; check_replace_dates=True keeps the date as one token)
+# Output: "Contact <PERSON> at <EMAIL>. Meeting on <DATE>."
+# (check_replace_dates=False gives the old "<YEAR><NUMBER><NUMBER>")
 
 print(f"Statistical Model format: {stat_text}")
-# Output: "contact person email meeting yearnumbernumber"
+# Output: "contact person email meeting date"
 
 print(f"Detected Language: {lang}")
 # Output: "ENGLISH"
@@ -571,7 +571,7 @@ new_cfg = dataclasses.replace(cfg, check_ner_process=False)
 | `check_replace_ips` | `True` | Replace IPv4/IPv6 addresses (runs before dates, phones, years) |
 | `replace_ips_public_only` | `False` | Keep private, loopback and reserved IPs; replace only public ones |
 | `check_replace_years` | `True` | Replace years (1900-2099) |
-| `check_replace_dates` | `False` | Replace full dates (ISO 8601, month names) |
+| `check_replace_dates` | `True` | Replace full dates and date-times with one `<DATE>` (ISO 8601, numeric with `-` `/` `.`, month names); runs before phones, years and numbers. `False`: digits fall to the year and number steps |
 | `check_fuzzy_replace_dates` | `False` | Fuzzy match misspelled months (requires `[fuzzy]`) |
 | `check_replace_phone_numbers` | `True` | Replace phone numbers |
 | `check_replace_numbers` | `True` | Replace standalone numbers |
