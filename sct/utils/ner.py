@@ -12,8 +12,6 @@ from pathlib import Path
 
 import onnxruntime as ort
 
-from presidio_anonymizer import AnonymizerEngine
-from presidio_anonymizer.entities import RecognizerResult
 
 from typing import NamedTuple as _NamedTuple
 
@@ -162,7 +160,7 @@ class GeneralNER:
         self._torch_device = f"cuda:{cuda_device_id}" if self.device == 'cuda' else self.device
         logger.info("Using device: %s (backend: %s)", self._torch_device, ner_backend)
 
-        self.engine = AnonymizerEngine()
+        self._engine = None
         self._cache_args = {"cache_dir": str(cache_dir)} if cache_dir else {}
 
         # Common state for all backends
@@ -481,6 +479,7 @@ class GeneralNER:
             return AnonymizeResult(text=text)
         else:
             # Standard entities only: use Presidio (existing behavior)
+            from presidio_anonymizer.entities import RecognizerResult
             analyzer_result = []
             for items in filtered_data:
                 entity_type = ENTITY_TYPE_MAP.get(items['entity_group'])
@@ -500,6 +499,14 @@ class GeneralNER:
 
             engine_result = self.engine.anonymize(text=text, analyzer_results=analyzer_result)
             return AnonymizeResult(text=engine_result.text)
+
+    @property
+    def engine(self):
+        # Lazy: presidio_anonymizer imports presidio_analyzer (and torch via GLiNER) when installed.
+        if getattr(self, '_engine', None) is None:
+            from presidio_anonymizer import AnonymizerEngine
+            self._engine = AnonymizerEngine()
+        return self._engine
 
     @staticmethod
     def _merge_overlaps(text, filtered_data):

@@ -249,11 +249,12 @@ class TextCleaner:
         if values and values[0].value > 0 and (len(values) < 2 or values[1].value < values[0].value):
             top = values[0]
             if not restricted or top.language.name in language_config:
-                return top.language.name, top.value, 'detected'
+                # Lingua's sum order varies per process (last-ulp noise); round so workers match.
+                return top.language.name, round(top.value, 6), 'detected'
         if restricted:
             first = language_config[0]
             conf = next((v.value for v in values if v.language.name == first), 0.0)
-            return first, conf, 'fallback'
+            return first, round(conf, 6), 'fallback'
         return None, None, 'none'
 
     def _language_needed(self) -> bool:

@@ -217,7 +217,7 @@ def _word_ner(overlap, detector, budget=12, mode="placeholder"):
     ner.tokenizer = _word_tokenizer
     ner.min_token_length = budget
     ner._ner_chunk_overlap = overlap
-    ner.engine = AnonymizerEngine()
+    ner._engine = AnonymizerEngine()
     return ner
 
 

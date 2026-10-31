@@ -18,7 +18,7 @@ import pytest
 from sct import TextCleaner, TextCleanerConfig, ProcessResult, AnonymizationMap
 from sct.config import DEFAULT_NER_MODELS, PII_DEFAULT_MODEL
 from sct.utils.ner import ENTITY_TYPE_MAP
-from tests.conftest import TEST_NER_MODELS
+from tests.conftest import TEST_NER_MODELS, TEST_TORCH_NER_MODELS
 
 # Derive entity tags from the authoritative map — stays in sync automatically
 ENTITY_TAGS = tuple(f"<{v}>" for v in ENTITY_TYPE_MAP.values())
@@ -75,10 +75,18 @@ def _make_ner_cfg(**overrides) -> TextCleanerConfig:
         check_statistical_model_processing=True,
         ner_models=NER_MODELS,
     )
+    if overrides.get("ner_backend") in ("torch", "ensemble_torch") and not USE_PROD:
+        defaults["torch_ner_models"] = TEST_TORCH_NER_MODELS
     defaults.update(overrides)
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", DeprecationWarning)
         return TextCleanerConfig(**defaults)
+
+
+def test_torch_tests_use_the_small_model():
+    """Torch-backend tests must not fall back to the multi-GB XLM-R defaults."""
+    cfg = _make_ner_cfg(ner_backend="torch")
+    assert set(cfg.torch_ner_models.values()) == {"dslim/bert-base-NER"} or USE_PROD
 
 
 # =========================================================================
@@ -835,6 +843,10 @@ class TestPIIMode:
 class TestPresidioGLiNER:
     """L. Presidio + GLiNER integration backend."""
 
+    @pytest.mark.skipif(
+        not (HAS_PRESIDIO and _has_package("en_core_web_lg")),
+        reason="presidio downloads the 400 MB spaCy en_core_web_lg at test time",
+    )
     def test_l53_presidio_gliner_backend(self):
         """Presidio + GLiNER backend with real models."""
         cfg = _make_ner_cfg(
