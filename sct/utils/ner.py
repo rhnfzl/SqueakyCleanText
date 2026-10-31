@@ -718,7 +718,10 @@ class GeneralNER:
                 language=analyzer_language,
             )
             # Analyzer names (PHONE_NUMBER, a label's upper case) -> the configured type names.
-            types = getattr(self, '_presidio_types', None) or _presidio_type_map({})
+            # An empty map (legacy names) is a valid map; only a missing one falls back.
+            types = getattr(self, '_presidio_types', None)
+            if types is None:
+                types = _presidio_type_map({})
             for result in analyzer_results:
                 result.entity_type = types.get(result.entity_type, result.entity_type)
             entities = tuple(

@@ -6,6 +6,7 @@ import unicodedata
 
 from sct.sct import TextCleaner
 from sct.utils import constants
+from sct.utils.contact import _DIGIT_VIEW
 
 _CONTACT_REGEXES = (
     constants.EMAIL_REGEX, constants.PHONE_REGEX, constants.URL_REGEX, constants.IP_REGEX,
@@ -77,7 +78,8 @@ class WindowedStreamingRedactor:
         cutoff = len(self._buffer) - self._overlap_chars
         # Never split inside a contact token that holds spaces ("06 12 34 56 78"). Match on a
         # view close to what the cleaner sees: HTML entities decoded ("12&#32;34") and each
-        # character NFKC-folded ("０６ １２"); starts/ends map view offsets back to the buffer.
+        # character NFKC-folded ("０６ １２") with any decimal digit as ASCII ("٠٦ ١٢", as the
+        # cleaner's digit view); starts/ends map view offsets back to the buffer.
         view, starts, ends = [], [], []
         for unit in _VIEW_UNIT.finditer(self._buffer):
             decoded = html.unescape(unit.group())
@@ -86,7 +88,7 @@ class WindowedStreamingRedactor:
             else:
                 unit_ends = (unit.end(),)
             for character, end in zip(decoded, unit_ends):
-                folded = unicodedata.normalize("NFKC", character)
+                folded = unicodedata.normalize("NFKC", character).translate(_DIGIT_VIEW)
                 view.append(folded if len(folded) == 1 else character)
                 starts.append(end - 1 if len(unit_ends) > 1 else unit.start())
                 ends.append(end)

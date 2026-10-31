@@ -14,6 +14,7 @@ Legacy API (backward compatible):
 
 import sys
 from dataclasses import dataclass
+from datetime import date
 from types import MappingProxyType
 from typing import Any, Mapping, Optional, Tuple, Union
 
@@ -352,8 +353,13 @@ class TextCleanerConfig:
     # synthetic: drop a fake's final '.' when a '.' follows the entity ('B.Eng..' -> 'B.Eng.');
     # False = keep both (earlier 0.8.0)
     synthetic_collapse_period: bool = True
+    # synthetic: ISO date that date fakes (DATE, DATE_OF_BIRTH) end on, so a document gets the
+    # same dates on any day; None = today, from the clock (earlier 0.8.0)
+    synthetic_reference_date: Optional[str] = '2026-01-01'
 
     def __post_init__(self):
+        if self.synthetic_reference_date is not None:
+            date.fromisoformat(self.synthetic_reference_date)  # ValueError on a bad date
         if self.gliclass_onnx:
             raise ValueError(
                 "GLiClass ONNX is not supported by the gliclass package. "
@@ -717,6 +723,7 @@ def _config_from_module_globals() -> TextCleanerConfig:
         ner_sees_tags=getattr(m, 'NER_SEES_TAGS', True),
         synthetic_low_confidence_locale=getattr(m, 'SYNTHETIC_LOW_CONFIDENCE_LOCALE', 'en_US'),
         synthetic_collapse_period=getattr(m, 'SYNTHETIC_COLLAPSE_PERIOD', True),
+        synthetic_reference_date=getattr(m, 'SYNTHETIC_REFERENCE_DATE', '2026-01-01'),
         check_replace_currency_symbols=m.CHECK_REPLACE_CURRENCY_SYMBOLS,
         check_ner_process=m.CHECK_NER_PROCESS,
         check_remove_isolated_letters=m.CHECK_REMOVE_ISOLATED_LETTERS,
@@ -824,6 +831,7 @@ SYNTHETIC_LOCALE = None
 NER_SEES_TAGS = True
 SYNTHETIC_LOW_CONFIDENCE_LOCALE = 'en_US'
 SYNTHETIC_COLLAPSE_PERIOD = True
+SYNTHETIC_REFERENCE_DATE = '2026-01-01'
 GLINER_ONNX = False
 LANGUAGE = None
 

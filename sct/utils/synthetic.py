@@ -10,6 +10,7 @@ import logging
 import os
 import random
 import threading
+from datetime import date, datetime, timedelta
 from typing import Dict, Optional
 
 logger = logging.getLogger(__name__)
@@ -113,15 +114,20 @@ class SyntheticReplacer:
     detection is low confidence (None = follow the language anyway).
     ``collapse_period`` drops a fake's final ``.`` when the text already has one
     right after the entity (``B.Eng..`` -> ``B.Eng.``).
+    ``reference_date`` (ISO date) is the "today" that date fakes (``DATE``,
+    ``DATE_OF_BIRTH``) end on, so they do not change with the clock; None = today.
     """
 
     def __init__(self, seed: int = 42, per_document: bool = True, locale: Optional[str] = None,
-                 low_confidence_locale: Optional[str] = None, collapse_period: bool = False):
+                 low_confidence_locale: Optional[str] = None, collapse_period: bool = False,
+                 reference_date: Optional[str] = None):
         self._seed = seed
         self._per_document = per_document
         self._locale = locale
         self._low_confidence_locale = low_confidence_locale
         self._collapse_period = collapse_period
+        self._reference = None if reference_date is None else datetime.combine(
+            date.fromisoformat(reference_date), datetime.min.time())
         self._local = threading.local()
 
     def _get_faker(self, locale: Optional[str] = None):
@@ -202,6 +208,13 @@ class SyntheticReplacer:
         method_name = FAKER_GENERATORS.get(entity_group)
 
         generate = getattr(fake, method_name) if method_name and hasattr(fake, method_name) else fake.name
+        if self._reference is not None and method_name == 'date':
+            generate = functools.partial(fake.date, end_datetime=self._reference)
+        elif self._reference is not None and method_name == 'date_of_birth':
+            # Faker's date_of_birth range (ages 0-115) ending on the reference date, not today.
+            generate = functools.partial(fake.date_between_dates,
+                                         self._reference - timedelta(days=115 * 365 + 28),
+                                         self._reference)
         if doc_seed is None:
             replacement = str(generate())
         else:

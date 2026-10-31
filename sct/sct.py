@@ -109,6 +109,7 @@ class TextCleaner:
                 locale=self.cfg.synthetic_locale,
                 low_confidence_locale=self.cfg.synthetic_low_confidence_locale,
                 collapse_period=self.cfg.synthetic_collapse_period,
+                reference_date=self.cfg.synthetic_reference_date,
             )
 
         self.GeneralNER: Optional[ner.GeneralNER] = None
