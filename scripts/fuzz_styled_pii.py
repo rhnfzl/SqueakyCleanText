@@ -3,7 +3,7 @@
 
 Each seed builds one document: random prose in Latin, CJK, Arabic, Devanagari,
 Thai or Cyrillic, plus 1-3 PII values (email, phone, IPv4, URL with a query,
-also www-introduced or on a host whose first labels look like an IPv4; email and URL
+also www-introduced, a bare host or on a host whose first labels look like an IPv4; email and URL
 also on a host of non-Latin labels, date, number). Each value
 is then rendered in forms a reader still reads as the same value: full-width and
 small-form characters, mathematical styled letters and digits, circled/squared
@@ -338,6 +338,8 @@ def _url_shape(rng, plain):
         host = _script_token(rng, script) + "." + _word(rng, script, 2, 4)
     if rng.random() < 0.25:
         intro, path = "www.", rng.choice((path, ""))
+    if rng.random() < 0.2:  # a bare host, so glued CJK prose (，電話：06 ...) meets the host grammar itself
+        path, rest = "", ""
     return intro + host + path + rest
 
 
@@ -403,6 +405,7 @@ def make_case(seed: int) -> dict:
         plain, cores = GENERATORS[typ](rng)
         if typ == "URL":
             plain = _url_shape(random.Random(f"{seed}-{len(values)}-url"), plain)  # noqa: S311
+            cores = [core for core in cores if core[1] in plain]  # a bare host has no query values
         if typ == "EMAIL":
             plain, cores = _email_shape(random.Random(f"{seed}-{len(values)}-mail"), plain, cores)  # noqa: S311
             plain = _upper(random.Random(f"{seed}-{len(values)}-upper"), plain)  # noqa: S311

@@ -90,14 +90,17 @@ _STYLED_JOINER_REGEX = re.compile(
 # After a scheme or a www introducer (as URL_REGEX accepts), full-width query/fragment syntax folds
 # whatever script the host is in (https://例え.テスト？email=...), and so do dots in the host
 # (https://例え．テスト/), so the whole URL, query values included, is one match.
+# CJK and full-width prose punctuation (，、「) ends the run, as it ends URL_REGEX, so prose glued after keeps
+# its ：; an IDNA dot before an ASCII letter or digit (例え。jp) stays in it.
 _URL_RUN_REGEX = re.compile(
-    rf'(?:[A-Za-z][A-Za-z0-9+.\-]*://|(?<![A-Za-z0-9_/.{_forms(".")}])www\d{{0,3}}(?:[.{_forms(".")}]|{_IDNA_DOT}))\S+',
+    rf'(?:[A-Za-z][A-Za-z0-9+.\-]*://|(?<![A-Za-z0-9_/.{_forms(".")}])www\d{{0,3}}(?:[.{_forms(".")}]|{_IDNA_DOT}))(?:[^\s{constants._WIDE_PUNCT}]|{_IDNA_DOT})+',
     re.IGNORECASE)
 _URL_RUN_JOINER = str.maketrans({ch: plain for ch, plain in _STYLED_SEP.items() if plain in ':/?=&#%~'})
 # Dots fold only in a host (up to the path), so prose glued after a URL keeps its ．; a run may hold
-# several URLs glued by CJK prose, each with its own host.
-_URL_AUTHORITY = re.compile(rf'(?:[A-Za-z][A-Za-z0-9+.\-]*://|www\d{{0,3}}(?:[.{_forms(".")}]|{_IDNA_DOT}))[^/?#]*',
-                            re.IGNORECASE)
+# several URLs glued by CJK prose, each with its own host (a host ends where the next scheme starts, so
+# 。 before a glued https:// stays a sentence end).
+_URL_AUTHORITY = re.compile(rf'(?:[A-Za-z][A-Za-z0-9+.\-]*://|www\d{{0,3}}(?:[.{_forms(".")}]|{_IDNA_DOT}))'
+                            r'(?:(?![A-Za-z][A-Za-z0-9+.\-]*://)[^/?#])*', re.IGNORECASE)
 _DOT_JOINER = str.maketrans({ch: plain for ch, plain in _STYLED_SEP.items() if plain == '.'})
 
 
@@ -150,11 +153,14 @@ _DIGIT_GROUP = '(?:\\d|[%s])' % ''.join(chr(cp) for cp, plain in _CIRCLED_ALNUM.
 _SPACE = '[%s]' % ''.join(chr(cp) for cp in range(0x110000) if unicodedata.category(chr(cp)) == 'Zs')
 _DIGIT_BEFORE, _DIGIT_AFTER = re.compile(_DIGIT_GROUP + _SPACE), re.compile(_SPACE + _DIGIT_GROUP)
 _GROUPS_BEFORE = re.compile(rf'(?:{_DIGIT_GROUP}+{_SPACE}){{2,}}\Z')
+# An IDNA dot after a decimal digit is a host label dot (𖭗𖭗｡⑫｡15.example), so a circled run after it folds.
+_IDNA_DOT_AFTER_DIGIT = re.compile(rf'\d[{_IDNA_DOTS}]')
 
 
 def _fold_circled_run(m):
     s, a, b = m.string, m.start(), m.end()
     if b - a > 1 or (a and _RUN_NEIGHBOUR.match(s, a - 1)) or (b < len(s) and _RUN_NEIGHBOUR.match(s, b)) or (
+            a > 1 and _IDNA_DOT_AFTER_DIGIT.match(s, a - 2)) or (
             a > 1 and _DIGIT_BEFORE.match(s, a - 2) and _DIGIT_AFTER.match(s, b)) or (
             _GROUPS_BEFORE.search(s, max(0, a - 64), a)):
         return m.group().translate(_CIRCLED_ALNUM)

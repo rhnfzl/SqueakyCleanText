@@ -221,15 +221,16 @@ URL_REGEX = re.compile(
     r"\[[0-9a-f:.]*:[0-9a-f:.]*\]" r"|"
     # IPv4 host, whole: a longer octet (any decimal digit, "1௨3") or another label after it (any
     # label start the host grammar below takes, "école" too) is a host name
-    rf"{_IPV4}(?![0-9{_DECIMAL}]|\.[a-z\u00a1-\uffff0-9{_SUPPLEMENTARY_ALNUM}])"
+    rf"{_IPV4}(?![0-9{_DECIMAL}]|\.[{_IDN_CHAR}])"
     r"|"
-    # host name (with proper Unicode support, beyond the BMP too)
+    # host name (with proper Unicode support, beyond the BMP too); the label characters of an email
+    # domain, so CJK and full-width prose punctuation (，、「) glued after a host ends it
     # (labels as X+(-+X+)*, as in EMAIL_REGEX, so a host with no TLD fails in linear time)
-    rf"[a-z\u00a1-\uffff0-9{_SUPPLEMENTARY_ALNUM}]+(?:-+[a-z\u00a1-\uffff0-9{_SUPPLEMENTARY_ALNUM}]+)*"
+    rf"[{_IDN_CHAR}]+(?:-+[{_IDN_CHAR}]+)*"
     # domain name
-    rf"(?:\.[a-z\u00a1-\uffff0-9{_SUPPLEMENTARY_ALNUM}]+(?:-+[a-z\u00a1-\uffff0-9{_SUPPLEMENTARY_ALNUM}]+)*)*"
+    rf"(?:\.[{_IDN_CHAR}]+(?:-+[{_IDN_CHAR}]+)*)*"
     # TLD identifier (punycode first, so ".xn" alone never ends the host)
-    rf"(?:\.(?:xn--[a-z0-9-]*[a-z0-9]|(?:{_NO_GLUE}[a-z\u00a1-\uffff{_SUPPLEMENTARY_ALNUM}]){{2,}}))"
+    rf"(?:\.(?:xn--[a-z0-9-]*[a-z0-9]|(?:{_NO_GLUE}[{_IDN_LETTER}]){{2,}}))"
     r"|" r"(?:(localhost))" r")"
     # port number
     r"(?::\d{2,5}\b)?"
