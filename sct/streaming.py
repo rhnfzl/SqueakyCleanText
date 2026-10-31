@@ -89,9 +89,13 @@ class WindowedStreamingRedactor:
                 unit_ends = (unit.end(),)
             for character, end in zip(decoded, unit_ends):
                 folded = unicodedata.normalize("NFKC", character).translate(_DIGIT_VIEW)
-                view.append(folded if len(folded) == 1 else character)
-                starts.append(end - 1 if len(unit_ends) > 1 else unit.start())
-                ends.append(end)
+                # styled multi-character folds ("⑫" -> "12") keep every character, all on one source span
+                if len(folded) != 1 and not (folded.isascii() and folded.isalnum()):
+                    folded = character
+                for view_character in folded:
+                    view.append(view_character)
+                    starts.append(end - 1 if len(unit_ends) > 1 else unit.start())
+                    ends.append(end)
         view = "".join(view)
         inside = {
             index

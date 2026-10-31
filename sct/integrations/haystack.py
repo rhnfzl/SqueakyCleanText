@@ -6,7 +6,7 @@ from typing import Any, Sequence, Union
 
 from haystack import Document, component, default_from_dict, default_to_dict
 
-from sct.config import TextCleanerConfig
+from sct.config import _PII_MAPS, TextCleanerConfig
 from sct.integrations._runtime import CleanerHandle, as_columns, clean_records
 
 
@@ -48,8 +48,10 @@ class SCTDocumentCleaner:
             config = {
                 f.name: _plain(value)
                 for f in fields(config)
-                # supported_languages is recomputed by __post_init__.
+                # supported_languages is recomputed by __post_init__; a derived PII label map is
+                # left out so the loaded config re-derives it (as pickle does).
                 if f.name != "supported_languages"
+                and not any(getattr(config, f.name) is m for m in _PII_MAPS.values())
                 and (value := getattr(config, f.name)) != getattr(default, f.name)
             }
         return default_to_dict(self, columns=self.columns, output=self.output, config=config)

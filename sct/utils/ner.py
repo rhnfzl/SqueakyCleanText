@@ -722,8 +722,10 @@ class GeneralNER:
             types = getattr(self, '_presidio_types', None)
             if types is None:
                 types = _presidio_type_map({})
+            # then aliases (PER/LOC/ORG) to canonical names, as the other backends do
             for result in analyzer_results:
-                result.entity_type = types.get(result.entity_type, result.entity_type)
+                entity_type = types.get(result.entity_type, result.entity_type)
+                result.entity_type = ENTITY_TYPE_MAP.get(entity_type, entity_type)
             entities = tuple(
                 DetectedEntity(
                     entity_type=result.entity_type,
@@ -1062,6 +1064,15 @@ class GeneralNER:
                 item for item in ensemble_results
                 if not any(a <= item['start'] and item['end'] <= b for a, b in markers)
             ]
+            # A span that cuts a marker ("of <EMAIL") takes it whole, so no fragment ("<EM", ">")
+            # is left beside the replacement in any mode.
+            for index, item in enumerate(ensemble_results):
+                start, end = item['start'], item['end']
+                for a, b in markers:
+                    if a < end and start < b:
+                        start, end = min(start, a), max(end, b)
+                if (start, end) != (item['start'], item['end']):
+                    ensemble_results[index] = {**item, 'start': start, 'end': end, 'word': text[start:end]}
         if not ensemble_results:
             return NERProcessingResult(text=text, findings=())
         entities = tuple(self._entity(item) for item in ensemble_results)

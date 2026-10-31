@@ -113,7 +113,7 @@ def test_presidio_types_mapped(legacy, phone):
                            default_rule=EntityRule(action="keep"))
     result = ner.ner_process_detailed("Anna 0612345678 now", positional_tags=("PER",), privacy_policy=policy)
     assert "0612345678" not in result.text
-    assert {f.entity.entity_type for f in result.findings} == {phone, "PER"}
+    assert {f.entity.entity_type for f in result.findings} == {phone, "PERSON"}  # PER alias -> canonical (round 17)
 
 
 # --- 7: a display tag cleanup removes still carries its value ---
