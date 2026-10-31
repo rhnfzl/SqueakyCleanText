@@ -134,7 +134,7 @@ cuda_device_id=0                    # GPU index for ONNX/torch/GLiNER (and GLiCl
 onnx_cuda_provider_options=None     # extra CUDAExecutionProvider options, e.g. {'gpu_mem_limit': 8 << 30}
 ner_chunk_overlap=0                 # NER window overlap in tokens per side for long docs (0 = 0.7.1 chunks)
 detect_all_languages=True           # Auto-detect over all 75 Lingua languages; False = 0.7 detector (EN/NL/DE/ES + extras)
-json_key_cleaning='pii'             # process_json keys: 'pii' = PII steps only | 'full' = whole config (0.7) | 'off' = raw
+json_key_cleaning='pii'             # process_json keys: 'pii' = regex PII steps only (no NER) | 'pii_ner' = plus NER | 'full' = whole config (0.7) | 'off' = raw
 language_confidence_warning=0.5     # metadata warning 'language_low_confidence' below this confidence (0..1, never changes routing)
 positional_tags=('PER','LOC','ORG','MISC')
 

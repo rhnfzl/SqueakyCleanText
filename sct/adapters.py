@@ -75,14 +75,14 @@ def is_sensitive_result(result: Any) -> bool:
     )
 
 
-def _pii_only_cleaner(cleaner: TextCleaner) -> TextCleaner:
+def _pii_only_cleaner(cleaner: TextCleaner, ner: bool = True) -> TextCleaner:
     """Return a view of *cleaner* that runs only its PII steps, sharing its NER models."""
     key_cleaner = copy.copy(cleaner)
     # Everything the training preset turns off (folding, letter/number removal, casefold...).
-    key_cleaner.cfg = replace(
-        cleaner.cfg,
-        **{name: value for name, value in PRESETS['training'].items() if value is False},
-    )
+    off = {name: value for name, value in PRESETS['training'].items() if value is False}
+    if not ner:
+        off['check_ner_process'] = False
+    key_cleaner.cfg = replace(cleaner.cfg, **off)
     key_cleaner._pipeline, key_cleaner._post_fuzzy_pipeline = [], []
     key_cleaner._init_pipeline()
     return key_cleaner
@@ -91,8 +91,10 @@ def _pii_only_cleaner(cleaner: TextCleaner) -> TextCleaner:
 def process_json(cleaner: TextCleaner, value: Any) -> StructuredResult:
     """Process every string in a JSON-compatible value.
 
-    Keys follow ``cfg.json_key_cleaning``: ``'pii'`` (default) replaces PII
-    only, so short keys such as ``"k"`` survive; ``'full'`` uses the whole
+    Keys follow ``cfg.json_key_cleaning``: ``'pii'`` (default) replaces regex
+    PII only (emails, phones, URLs...), so short keys such as ``"k"`` and
+    common words such as ``"message"`` survive (NER tags lone words out of
+    context); ``'pii_ner'`` also runs NER on keys; ``'full'`` uses the whole
     config; ``'off'`` keeps keys as written.
     """
     _require_adapter_mode(cleaner)
@@ -117,12 +119,12 @@ def process_json(cleaner: TextCleaner, value: Any) -> StructuredResult:
             for index, (key, child) in enumerate(item.items()):
                 # The raw key may itself be PII, so its path uses the index.
                 if isinstance(key, str) and key_mode != 'off':
-                    if key_mode == 'pii' and key_cleaner is None:
-                        key_cleaner = _pii_only_cleaner(cleaner)
+                    if key_mode in ('pii', 'pii_ner') and key_cleaner is None:
+                        key_cleaner = _pii_only_cleaner(cleaner, ner=key_mode == 'pii_ner')
                     processed_key = visit(
                         key,
                         path + ("@key", index),
-                        key_cleaner if key_mode == 'pii' else cleaner,
+                        cleaner if key_mode == 'full' else key_cleaner,
                     )
                 else:
                     processed_key = key

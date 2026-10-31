@@ -620,7 +620,7 @@ new_cfg = dataclasses.replace(cfg, check_ner_process=False)
 | `gliner_label_map` | `None` | Maps GLiNER labels to NER tags |
 | `gliner_threshold` | `None` | GLiNER confidence threshold (0..1). `None` = 0.4, or 0.3 in PII mode |
 | `gliner_label_descriptions` | `None` | ZERONER-style: `{label: "description"}` for improved zero-shot accuracy |
-| `json_key_cleaning` | `'pii'` | How `process_json` (and `sct-clean --json-input`, MCP `clean_json`, RAG chunk metadata) cleans dict keys: `'pii'` = PII steps only, `'full'` = the whole config (0.7), `'off'` = keys as written (can carry PII) |
+| `json_key_cleaning` | `'pii'` | How `process_json` (and `sct-clean --json-input`, MCP `clean_json`, RAG chunk metadata) cleans dict keys: `'pii'` = regex PII steps only (no NER: models tag lone words such as `message` out of context), `'pii_ner'` = PII steps plus NER, `'full'` = the whole config (0.7), `'off'` = keys as written (can carry PII) |
 | `fuzzy_date_score_cutoff` | `85` | Fuzzy matching threshold (0-100) for misspelled months |
 | `custom_pipeline_steps` | `()` | Tuple of `(text: str) -> str` callables appended after all built-in steps |
 
@@ -699,7 +699,7 @@ The base package includes JSON, DataFrame, retrieval, command-line, and streamin
 from sct import RAGChunk, process_json, process_rag_chunks
 
 cleaned_json = process_json(cleaner, {"message": "Email a@example.com"})
-# Keys get PII replacement only (json_key_cleaning='pii'); 'full' or 'off' to change.
+# Keys get regex PII replacement only (json_key_cleaning='pii'); 'pii_ner', 'full' or 'off' to change.
 cleaned_chunks = process_rag_chunks(
     cleaner,
     [RAGChunk(id="1", text="Call +1-202-555-0147", metadata={})],

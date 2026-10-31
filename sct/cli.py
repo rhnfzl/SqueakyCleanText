@@ -69,7 +69,10 @@ def main(
     except ImportError as exc:
         parser.error(str(exc))
     if args.json_input:
-        cleaned = process_json(cleaner, json.loads(source)).value
+        try:
+            cleaned = process_json(cleaner, json.loads(source)).value
+        except ValueError as exc:  # bad JSON or two keys cleaned to the same text
+            parser.error(str(exc))
         stdout.write(json.dumps(cleaned, ensure_ascii=False) + "\n")
     else:
         result = cleaner.process(source)

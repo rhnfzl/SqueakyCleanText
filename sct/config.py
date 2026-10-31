@@ -131,7 +131,7 @@ PII_DEFAULT_THRESHOLD = 0.3  # Recall > precision for PII
 
 VALID_NER_MODES = frozenset({'standard', 'pii'})
 VALID_REPLACEMENT_MODES = frozenset({'placeholder', 'synthetic', 'reversible'})
-VALID_JSON_KEY_CLEANING = frozenset({'pii', 'full', 'off'})
+VALID_JSON_KEY_CLEANING = frozenset({'pii', 'pii_ner', 'full', 'off'})
 
 # Optional ModernBERT NER models (available when exported via export_onnx_models.py)
 MODERNBERT_NER_MODELS: dict[str, str] = {
@@ -304,7 +304,9 @@ class TextCleanerConfig:
     ner_device: Optional[str] = None  # None = auto (CUDA when available), 'cpu', 'cuda'
     cuda_device_id: int = 0  # GPU index for ONNX, torch and GLiNER when on CUDA
     onnx_cuda_provider_options: Optional[Mapping[str, Any]] = None  # extra CUDAExecutionProvider options
-    json_key_cleaning: str = 'pii'  # process_json keys: 'pii' = PII steps only, 'full' = whole config (0.7), 'off' = raw
+    # process_json keys: 'pii' = regex PII steps only (NER tags lone words like 'message' out of context),
+    # 'pii_ner' = PII steps plus NER, 'full' = whole config (0.7), 'off' = raw
+    json_key_cleaning: str = 'pii'
 
     def __post_init__(self):
         if self.gliclass_onnx:

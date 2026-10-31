@@ -5,6 +5,7 @@ import types
 import pytest
 
 from sct import TextCleaner, TextCleanerConfig
+from tests.conftest import TEST_NER_MODELS
 
 
 # --- Linux 2: Lingua confidence is rounded so workers and in-process agree ---
@@ -40,3 +41,35 @@ def test_import_sct_does_not_load_presidio():
 def test_isolated_symbols_need_space_on_both_sides(text, expected):
     cleaner = TextCleaner(TextCleanerConfig(check_ner_process=False))
     assert cleaner.process(text).lm_text == expected
+
+
+# --- Mac A: JSON keys get regex PII only by default; NER on keys is opt-in ---
+
+def test_json_keys_skip_ner_by_default():
+    from sct.adapters import _pii_only_cleaner
+    cleaner = TextCleaner(TextCleanerConfig(ner_models=TEST_NER_MODELS))
+    assert _pii_only_cleaner(cleaner, ner=False).cfg.check_ner_process is False
+    assert _pii_only_cleaner(cleaner, ner=True).cfg.check_ner_process is True
+
+
+def test_process_json_default_keys_do_not_reach_ner(monkeypatch):
+    from sct import adapters
+    seen = []
+    real = adapters._pii_only_cleaner
+    monkeypatch.setattr(adapters, "_pii_only_cleaner",
+                        lambda c, ner=True: seen.append(ner) or real(c, ner))
+    cleaner = TextCleaner(TextCleanerConfig(check_ner_process=False))
+    out = adapters.process_json(cleaner, {"user": "x", "to a@b.com": 1})
+    assert seen == [False]
+    assert list(out.value) == ["user", "to <EMAIL>"]
+    TextCleanerConfig(json_key_cleaning="pii_ner")  # opt-in mode is valid
+
+
+def test_cli_reports_duplicate_json_key_as_usage_error(monkeypatch):
+    import io
+    from sct import cli
+    monkeypatch.setattr(cli, "process_json", lambda *a: (_ for _ in ()).throw(
+        ValueError("Cleaning JSON keys produced a duplicate key")))
+    with pytest.raises(SystemExit) as exc:
+        cli.main(["--json-input", "--no-ner"], stdin=io.StringIO('{"a": 1}'), stdout=io.StringIO())
+    assert exc.value.code == 2
