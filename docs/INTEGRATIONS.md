@@ -86,5 +86,6 @@ Returns new documents; their ids are recomputed from the cleaned content.
 
 - Each adapter owns its cleaner. It is built on first use inside the worker and rebuilt when the process ID changes, so a fork never reuses the parent's model sessions. Two adapters with different configs never share a cleaner.
 - Plan for 5 to 7 GB of RAM per worker with the default NER ensemble. `workers x 6 GB` must fit in memory; lower `num_proc` / `workers` before anything else.
+- An NER model without a pinned revision (`ner_model_revisions`) makes one Hub request per worker to resolve `main` when the parent never loaded it before the workers started. Pin the revision, load the cleaner once in the parent, or set `HF_HUB_OFFLINE=1` once the models are cached. The default ensemble is pinned and makes none.
 - Guard multi-process code with `if __name__ == "__main__":` (macOS and Windows start workers with spawn and re-import your script).
 - Run SCT after language and quality filters: NER is the slow step, so do not spend it on documents you drop anyway.

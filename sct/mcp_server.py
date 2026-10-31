@@ -9,6 +9,9 @@ Server settings come from the environment only:
 ``SCT_MCP_PRESET``
     Config preset for the built-in cleaners (default ``sct``, the library
     default; ``training`` keeps text as written apart from PII).
+``SCT_MCP_TO_ASCII``
+    ``1`` transliterates output to ASCII (0.7 default, ``日本語`` -> ``Ri Ben Yu``);
+    unset keeps every script.
 """
 
 import os
@@ -224,6 +227,7 @@ def create_mcp_server(
         raise ValueError("SCT_MCP_MAX_BYTES must be zero or more")
     preset = preset or os.environ.get("SCT_MCP_PRESET") or "sct"
     preset_config(preset)  # fail at start-up on an unknown name
+    ascii_override = {"check_to_ascii_unicode": True} if os.environ.get("SCT_MCP_TO_ASCII") == "1" else {}
 
     server = FastMCP(
         "SqueakyCleanText",
@@ -247,7 +251,7 @@ def create_mcp_server(
             with cleaners_lock:
                 if pii not in cleaners:
                     cleaners[pii] = TextCleaner(
-                        cfg=preset_config(preset, ner_mode="pii" if pii else "standard"),
+                        cfg=preset_config(preset, ner_mode="pii" if pii else "standard", **ascii_override),
                         include_entities=True,
                     )
         return cleaners[pii]

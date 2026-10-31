@@ -1,4 +1,5 @@
 import ipaddress
+import re
 
 from sct.utils import constants
 
@@ -11,7 +12,8 @@ def numbers_regex(in_words=False):
 def is_replaceable_ip(candidate, public_only=False):
     """True if ``candidate`` is a valid IP (and public, when ``public_only``)."""
     try:
-        ip = ipaddress.ip_address(candidate)
+        # Digits of any script count (١٩٢.١٦٨.١.١ is 192.168.1.1).
+        ip = ipaddress.ip_address(re.sub(r"\d", lambda m: str(int(m.group())), candidate))
     except ValueError:
         return False
     return ip.is_global or not public_only

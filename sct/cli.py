@@ -30,6 +30,11 @@ def _parser() -> argparse.ArgumentParser:
         help="Config preset: sct (library default) or training (PII only, text kept as written)",
     )
     parser.add_argument(
+        "--to-ascii",
+        action="store_true",
+        help="Transliterate to ASCII (0.7 default: 日本語 -> Ri Ben Yu); off keeps every script",
+    )
+    parser.add_argument(
         "--replacement-mode",
         choices=("placeholder", "reversible", "synthetic"),
         default="placeholder",
@@ -65,6 +70,7 @@ def main(
             check_ner_process=not args.no_ner,
             ner_mode="pii" if args.pii else "standard",
             replacement_mode=args.replacement_mode,
+            **({"check_to_ascii_unicode": True} if args.to_ascii else {}),
         ))
     except ImportError as exc:
         parser.error(str(exc))

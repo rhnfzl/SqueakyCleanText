@@ -163,7 +163,7 @@ class TextCleanerConfig:
     # Pipeline step toggles
     check_detect_language: bool = True
     check_fix_bad_unicode: bool = True
-    check_to_ascii_unicode: bool = True
+    check_to_ascii_unicode: bool = False  # True = unidecode transliteration (0.7: 日本語 -> Ri Ben Yu)
     check_replace_html: bool = True
     check_replace_urls: bool = True
     check_replace_emails: bool = True
@@ -704,7 +704,7 @@ def _config_from_module_globals() -> TextCleanerConfig:
 # ---------------------------------------------------------------------------
 CHECK_DETECT_LANGUAGE = True
 CHECK_FIX_BAD_UNICODE = True
-CHECK_TO_ASCII_UNICODE = True
+CHECK_TO_ASCII_UNICODE = False
 CHECK_REPLACE_HTML = True
 CHECK_REPLACE_URLS = True
 CHECK_REPLACE_EMAILS = True

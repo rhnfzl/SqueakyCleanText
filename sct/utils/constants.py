@@ -94,6 +94,9 @@ _IPV6_START = (
 IP_REGEX = re.compile(
     rf"{_IPV6_START}(?:{_IPV6})(?![A-Za-z0-9_:]|\.[0-9])"
     rf"|(?<![0-9.])(?:{_IPV4})(?![0-9]|\.[0-9])"
+    # IPv4 in other digit scripts (١٩٢.١٦٨.١.١): needs one non-ASCII digit ([^\x00-\x7f\D]),
+    # so ASCII matching (and the browser export, where \d is ASCII) is unchanged.
+    r"|(?<![\d.])(?=[\d.]*[^\x00-\x7f\D])\d{1,3}(?:\.\d{1,3}){3}(?!\d|\.\d)"
 )
 
 _NUMBER_BODY = (

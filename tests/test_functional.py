@@ -107,8 +107,8 @@ class TestCorePipeline:
         assert "â€" not in lm
 
     def test_a02_ascii_transliteration(self):
-        """unidecode converts non-ASCII to ASCII equivalents."""
-        cfg = _make_cfg()
+        """unidecode converts non-ASCII to ASCII equivalents (opt-in since 0.8.0)."""
+        cfg = _make_cfg(check_to_ascii_unicode=True)
         tc = TextCleaner(cfg=cfg)
         lm, _, _ = tc.process("Ångström café résumé naïve")
         assert "Angstrom" in lm
@@ -129,8 +129,6 @@ class TestCorePipeline:
         cfg = _make_cfg(check_remove_emoji=False)
         tc = TextCleaner(cfg=cfg)
         lm, _, _ = tc.process("Hello 🌍 World")
-        # Emoji gets transliterated by unidecode (to_ascii_unicode), not removed
-        # This is expected behavior — emoji characters become ASCII approximations
         assert "Hello" in lm
 
     def test_a05_html_stripping(self):
