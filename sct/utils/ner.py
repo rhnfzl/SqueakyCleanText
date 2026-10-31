@@ -1030,6 +1030,10 @@ class GeneralNER:
             m.span() for m in _PLACEHOLDER_TOKEN.finditer(text)
             if not source_markers or m.group() not in source_markers
         ]
+        if getattr(self, '_synthetic_replacer', None):  # set only in synthetic mode
+            # Fakes the regex steps inserted (emails, phones...) are protected like placeholders.
+            for fake in set(self._synthetic_replacer._get_cache().values()):
+                markers += [m.span() for m in re.finditer(re.escape(fake), text)]
         if markers:
             ensemble_results = [
                 item for item in ensemble_results

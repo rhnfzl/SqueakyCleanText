@@ -73,3 +73,22 @@ def test_cli_reports_duplicate_json_key_as_usage_error(monkeypatch):
     with pytest.raises(SystemExit) as exc:
         cli.main(["--json-input", "--no-ner"], stdin=io.StringIO('{"a": 1}'), stdout=io.StringIO())
     assert exc.value.code == 2
+
+
+# --- Mac B: NER does not rewrite the synthetic fake a regex step inserted ---
+
+def test_ner_leaves_regex_synthetic_fakes_alone():
+    from sct.utils.synthetic import SyntheticReplacer
+    from tests.test_chunking import _FakeRunDetector, _word_ner
+
+    ner = _word_ner(0, _FakeRunDetector(), mode="synthetic")
+    ner._synthetic_replacer = SyntheticReplacer()
+    ner._synthetic_replacer.reset_cache()
+    fake = ner._synthetic_replacer.get_replacement("EMAIL", "anna@beispiel.de")
+    # The fake detector tags capitalised words, like the real models tag pieces of the fake email.
+    fake = fake[0].upper() + fake[1:]
+    ner._synthetic_replacer._get_cache()[("EMAIL", "anna@beispiel.de")] = fake
+    result = ner.ner_process_detailed(
+        f"Write to {fake} today, Angela.", positional_tags=("PER",), ner_confidence_threshold=0.5)
+    assert fake in result.text
+    assert "Angela" not in result.text
