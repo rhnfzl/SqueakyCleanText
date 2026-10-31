@@ -1,0 +1,156 @@
+"""Fuzz the styled / full-width PII leak class on fixed seeds (``scripts/fuzz_styled_pii.py``).
+
+Every counted failure cluster of fuzz round 0 (3000 seeds, research/0.8.0-fuzz-round0.md) is
+listed with the first seed that shows it. Each one is an xfail(strict=True) until fixed; a new
+cluster on these seeds fails ``test_no_new_failure_cluster``. Remove a cluster once it passes.
+"""
+
+import pytest
+
+from scripts.fuzz_styled_pii import check_case, fold, make_case, render
+
+# cluster id -> first seed that shows it (fuzz round 0)
+KNOWN_CLUSTERS = {
+    "leak|EMAIL|enclosed_alnum+native_digit+wide_sep|placeholder": 2834,
+    "leak|EMAIL|enclosed_alnum+native_digit+wide_sep|reversible": 2834,
+    "leak|EMAIL|enclosed_alnum+native_digit+wide_sep|stream": 2834,
+    "leak|EMAIL|enclosed_alnum+native_digit+wide_sep|synthetic": 2834,
+    "leak|EMAIL|font_sep|placeholder": 72,
+    "leak|EMAIL|font_sep|reversible": 72,
+    "leak|EMAIL|font_sep|stream": 72,
+    "leak|EMAIL|font_sep|synthetic": 72,
+    "leak|EMAIL|small_sep|placeholder": 3,
+    "leak|EMAIL|small_sep|reversible": 3,
+    "leak|EMAIL|small_sep|stream": 3,
+    "leak|EMAIL|small_sep|synthetic": 3,
+    "leak|EMAIL|zw_join|placeholder": 258,
+    "leak|EMAIL|zw_join|reversible": 258,
+    "leak|EMAIL|zw_join|stream": 258,
+    "leak|EMAIL|zw_join|synthetic": 258,
+    "leak|IP|enclosed_alnum+native_digit+wide_sep|placeholder": 2579,
+    "leak|IP|enclosed_alnum+native_digit+wide_sep|reversible": 2579,
+    "leak|IP|enclosed_alnum+native_digit+wide_sep|stream": 2579,
+    "leak|IP|enclosed_alnum+native_digit+wide_sep|synthetic": 2579,
+    "leak|IP|enclosed_alnum+native_digit|placeholder": 23,
+    "leak|IP|enclosed_alnum+native_digit|reversible": 23,
+    "leak|IP|enclosed_alnum+native_digit|stream": 23,
+    "leak|IP|enclosed_alnum+native_digit|synthetic": 23,
+    "leak|IP|enclosed_alnum+wide_sep|placeholder": 52,
+    "leak|IP|enclosed_alnum+wide_sep|reversible": 52,
+    "leak|IP|enclosed_alnum+wide_sep|stream": 52,
+    "leak|IP|enclosed_alnum+wide_sep|synthetic": 52,
+    "leak|IP|enclosed_pair+glue|stream": 372,
+    "leak|IP|enclosed_pair+native_digit+small_sep|placeholder": 301,
+    "leak|IP|enclosed_pair+native_digit+small_sep|reversible": 301,
+    "leak|IP|enclosed_pair+native_digit+small_sep|stream": 301,
+    "leak|IP|enclosed_pair+native_digit+small_sep|synthetic": 301,
+    "leak|IP|enclosed_pair+native_digit+wide_sep|placeholder": 110,
+    "leak|IP|enclosed_pair+native_digit+wide_sep|reversible": 110,
+    "leak|IP|enclosed_pair+native_digit+wide_sep|stream": 110,
+    "leak|IP|enclosed_pair+native_digit+wide_sep|synthetic": 110,
+    "leak|IP|enclosed_pair+wide_sep|placeholder": 76,
+    "leak|IP|enclosed_pair+wide_sep|reversible": 76,
+    "leak|IP|enclosed_pair+wide_sep|stream": 76,
+    "leak|IP|enclosed_pair+wide_sep|synthetic": 76,
+    "leak|IP|glue|placeholder": 36,
+    "leak|IP|glue|reversible": 36,
+    "leak|IP|glue|stream": 36,
+    "leak|IP|glue|synthetic": 36,
+    "leak|IP|small_sep|placeholder": 2,
+    "leak|IP|small_sep|reversible": 2,
+    "leak|IP|small_sep|stream": 2,
+    "leak|IP|small_sep|synthetic": 2,
+    "leak|PHONE|enclosed_alnum+enclosed_pair+native_digit|placeholder": 2150,
+    "leak|PHONE|enclosed_alnum+enclosed_pair+native_digit|reversible": 2150,
+    "leak|PHONE|enclosed_alnum+enclosed_pair+native_digit|stream": 2150,
+    "leak|PHONE|enclosed_alnum+enclosed_pair+native_digit|synthetic": 2150,
+    "leak|PHONE|enclosed_alnum+enclosed_pair+wide_sep|synthetic": 2900,
+    "leak|PHONE|enclosed_alnum+native_digit|placeholder": 121,
+    "leak|PHONE|enclosed_alnum+native_digit|reversible": 121,
+    "leak|PHONE|enclosed_alnum+native_digit|stream": 121,
+    "leak|PHONE|enclosed_alnum+native_digit|synthetic": 121,
+    "leak|PHONE|enclosed_pair+font_sep+native_digit|placeholder": 212,
+    "leak|PHONE|enclosed_pair+font_sep+native_digit|reversible": 212,
+    "leak|PHONE|enclosed_pair+font_sep+native_digit|stream": 212,
+    "leak|PHONE|enclosed_pair+font_sep+native_digit|synthetic": 212,
+    "leak|PHONE|enclosed_pair+native_digit+wide_sep|placeholder": 534,
+    "leak|PHONE|enclosed_pair+native_digit+wide_sep|reversible": 534,
+    "leak|PHONE|enclosed_pair+native_digit+wide_sep|stream": 534,
+    "leak|PHONE|enclosed_pair+native_digit+wide_sep|synthetic": 534,
+    "leak|PHONE|enclosed_pair+native_digit|placeholder": 242,
+    "leak|PHONE|enclosed_pair+native_digit|reversible": 242,
+    "leak|PHONE|enclosed_pair+native_digit|stream": 242,
+    "leak|PHONE|enclosed_pair+native_digit|synthetic": 242,
+    "leak|PHONE|enclosed_pair|placeholder": 167,
+    "leak|PHONE|enclosed_pair|reversible": 167,
+    "leak|PHONE|enclosed_pair|stream": 167,
+    "leak|PHONE|enclosed_pair|synthetic": 167,
+    "leak|PHONE|font_sep|placeholder": 914,
+    "leak|PHONE|font_sep|reversible": 914,
+    "leak|PHONE|font_sep|stream": 914,
+    "leak|PHONE|font_sep|synthetic": 914,
+    "leak|PHONE|glue|placeholder": 413,
+    "leak|PHONE|glue|reversible": 413,
+    "leak|PHONE|glue|stream": 413,
+    "leak|PHONE|glue|synthetic": 413,
+    "leak|PHONE|native_digit+wide_sep|placeholder": 963,
+    "leak|PHONE|native_digit+wide_sep|reversible": 963,
+    "leak|PHONE|native_digit+wide_sep|stream": 963,
+    "leak|PHONE|native_digit+wide_sep|synthetic": 963,
+    "leak|PHONE|plain|placeholder": 29,
+    "leak|PHONE|plain|reversible": 29,
+    "leak|PHONE|plain|stream": 29,
+    "leak|PHONE|plain|synthetic": 29,
+    "leak|PHONE|small_sep+glue|stream": 283,
+    "leak|PHONE|small_sep|placeholder": 82,
+    "leak|PHONE|small_sep|reversible": 82,
+    "leak|PHONE|small_sep|stream": 82,
+    "leak|PHONE|small_sep|synthetic": 82,
+    "leak|URL|enclosed_pair+wide_sep|stream": 651,
+    "leak|URL|glue|placeholder": 5,
+    "leak|URL|glue|reversible": 5,
+    "leak|URL|glue|stream": 108,
+    "leak|URL|glue|synthetic": 5,
+    "leak|URL|small_sep|placeholder": 9,
+    "leak|URL|small_sep|reversible": 9,
+    "leak|URL|small_sep|stream": 9,
+    "leak|URL|small_sep|synthetic": 9,
+    "leak|URL|wide_sep+glue|stream": 2338,
+    "leak|URL|wide_sep+zw_boundary|stream": 1623,
+    "leak|URL|wide_sep|placeholder": 4,
+    "leak|URL|wide_sep|reversible": 4,
+    "leak|URL|wide_sep|stream": 4,
+    "leak|URL|wide_sep|synthetic": 4,
+    "stream_mismatch|sct|NUMBER:glue+PHONE:glue": 1364,
+    "stream_mismatch|sct|PHONE:glue": 283,
+    "stream_mismatch|training|NUMBER:glue+PHONE:glue": 1364,
+    "stream_mismatch|training|PHONE:glue": 283,
+}
+SEEDS = sorted(set(range(10)) | set(KNOWN_CLUSTERS.values()))
+
+
+@pytest.fixture(scope="module")
+def clusters():
+    found = {}
+    for seed in SEEDS:
+        for failure in check_case(seed, folds=(True,))["failures"]:
+            found.setdefault(failure["signature"], seed)
+    return found
+
+
+def test_rendered_values_fold_back():
+    for seed in range(200):
+        for value in make_case(seed)["values"]:
+            assert fold(render(value)) == fold(value["plain"])
+
+
+def test_no_new_failure_cluster(clusters):
+    assert sorted(set(clusters) - set(KNOWN_CLUSTERS)) == []
+
+
+@pytest.mark.parametrize("cluster", [
+    pytest.param(cluster, marks=pytest.mark.xfail(strict=True, reason=f"fuzz round 0 cluster {cluster}"))
+    for cluster in sorted(KNOWN_CLUSTERS)
+])
+def test_known_cluster(cluster, clusters):
+    assert cluster not in clusters

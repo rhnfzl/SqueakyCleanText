@@ -1,0 +1,575 @@
+#!/usr/bin/env python3
+"""Fuzz the styled / full-width PII leak class.
+
+Each seed builds one document: random prose in Latin, CJK, Arabic, Devanagari,
+Thai or Cyrillic, plus 1-3 PII values (email, phone, IPv4, URL with a query,
+date, number). Each value is then rendered in forms a reader still reads as the
+same value: full-width and small-form characters, mathematical styled letters
+and digits, circled/squared letters and digits, native decimal digits of any
+script, decomposed letters (base + combining mark), zero-width characters where
+they are legal, and glued to CJK/Thai prose without a space. Every variant comes
+from Unicode data (decomposition tag, NFKC, decimal value, category), and every
+rendered value folds back to the plain value (NFKC, Cf removed, Nd -> ASCII).
+
+The cleaner runs with NER off on the ``training`` preset and the default
+config, with ``fold_styled_characters`` on and off, in placeholder, synthetic,
+reversible (restore must give every value back) and streaming
+(``WindowedStreamingRedactor``, compared with the whole-document output) modes.
+
+A leak is a plain identifying core of a value (email local part / host label,
+>= 7 phone or date or number digits, the IPv4, URL query values) found in the
+output after the same fold. Each failure is shrunk to the smallest set of
+transformations that still fails; the cluster key is that set plus type and
+mode. Failures with ``fold_styled_characters=False`` are recorded, not counted.
+
+    python -m scripts.fuzz_styled_pii --seeds 3000 --workers 8 --out fuzz.jsonl --report fuzz.md
+"""
+
+import argparse
+from collections import Counter, defaultdict
+from functools import lru_cache, partial
+import json
+import multiprocessing
+from pathlib import Path
+import random
+import re
+import sys
+import unicodedata
+
+from sct import TextCleaner, TextCleanerConfig
+from sct.streaming import WindowedStreamingRedactor
+
+PRESETS = ("training", "sct")
+MODES = ("placeholder", "synthetic", "reversible", "stream")
+CHECKS = ("leak", "restore", "restore_exact", "false_positive", "stream_mismatch")
+STREAM_PARAMS = ((48, 12), (80, 24), (160, 48))
+TYPE_FLAG = {
+    "EMAIL": "check_replace_emails", "PHONE": "check_replace_phone_numbers", "IP": "check_replace_ips",
+    "URL": "check_replace_urls", "DATE": "check_replace_dates", "NUMBER": "check_replace_numbers",
+}
+# Zero-width characters (all category Cf, removed by the oracle fold).
+ZWSP, ZWNJ, ZWJ, WJ = "​", "‌", "‍", "⁠"
+# Decomposition tags whose NFKC fold is the styled character's plain reading.
+STYLE_TAGS = {"wide": "wide", "small": "small", "font": "font", "circle": "enclosed", "square": "enclosed"}
+# Script letter ranges for context prose and non-ASCII PII (letters picked by category).
+SCRIPT_RANGES = {
+    "latin": ((0x61, 0x7A),), "cyrillic": ((0x430, 0x44F),), "arabic": ((0x628, 0x64A),),
+    "devanagari": ((0x915, 0x939),), "thai": ((0xE01, 0xE2E),), "cjk": ((0x4E00, 0x9FFF), (0x3041, 0x3096)),
+}
+UNSPACED = ("cjk", "thai")
+PUNCT = {
+    "latin": (", ", ". ", "! ", "? "), "cyrillic": (", ", ". ", "! "), "arabic": ("، ", "؟ ", ". "),
+    "devanagari": (" । ", ", "), "thai": (" ",), "cjk": ("，", "。", "、", "！", "？", "：", "・"),
+}
+TLDS = ("com", "org", "net", "nl", "de", "jp", "io", "in")
+
+
+def _unicode_tables():
+    """Styled variants per plain ASCII target, digit sets per script, letters per script."""
+    variants = defaultdict(lambda: defaultdict(list))  # target -> kind -> [chars]
+    zeros = []
+    for cp in range(0x110000):
+        ch = chr(cp)
+        category = unicodedata.category(ch)
+        if category in ("Cs", "Cn", "Co"):
+            continue
+        if category == "Nd" and unicodedata.decimal(ch) == 0 and cp > 0x7F and all(
+                unicodedata.decimal(chr(cp + k), -1) == k for k in range(10)):
+            zeros.append(cp)
+        decomposition = unicodedata.decomposition(ch)
+        if not decomposition.startswith("<"):
+            continue
+        kind = STYLE_TAGS.get(decomposition[1:decomposition.index(">")])
+        target = unicodedata.normalize("NFKC", ch)
+        if kind and target.isascii() and target.strip() and (len(target) == 1 or target.isdigit()):
+            variants[target][kind].append(ch)
+    letters = {
+        script: [chr(cp) for lo, hi in ranges for cp in range(lo, hi + 1) if unicodedata.category(chr(cp)).startswith("L")]
+        for script, ranges in SCRIPT_RANGES.items()
+    }
+    accented = [chr(cp) for cp in range(0xE0, 0x17F) if unicodedata.category(chr(cp)) == "Ll"
+                and unicodedata.normalize("NFD", chr(cp)) != chr(cp)]
+    # Devanagari vowel signs (category M*) follow a consonant.
+    signs = [chr(cp) for cp in range(0x93E, 0x94D) if unicodedata.category(chr(cp)).startswith("M")]
+    return variants, zeros, letters, accented, signs
+
+
+VARIANTS, DIGIT_ZEROS, LETTERS, ACCENTED, DEVA_SIGNS = _unicode_tables()
+_DIGIT_FOLD = {cp: str(unicodedata.decimal(chr(cp))) for zero in DIGIT_ZEROS for cp in range(zero, zero + 10)}
+
+
+def fold(text: str) -> str:
+    """The oracle fold: drop Cf, NFKC, any decimal digit -> ASCII, casefold."""
+    text = "".join(ch for ch in text if unicodedata.category(ch) != "Cf")
+    return unicodedata.normalize("NFKC", text).translate(_DIGIT_FOLD).casefold()
+
+
+# --- document generation ---
+
+
+def _word(rng, script, low=2, high=6):
+    if script == "latin" and rng.random() < 0.3:
+        pool = LETTERS["latin"] + ACCENTED
+    else:
+        pool = LETTERS[script]
+    word = "".join(rng.choice(pool) for _ in range(rng.randint(low, high)))
+    if script == "devanagari":
+        word = "".join(ch + (rng.choice(DEVA_SIGNS) if rng.random() < 0.4 else "") for ch in word)
+    return word
+
+
+def _sentence(rng, script):
+    joiner = "" if script in UNSPACED else " "
+    words = [_word(rng, script, 1 if script in UNSPACED else 2, 4) for _ in range(rng.randint(3, 8))]
+    text = ""
+    for index, word in enumerate(words):
+        text += word
+        if index < len(words) - 1:
+            text += rng.choice(PUNCT[script]) if rng.random() < 0.2 else joiner
+    end = rng.choice(PUNCT[script]).strip() or "."
+    if script == "cjk" and rng.random() < 0.3:
+        text = f"（{text}）"
+    return text + end
+
+
+def _ascii_token(rng, low, high):
+    """Letters and digits, at least one of each, so a core is unlikely in prose or fakes."""
+    size = rng.randint(low, high)
+    chars = [rng.choice("abcdefghijklmnopqrstuvwxyz") for _ in range(size - 1)] + [rng.choice("0123456789")]
+    rng.shuffle(chars)
+    return "".join(chars)
+
+
+def _script_token(rng, script):
+    token = _word(rng, script, 3, 5)
+    if script == "latin":  # an accented (precomposed) letter, so decomposition applies
+        token = token[:-1] + rng.choice(ACCENTED)
+    if script == "devanagari" and rng.random() < 0.5:  # a conjunct (virama), where ZWJ/ZWNJ are legal
+        token = token[0] + "्" + token[1:]
+    return token
+
+
+def _host(rng):
+    if rng.random() < 0.5:
+        label = _ascii_token(rng, 4, 8)
+    else:
+        label = _script_token(rng, rng.choice(("latin", "cyrillic", "arabic", "devanagari", "thai", "cjk")))
+    sub = _ascii_token(rng, 4, 6) + "." if rng.random() < 0.2 else ""
+    return sub + label + "." + rng.choice(TLDS), label
+
+
+def _email(rng):
+    script = rng.choice(("ascii", "ascii", "latin", "cyrillic", "arabic", "devanagari", "thai", "cjk"))
+    parts = [_ascii_token(rng, 4, 7) if script == "ascii" else _script_token(rng, script)]
+    if rng.random() < 0.4:
+        parts.append(_ascii_token(rng, 4, 6))
+    local = rng.choice(".-_+").join(parts)
+    host, label = _host(rng)
+    return f"{local}@{host}", [("str", part) for part in parts] + [("str", label)]
+
+
+def _digits(rng, size):
+    return "".join(rng.choice("0123456789") for _ in range(size))
+
+
+def _phone(rng):
+    shape = rng.choice((
+        "+31 6 {4} {4}", "06-{8}", "({3}) {3}-{4}", "+44 20 {4} {4}", "0{2} {3} {2} {2}", "+91 {5} {5}",
+        "06 {2} {2} {2} {2}", "+49 30 {8}",
+    ))
+    value = re.sub(r"\{(\d)\}", lambda m: _digits(rng, int(m.group(1))), shape)
+    return value, [("digits", re.sub(r"\D", "", value))]
+
+
+def _ip(rng):
+    octets = [str(rng.randint(1, 254)) for _ in range(4)]
+    return ".".join(octets), [("ip", tuple(octets))]
+
+
+def _url(rng):
+    host, _ = _host(rng)
+    token = _ascii_token(rng, 10, 14)
+    cores = [("str", token)]
+    if rng.random() < 0.5:
+        local = _ascii_token(rng, 5, 8)
+        mail_host, _ = _host(rng)
+        value = f"{local}{rng.choice(('%40', '@'))}{mail_host}"
+        cores.append(("str", local))
+    else:
+        value = token
+    query = f"?{rng.choice(('email', 'token', 'id', 'user', 'q'))}={value}"
+    if value != token:
+        query += f"&sid={token}"
+    tail = rng.choice(("", f"#{_ascii_token(rng, 10, 12)}"))
+    if tail:
+        cores.append(("str", tail[1:]))
+    return f"{rng.choice(('https', 'http'))}://{host}/{_ascii_token(rng, 3, 6)}{query}{tail}", cores
+
+
+def _date(rng):
+    year, month, day = rng.randint(1950, 2030), rng.randint(1, 12), rng.randint(1, 28)
+    value = rng.choice((f"{day:02d}/{month:02d}/{year}", f"{year}-{month:02d}-{day:02d}",
+                        f"{day:02d}.{month:02d}.{year}", f"{month:02d}/{day:02d}/{year}"))
+    return value, [("digits", re.sub(r"\D", "", value))]
+
+
+def _number(rng):
+    value = str(rng.randint(1, 9)) + _digits(rng, rng.randint(5, 8))
+    return value, [("digits", value)]
+
+
+GENERATORS = {"EMAIL": _email, "PHONE": _phone, "IP": _ip, "URL": _url, "DATE": _date, "NUMBER": _number}
+
+
+def _plan(rng, plain, legal_join):
+    """Per-character styled replacements and zero-width insertions; each tagged by its kind."""
+    slots = [None] * len(plain)  # index -> (kind, text)
+    inserts = {}  # index -> (kind, text), inserted before plain[index]
+    eligible = defaultdict(list)
+    for index, ch in enumerate(plain):
+        for kind, chars in VARIANTS.get(ch, {}).items():
+            eligible[f"{kind}_{'alnum' if ch.isalnum() else 'sep'}"].append(index)
+        if ch.isdigit() and ch.isascii():
+            eligible["native_digit"].append(index)
+            if len(plain[index:index + 2]) == 2 and "enclosed" in VARIANTS.get(plain[index:index + 2], {}):
+                eligible["enclosed_pair"].append(index)
+        if unicodedata.normalize("NFD", ch) != ch:
+            eligible["decomposed"].append(index)
+        if index in legal_join:
+            eligible["zw_join"].append(index)
+    eligible["zw_boundary"] = [0, len(plain)]
+    kinds = sorted(k for k in eligible if rng.random() < 0.4)
+    if not kinds:
+        kinds = [rng.choice(sorted(eligible))]
+    rng.shuffle(kinds)
+    style = rng.randrange(13)  # one font style per value (bold, italic, ...)
+    digit_zero = rng.choice(DIGIT_ZEROS)
+    for kind in kinds:
+        density = rng.choice((1.0, 1.0, 0.6, 0.3))
+        for index in eligible[kind]:
+            if rng.random() >= density:
+                continue
+            if kind == "zw_boundary":
+                inserts[index] = (kind, rng.choice((ZWSP, WJ)))
+            elif kind == "zw_join":
+                inserts[index] = (kind, rng.choice((ZWNJ, ZWJ)))
+            elif slots[index] is not None:
+                continue
+            elif kind == "native_digit":
+                slots[index] = (kind, chr(digit_zero + int(plain[index])))
+            elif kind == "decomposed":
+                slots[index] = (kind, unicodedata.normalize("NFD", plain[index]))
+            elif kind == "enclosed_pair":
+                if slots[index + 1] is None:
+                    slots[index] = (kind, rng.choice(VARIANTS[plain[index:index + 2]]["enclosed"]))
+                    slots[index + 1] = (kind, "")
+            else:
+                chars = VARIANTS[plain[index]][kind.rsplit("_", 1)[0]]
+                slots[index] = (kind, chars[min(style, len(chars) - 1)] if kind.startswith("font") else rng.choice(chars))
+    used = {s[0] for s in slots if s} | {i[0] for i in inserts.values()}
+    return slots, inserts, sorted(used)
+
+
+def _legal_join(plain, typ):
+    """Positions where ZWNJ/ZWJ are legal inside a label: after a virama or between Arabic letters."""
+    if typ != "EMAIL":
+        return set()
+    legal = set()
+    for index in range(1, len(plain)):
+        before, after = plain[index - 1], plain[index]
+        if unicodedata.combining(before) == 9 or (
+                "ARABIC" in unicodedata.name(before, "") and "ARABIC" in unicodedata.name(after, "")):
+            legal.add(index)
+    return legal
+
+
+def make_case(seed: int) -> dict:
+    rng = random.Random(seed)  # noqa: S311  # reproducible test data, not crypto
+    scripts = rng.sample(sorted(SCRIPT_RANGES), rng.choice((1, 2)))
+    values = []
+    for _ in range(rng.randint(1, 3)):
+        typ = rng.choice(sorted(GENERATORS))
+        plain, cores = GENERATORS[typ](rng)
+        slots, inserts, kinds = _plan(rng, plain, _legal_join(plain, typ))
+        glue = rng.random() < 0.5
+        values.append({"type": typ, "plain": plain, "cores": cores, "slots": slots, "inserts": inserts,
+                       "kinds": kinds + (["glue"] if glue else []), "glue": glue})
+    context_scripts = [rng.choice(scripts) for _ in range(len(values) + 1)]
+    context = [_sentence(rng, script) for script in context_scripts]
+    case = {"seed": seed, "scripts": scripts, "context": context, "context_scripts": context_scripts, "values": values}
+    for value in values:
+        assert fold(render(value)) == fold(value["plain"]), (seed, value["plain"], render(value))
+    return case
+
+
+def render(value, disabled=frozenset()):
+    out = []
+    for index, ch in enumerate(value["plain"] + "\0"):
+        insert = value["inserts"].get(index)
+        if insert and insert[0] not in disabled:
+            out.append(insert[1])
+        if ch == "\0":
+            break
+        slot = value["slots"][index]
+        out.append(ch if slot is None or slot[0] in disabled else slot[1])
+    return "".join(out)
+
+
+def build_doc(case, disabled=None) -> str:
+    disabled = disabled or {}
+    doc = case["context"][0]
+    for index, value in enumerate(case["values"]):
+        off = disabled.get(index, frozenset())
+        glue = value["glue"] and "glue" not in off
+        left, right = case["context_scripts"][index], case["context_scripts"][index + 1]
+        doc += ("" if glue and left in UNSPACED else " ") + render(value, off)
+        doc += ("" if glue and right in UNSPACED else " ") + case["context"][index + 1]
+    return doc
+
+
+def steps(value):
+    """Readable render steps: kind -> characters changed."""
+    out = defaultdict(list)
+    for index, slot in enumerate(value["slots"]):
+        if slot:
+            out[slot[0]].append(f"{value['plain'][index]}->{slot[1] or '(joined)'}")
+    for index, (kind, ch) in sorted(value["inserts"].items()):
+        out[kind].append(f"+U+{ord(ch):04X}@{index}")
+    if value["glue"]:
+        out["glue"].append("no space beside CJK/Thai")
+    return dict(out)
+
+
+# --- oracle ---
+
+
+@lru_cache(maxsize=None)
+def cleaner(preset: str, fold_styled: bool, mode: str) -> TextCleaner:
+    cfg = TextCleanerConfig.from_preset(preset, check_ner_process=False, fold_styled_characters=fold_styled,
+                                        replacement_mode="placeholder" if mode == "stream" else mode)
+    return TextCleaner(cfg)
+
+
+_DIGIT_RUN = re.compile(r"\d+(?:[^\w<>]{1,3}\d+)*")
+
+
+def leaked(core, text_fold: str) -> bool:
+    kind, value = core
+    if kind == "str":
+        return fold(value) in text_fold
+    runs = [re.findall(r"\d+", m.group()) for m in _DIGIT_RUN.finditer(text_fold)]
+    if kind == "ip":
+        size = len(value)
+        return ".".join(value) in text_fold or any(
+            tuple(groups[i:i + size]) == tuple(value) for groups in runs for i in range(len(groups)))
+    window = min(7, len(value))
+    joined = ["".join(groups) for groups in runs]
+    return any(value[i:i + window] in run for run in joined for i in range(len(value) - window + 1))
+
+
+def run_stream(cl, doc, max_chars, overlap, seed):
+    rng = random.Random(seed * 7919 + max_chars)  # noqa: S311  # reproducible chunking
+    stream = WindowedStreamingRedactor(cl, max_buffer_chars=max_chars, overlap_chars=overlap)
+    out, start = [], 0
+    while start < len(doc):
+        size = rng.randint(1, 20)
+        out.append(stream.feed(doc[start:start + size]))
+        start += size
+    return "".join(out) + stream.finish()
+
+
+def outputs(doc, preset, fold_styled, mode, seed):
+    """Output text(s) of one mode; stream gives one per window size (None on BufferError)."""
+    cl = cleaner(preset, fold_styled, mode)
+    if mode != "stream":
+        result = cl.process(doc)
+        restored = result.metadata["anon_map"].deanonymize(result.lm_text) if mode == "reversible" else None
+        return {"main": result.lm_text, "restored": restored}
+    found = {}
+    for max_chars, overlap in STREAM_PARAMS:
+        try:
+            found[f"{max_chars}/{overlap}"] = run_stream(cl, doc, max_chars, overlap, seed)
+        except BufferError:
+            found[f"{max_chars}/{overlap}"] = None
+    return found
+
+
+def active_cores(case, preset):
+    """(value index, core) pairs whose type the config replaces and which are not in the prose."""
+    cfg = cleaner(preset, True, "placeholder").cfg
+    context_fold = fold(" ".join(case["context"]))
+    return [(index, core) for index, value in enumerate(case["values"]) if getattr(cfg, TYPE_FLAG[value["type"]])
+            for core in value["cores"] if not leaked(core, context_fold)]
+
+
+def _leaks(case, preset, fold_styled, mode, index, core, disabled, key):
+    out = outputs(build_doc(case, disabled), preset, fold_styled, mode, case["seed"])
+    text = out.get(key)
+    if text is None:
+        return False
+    return (not leaked(core, fold(text))) if key == "restored" else leaked(core, fold(text))
+
+
+def _shrink(case, index, still_fails):
+    """Greedy: drop each kind of value ``index`` while the failure remains."""
+    kept = list(case["values"][index]["kinds"])
+    for kind in list(kept):
+        trial = [k for k in kept if k != kind]
+        off = frozenset(set(case["values"][index]["kinds"]) - set(trial))
+        if still_fails({index: off}):
+            kept = trial
+    return kept
+
+
+def _shrink_all(case, still_fails):
+    """Greedy over (value, kind) pairs for document-level failures."""
+    pairs = [(i, k) for i, value in enumerate(case["values"]) for k in value["kinds"]]
+    off = defaultdict(set)
+    for index, kind in pairs:
+        off[index].add(kind)
+        if not still_fails({i: frozenset(s) for i, s in off.items()}):
+            off[index].discard(kind)
+    return sorted(f"{case['values'][i]['type']}:{k}" for i, k in pairs if k not in off[i])
+
+
+def _record(case, doc, check, preset, fold_styled, mode, output, **extra):
+    return {"seed": case["seed"], "check": check, "preset": preset, "fold_styled_characters": fold_styled,
+            "mode": mode, "counts": fold_styled, "input": doc, "output": output, **extra}
+
+
+def check_case(seed: int, modes=MODES, folds=(True, False)) -> dict:
+    case = make_case(seed)
+    doc = build_doc(case)
+    context_doc = " ".join(case["context"])
+    failures, stream_errors = [], 0
+    for preset in PRESETS:
+        cores = active_cores(case, preset)
+        for fold_styled in folds:
+            suffix = "" if fold_styled else "|fold_off"
+            placeholder = cleaner(preset, fold_styled, "placeholder")
+            # false positives: prose without PII comes out unchanged (training) or without PII tags (default)
+            prose = placeholder.process(context_doc).lm_text
+            if prose != context_doc if preset == "training" else re.search(r"<[A-Z_]+>", prose):
+                failures.append(_record(case, context_doc, "false_positive", preset, fold_styled, "placeholder", prose,
+                                        signature=f"false_positive|{preset}|{'+'.join(case['scripts'])}{suffix}"))
+            whole = placeholder.process(doc).lm_text
+            for mode in modes:
+                out = outputs(doc, preset, fold_styled, mode, seed)
+                for key, text in out.items():
+                    if text is None:
+                        stream_errors += mode == "stream"
+                        continue
+                    text_fold = fold(text)
+                    is_restore = key == "restored"
+                    for index, core in cores:
+                        if leaked(core, text_fold) == is_restore:
+                            continue
+                        value = case["values"][index]
+                        check = "restore" if is_restore else "leak"
+                        kinds = _shrink(case, index, lambda off, index=index, core=core, mode=mode, key=key: _leaks(
+                            case, preset, fold_styled, mode, index, core, off, key))
+                        failures.append(_record(
+                            case, doc, check, preset, fold_styled, mode, text, stream=key if mode == "stream" else None,
+                            type=value["type"], plain=value["plain"], rendered=render(value), core=list(core),
+                            steps=steps(value), minimal_kinds=kinds,
+                            signature=f"{check}|{value['type']}|{'+'.join(kinds) or 'plain'}|{mode}{suffix}"))
+                        break  # one record per output is enough to cluster
+                    if is_restore and preset == "training" and text_fold != fold(doc):
+                        # training keeps the prose, so restore gives the whole input back (up to the fold)
+                        def restore_differs(off):
+                            changed = build_doc(case, off)
+                            got = outputs(changed, preset, fold_styled, "reversible", seed)["restored"]
+                            return fold(got) != fold(changed)
+                        kinds = _shrink_all(case, restore_differs)
+                        failures.append(_record(
+                            case, doc, "restore_exact", preset, fold_styled, mode, text, minimal_kinds=kinds,
+                            signature=f"restore_exact|{preset}|{'+'.join(kinds) or 'plain'}{suffix}"))
+                    if mode == "stream" and text != whole:
+                        def mismatch(off, key=key):
+                            changed = build_doc(case, off)
+                            got = outputs(changed, preset, fold_styled, "stream", seed)[key]
+                            return got is not None and got != placeholder.process(changed).lm_text
+                        kinds = _shrink_all(case, mismatch)
+                        failures.append(_record(
+                            case, doc, "stream_mismatch", preset, fold_styled, mode, text, stream=key, whole=whole,
+                            minimal_kinds=kinds,
+                            signature=f"stream_mismatch|{preset}|{'+'.join(kinds) or 'plain'}{suffix}"))
+    return {"seed": seed, "failures": failures, "stream_errors": stream_errors,
+            "types": [v["type"] for v in case["values"]]}
+
+
+def run(seeds, workers=1, modes=MODES):
+    check = partial(check_case, modes=tuple(modes))
+    if workers > 1:
+        with multiprocessing.get_context("spawn").Pool(workers) as pool:
+            return list(pool.imap(check, seeds, chunksize=8))
+    return [check(seed) for seed in seeds]
+
+
+def cluster(results):
+    clusters = {}
+    for result in results:
+        for failure in result["failures"]:
+            entry = clusters.setdefault(failure["signature"], {
+                "count": 0, "counts": failure["counts"], "check": failure["check"], "seeds": [], "presets": set(),
+                "example": failure})
+            entry["count"] += 1
+            entry["presets"].add(failure["preset"])
+            if failure["seed"] not in entry["seeds"]:
+                entry["seeds"].append(failure["seed"])
+    return clusters
+
+
+def summary(results, clusters) -> str:
+    totals = Counter()
+    for check in CHECKS:
+        totals[check] = sum(c["count"] for c in clusters.values() if c["check"] == check and c["counts"])
+        totals[check + "_fold_off"] = sum(c["count"] for c in clusters.values() if c["check"] == check and not c["counts"])
+    lines = [
+        f"cases: {len(results)}; values: {sum(len(r['types']) for r in results)} "
+        f"({dict(Counter(t for r in results for t in r['types']))})",
+        f"stream BufferError (documented, not counted): {sum(r['stream_errors'] for r in results)}",
+        "counted (fold on): " + ", ".join(f"{k}={totals[k]}" for k in CHECKS),
+        "recorded only (fold off): " + ", ".join(
+            f"{k}={totals[k + '_fold_off']}" for k in CHECKS),
+        "",
+        "| cluster | counted | records | seeds | presets | example seed |",
+        "|---|---|---|---|---|---|",
+    ]
+    for signature, entry in sorted(clusters.items(), key=lambda item: (not item[1]["counts"], -item[1]["count"])):
+        lines.append(f"| `{signature}` | {'yes' if entry['counts'] else 'no'} | {entry['count']} | {len(entry['seeds'])} "
+                     f"| {','.join(sorted(entry['presets']))} | {entry['seeds'][0]} |")
+    lines += ["", "Examples (first record per counted cluster):", ""]
+    for signature, entry in sorted(clusters.items(), key=lambda item: -item[1]["count"]):
+        if entry["counts"]:
+            example = entry["example"]
+            lines.append(f"- `{signature}` seed {example['seed']} ({example['preset']}): "
+                         f"value {example.get('rendered', '')!r} -> output {example['output'][:200]!r}")
+    return "\n".join(lines)
+
+
+def main(argv=None):
+    parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
+    parser.add_argument("--seeds", type=int, default=200)
+    parser.add_argument("--start", type=int, default=0)
+    parser.add_argument("--workers", type=int, default=1)
+    parser.add_argument("--modes", nargs="+", choices=MODES, default=list(MODES))
+    parser.add_argument("--out", type=Path, help="jsonl of failures")
+    parser.add_argument("--report", type=Path, help="markdown summary")
+    args = parser.parse_args(argv)
+    results = run(range(args.start, args.start + args.seeds), args.workers, args.modes)
+    clusters = cluster(results)
+    if args.out:
+        with args.out.open("w", encoding="utf-8") as handle:
+            for result in results:
+                for failure in result["failures"]:
+                    handle.write(json.dumps(failure, ensure_ascii=False) + "\n")
+    text = summary(results, clusters)
+    if args.report:
+        args.report.write_text(text + "\n", encoding="utf-8")
+    print(text)
+    return 1 if any(entry["counts"] for entry in clusters.values()) else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
