@@ -286,6 +286,7 @@ class TextCleaner:
                 language=language,
                 anon_map=anon_map,
                 privacy_policy=self._privacy_policy,
+                source_markers=frozenset(ner._PLACEHOLDER_TOKEN.findall(text)),
             )
             current_text = detailed.text
             findings = detailed.findings
@@ -490,6 +491,9 @@ class TextCleaner:
                 privacy_policy=self._privacy_policy,
                 before_finalize=restore_synthetic,
                 max_workers=max_workers,
+                source_markers=[
+                    frozenset(ner._PLACEHOLDER_TOKEN.findall(text)) for _, text in to_process
+                ],
             )
             for (i, _), state, ner_result in zip(to_process, states, ner_results):
                 results[i] = self._after_ner(state, ner_result.text, ner_result.findings)

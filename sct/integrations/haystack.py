@@ -1,12 +1,13 @@
 """Haystack component (``pip install squeakycleantext[haystack]``)."""
 
-from dataclasses import replace
-from typing import Sequence, Union
+from collections.abc import Mapping
+from dataclasses import fields, replace
+from typing import Any, Sequence, Union
 
-from haystack import Document, component
+from haystack import Document, component, default_from_dict, default_to_dict
 
 from sct.config import TextCleanerConfig
-from sct.integrations._runtime import CleanerHandle, clean_records
+from sct.integrations._runtime import CleanerHandle, as_columns, clean_records
 
 
 @component
@@ -22,9 +23,34 @@ class SCTDocumentCleaner:
         output: str = "overwrite",
         config: Union[TextCleanerConfig, str, None] = None,
     ):
-        self.columns = tuple(columns)
+        self.columns = as_columns(columns)
         self.output = output
+        self._config = config
         self.handle = CleanerHandle(config)
+
+    def to_dict(self) -> dict[str, Any]:
+        """Preset names stay names; a config keeps only its non-default fields.
+
+        Haystack raises SerializationError for values it cannot store (custom steps).
+        """
+        config = self._config
+        if isinstance(config, TextCleanerConfig):
+            default = TextCleanerConfig()
+            config = {
+                f.name: dict(value) if isinstance(value, Mapping) else value
+                for f in fields(config)
+                # supported_languages is recomputed by __post_init__.
+                if f.name != "supported_languages"
+                and (value := getattr(config, f.name)) != getattr(default, f.name)
+            }
+        return default_to_dict(self, columns=self.columns, output=self.output, config=config)
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "SCTDocumentCleaner":
+        params = dict(data.get("init_parameters", {}))
+        if isinstance(params.get("config"), dict):
+            params["config"] = TextCleanerConfig(**params["config"])
+        return default_from_dict(cls, {**data, "init_parameters": params})
 
     @component.output_types(documents=list[Document])
     def run(self, documents: list[Document]):

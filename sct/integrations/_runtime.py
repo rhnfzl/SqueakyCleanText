@@ -56,11 +56,16 @@ class CleanerHandle:
         self._pid = None
 
 
+def as_columns(columns) -> tuple:
+    """One column name or a sequence of them, as a tuple ("text" is not ("t", "e", "x", "t"))."""
+    return (columns,) if isinstance(columns, str) else tuple(columns)
+
+
 def _clean(handle: CleanerHandle, batch: Mapping[str, Sequence], columns, output: str):
     """Return (new batch, ProcessResult-or-None per row of the first column)."""
     if output not in OUTPUTS:
         raise ValueError(f"output must be one of {OUTPUTS}, got {output!r}")
-    columns = (columns,) if isinstance(columns, str) else tuple(columns)
+    columns = as_columns(columns)
     if not columns:
         raise ValueError("columns must name at least one column")
     missing = [c for c in columns if c not in batch]
@@ -122,7 +127,7 @@ def clean_records(
     key (missing keys pass through). Metadata is copied; ``metadata["sct"]``
     holds the public signals of the first column.
     """
-    columns = (columns,) if isinstance(columns, str) else tuple(columns)
+    columns = as_columns(columns)
     batch = {c: [t if c == text_key else m.get(c) for t, m in records] for c in columns}
     out, results = _clean(handle, batch, columns, output)
     cleaned = []

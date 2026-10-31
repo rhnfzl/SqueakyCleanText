@@ -66,8 +66,6 @@ class GLiNERAdapter:
                     self._onnx = False
             else:
                 self.model = GLiNER.from_pretrained(model_id, **load_kwargs)
-            if device.startswith('cuda') and not onnx:
-                self.model = self.model.to(device)
 
         elif variant == 'gliner2':
             try:
@@ -78,8 +76,12 @@ class GLiNERAdapter:
                     "Install with: pip install squeakycleantext[gliner2]"
                 )
             self.model = GLiNER2.from_pretrained(model_id, **load_kwargs)
+            self._onnx = False  # GLiNER2 has no ONNX loader; it always runs in torch
         else:
             raise ValueError(f"Unknown GLiNER variant: {variant!r}. Use 'gliner' or 'gliner2'.")
+        # The effective backend decides: an ONNX load that fell back to torch still moves.
+        if device.startswith('cuda') and not self._onnx:
+            self.model = self.model.to(device)
 
         # Bi-encoder detection: ModernBERT and similar architectures expose encode_labels()
         self._is_bi_encoder = hasattr(self.model, 'encode_labels')

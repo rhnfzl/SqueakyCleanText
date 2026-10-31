@@ -43,11 +43,19 @@ EMAIL_REGEX = re.compile(
 # Digit boundaries are "not next to a digit", so numbers glued to letters of
 # any script (``电话9876543210``, ``फोन9876543210पर``) are still found.
 PHONE_REGEX = re.compile(
+    # National trunk-0 numbers in groups, 9+ digits: 020 7946 0958, 010-6552 1234, 06 12 34 56 78.
+    # First, so the general pattern below cannot take only their leading groups.
+    # 00 is the international prefix, left to the general pattern.
+    r"(?<![\d_)])0[1-9]\d{0,3}(?=(?:[ .-]?\d){8})(?:[ .-]\d{2,4}){2,4}"
+    r"(?:\s?(?:ext\.?|[#x])\s?\d{2,6})?(?![\d_])"
+    r"|"
     # A leading year group ("1999 2000", "2019 555-1234") stays for the year step.
     r"((?<![\d_)])(?!(?:19|20)\d\d[ .-])((\+?\d+|0{1,2}\d*?)[ .-]?)?(\(?\d{3,4}\)?/?[ .-]?)?"
     r"(\d{3}[ .-]?\d{4})(\s?(?:ext\.?|[#x-])\s?\d{2,6})?(?![\d_]))|\+?\d{4,5}[ .-/]\d{6,9}"
     # Indian mobile: 98765 43210, 098765-43210
     r"|(?<![\d_)])0?[6-9]\d{4}[ -]?\d{5}(?![\d_])"
+    # 3-3-3 national numbers (699 123 456, 912 345 678); a space-grouped 9-digit amount reads as one too
+    r"|(?<![\d_)])(?<!\d[ .,])\d{3}[ .-]\d{3}[ .-]\d{3}(?![\d_]|[ .,]\d)"
     # International: "+" then at least 8 digits in groups (+34 612 345 678, +91 98765 43210)
     # Area-code parentheses must be balanced, so a closing ")" of the sentence stays.
     r"|(?<![\d+])\+(?=(?:[ .()-]{0,2}\d){8})\d{1,3}(?:[ .-]?(?:\(\d{1,5}\)|\d{1,5})){1,5}"

@@ -5,7 +5,7 @@ from typing import Any, Sequence, Union
 from langchain_core.documents import BaseDocumentTransformer, Document
 
 from sct.config import TextCleanerConfig
-from sct.integrations._runtime import CleanerHandle, clean_records
+from sct.integrations._runtime import CleanerHandle, as_columns, clean_records
 
 
 class SCTDocumentTransformer(BaseDocumentTransformer):
@@ -20,7 +20,7 @@ class SCTDocumentTransformer(BaseDocumentTransformer):
         output: str = "overwrite",
         config: Union[TextCleanerConfig, str, None] = None,
     ):
-        self.columns = tuple(columns)
+        self.columns = as_columns(columns)
         self.output = output
         self.handle = CleanerHandle(config)
 

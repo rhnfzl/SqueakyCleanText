@@ -8,7 +8,7 @@ from datatrove.pipeline.base import PipelineStep
 from datatrove.utils.typeshelper import StatHints
 
 from sct.config import TextCleanerConfig
-from sct.integrations._runtime import CleanerHandle, clean_records
+from sct.integrations._runtime import CleanerHandle, as_columns, clean_records
 
 
 class SCTCleaner(PipelineStep):
@@ -29,7 +29,7 @@ class SCTCleaner(PipelineStep):
         batch_size: int = 64,
     ):
         super().__init__()
-        self.columns = tuple(columns)
+        self.columns = as_columns(columns)
         self.output = output
         self.batch_size = batch_size
         self.handle = CleanerHandle(config)

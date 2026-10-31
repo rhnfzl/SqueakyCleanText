@@ -7,7 +7,7 @@ import re
 import threading
 from collections import defaultdict
 import logging
-from typing import Dict, List, Optional, Sequence, Union
+from typing import Collection, Dict, List, Optional, Sequence, Union
 from pathlib import Path
 
 import onnxruntime as ort
@@ -46,7 +46,8 @@ ENTITY_TYPE_MAP = {
 }
 
 # A regex step's placeholder (<PHONE>, <EMAIL_0>); NER spans inside one are dropped,
-# so "call <PHONE>" never becomes "call <<MISC>>".
+# so "call <PHONE>" never becomes "call <<MISC>>". Marker-shaped text already in the
+# source (*source_markers*, e.g. "<LONDON>") gets no protection, so it cannot hide PII.
 # shortcut: matches upper-case <TAG> markers only; custom replace_with_* text is not protected.
 _PLACEHOLDER_TOKEN = re.compile(r"<[A-Z][A-Z0-9_]*>")
 
@@ -234,8 +235,7 @@ class GeneralNER:
             self._provenance['GLINER'] = {
                 'key': 'GLINER', 'id': gliner_config['model'],
                 'revision': gliner_config.get('revision'),
-                'provider': 'onnx' if onnx_gliner or ner_backend == 'presidio_gliner'
-                else self._torch_device,
+                'provider': 'onnx' if onnx_gliner else self._torch_device,
             }
 
         if ner_backend != 'presidio_gliner' and ner_chunk_overlap:
@@ -290,6 +290,7 @@ class GeneralNER:
                     for label in gliner_config.get('labels', ['person', 'organization', 'location'])
                 ],
                 threshold=gliner_config.get('threshold', 0.4),
+                map_location=self._torch_device,  # Presidio loads GLiNER in torch
             )
             self._analyzer.registry.add_recognizer(gliner_recognizer)
         except ImportError:
@@ -666,6 +667,7 @@ class GeneralNER:
         language: Optional[str] = None,
         anon_map: Optional['AnonymizationMap'] = None,
         privacy_policy: Optional[PrivacyPolicy] = None,
+        source_markers: Optional[Collection[str]] = None,
     ) -> NERProcessingResult:
         """Process text and return transformed text with entity findings.
 
@@ -726,6 +728,7 @@ class GeneralNER:
         )
         return self._finalize(
             text, windows, window_results, ner_confidence_threshold, anon_map, privacy_policy,
+            source_markers,
         )
 
     def ner_process_batch_detailed(
@@ -738,6 +741,7 @@ class GeneralNER:
         privacy_policy: Optional[PrivacyPolicy] = None,
         before_finalize=None,
         max_workers: int = 1,
+        source_markers: Optional[Sequence[Optional[Collection[str]]]] = None,
     ) -> List[NERProcessingResult]:
         """``ner_process_detailed`` for many documents, batching model calls across them.
 
@@ -752,6 +756,7 @@ class GeneralNER:
         if ner_confidence_threshold is None:
             ner_confidence_threshold = 0.85
         anon_maps = anon_maps if anon_maps is not None else [None] * len(texts)
+        source_markers = source_markers if source_markers is not None else [None] * len(texts)
         if self._ner_backend == 'presidio_gliner':
             results = []
             for i, text in enumerate(texts):
@@ -786,7 +791,7 @@ class GeneralNER:
                 continue
             results.append(self._finalize(
                 text, windows, window_results, ner_confidence_threshold,
-                anon_maps[i], privacy_policy,
+                anon_maps[i], privacy_policy, source_markers[i],
             ))
         return results
 
@@ -982,6 +987,7 @@ class GeneralNER:
         ner_confidence_threshold: float,
         anon_map: Optional['AnonymizationMap'],
         privacy_policy: Optional[PrivacyPolicy],
+        source_markers: Optional[Collection[str]] = None,
     ) -> NERProcessingResult:
         """Merge window spans in document coordinates, vote, and replace once."""
         spans, foreign = [], []
@@ -1015,7 +1021,10 @@ class GeneralNER:
             ]
 
         ensemble_results = self.ner_ensemble(spans, ner_confidence_threshold)
-        markers = [m.span() for m in _PLACEHOLDER_TOKEN.finditer(text)]
+        markers = [
+            m.span() for m in _PLACEHOLDER_TOKEN.finditer(text)
+            if not source_markers or m.group() not in source_markers
+        ]
         if markers:
             ensemble_results = [
                 item for item in ensemble_results

@@ -4,7 +4,7 @@ from typing import Any, Optional, Sequence, Union
 
 import sct
 from sct.config import TextCleanerConfig
-from sct.integrations._runtime import CleanerHandle, clean_columns
+from sct.integrations._runtime import CleanerHandle, as_columns, clean_columns
 
 
 class SCTMap:
@@ -17,7 +17,7 @@ class SCTMap:
         config: Union[TextCleanerConfig, str, None] = None,
         score: bool = False,
     ):
-        self.columns = tuple(columns)
+        self.columns = as_columns(columns)
         self.output = output
         self.score = score
         self.handle = CleanerHandle(config)
