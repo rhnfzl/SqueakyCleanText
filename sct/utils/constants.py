@@ -41,7 +41,8 @@ LEGACY_TYPE_NAMES = {'PHONE': 'PHONE_NUMBER', 'IP': 'IP_ADDRESS'}
 
 # Fixed: Unicode ranges use actual Unicode escapes (not literal \\u in raw strings)
 # Local part takes RFC 5322 punctuation (o'connor, jo&co, alice!) after a word start,
-# so no prefix of the address stays visible; it never ends in a dot.
+# so no prefix of the address stays visible; it never ends in a dot. ZWNJ/ZWJ join letters
+# in it as in a domain label (Devanagari half forms, Persian).
 # Domain labels take any script but not general, CJK or full-width punctuation, so
 # "a@b.com（担当：鈴木）" or "a@b.com、" ends at ".com". The letters and numbers of the
 # CJK punctuation block (々 〆 〇, by Unicode category) stay, so "info@佐々木.jp" is whole.
@@ -76,7 +77,7 @@ _IDN_CHAR = _IDN_LETTER + r"0-9\uff10-\uff19\u200c\u200d"
 # A punycode TLD (xn--p1ai) is tried first, so ".xn" alone never ends the match.
 _TLD = rf"(?:xn--[a-z0-9-]*[a-z0-9]|[{_IDN_LETTER}]{{2,}})"
 EMAIL_REGEX = re.compile(
-    rf"(?:^|(?<=[^\w@.){MARKS}]))[\w+-](?:[\w!#$%&'*+{MARKS}-]|\.(?!\.))*?(?<!\.)(@|[(<{{\[]at[)>}}\]])"
+    rf"(?:^|(?<=[^\w@.){MARKS}]))[\w+-](?:[\w!#$%&'*+{MARKS}\u200c\u200d-]|\.(?!\.))*?(?<!\.)(@|[(<{{\[]at[)>}}\]])"
     rf"(?:(?:[{_IDN_CHAR}]-*)*[{_IDN_CHAR}]+)(?:\.(?:[{_IDN_CHAR}]-*)*[{_IDN_CHAR}]+)*(?:\.{_TLD})",
     flags=re.IGNORECASE | re.UNICODE,
 )
@@ -87,7 +88,7 @@ PHONE_REGEX = re.compile(
     # National trunk-0 numbers in groups, 9+ digits: 020 7946 0958, 010-6552 1234, 06 12 34 56 78.
     # First, so the general pattern below cannot take only their leading groups.
     # 00 is the international prefix, left to the general pattern.
-    r"(?<![\d_)])0[1-9]\d{0,3}(?=(?:[ .-]?\d){8})(?:[ .-]\d{2,4}){2,4}"
+    r"(?<![\d_)])0[1-9](?=(?:[ .-]?\d){7})\d{0,3}(?:[ .-]\d{2,4}){2,4}"
     r"(?:\s?(?:ext\.?|[#x])\s?\d{2,6})?(?![\d_])"
     r"|"
     # A leading year group ("1999 2000", "2019 555-1234") stays for the year step.
@@ -168,9 +169,17 @@ HTML_REGEX = re.compile(
     flags=re.UNICODE | re.IGNORECASE,
 )
 
+# Punctuation (category P) of the CJK symbol, katakana middle dot and full-width blocks, except the
+# full-width forms of URL syntax (／ ？ ＃ ％ ＆ ＠ ： ． － ＿), which the styled fold turns into ASCII.
+_WIDE_PUNCT = re.escape(''.join(
+    chr(cp) for cp in [*range(0x3000, 0x3040), 0x30FB, *range(0xFF00, 0xFF66)]
+    if unicodedata.category(chr(cp))[0] == 'P' and unicodedata.normalize('NFKC', chr(cp)) not in '/?#%&@:.-_'))
+
 # Fixed: Unicode ranges use actual Unicode escapes (not literal \\u in raw strings)
 URL_REGEX = re.compile(
-    r"(?:^|(?<![\w\/\.]))"
+    # Only an ASCII letter or digit glues to the scheme, so a URL right after CJK/Thai text
+    # (請見https://..., ดูhttps://...) is still found.
+    r"(?:^|(?<![A-Za-z0-9_\/\.]))"
     # protocol identifier
     r"(?:(?:https?:\/\/|ftp:\/\/|www\d{0,3}\.))"
     # user:pass authentication; never across / ? # " < > so a later "@" in the
@@ -192,10 +201,11 @@ URL_REGEX = re.compile(
     r"(?::\d{2,5}\b)?"
     # resource path, or a query/fragment right after the host ("?id=", "#token=");
     # " < > are never raw in a URL, so markup around it survives. A bare trailing "?"
-    # stays punctuation. ) ] } belong to the URL only when more URL text follows
+    # stays punctuation. CJK and full-width punctuation (，。！（ ・) ends it, as in an email
+    # domain, so CJK prose glued after a URL stays. ) ] } belong to the URL only when more URL text follows
     # ("?f=(a)&email=..."), so a closing bracket around a URL stays outside it.
-    r"(?:\/(?:[^\)\]\}\s\"<>]|[\)\]\}](?=[\w&=/?#%+~-]))*"
-    r"|[?#](?:[^\)\]\}\s\"<>]|[\)\]\}](?=[\w&=/?#%+~-]))+)?",
+    rf"(?:\/(?:[^\)\]\}}\s\"<>{_WIDE_PUNCT}]|[\)\]\}}](?=[\w&=/?#%+~-]))*"
+    rf"|[?#](?:[^\)\]\}}\s\"<>{_WIDE_PUNCT}]|[\)\]\}}](?=[\w&=/?#%+~-]))+)?",
     flags=re.UNICODE | re.IGNORECASE,
 )
 

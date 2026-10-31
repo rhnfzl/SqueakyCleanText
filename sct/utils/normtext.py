@@ -15,7 +15,7 @@ _FULLWIDTH_ALNUM = {c: c - 0xFEE0 for r in ((0xFF10, 0xFF19), (0xFF21, 0xFF3A), 
 # Full-width @ . - _ + and ideographic space become ASCII only inside alphanumeric runs (emails,
 # phones; ＠ and ． also beside letters of any script), so CJK punctuation such as ， ： ！ keeps its width.
 # A word of any script may end in a combining mark (प्रिया), so marks count as its letters.
-_WORD_END = rf'(?<=[^\W_{constants.MARKS}])'
+_WORD_END = rf'(?<=[^\W_]|[{constants.MARKS}])'
 _FULLWIDTH_JOINER_REGEX = re.compile(r'(?<=[0-9A-Za-z])[＠．－＿＋\u3000](?=[0-9A-Za-z])|＋(?=[0-9])'
                                      rf'|{_WORD_END}＠(?=[^\W_])|{_WORD_END}．(?=[0-9A-Za-z])|(?<=[0-9A-Za-z])．(?=[^\W_])')
 _FULLWIDTH_JOINER = {'＠': '@', '．': '.', '－': '-', '＿': '_', '＋': '+', '\u3000': ' '}
@@ -48,23 +48,50 @@ def _nfkc_ascii_alnum(tags):
 _STYLED_ALNUM = _nfkc_ascii_alnum({'<font>', '<wide>'})
 _CIRCLED_ALNUM = _nfkc_ascii_alnum({'<circle>'})
 _CIRCLED_RUN_REGEX = re.compile('[%s]+' % ''.join(map(chr, _CIRCLED_ALNUM)))
-_RUN_NEIGHBOUR = re.compile(r'[0-9A-Za-z@＠.:/_+\-]')
-# URL/email/phone/date punctuation in compatibility form folds between ASCII alnum; contact
-# syntax also beside letters of any script: ＠ between letters/digits, ． with an ASCII side
-# (例え．jp) and a ：／／ scheme after ASCII letters (https：／／例え.jp).
-_STYLED_JOINER_REGEX = re.compile(r'(?<=[0-9A-Za-z])[＠．－＿＋：／？＝＆＃％～\u3000]+(?=[0-9A-Za-z])|＋(?=[0-9])'
-                                  rf'|{_WORD_END}＠(?=[^\W_])|{_WORD_END}．(?=[0-9A-Za-z])|(?<=[0-9A-Za-z])．(?=[^\W_])|(?<=[A-Za-z])：／／')
+# Contact punctuation in every compatibility form (full-width ＠, small ﹫, font ﬩ for +), picked by
+# decomposition tag and NFKC value so every rule below folds the same set; ideographic space too.
+_STYLED_SEP = {ch: unicodedata.normalize('NFKC', ch) for ch in map(chr, range(0x20000))
+               if unicodedata.decomposition(ch).split(' ', 1)[0] in ('<wide>', '<small>', '<font>')
+               and unicodedata.normalize('NFKC', ch) in '@.-_+:/?=&#%~ '}
+
+
+def _forms(ascii_chars):
+    """Character-class body of the styled forms of ``ascii_chars``."""
+    return re.escape(''.join(ch for ch, plain in _STYLED_SEP.items() if plain in ascii_chars))
+
+
+_STYLED_PUNCT = _forms('@.-_+:/?=&#%~ ')
+_PUNCT_ANY = _STYLED_PUNCT + re.escape('@.-_+:/?=&#%~')
+# A circled run folds beside ASCII alnum, any decimal digit (⑩꤈) or contact punctuation in any form.
+_RUN_NEIGHBOUR = re.compile(rf'[0-9A-Za-z{_PUNCT_ANY}]|\d')
+# URL/email/phone/date punctuation in compatibility form folds between ASCII letters or digits of
+# any script (a run may mix forms: http：/／x); contact syntax also beside letters of any script:
+# ＠ between letters/digits, ． with an ASCII side (例え．jp) and a ：／／ scheme after ASCII letters (https：／／例え.jp).
+_STYLED_JOINER_REGEX = re.compile(
+    rf'(?<=[A-Za-z\d])[{_PUNCT_ANY}]*[{_STYLED_PUNCT}][{_PUNCT_ANY}]*(?=[A-Za-z\d])|[{_forms("+")}](?=\d)'
+    rf'|{_WORD_END}[{_forms("@")}](?=[^\W_])|{_WORD_END}[{_forms(".")}](?=[0-9A-Za-z])'
+    rf'|(?<=[0-9A-Za-z])[{_forms(".")}](?=[^\W_])|(?<=[A-Za-z])[:{_forms(":")}][/{_forms("/")}]{{2}}')
 
 
 # After a scheme, full-width query/fragment syntax folds whatever script the host is in
 # (https://例え.テスト？email=...), so the whole URL, query values included, is one match.
 _URL_RUN_REGEX = re.compile(r'[A-Za-z][A-Za-z0-9+.\-]*://\S+')
-_URL_RUN_JOINER = str.maketrans('：／？＝＆＃％～', ':/?=&#%~')
+_URL_RUN_JOINER = str.maketrans({ch: plain for ch, plain in _STYLED_SEP.items() if plain in ':/?=&#%~'})
+# Inside an address-shaped run every styled form of @ . - _ + folds (the full-width-only rule above, widened).
+_STYLED_EMAIL_RUN_REGEX = re.compile(
+    rf'\w[\w{_forms(".-_+")}{constants.MARKS}]*[@{_forms("@")}][\w{_forms(".-_")}{constants.MARKS}]*\w')
+_STYLED_EMAIL_RUN_JOINER = str.maketrans({ch: plain for ch, plain in _STYLED_SEP.items() if plain in '@.-_+'})
+
+
+# A lone circled number between space-separated digit groups (06 ⑬ 01 68) is one group of them.
+_DIGIT_GROUP = '(?:\\d|[%s])' % ''.join(chr(cp) for cp, plain in _CIRCLED_ALNUM.items() if plain.isdigit())
+_DIGIT_BEFORE, _DIGIT_AFTER = re.compile(_DIGIT_GROUP + ' '), re.compile(' ' + _DIGIT_GROUP)
 
 
 def _fold_circled_run(m):
     s, a, b = m.string, m.start(), m.end()
-    if b - a > 1 or (a and _RUN_NEIGHBOUR.match(s, a - 1)) or (b < len(s) and _RUN_NEIGHBOUR.match(s, b)):
+    if b - a > 1 or (a and _RUN_NEIGHBOUR.match(s, a - 1)) or (b < len(s) and _RUN_NEIGHBOUR.match(s, b)) or (
+            a > 1 and _DIGIT_BEFORE.match(s, a - 2) and _DIGIT_AFTER.match(s, b)):
         return m.group().translate(_CIRCLED_ALNUM)
     return m.group()
 
@@ -73,7 +100,8 @@ def fold_styled(text):
     """Fold styled/compatibility letters, digits and in-run URL punctuation to ASCII."""
     text = _CIRCLED_RUN_REGEX.sub(_fold_circled_run, text.translate(_STYLED_ALNUM))
     text = _STYLED_JOINER_REGEX.sub(lambda m: unicodedata.normalize('NFKC', m.group()), text)
-    return _fold_email_runs(_URL_RUN_REGEX.sub(lambda m: m.group().translate(_URL_RUN_JOINER), text))
+    text = _URL_RUN_REGEX.sub(lambda m: m.group().translate(_URL_RUN_JOINER), text)
+    return _STYLED_EMAIL_RUN_REGEX.sub(lambda m: m.group().translate(_STYLED_EMAIL_RUN_JOINER), text)
 
 
 class NormaliseText:

@@ -126,7 +126,7 @@ def _sentence(rng, script):
         text += word
         if index < len(words) - 1:
             text += rng.choice(PUNCT[script]) if rng.random() < 0.2 else joiner
-    end = rng.choice(PUNCT[script]).strip() or "."
+    end = rng.choice(PUNCT[script]).strip() or ("" if script == "thai" else ".")  # Thai ends a sentence with a space
     if script == "cjk" and rng.random() < 0.3:
         text = f"（{text}）"
     return text + end
@@ -174,10 +174,12 @@ def _digits(rng, size):
 
 def _phone(rng):
     shape = rng.choice((
-        "+31 6 {4} {4}", "06-{8}", "({3}) {3}-{4}", "+44 20 {4} {4}", "0{2} {3} {2} {2}", "+91 {5} {5}",
+        "+31 6 {4} {4}", "06-{8}", "({3}) {3}-{4}", "+44 20 {4} {4}", "0{z}{1} {3} {2} {2}", "+91 {5} {5}",
         "06 {2} {2} {2} {2}", "+49 30 {8}",
     ))
-    value = re.sub(r"\{(\d)\}", lambda m: _digits(rng, int(m.group(1))), shape)
+    # {z} is one non-zero digit: a national area code never starts with 00 (the international prefix)
+    value = re.sub(r"\{(\d|z)\}", lambda m: rng.choice("123456789") if m.group(1) == "z"
+                   else _digits(rng, int(m.group(1))), shape)
     return value, [("digits", re.sub(r"\D", "", value))]
 
 

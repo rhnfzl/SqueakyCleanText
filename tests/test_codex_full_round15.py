@@ -70,7 +70,8 @@ def test_native_digit_phone_and_ip_fully_replaced(text, mode):
 
 def test_native_digit_ip_public_only_check():
     out = _training("ip ١٩٢．١٦٨．١．١ and ٨．٨．٨．٨", "placeholder", replace_ips_public_only=True)
-    assert out == "ip ١٩٢．١٦٨．١．١ and <IP>"
+    # ． between digits of any script folds like between ASCII digits (fuzz round 1); the private IP stays
+    assert out == "ip ١٩٢.١٦٨.١.١ and <IP>"
 
 
 # --- 5: dataclasses.replace re-derives the PII label map ---

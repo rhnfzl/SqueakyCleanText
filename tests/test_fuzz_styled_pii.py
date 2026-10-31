@@ -1,16 +1,25 @@
 """Fuzz the styled / full-width PII leak class on fixed seeds (``scripts/fuzz_styled_pii.py``).
 
-Every counted failure cluster of fuzz round 0 (3000 seeds, research/0.8.0-fuzz-round0.md) is
-listed with the first seed that shows it. Each one is an xfail(strict=True) until fixed; a new
-cluster on these seeds fails ``test_no_new_failure_cluster``. Remove a cluster once it passes.
+Every counted failure cluster of the fuzz rounds (research/0.8.0-fuzz-round*.md) is listed with
+the first seed that shows it: open ones are xfail(strict=True), fixed ones must stay fixed. A new
+cluster on these seeds fails ``test_no_new_failure_cluster``. Move a cluster to FIXED once it passes.
 """
 
 import pytest
 
 from scripts.fuzz_styled_pii import check_case, fold, make_case, render
 
-# cluster id -> first seed that shows it (fuzz round 0)
+# Open clusters (fuzz round 1, research/0.8.0-fuzz-round1.md) -> first seed that still shows them.
+# A lone enclosed number at the edge of a digit-group run ("093 622 17 ㉝") reads like a list
+# marker beside a number ("① 2024年"), so it is left unfolded; xfail(strict=True) until fixed.
 KNOWN_CLUSTERS = {
+    "leak|PHONE|enclosed_pair|placeholder": 48,
+    "leak|PHONE|enclosed_pair|reversible": 48,
+    "leak|PHONE|enclosed_pair|stream": 48,
+    "leak|PHONE|enclosed_pair|synthetic": 48,
+}
+# Fixed clusters (rounds 0-1) -> first seed that showed them on the old code; they must stay fixed.
+FIXED_CLUSTERS = {
     "leak|EMAIL|enclosed_alnum+native_digit+wide_sep|placeholder": 2834,
     "leak|EMAIL|enclosed_alnum+native_digit+wide_sep|reversible": 2834,
     "leak|EMAIL|enclosed_alnum+native_digit+wide_sep|stream": 2834,
@@ -23,6 +32,10 @@ KNOWN_CLUSTERS = {
     "leak|EMAIL|small_sep|reversible": 3,
     "leak|EMAIL|small_sep|stream": 3,
     "leak|EMAIL|small_sep|synthetic": 3,
+    "leak|EMAIL|wide_sep+zw_join|placeholder": 100177,
+    "leak|EMAIL|wide_sep+zw_join|reversible": 100177,
+    "leak|EMAIL|wide_sep+zw_join|stream": 100177,
+    "leak|EMAIL|wide_sep+zw_join|synthetic": 100177,
     "leak|EMAIL|zw_join|placeholder": 258,
     "leak|EMAIL|zw_join|reversible": 258,
     "leak|EMAIL|zw_join|stream": 258,
@@ -39,7 +52,6 @@ KNOWN_CLUSTERS = {
     "leak|IP|enclosed_alnum+wide_sep|reversible": 52,
     "leak|IP|enclosed_alnum+wide_sep|stream": 52,
     "leak|IP|enclosed_alnum+wide_sep|synthetic": 52,
-    "leak|IP|enclosed_pair+glue|stream": 372,
     "leak|IP|enclosed_pair+native_digit+small_sep|placeholder": 301,
     "leak|IP|enclosed_pair+native_digit+small_sep|reversible": 301,
     "leak|IP|enclosed_pair+native_digit+small_sep|stream": 301,
@@ -48,14 +60,11 @@ KNOWN_CLUSTERS = {
     "leak|IP|enclosed_pair+native_digit+wide_sep|reversible": 110,
     "leak|IP|enclosed_pair+native_digit+wide_sep|stream": 110,
     "leak|IP|enclosed_pair+native_digit+wide_sep|synthetic": 110,
+    "leak|IP|enclosed_pair+small_sep|stream": 2046,
     "leak|IP|enclosed_pair+wide_sep|placeholder": 76,
     "leak|IP|enclosed_pair+wide_sep|reversible": 76,
     "leak|IP|enclosed_pair+wide_sep|stream": 76,
     "leak|IP|enclosed_pair+wide_sep|synthetic": 76,
-    "leak|IP|glue|placeholder": 36,
-    "leak|IP|glue|reversible": 36,
-    "leak|IP|glue|stream": 36,
-    "leak|IP|glue|synthetic": 36,
     "leak|IP|small_sep|placeholder": 2,
     "leak|IP|small_sep|reversible": 2,
     "leak|IP|small_sep|stream": 2,
@@ -73,6 +82,7 @@ KNOWN_CLUSTERS = {
     "leak|PHONE|enclosed_pair+font_sep+native_digit|reversible": 212,
     "leak|PHONE|enclosed_pair+font_sep+native_digit|stream": 212,
     "leak|PHONE|enclosed_pair+font_sep+native_digit|synthetic": 212,
+    "leak|PHONE|enclosed_pair+glue|stream": 101747,
     "leak|PHONE|enclosed_pair+native_digit+wide_sep|placeholder": 534,
     "leak|PHONE|enclosed_pair+native_digit+wide_sep|reversible": 534,
     "leak|PHONE|enclosed_pair+native_digit+wide_sep|stream": 534,
@@ -81,10 +91,7 @@ KNOWN_CLUSTERS = {
     "leak|PHONE|enclosed_pair+native_digit|reversible": 242,
     "leak|PHONE|enclosed_pair+native_digit|stream": 242,
     "leak|PHONE|enclosed_pair+native_digit|synthetic": 242,
-    "leak|PHONE|enclosed_pair|placeholder": 167,
-    "leak|PHONE|enclosed_pair|reversible": 167,
-    "leak|PHONE|enclosed_pair|stream": 167,
-    "leak|PHONE|enclosed_pair|synthetic": 167,
+    "leak|PHONE|font_sep+glue|stream": 100306,
     "leak|PHONE|font_sep|placeholder": 914,
     "leak|PHONE|font_sep|reversible": 914,
     "leak|PHONE|font_sep|stream": 914,
@@ -115,18 +122,19 @@ KNOWN_CLUSTERS = {
     "leak|URL|small_sep|reversible": 9,
     "leak|URL|small_sep|stream": 9,
     "leak|URL|small_sep|synthetic": 9,
-    "leak|URL|wide_sep+glue|stream": 2338,
     "leak|URL|wide_sep+zw_boundary|stream": 1623,
     "leak|URL|wide_sep|placeholder": 4,
     "leak|URL|wide_sep|reversible": 4,
     "leak|URL|wide_sep|stream": 4,
     "leak|URL|wide_sep|synthetic": 4,
+    "stream_mismatch|sct|EMAIL:glue+PHONE:glue": 100963,
     "stream_mismatch|sct|NUMBER:glue+PHONE:glue": 1364,
     "stream_mismatch|sct|PHONE:glue": 283,
+    "stream_mismatch|training|EMAIL:glue+PHONE:glue": 100963,
     "stream_mismatch|training|NUMBER:glue+PHONE:glue": 1364,
     "stream_mismatch|training|PHONE:glue": 283,
 }
-SEEDS = sorted(set(range(10)) | set(KNOWN_CLUSTERS.values()))
+SEEDS = sorted(set(range(10)) | set(KNOWN_CLUSTERS.values()) | set(FIXED_CLUSTERS.values()))
 
 
 @pytest.fixture(scope="module")
@@ -148,8 +156,13 @@ def test_no_new_failure_cluster(clusters):
     assert sorted(set(clusters) - set(KNOWN_CLUSTERS)) == []
 
 
+@pytest.mark.parametrize("cluster", sorted(FIXED_CLUSTERS))
+def test_fixed_cluster(cluster, clusters):
+    assert cluster not in clusters
+
+
 @pytest.mark.parametrize("cluster", [
-    pytest.param(cluster, marks=pytest.mark.xfail(strict=True, reason=f"fuzz round 0 cluster {cluster}"))
+    pytest.param(cluster, marks=pytest.mark.xfail(strict=True, reason=f"fuzz round 1 open cluster {cluster}"))
     for cluster in sorted(KNOWN_CLUSTERS)
 ])
 def test_known_cluster(cluster, clusters):

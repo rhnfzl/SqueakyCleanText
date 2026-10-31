@@ -7,6 +7,7 @@ import unicodedata
 from sct.sct import TextCleaner
 from sct.utils import constants
 from sct.utils.contact import _DIGIT_VIEW
+from sct.utils.normtext import _STYLED_SEP
 
 _CONTACT_REGEXES = (
     constants.EMAIL_REGEX, constants.PHONE_REGEX, constants.URL_REGEX, constants.IP_REGEX,
@@ -77,9 +78,9 @@ class WindowedStreamingRedactor:
 
         cutoff = len(self._buffer) - self._overlap_chars
         # Never split inside a contact token that holds spaces ("06 12 34 56 78"). Match on a
-        # view close to what the cleaner sees: HTML entities decoded ("12&#32;34") and each
-        # character NFKC-folded ("０６ １２") with any decimal digit as ASCII ("٠٦ ١٢", as the
-        # cleaner's digit view); starts/ends map view offsets back to the buffer.
+        # view close to what the cleaner sees: HTML entities decoded ("12&#32;34") and each letter,
+        # digit, space and contact punctuation NFKC-folded ("０６ １２") with any decimal digit as
+        # ASCII ("٠٦ ١٢", as the cleaner's digit view); starts/ends map view offsets back to the buffer.
         view, starts, ends = [], [], []
         for unit in _VIEW_UNIT.finditer(self._buffer):
             decoded = html.unescape(unit.group())
@@ -89,6 +90,10 @@ class WindowedStreamingRedactor:
                 unit_ends = (unit.end(),)
             for character, end in zip(decoded, unit_ends):
                 folded = unicodedata.normalize("NFKC", character).translate(_DIGIT_VIEW)
+                # punctuation folds only where the cleaner's styled fold does (contact punctuation),
+                # so a "（" glued after a phone stays wide and does not end the match early
+                if not (folded.isalnum() or folded.isspace()) and character not in _STYLED_SEP:
+                    folded = character
                 # styled multi-character folds ("⑫" -> "12") keep every character, all on one source span
                 if len(folded) != 1 and not (folded.isascii() and folded.isalnum()):
                     folded = character
