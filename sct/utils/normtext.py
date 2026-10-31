@@ -48,12 +48,18 @@ def _nfkc_ascii_alnum(tags):
 _STYLED_ALNUM = _nfkc_ascii_alnum({'<font>', '<wide>'})
 _CIRCLED_ALNUM = _nfkc_ascii_alnum({'<circle>'})
 _CIRCLED_RUN_REGEX = re.compile('[%s]+' % ''.join(map(chr, _CIRCLED_ALNUM)))
-_RUN_NEIGHBOUR = re.compile(r'[0-9A-Za-z@.:/_+\-]')
+_RUN_NEIGHBOUR = re.compile(r'[0-9A-Za-z@＠.:/_+\-]')
 # URL/email/phone/date punctuation in compatibility form folds between ASCII alnum; contact
 # syntax also beside letters of any script: ＠ between letters/digits, ． with an ASCII side
 # (例え．jp) and a ：／／ scheme after ASCII letters (https：／／例え.jp).
 _STYLED_JOINER_REGEX = re.compile(r'(?<=[0-9A-Za-z])[＠．－＿＋：／？＝＆＃％～\u3000]+(?=[0-9A-Za-z])|＋(?=[0-9])'
                                   rf'|{_WORD_END}＠(?=[^\W_])|{_WORD_END}．(?=[0-9A-Za-z])|(?<=[0-9A-Za-z])．(?=[^\W_])|(?<=[A-Za-z])：／／')
+
+
+# After a scheme, full-width query/fragment syntax folds whatever script the host is in
+# (https://例え.テスト？email=...), so the whole URL, query values included, is one match.
+_URL_RUN_REGEX = re.compile(r'[A-Za-z][A-Za-z0-9+.\-]*://\S+')
+_URL_RUN_JOINER = str.maketrans('：／？＝＆＃％～', ':/?=&#%~')
 
 
 def _fold_circled_run(m):
@@ -66,7 +72,8 @@ def _fold_circled_run(m):
 def fold_styled(text):
     """Fold styled/compatibility letters, digits and in-run URL punctuation to ASCII."""
     text = _CIRCLED_RUN_REGEX.sub(_fold_circled_run, text.translate(_STYLED_ALNUM))
-    return _fold_email_runs(_STYLED_JOINER_REGEX.sub(lambda m: unicodedata.normalize('NFKC', m.group()), text))
+    text = _STYLED_JOINER_REGEX.sub(lambda m: unicodedata.normalize('NFKC', m.group()), text)
+    return _fold_email_runs(_URL_RUN_REGEX.sub(lambda m: m.group().translate(_URL_RUN_JOINER), text))
 
 
 class NormaliseText:

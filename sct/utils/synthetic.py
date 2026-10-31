@@ -3,13 +3,17 @@
 Thread-safe: uses threading.local() for both Faker instances and consistency
 caches, so parallel batch processing in TextCleaner has no shared mutable state.
 """
+import contextlib
+import datetime as _datetime_module
 import functools
 import hashlib
 import locale as _stdlib_locale
 import logging
 import os
 import random
+import sys
 import threading
+import types
 from datetime import date, datetime, timedelta
 from typing import Dict, Optional
 
@@ -20,7 +24,53 @@ logger = logging.getLogger(__name__)
 _GLOBAL_RANDOM_LOCK = threading.Lock()
 if hasattr(os, "register_at_fork"):
     # A child forked while another thread held the lock must not inherit it held.
-    os.register_at_fork(after_in_child=lambda: globals().update(_GLOBAL_RANDOM_LOCK=threading.Lock()))
+    os.register_at_fork(after_in_child=lambda: globals().update(_GLOBAL_RANDOM_LOCK=threading.Lock(),
+                                                                  _CLOCK_LOCK=threading.Lock()))
+_CLOCK_LOCK = threading.Lock()
+
+
+class _HeldClock(type):
+    """isinstance against a held-clock class still accepts every real date/datetime."""
+    def __instancecheck__(cls, obj):
+        return isinstance(obj, cls.__mro__[1])
+
+
+@contextlib.contextmanager
+def _clock_at(reference, modules):
+    """Faker code in *modules* reads *reference* as today and now.
+
+    Native SSN/TAX_ID providers (zh_CN, fi_FI, sv_SE, pl_PL ...) derive the birthday inside
+    the number from the clock, not from any argument.
+    shortcut: swaps module globals process-wide under a lock, so a Faker call outside SCT on
+    another thread meanwhile sees the reference date too; upgrade if Faker gains a clock hook.
+    """
+    class Date(date, metaclass=_HeldClock):
+        @classmethod
+        def today(cls):
+            return reference.date()
+
+    class DateTime(datetime, metaclass=_HeldClock):
+        @classmethod
+        def now(cls, tz=None):
+            return reference.replace(tzinfo=tz)
+
+        @classmethod
+        def today(cls):
+            return reference
+
+    module = types.SimpleNamespace(**vars(_datetime_module))
+    module.date, module.datetime = Date, DateTime
+    held = {id(_datetime_module): module, id(datetime): DateTime, id(date): Date}
+    with _CLOCK_LOCK:
+        saved = [(mod, name, value) for mod in modules for name, value in vars(mod).items()
+                 if id(value) in held]
+        for mod, name, value in saved:
+            setattr(mod, name, held[id(value)])
+        try:
+            yield
+        finally:
+            for mod, name, value in saved:
+                setattr(mod, name, value)
 
 # Maps entity tags to Faker method names
 FAKER_GENERATORS: Dict[str, str] = {
@@ -215,6 +265,11 @@ class SyntheticReplacer:
             generate = functools.partial(fake.date_between_dates,
                                          self._reference - timedelta(days=115 * 365 + 28),
                                          self._reference)
+        if self._reference is not None:
+            method = getattr(generate, 'func', generate)
+            modules = {sys.modules.get(getattr(method, '__module__', None)),
+                       sys.modules.get('faker.providers.date_time')} - {None}
+            generate = functools.partial(self._at_reference, generate, modules)
         if doc_seed is None:
             replacement = str(generate())
         else:
@@ -228,6 +283,10 @@ class SyntheticReplacer:
 
         cache[cache_key] = replacement
         return replacement
+
+    def _at_reference(self, generate, modules):
+        with _clock_at(self._reference, modules):
+            return generate()
 
     def generate_for_entities(
         self, text: str, filtered_data: list,

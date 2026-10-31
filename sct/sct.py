@@ -689,8 +689,13 @@ class TextCleaner:
         values: Dict[str, list] = {}
         for tag, value in order:
             values.setdefault(tag, []).append(value)
-        pattern = re.compile('|'.join(map(re.escape, sorted(values, key=len, reverse=True))))
-        found = Counter(match.group() for match in pattern.finditer(text))
+        tags = sorted(values, key=len, reverse=True)
+        pattern = re.compile('|'.join(map(re.escape, tags)))
+        # An NER placeholder in the text is matched whole, so a marker such as "PERSON" is
+        # not counted (or swapped) inside "<PERSON_0>".
+        held = {e.placeholder for e in anon_map.entries} - set(values) if anon_map is not None else set()
+        in_text = re.compile('|'.join(map(re.escape, sorted([*held, *tags], key=len, reverse=True))))
+        found = Counter(match.group() for match in in_text.finditer(text) if match.group() in values)
         where: Dict[str, list] = {}
         for match in pattern.finditer(source):
             where.setdefault(match.group(), []).append(match.span())
@@ -729,7 +734,7 @@ class TextCleaner:
             tag = match.group()
             value = next(pending[tag]) if tag in pending else None
             return tag if value is None else value
-        return pattern.sub(put, text)
+        return in_text.sub(put, text)
 
     def _replace_reversible(self, text, pattern, entity_type, keep=None):
         anon_map = getattr(self._document_context, 'anon_map', None)
