@@ -45,6 +45,11 @@ ENTITY_TYPE_MAP = {
     'MISC': 'MISC',
 }
 
+# A regex step's placeholder (<PHONE>, <EMAIL_0>); NER spans inside one are dropped,
+# so "call <PHONE>" never becomes "call <<MISC>>".
+# shortcut: matches upper-case <TAG> markers only; custom replace_with_* text is not protected.
+_PLACEHOLDER_TOKEN = re.compile(r"<[A-Z][A-Z0-9_]*>")
+
 
 # Freeing an inherited ONNX session in a forked child crashes or hangs, so children pin every live
 # GeneralNER for their whole life instead of ever destroying one.
@@ -1010,6 +1015,12 @@ class GeneralNER:
             ]
 
         ensemble_results = self.ner_ensemble(spans, ner_confidence_threshold)
+        markers = [m.span() for m in _PLACEHOLDER_TOKEN.finditer(text)]
+        if markers:
+            ensemble_results = [
+                item for item in ensemble_results
+                if not any(a <= item['start'] and item['end'] <= b for a, b in markers)
+            ]
         if not ensemble_results:
             return NERProcessingResult(text=text, findings=())
         entities = tuple(self._entity(item) for item in ensemble_results)

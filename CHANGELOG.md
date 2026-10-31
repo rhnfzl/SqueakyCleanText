@@ -52,6 +52,8 @@ placeholder merge below.
 
 ### Fixes
 
+- NER no longer tags text inside a regex placeholder: with the default models, `call +1-202-555-0147` became `call <<MISC>>` (the model tagged `PHONE` in `<PHONE>`; 0.7.1 did the same). Spans inside an upper-case `<TAG>` / `<TAG_n>` marker are dropped; custom `replace_with_*` text is not protected.
+- International phone numbers no longer swallow a closing parenthesis of the sentence: `(tel +31 6 1234 5678)` now gives `(tel <PHONE>)`, not `(tel <PHONE>`. Area-code parentheses must be balanced (`+44 (0)20 ...` unchanged).
 - `ner_backend='presidio_gliner'`: a detected language that the Presidio analyzer has no NLP engine for is analyzed as English instead of failing (the default `AnalyzerEngine` only has English).
 - A warning is logged when CUDA was requested but ONNX Runtime fell back to CPU (missing CUDA/cuDNN libraries or a driver that does not match the onnxruntime-gpu build). Before, this happened silently. New `docs/PERFORMANCE.md` gives CPU and GPU throughput and CUDA setup notes.
 - NER windows now fit every tokenizer of the models a document's language runs, not only the one with the smallest limit. Models loaded for other languages do not change a document's windows. With the default models, the multilingual model (WordPiece) can need far more tokens than XLM-RoBERTa for the same text and silently truncated the rest of a window, so it never saw entities past that point. Such texts now get more, smaller windows; on the release set 2 of 30 documents (and 2 of 4 joined long documents) are affected. Default-config output of the release set is unchanged, but these documents run more model calls (single-run Mac benchmark of the release set: 6.9 to 5.4 docs/s).

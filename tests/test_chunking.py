@@ -350,3 +350,14 @@ def test_overlap_with_real_tokenizer():
     assert "Paris" not in result.text
     assert len({(f.entity.start, f.entity.end) for f in result.findings}) == len(result.findings)
     assert anon_map.deanonymize(result.text) == text
+
+
+def test_ner_span_inside_regex_placeholder_is_dropped():
+    # Old code: a model tagging "PHONE" in "<PHONE>" gave "call <<PERSON>>" (0.7.1 too).
+    detector = _FakeRunDetector()
+    detector.pattern = re.compile(r"[A-Z]{2,}|Ann")
+    ner = _word_ner(0, detector)
+    result = ner.ner_process_detailed(
+        "call <PHONE> or <EMAIL_0>, ask Ann", positional_tags=("PER",), ner_confidence_threshold=0.5)
+    assert result.text == "call <PHONE> or <EMAIL_0>, ask <PERSON>"
+    assert [f.entity.text for f in result.findings] == ["Ann"]
