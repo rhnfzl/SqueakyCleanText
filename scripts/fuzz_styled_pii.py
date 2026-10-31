@@ -3,7 +3,8 @@
 
 Each seed builds one document: random prose in Latin, CJK, Arabic, Devanagari,
 Thai or Cyrillic, plus 1-3 PII values (email, phone, IPv4, URL with a query,
-also www-introduced; email and URL also on a host of non-Latin labels, date, number). Each value
+also www-introduced or on a host whose first labels look like an IPv4; email and URL
+also on a host of non-Latin labels, date, number). Each value
 is then rendered in forms a reader still reads as the same value: full-width and
 small-form characters, mathematical styled letters and digits, circled/squared
 letters and digits, native decimal digits of any script, decomposed letters
@@ -205,6 +206,8 @@ def _ip(rng):
 
 def _url(rng):
     host, _ = _host(rng)
+    if rng.random() < 0.15:  # an IPv4-shaped first label ("10.0.0.1.école.fr") is still a host name
+        host = ".".join(str(rng.randint(1, 254)) for _ in range(4)) + "." + host
     token = _ascii_token(rng, 10, 14)
     cores = [("str", token)]
     if rng.random() < 0.5:

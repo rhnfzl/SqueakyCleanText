@@ -219,8 +219,9 @@ URL_REGEX = re.compile(
     # bracketed IPv6 host; private and loopback IPv4 hosts match too, so the whole
     # URL (query values included) is replaced, not just the address
     r"\[[0-9a-f:.]*:[0-9a-f:.]*\]" r"|"
-    # IPv4 host, whole: a longer octet or another label after it is a host name
-    rf"{_IPV4}(?![0-9]|\.[0-9a-z])"
+    # IPv4 host, whole: a longer octet (any decimal digit, "1௨3") or another label after it (any
+    # label start the host grammar below takes, "école" too) is a host name
+    rf"{_IPV4}(?![0-9{_DECIMAL}]|\.[a-z\u00a1-\uffff0-9{_SUPPLEMENTARY_ALNUM}])"
     r"|"
     # host name (with proper Unicode support, beyond the BMP too)
     # (labels as X+(-+X+)*, as in EMAIL_REGEX, so a host with no TLD fails in linear time)

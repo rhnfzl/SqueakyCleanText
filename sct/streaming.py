@@ -46,8 +46,8 @@ class BufferedStreamingRedactor:
 class WindowedStreamingRedactor:
     """Emit bounded chunks while retaining a configurable token overlap.
 
-    This mode is suitable for bounded contact tokens such as emails and phone
-    numbers. Use ``BufferedStreamingRedactor`` when multiword NER entities must
+    This mode is suitable for bounded contact tokens such as emails, phone
+    numbers and dates. Use ``BufferedStreamingRedactor`` when multiword NER entities must
     have document-wide guarantees.
     """
 
@@ -106,9 +106,12 @@ class WindowedStreamingRedactor:
                     starts.append(end - 1 if len(unit_ends) > 1 else unit.start())
                     ends.append(end)
         view = "".join(view)
+        # a configured date ("15 January 1990") is one token too; the cleaner's own (custom) date regex
+        regexes = _CONTACT_REGEXES + (
+            (self._cleaner.ProcessDateTime._date_regex.pattern,) if self._cleaner.cfg.check_replace_dates else ())
         inside = {
             index
-            for regex in _CONTACT_REGEXES
+            for regex in regexes
             for match in regex.finditer(view)
             for index in range(starts[match.start()] + 1, ends[match.end() - 1])
         }
