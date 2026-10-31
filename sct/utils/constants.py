@@ -4,6 +4,7 @@ Constant symbols and compiled RegExs used for cleaning.
 
 import re
 import string
+import unicodedata
 import regex
 
 CURRENCIES = {
@@ -42,8 +43,11 @@ LEGACY_TYPE_NAMES = {'PHONE': 'PHONE_NUMBER', 'IP': 'IP_ADDRESS'}
 # Local part takes RFC 5322 punctuation (o'connor, jo&co, alice!) after a word start,
 # so no prefix of the address stays visible; it never ends in a dot.
 # Domain labels take any script but not general, CJK or full-width punctuation, so
-# "a@b.com（担当：鈴木）" or "a@b.com、" ends at ".com".
-_IDN_LETTER = r"a-z\u00a1-\u1fff\u2070-\u2fff\u3040-\ufeff\uff21-\uff3a\uff41-\uff5a\uff66-\uffff"
+# "a@b.com（担当：鈴木）" or "a@b.com、" ends at ".com". The letters and numbers of the
+# CJK punctuation block (々 〆 〇, by Unicode category) stay, so "info@佐々木.jp" is whole.
+_CJK_SYMBOL_LETTERS = ''.join(chr(c) for c in range(0x3000, 0x3040) if unicodedata.category(chr(c))[0] in 'LN')
+_IDN_LETTER = (r"a-z\u00a1-\u1fff\u2070-\u2fff\u3040-\ufeff\uff21-\uff3a\uff41-\uff5a\uff66-\uffff"
+               + _CJK_SYMBOL_LETTERS)
 _IDN_CHAR = _IDN_LETTER + r"0-9\uff10-\uff19"
 EMAIL_REGEX = re.compile(
     r"(?:^|(?<=[^\w@.)]))[\w+-](?:[\w!#$%&'*+-]|\.(?!\.))*?(?<!\.)(@|[(<{\[]at[)>}\]])"
@@ -318,12 +322,13 @@ _DAY = r'(?:0?[1-9]|[12]\d|3[01])'
 _MONTH = r'(?:0?[1-9]|1[0-2])'
 # Numeric dates with a 4-digit year and one separator (-, / or .), optional time:
 # 2024-01-15, 2024/1/15, 2024.01.15, 15.01.2024, 01/15/2024, 2024-01-15T10:30:00Z, 15-01-2024 10:30.
+# Year-last takes day-month or month-day, so one part must be a month (no 31/31/2024).
 # Year-first with dots needs 2-digit month/day so CalVer "2024.1.5" stays; a digit
 # joined by . or , on either side means a version, IP or decimal ("10.1.12.2024").
 _NUMERIC_DATE = (
     r'(?<!\d[.,])(?:'
     r'\d{4}(?:([-/])' + _MONTH + r'\1' + _DAY + r'|\.(?:0[1-9]|1[0-2])\.(?:0[1-9]|[12]\d|3[01]))'
-    r'|' + _DAY + r'([-/.])' + _DAY + r'\2\d{4}'
+    r'|' + _DAY + r'([-/.])' + _MONTH + r'\2\d{4}|' + _MONTH + r'([-/.])' + _DAY + r'\3\d{4}'
     r')'
     r'(?:[T ]\d{1,2}:\d{2}(?::\d{2})?(?:[.,]\d+)?(?:\s?Z|\s?[+-]\d{2}:?\d{2})?)?'
     r'(?![.,]\d)'

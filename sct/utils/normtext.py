@@ -13,8 +13,9 @@ logger = logging.getLogger(__name__)
 _FULLWIDTH_ALNUM = {c: c - 0xFEE0 for r in ((0xFF10, 0xFF19), (0xFF21, 0xFF3A), (0xFF41, 0xFF5A))
                     for c in range(r[0], r[1] + 1)}
 # Full-width @ . - _ + and ideographic space become ASCII only inside alphanumeric runs (emails,
-# phones), so CJK punctuation such as ， ： ！ keeps its width.
-_FULLWIDTH_JOINER_REGEX = re.compile(r'(?<=[0-9A-Za-z])[＠．－＿＋\u3000](?=[0-9A-Za-z])|＋(?=[0-9])')
+# phones; ＠ and ． also beside letters of any script), so CJK punctuation such as ， ： ！ keeps its width.
+_FULLWIDTH_JOINER_REGEX = re.compile(r'(?<=[0-9A-Za-z])[＠．－＿＋\u3000](?=[0-9A-Za-z])|＋(?=[0-9])'
+                                     r'|(?<=[^\W_])＠(?=[^\W_])|(?<=[^\W_])．(?=[0-9A-Za-z])|(?<=[0-9A-Za-z])．(?=[^\W_])')
 _FULLWIDTH_JOINER = {'＠': '@', '．': '.', '－': '-', '＿': '_', '＋': '+', '\u3000': ' '}
 
 
@@ -38,8 +39,11 @@ _STYLED_ALNUM = _nfkc_ascii_alnum({'<font>', '<wide>'})
 _CIRCLED_ALNUM = _nfkc_ascii_alnum({'<circle>'})
 _CIRCLED_RUN_REGEX = re.compile('[%s]+' % ''.join(map(chr, _CIRCLED_ALNUM)))
 _RUN_NEIGHBOUR = re.compile(r'[0-9A-Za-z@.:/_+\-]')
-# URL/email/phone/date punctuation in compatibility form folds only between ASCII alnum.
-_STYLED_JOINER_REGEX = re.compile(r'(?<=[0-9A-Za-z])[＠．－＿＋：／？＝＆＃％～\u3000]+(?=[0-9A-Za-z])|＋(?=[0-9])')
+# URL/email/phone/date punctuation in compatibility form folds between ASCII alnum; contact
+# syntax also beside letters of any script: ＠ between letters/digits, ． with an ASCII side
+# (例え．jp) and a ：／／ scheme after ASCII letters (https：／／例え.jp).
+_STYLED_JOINER_REGEX = re.compile(r'(?<=[0-9A-Za-z])[＠．－＿＋：／？＝＆＃％～\u3000]+(?=[0-9A-Za-z])|＋(?=[0-9])'
+                                  r'|(?<=[^\W_])＠(?=[^\W_])|(?<=[^\W_])．(?=[0-9A-Za-z])|(?<=[0-9A-Za-z])．(?=[^\W_])|(?<=[A-Za-z])：／／')
 
 
 def _fold_circled_run(m):

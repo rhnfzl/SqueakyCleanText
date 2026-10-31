@@ -406,7 +406,7 @@ class TextCleaner:
         """Every step after NER, for the document *state* from ``_before_ner``."""
         (_, language, anon_map, doc_classes, started_at, regex_counts,
          language_confidence, language_source, source_chars, _, language_margin, deferred) = state
-        current_text = self._swap_deferred(current_text, deferred)
+        current_text = self._swap_deferred(current_text, deferred, state[0], findings, anon_map)
 
         # Statistical model processing (always returns stext, even if None)
         stext = None
@@ -666,8 +666,12 @@ class TextCleaner:
         return pattern.sub(put, text)
 
     @staticmethod
-    def _swap_deferred(text, order):
-        """After NER: the k-th occurrence of each tag gets the k-th recorded value."""
+    def _swap_deferred(text, order, source='', findings=(), anon_map=None):
+        """After NER: each tag occurrence NER left gets its recorded value, in order.
+
+        *source* is the text NER read; occurrences inside an NER finding are skipped, and in
+        reversible mode their originals go back into that NER map entry.
+        """
         if not order:
             return text
         values: Dict[str, list] = {}
@@ -675,9 +679,33 @@ class TextCleaner:
             values.setdefault(tag, []).append(value)
         pattern = re.compile('|'.join(map(re.escape, sorted(values, key=len, reverse=True))))
         found = Counter(match.group() for match in pattern.finditer(text))
-        # shortcut: a tag an NER span cut or added changes its count; that tag then stays
-        # as the plain tag everywhere (no value lost to the wrong place, no PII).
-        pending = {tag: iter(v) for tag, v in values.items() if found[tag] == len(v)}
+        where: Dict[str, list] = {}
+        for match in pattern.finditer(source):
+            where.setdefault(match.group(), []).append(match.span())
+        spans = [(f.entity.start, f.entity.end) for f in findings]
+        pending, swallowed = {}, []
+        for tag, vals in values.items():
+            if found[tag] == len(vals):
+                pending[tag] = iter(vals)
+                continue
+            if len(where.get(tag, ())) != len(vals):
+                continue
+            inside = [any(s < b and a < e for s, e in spans) for a, b in where[tag]]
+            if found[tag] == inside.count(False):
+                pending[tag] = iter(v for v, hit in zip(vals, inside) if not hit)
+                swallowed += [(a, b, v) for (a, b), v, hit in zip(where[tag], vals, inside) if hit and v]
+            # shortcut: any other count change (NER added a tag) keeps that tag plain
+            # everywhere (no value lost to the wrong place, no PII).
+        if swallowed and anon_map is not None:
+            originals = {e.placeholder: e.original for e in anon_map.entries}
+            for entry in anon_map.entries:
+                if source[entry.start:entry.end] != entry.original:
+                    continue  # regex entry: its offsets index another text
+                # shortcut: a tag the span only cuts stays as cut text in the entry.
+                for a, b, value in sorted(swallowed, reverse=True):
+                    if entry.start <= a and b <= entry.end:
+                        entry.original = (entry.original[:a - entry.start] + originals.get(value, value)
+                                          + entry.original[b - entry.start:])
 
         def put(match):
             tag = match.group()
