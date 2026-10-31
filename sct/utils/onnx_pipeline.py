@@ -5,11 +5,13 @@ eliminating the torch and transformers dependencies (~2 GB) while producing
 byte-identical entity span and label output.
 """
 
+import ctypes
 import hashlib
 import json
 import logging
 import os
 import shutil
+import sys
 import uuid
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
@@ -294,13 +296,26 @@ def _quantized_dir(model_name: str, revision: Optional[str]) -> str:
     return name + (f"@{hashlib.sha256(revision.encode()).hexdigest()[:16]}" if revision else "")
 
 
+def _link(src: Path, dst: Path) -> None:
+    """Hard-link *src* to *dst*; on macOS make an APFS clone (own inode, shared blocks) instead.
+
+    macOS may report an opened hard link under its other name (``F_GETPATH``), so ONNX Runtime
+    then sees ``model.onnx_data`` in the blob store, outside the model directory, and refuses it.
+    """
+    if sys.platform != 'darwin':
+        os.link(src, dst)
+    elif ctypes.CDLL(None, use_errno=True).clonefile(os.fsencode(src), os.fsencode(dst), 0):
+        err = ctypes.get_errno()
+        raise OSError(err, os.strerror(err), str(dst))
+
+
 def _colocate_external_data(model_path: str, data_path: str, link_dir: Path) -> str:
     """Return a model path whose external data file resolves next to it.
 
     ONNX Runtime only accepts ``model.onnx_data`` whose real path is in the real directory of
     ``model.onnx``. A huggingface-hub cache that stores each blob in its own directory (the
     sharded ``hub/blobs/<xx>/<sha256>`` store) breaks that, so both files are hard-linked
-    (copied if linking fails) into ``link_dir``. Other layouts are returned unchanged.
+    (cloned on macOS, copied if that fails) into ``link_dir``. Other layouts are returned unchanged.
     """
     real_model, real_data = Path(model_path).resolve(), Path(data_path).resolve()
     if real_model.parent == real_data.parent:
@@ -326,7 +341,7 @@ def _colocate_external_data(model_path: str, data_path: str, link_dir: Path) -> 
         try:
             for src, name in pairs:
                 try:
-                    os.link(src, tmp / name)
+                    _link(src, tmp / name)
                 except OSError:
                     logger.warning("Cannot hard-link %s, copying it to %s", src, link_dir)
                     shutil.copyfile(src, tmp / name)

@@ -10,6 +10,7 @@ import json
 import os
 import shutil
 import struct
+import sys
 from pathlib import Path
 
 import pytest
@@ -117,7 +118,9 @@ def test_sharded_blob_store_loads_and_runs(tmp_path, snapshot):
     }]]
     linked = _linked(tmp_path)
     for name in ("model.onnx", "model.onnx_data"):
-        assert os.path.samefile(linked / name, snapshot / name)  # hard links, no copy
+        # hard links; APFS clones on macOS, where an opened hard link may report the blob's path
+        assert os.path.samefile(linked / name, snapshot / name) == (sys.platform != "darwin")
+        assert (linked / name).read_bytes() == (snapshot / name).read_bytes()
     assert sorted(p.name for p in linked.parent.iterdir()) == [linked.name]
 
     # Second load reuses the directory.
@@ -130,7 +133,7 @@ def test_copies_when_hard_link_fails(tmp_path, snapshot, monkeypatch):
     def no_link(*args):
         raise OSError("cross-device link")
 
-    monkeypatch.setattr(onnx_pipeline.os, "link", no_link)
+    monkeypatch.setattr(onnx_pipeline, "_link", no_link)
     pipe, _ = onnx_pipeline.load_onnx_ner_model(REPO, cache_dir=str(tmp_path / "cache"))
     assert pipe(["john"])[0][0]["entity_group"] == "PER"
     assert (_linked(tmp_path) / "model.onnx_data").read_bytes() == WEIGHTS
@@ -145,7 +148,7 @@ def test_failed_copy_leaves_no_partial_directory(tmp_path, snapshot, monkeypatch
             f.write(b"partial")
         raise OSError("disk full")
 
-    monkeypatch.setattr(onnx_pipeline.os, "link", no_link)
+    monkeypatch.setattr(onnx_pipeline, "_link", no_link)
     monkeypatch.setattr(onnx_pipeline.shutil, "copyfile", half_copy)
     with pytest.raises(OSError, match="disk full"):
         onnx_pipeline.load_onnx_ner_model(REPO, cache_dir=str(tmp_path / "cache"))
@@ -176,7 +179,7 @@ def test_copied_cache_is_reused(tmp_path, snapshot, monkeypatch):
     def no_link(*args):
         raise OSError("cross-device link")
 
-    monkeypatch.setattr(onnx_pipeline.os, "link", no_link)
+    monkeypatch.setattr(onnx_pipeline, "_link", no_link)
     monkeypatch.setattr(onnx_pipeline.shutil, "copyfile",
                         lambda src, dst: copies.append(src) or real_copy(src, dst))
     for _ in range(2):
@@ -194,7 +197,7 @@ def test_concurrent_loader_accepts_winners_copy(tmp_path, snapshot, monkeypatch)
         shutil.copytree(src, dst)  # another process published its copy first
         return real_rename(src, dst)
 
-    monkeypatch.setattr(onnx_pipeline.os, "link", no_link)
+    monkeypatch.setattr(onnx_pipeline, "_link", no_link)
     monkeypatch.setattr(onnx_pipeline.os, "rename", winner_first)
     pipe, _ = onnx_pipeline.load_onnx_ner_model(REPO, cache_dir=str(tmp_path / "cache"))
     assert pipe(["john"])[0][0]["entity_group"] == "PER"
@@ -205,7 +208,7 @@ def test_copy_from_older_blob_is_replaced(tmp_path, snapshot, monkeypatch):
     def no_link(*args):
         raise OSError("cross-device link")
 
-    monkeypatch.setattr(onnx_pipeline.os, "link", no_link)
+    monkeypatch.setattr(onnx_pipeline, "_link", no_link)
     onnx_pipeline.load_onnx_ner_model(REPO, cache_dir=str(tmp_path / "cache"))
     copied = _linked(tmp_path) / "model.onnx_data"
     copied.write_bytes(struct.pack("<2f", 5.0, 5.0))  # same size, stale content
@@ -224,7 +227,7 @@ def test_branch_moving_between_cached_snapshots_loads_each_snapshots_weights(
     monkeypatch.setattr(onnx_pipeline, "hf_hub_download",
                         lambda repo_id, filename, **kw: str(current[0] / filename))
     if not hard_links:
-        monkeypatch.setattr(onnx_pipeline.os, "link", lambda *a: (_ for _ in ()).throw(OSError("xdev")))
+        monkeypatch.setattr(onnx_pipeline, "_link", lambda *a: (_ for _ in ()).throw(OSError("xdev")))
     loaded = []
 
     def record(path, **kw):  # one process per load in practice; read the files ORT would get
@@ -243,7 +246,7 @@ def test_stale_directory_removed_by_concurrent_loader(tmp_path, snapshot, monkey
     def no_link(*args):
         raise OSError("cross-device link")
 
-    monkeypatch.setattr(onnx_pipeline.os, "link", no_link)
+    monkeypatch.setattr(onnx_pipeline, "_link", no_link)
     onnx_pipeline.load_onnx_ner_model(REPO, cache_dir=str(tmp_path / "cache"))
     copied = _linked(tmp_path) / "model.onnx_data"
     copied.write_bytes(struct.pack("<2f", 5.0, 5.0))
