@@ -7,7 +7,14 @@ A final re-run at `371a873` (all 0.8.0 features and fixes) gave the same TP/FP/F
 and 30 of 30 byte-identical outputs as `ef3f245`.
 The final check at `5f56bec` gives the same TP/FP/FN and leaks; 11 of 30 outputs differ from
 `ef3f245` only by a sentence-final `.` or a comma after a word (`，`, written `,`) that is now kept (isolated-symbol
-fix, CHANGELOG). `benchmark-0.8.0.json` / `.md` are from that run.
+fix, CHANGELOG).
+The last re-run at `3a01635` (final 0.8.0) gives the same TP/FP/FN and leaks again. Outputs differ
+from `5f56bec` only by the new names and defaults: reversible placeholders `<PHONE_n>` / `<IP_n>`
+instead of `<PHONE_NUMBER_n>` / `<IP_ADDRESS_n>` (18 documents) and `，` kept in Chinese (2 documents,
+`fix_character_width=False`). The dataset label `PHONE_NUMBER` is now `PHONE`, so its sha256 changed.
+`benchmark-0.8.0.json` / `.md` are from that run; its speed line (7.5 docs/s) was measured on a
+loaded machine (load average 9 to 16; paired runs of the code before and after the last commit
+were within noise of each other) and is not comparable to the 10.3 docs/s of `5f56bec`.
 
 ## Headline
 
@@ -23,7 +30,8 @@ fix, CHANGELOG). `benchmark-0.8.0.json` / `.md` are from that run.
 macOS 27.2 arm64 (Apple M4 Max, 16 cores), Python 3.13.12, onnxruntime 1.31.1,
 lingua-language-detector 2.2.0. `python -m scripts.benchmark_release` with the committed
 correctness settings (`replacement_mode="reversible"`, `check_to_ascii_unicode=False`),
-dataset `release_benchmark.jsonl` (same sha256 as the 0.7.1 run, 30 documents, 84 entities).
+dataset `release_benchmark.jsonl` (same records as the 0.7.1 run, 30 documents, 84 entities; the
+`PHONE_NUMBER` label is `PHONE` since `28ed3a2`).
 Full numbers: `benchmark-0.8.0.md` / `.json`.
 
 | | 0.7.1 | 0.8.0 |

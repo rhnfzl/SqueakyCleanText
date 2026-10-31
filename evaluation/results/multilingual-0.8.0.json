@@ -1,9 +1,9 @@
 {
   "dataset": "multilingual_pii.jsonl",
-  "dataset_sha256": "b44be1e05407b03dc9759737b225c705086c57acfaa2d7463dfb08d7c78bb2ef",
+  "dataset_sha256": "d946043dc567a8246657f7cbb443aa773d038c5ca1c7fc6f44e68981bd2540c1",
   "documents": 220,
   "entities": 660,
-  "git_commit": "371a873f2b316d8273bc10d8a6b7c03cedd50f41",
+  "git_commit": "3a01635c61f5619a691741973ad52ef8462d910b",
   "models": {
     "sct-default": {
       "config": "TextCleanerConfig(**{'replacement_mode': 'reversible', 'check_to_ascii_unicode': False})",
@@ -34,11 +34,6 @@
         ],
         "ar-billing-010": [
           {
-            "end": 34,
-            "label": "ORGANISATION",
-            "start": 22
-          },
-          {
             "end": 64,
             "label": "EMAIL",
             "start": 45
@@ -67,11 +62,6 @@
           }
         ],
         "ar-billing-020": [
-          {
-            "end": 34,
-            "label": "ORGANISATION",
-            "start": 22
-          },
           {
             "end": 64,
             "label": "EMAIL",
@@ -114,7 +104,7 @@
           {
             "end": 61,
             "label": "LOCATION",
-            "start": 56
+            "start": 49
           }
         ],
         "ar-hr-012": [
@@ -144,11 +134,6 @@
             "end": 25,
             "label": "LOCATION",
             "start": 20
-          },
-          {
-            "end": 66,
-            "label": "ORGANISATION",
-            "start": 48
           }
         ],
         "ar-office-004": [
@@ -164,7 +149,7 @@
           },
           {
             "end": 80,
-            "label": "PHONE_NUMBER",
+            "label": "PHONE",
             "start": 64
           }
         ],
@@ -181,7 +166,7 @@
           },
           {
             "end": 81,
-            "label": "PHONE_NUMBER",
+            "label": "PHONE",
             "start": 65
           }
         ],
@@ -198,7 +183,7 @@
           },
           {
             "end": 78,
-            "label": "PHONE_NUMBER",
+            "label": "PHONE",
             "start": 62
           }
         ],
@@ -215,7 +200,7 @@
           },
           {
             "end": 79,
-            "label": "PHONE_NUMBER",
+            "label": "PHONE",
             "start": 67
           }
         ],
@@ -295,7 +280,7 @@
           },
           {
             "end": 88,
-            "label": "PHONE_NUMBER",
+            "label": "PHONE",
             "start": 72
           }
         ],
@@ -312,7 +297,7 @@
           },
           {
             "end": 89,
-            "label": "PHONE_NUMBER",
+            "label": "PHONE",
             "start": 73
           }
         ],
@@ -329,7 +314,7 @@
           },
           {
             "end": 90,
-            "label": "PHONE_NUMBER",
+            "label": "PHONE",
             "start": 74
           }
         ],
@@ -346,7 +331,7 @@
           },
           {
             "end": 90,
-            "label": "PHONE_NUMBER",
+            "label": "PHONE",
             "start": 74
           }
         ],
@@ -403,7 +388,7 @@
         ],
         "bn-billing-020": [
           {
-            "end": 3,
+            "end": 12,
             "label": "ORGANISATION",
             "start": 0
           },
@@ -445,11 +430,6 @@
             "end": 26,
             "label": "LOCATION",
             "start": 17
-          },
-          {
-            "end": 68,
-            "label": "ORGANISATION",
-            "start": 45
           }
         ],
         "bn-hr-012": [
@@ -474,16 +454,21 @@
             "end": 32,
             "label": "LOCATION",
             "start": 23
+          },
+          {
+            "end": 62,
+            "label": "ORGANISATION",
+            "start": 51
+          },
+          {
+            "end": 68,
+            "label": "ORGANISATION",
+            "start": 65
           }
         ],
         "bn-office-004": [
           {
-            "end": 4,
-            "label": "LOCATION",
-            "start": 0
-          },
-          {
-            "end": 40,
+            "end": 42,
             "label": "PERSON",
             "start": 27
           }
@@ -501,7 +486,7 @@
           },
           {
             "end": 77,
-            "label": "PHONE_NUMBER",
+            "label": "PHONE",
             "start": 63
           }
         ],
@@ -518,7 +503,7 @@
           },
           {
             "end": 76,
-            "label": "PHONE_NUMBER",
+            "label": "PHONE",
             "start": 62
           }
         ],
@@ -541,6 +526,11 @@
             "start": 0
           },
           {
+            "end": 32,
+            "label": "LOCATION",
+            "start": 29
+          },
+          {
             "end": 52,
             "label": "IP",
             "start": 42
@@ -551,11 +541,6 @@
             "end": 13,
             "label": "PERSON",
             "start": 0
-          },
-          {
-            "end": 46,
-            "label": "ORGANISATION",
-            "start": 29
           },
           {
             "end": 58,
@@ -582,11 +567,6 @@
             "start": 0
           },
           {
-            "end": 45,
-            "label": "ORGANISATION",
-            "start": 28
-          },
-          {
             "end": 57,
             "label": "IP",
             "start": 46
@@ -605,7 +585,7 @@
           },
           {
             "end": 88,
-            "label": "PHONE_NUMBER",
+            "label": "PHONE",
             "start": 74
           }
         ],
@@ -794,7 +774,7 @@
           },
           {
             "end": 90,
-            "label": "PHONE_NUMBER",
+            "label": "PHONE",
             "start": 75
           }
         ],
@@ -811,7 +791,7 @@
           },
           {
             "end": 90,
-            "label": "PHONE_NUMBER",
+            "label": "PHONE",
             "start": 75
           }
         ],
@@ -828,7 +808,7 @@
           },
           {
             "end": 91,
-            "label": "PHONE_NUMBER",
+            "label": "PHONE",
             "start": 75
           }
         ],
@@ -845,7 +825,7 @@
           },
           {
             "end": 84,
-            "label": "PHONE_NUMBER",
+            "label": "PHONE",
             "start": 72
           }
         ],
@@ -942,7 +922,7 @@
           },
           {
             "end": 94,
-            "label": "PHONE_NUMBER",
+            "label": "PHONE",
             "start": 79
           }
         ],
@@ -959,7 +939,7 @@
           },
           {
             "end": 97,
-            "label": "PHONE_NUMBER",
+            "label": "PHONE",
             "start": 82
           }
         ],
@@ -976,7 +956,7 @@
           },
           {
             "end": 94,
-            "label": "PHONE_NUMBER",
+            "label": "PHONE",
             "start": 82
           }
         ],
@@ -1129,7 +1109,7 @@
           },
           {
             "end": 81,
-            "label": "PHONE_NUMBER",
+            "label": "PHONE",
             "start": 66
           }
         ],
@@ -1146,7 +1126,7 @@
           },
           {
             "end": 79,
-            "label": "PHONE_NUMBER",
+            "label": "PHONE",
             "start": 65
           }
         ],
@@ -1163,7 +1143,7 @@
           },
           {
             "end": 80,
-            "label": "PHONE_NUMBER",
+            "label": "PHONE",
             "start": 66
           }
         ],
@@ -1180,7 +1160,7 @@
           },
           {
             "end": 83,
-            "label": "PHONE_NUMBER",
+            "label": "PHONE",
             "start": 67
           }
         ],
@@ -1265,7 +1245,7 @@
           },
           {
             "end": 74,
-            "label": "PHONE_NUMBER",
+            "label": "PHONE",
             "start": 59
           }
         ],
@@ -1282,7 +1262,7 @@
           },
           {
             "end": 73,
-            "label": "PHONE_NUMBER",
+            "label": "PHONE",
             "start": 58
           }
         ],
@@ -1299,7 +1279,7 @@
           },
           {
             "end": 74,
-            "label": "PHONE_NUMBER",
+            "label": "PHONE",
             "start": 60
           }
         ],
@@ -1316,7 +1296,7 @@
           },
           {
             "end": 71,
-            "label": "PHONE_NUMBER",
+            "label": "PHONE",
             "start": 56
           }
         ],
@@ -1417,7 +1397,7 @@
             "start": 26
           },
           {
-            "end": 84,
+            "end": 85,
             "label": "ORGANISATION",
             "start": 64
           }
@@ -1469,7 +1449,7 @@
           },
           {
             "end": 94,
-            "label": "PHONE_NUMBER",
+            "label": "PHONE",
             "start": 79
           }
         ],
@@ -1486,7 +1466,7 @@
           },
           {
             "end": 93,
-            "label": "PHONE_NUMBER",
+            "label": "PHONE",
             "start": 82
           }
         ],
@@ -1503,7 +1483,7 @@
           },
           {
             "end": 89,
-            "label": "PHONE_NUMBER",
+            "label": "PHONE",
             "start": 78
           }
         ],
@@ -1520,7 +1500,7 @@
           },
           {
             "end": 95,
-            "label": "PHONE_NUMBER",
+            "label": "PHONE",
             "start": 79
           }
         ],
@@ -1605,7 +1585,7 @@
           },
           {
             "end": 94,
-            "label": "PHONE_NUMBER",
+            "label": "PHONE",
             "start": 78
           }
         ],
@@ -1622,7 +1602,7 @@
           },
           {
             "end": 88,
-            "label": "PHONE_NUMBER",
+            "label": "PHONE",
             "start": 73
           }
         ],
@@ -1639,7 +1619,7 @@
           },
           {
             "end": 86,
-            "label": "PHONE_NUMBER",
+            "label": "PHONE",
             "start": 75
           }
         ],
@@ -1656,7 +1636,7 @@
           },
           {
             "end": 85,
-            "label": "PHONE_NUMBER",
+            "label": "PHONE",
             "start": 74
           }
         ],
@@ -1672,9 +1652,9 @@
             "start": 57
           },
           {
-            "end": -1,
+            "end": 108,
             "label": "PERSON",
-            "start": -1
+            "start": 97
           }
         ],
         "hi-billing-010": [
@@ -1689,9 +1669,9 @@
             "start": 38
           },
           {
-            "end": -1,
+            "end": 93,
             "label": "PERSON",
-            "start": -1
+            "start": 81
           }
         ],
         "hi-billing-015": [
@@ -1706,9 +1686,9 @@
             "start": 57
           },
           {
-            "end": -1,
+            "end": 108,
             "label": "PERSON",
-            "start": -1
+            "start": 97
           }
         ],
         "hi-billing-020": [
@@ -1723,9 +1703,9 @@
             "start": 57
           },
           {
-            "end": -1,
+            "end": 112,
             "label": "PERSON",
-            "start": -1
+            "start": 100
           }
         ],
         "hi-hr-002": [
@@ -1804,7 +1784,7 @@
           },
           {
             "end": 75,
-            "label": "PHONE_NUMBER",
+            "label": "PHONE",
             "start": 59
           }
         ],
@@ -1821,7 +1801,7 @@
           },
           {
             "end": 73,
-            "label": "PHONE_NUMBER",
+            "label": "PHONE",
             "start": 58
           }
         ],
@@ -1838,7 +1818,7 @@
           },
           {
             "end": 70,
-            "label": "PHONE_NUMBER",
+            "label": "PHONE",
             "start": 59
           }
         ],
@@ -1855,7 +1835,7 @@
           },
           {
             "end": 72,
-            "label": "PHONE_NUMBER",
+            "label": "PHONE",
             "start": 59
           }
         ],
@@ -1930,7 +1910,7 @@
           },
           {
             "end": 71,
-            "label": "PHONE_NUMBER",
+            "label": "PHONE",
             "start": 58
           }
         ],
@@ -1947,7 +1927,7 @@
           },
           {
             "end": 69,
-            "label": "PHONE_NUMBER",
+            "label": "PHONE",
             "start": 56
           }
         ],
@@ -1964,7 +1944,7 @@
           },
           {
             "end": 74,
-            "label": "PHONE_NUMBER",
+            "label": "PHONE",
             "start": 58
           }
         ],
@@ -1981,7 +1961,7 @@
           },
           {
             "end": 73,
-            "label": "PHONE_NUMBER",
+            "label": "PHONE",
             "start": 57
           }
         ],
@@ -2029,6 +2009,11 @@
             "end": 55,
             "label": "PERSON",
             "start": 44
+          },
+          {
+            "end": 66,
+            "label": "PERSON",
+            "start": 65
           }
         ],
         "ja-billing-020": [
@@ -2041,6 +2026,11 @@
             "end": 47,
             "label": "PERSON",
             "start": 43
+          },
+          {
+            "end": 58,
+            "label": "PERSON",
+            "start": 57
           }
         ],
         "ja-hr-002": [
@@ -2079,7 +2069,7 @@
         ],
         "ja-hr-012": [
           {
-            "end": 12,
+            "end": 13,
             "label": "PERSON",
             "start": 0
           },
@@ -2096,7 +2086,7 @@
         ],
         "ja-hr-017": [
           {
-            "end": 11,
+            "end": 12,
             "label": "PERSON",
             "start": 0
           },
@@ -2118,13 +2108,13 @@
             "start": 0
           },
           {
-            "end": 22,
+            "end": 23,
             "label": "PERSON",
-            "start": 10
+            "start": 9
           },
           {
             "end": 44,
-            "label": "PHONE_NUMBER",
+            "label": "PHONE",
             "start": 32
           }
         ],
@@ -2136,7 +2126,7 @@
           },
           {
             "end": 36,
-            "label": "PHONE_NUMBER",
+            "label": "PHONE",
             "start": 24
           }
         ],
@@ -2147,13 +2137,13 @@
             "start": 0
           },
           {
-            "end": 21,
+            "end": 22,
             "label": "PERSON",
-            "start": 10
+            "start": 9
           },
           {
             "end": 43,
-            "label": "PHONE_NUMBER",
+            "label": "PHONE",
             "start": 31
           }
         ],
@@ -2170,7 +2160,7 @@
           },
           {
             "end": 40,
-            "label": "PHONE_NUMBER",
+            "label": "PHONE",
             "start": 24
           }
         ],
@@ -2255,7 +2245,7 @@
           },
           {
             "end": 47,
-            "label": "PHONE_NUMBER",
+            "label": "PHONE",
             "start": 35
           }
         ],
@@ -2267,7 +2257,7 @@
           },
           {
             "end": 47,
-            "label": "PHONE_NUMBER",
+            "label": "PHONE",
             "start": 35
           }
         ],
@@ -2279,7 +2269,7 @@
           },
           {
             "end": 52,
-            "label": "PHONE_NUMBER",
+            "label": "PHONE",
             "start": 36
           }
         ],
@@ -2291,7 +2281,7 @@
           },
           {
             "end": 55,
-            "label": "PHONE_NUMBER",
+            "label": "PHONE",
             "start": 43
           }
         ],
@@ -2444,7 +2434,7 @@
           },
           {
             "end": 95,
-            "label": "PHONE_NUMBER",
+            "label": "PHONE",
             "start": 80
           }
         ],
@@ -2461,7 +2451,7 @@
           },
           {
             "end": 95,
-            "label": "PHONE_NUMBER",
+            "label": "PHONE",
             "start": 87
           }
         ],
@@ -2478,7 +2468,7 @@
           },
           {
             "end": 95,
-            "label": "PHONE_NUMBER",
+            "label": "PHONE",
             "start": 87
           }
         ],
@@ -2495,7 +2485,7 @@
           },
           {
             "end": 95,
-            "label": "PHONE_NUMBER",
+            "label": "PHONE",
             "start": 87
           }
         ],
@@ -2580,7 +2570,7 @@
           },
           {
             "end": 78,
-            "label": "PHONE_NUMBER",
+            "label": "PHONE",
             "start": 70
           }
         ],
@@ -2597,7 +2587,7 @@
           },
           {
             "end": 85,
-            "label": "PHONE_NUMBER",
+            "label": "PHONE",
             "start": 71
           }
         ],
@@ -2614,7 +2604,7 @@
           },
           {
             "end": 79,
-            "label": "PHONE_NUMBER",
+            "label": "PHONE",
             "start": 64
           }
         ],
@@ -2631,7 +2621,7 @@
           },
           {
             "end": 76,
-            "label": "PHONE_NUMBER",
+            "label": "PHONE",
             "start": 65
           }
         ],
@@ -2688,11 +2678,6 @@
         ],
         "ta-billing-020": [
           {
-            "end": 16,
-            "label": "ORGANISATION",
-            "start": 0
-          },
-          {
             "end": 65,
             "label": "EMAIL",
             "start": 44
@@ -2710,7 +2695,7 @@
             "start": 0
           },
           {
-            "end": 42,
+            "end": 50,
             "label": "LOCATION",
             "start": 26
           },
@@ -2747,6 +2732,11 @@
             "end": 31,
             "label": "LOCATION",
             "start": 25
+          },
+          {
+            "end": 93,
+            "label": "PERSON",
+            "start": 92
           }
         ],
         "ta-hr-017": [
@@ -2779,7 +2769,7 @@
           },
           {
             "end": 79,
-            "label": "PHONE_NUMBER",
+            "label": "PHONE",
             "start": 66
           }
         ],
@@ -2796,11 +2786,16 @@
           },
           {
             "end": 89,
-            "label": "PHONE_NUMBER",
+            "label": "PHONE",
             "start": 78
           }
         ],
         "ta-office-014": [
+          {
+            "end": 5,
+            "label": "LOCATION",
+            "start": 0
+          },
           {
             "end": 55,
             "label": "PERSON",
@@ -2808,11 +2803,16 @@
           },
           {
             "end": 86,
-            "label": "PHONE_NUMBER",
+            "label": "PHONE",
             "start": 70
           }
         ],
         "ta-office-019": [
+          {
+            "end": 5,
+            "label": "LOCATION",
+            "start": 0
+          },
           {
             "end": 55,
             "label": "PERSON",
@@ -2820,7 +2820,7 @@
           },
           {
             "end": 83,
-            "label": "PHONE_NUMBER",
+            "label": "PHONE",
             "start": 70
           }
         ],
@@ -2834,6 +2834,11 @@
             "end": 51,
             "label": "IP",
             "start": 40
+          },
+          {
+            "end": 96,
+            "label": "ORGANISATION",
+            "start": 77
           }
         ],
         "ta-security-008": [
@@ -2858,6 +2863,16 @@
             "end": 50,
             "label": "IP",
             "start": 40
+          },
+          {
+            "end": 80,
+            "label": "LOCATION",
+            "start": 76
+          },
+          {
+            "end": 102,
+            "label": "PERSON",
+            "start": 101
           }
         ],
         "ta-security-018": [
@@ -2890,7 +2905,7 @@
           },
           {
             "end": 99,
-            "label": "PHONE_NUMBER",
+            "label": "PHONE",
             "start": 86
           }
         ],
@@ -2907,7 +2922,7 @@
           },
           {
             "end": 94,
-            "label": "PHONE_NUMBER",
+            "label": "PHONE",
             "start": 81
           }
         ],
@@ -2924,7 +2939,7 @@
           },
           {
             "end": 100,
-            "label": "PHONE_NUMBER",
+            "label": "PHONE",
             "start": 84
           }
         ],
@@ -2941,7 +2956,7 @@
           },
           {
             "end": 101,
-            "label": "PHONE_NUMBER",
+            "label": "PHONE",
             "start": 86
           }
         ],
@@ -2959,7 +2974,7 @@
           {
             "end": 100,
             "label": "PERSON",
-            "start": 83
+            "start": 77
           }
         ],
         "th-billing-010": [
@@ -2993,7 +3008,7 @@
           {
             "end": 90,
             "label": "PERSON",
-            "start": 81
+            "start": 75
           }
         ],
         "th-billing-020": [
@@ -3044,11 +3059,6 @@
         ],
         "th-hr-012": [
           {
-            "end": 11,
-            "label": "PERSON",
-            "start": 0
-          },
-          {
             "end": 28,
             "label": "LOCATION",
             "start": 18
@@ -3089,7 +3099,7 @@
           },
           {
             "end": 80,
-            "label": "PHONE_NUMBER",
+            "label": "PHONE",
             "start": 69
           }
         ],
@@ -3106,7 +3116,7 @@
           },
           {
             "end": 81,
-            "label": "PHONE_NUMBER",
+            "label": "PHONE",
             "start": 69
           }
         ],
@@ -3123,7 +3133,7 @@
           },
           {
             "end": 78,
-            "label": "PHONE_NUMBER",
+            "label": "PHONE",
             "start": 66
           }
         ],
@@ -3140,7 +3150,7 @@
           },
           {
             "end": 81,
-            "label": "PHONE_NUMBER",
+            "label": "PHONE",
             "start": 66
           }
         ],
@@ -3220,7 +3230,7 @@
           },
           {
             "end": 80,
-            "label": "PHONE_NUMBER",
+            "label": "PHONE",
             "start": 65
           }
         ],
@@ -3237,7 +3247,7 @@
           },
           {
             "end": 75,
-            "label": "PHONE_NUMBER",
+            "label": "PHONE",
             "start": 60
           }
         ],
@@ -3254,7 +3264,7 @@
           },
           {
             "end": 80,
-            "label": "PHONE_NUMBER",
+            "label": "PHONE",
             "start": 69
           }
         ],
@@ -3271,7 +3281,7 @@
           },
           {
             "end": 77,
-            "label": "PHONE_NUMBER",
+            "label": "PHONE",
             "start": 65
           }
         ],
@@ -3338,11 +3348,6 @@
             "end": 16,
             "label": "ORGANISATION",
             "start": 12
-          },
-          {
-            "end": 19,
-            "label": "PERSON",
-            "start": 18
           }
         ],
         "zh-hr-007": [
@@ -3409,7 +3414,7 @@
           },
           {
             "end": 33,
-            "label": "PHONE_NUMBER",
+            "label": "PHONE",
             "start": 20
           }
         ],
@@ -3426,7 +3431,7 @@
           },
           {
             "end": 43,
-            "label": "PHONE_NUMBER",
+            "label": "PHONE",
             "start": 30
           }
         ],
@@ -3443,7 +3448,7 @@
           },
           {
             "end": 47,
-            "label": "PHONE_NUMBER",
+            "label": "PHONE",
             "start": 31
           }
         ],
@@ -3460,7 +3465,7 @@
           },
           {
             "end": 32,
-            "label": "PHONE_NUMBER",
+            "label": "PHONE",
             "start": 20
           }
         ],
@@ -3540,7 +3545,7 @@
           },
           {
             "end": 46,
-            "label": "PHONE_NUMBER",
+            "label": "PHONE",
             "start": 33
           }
         ],
@@ -3557,7 +3562,7 @@
           },
           {
             "end": 41,
-            "label": "PHONE_NUMBER",
+            "label": "PHONE",
             "start": 29
           }
         ],
@@ -3574,7 +3579,7 @@
           },
           {
             "end": 49,
-            "label": "PHONE_NUMBER",
+            "label": "PHONE",
             "start": 33
           }
         ],
@@ -3591,7 +3596,7 @@
           },
           {
             "end": 45,
-            "label": "PHONE_NUMBER",
+            "label": "PHONE",
             "start": 29
           }
         ]
@@ -3599,36 +3604,36 @@
       "report": {
         "by_domain": {
           "billing": {
-            "f1": 0.7829457364341086,
-            "false_negatives": 31,
-            "false_positives": 25,
-            "precision": 0.8015873015873016,
-            "recall": 0.7651515151515151,
-            "true_positives": 101
+            "f1": 0.801556420233463,
+            "false_negatives": 29,
+            "false_positives": 22,
+            "precision": 0.824,
+            "recall": 0.7803030303030303,
+            "true_positives": 103
           },
           "hr": {
-            "f1": 0.9153846153846155,
-            "false_negatives": 13,
-            "false_positives": 9,
-            "precision": 0.9296875,
-            "recall": 0.9015151515151515,
-            "true_positives": 119
+            "f1": 0.888030888030888,
+            "false_negatives": 17,
+            "false_positives": 12,
+            "precision": 0.905511811023622,
+            "recall": 0.8712121212121212,
+            "true_positives": 115
           },
           "office": {
-            "f1": 0.9420849420849421,
+            "f1": 0.9384615384615383,
             "false_negatives": 10,
-            "false_positives": 5,
-            "precision": 0.9606299212598425,
+            "false_positives": 6,
+            "precision": 0.953125,
             "recall": 0.9242424242424242,
             "true_positives": 122
           },
           "security": {
-            "f1": 0.9176470588235294,
-            "false_negatives": 15,
-            "false_positives": 6,
-            "precision": 0.9512195121951219,
-            "recall": 0.8863636363636364,
-            "true_positives": 117
+            "f1": 0.8949416342412451,
+            "false_negatives": 17,
+            "false_positives": 10,
+            "precision": 0.92,
+            "recall": 0.8712121212121212,
+            "true_positives": 115
           },
           "support": {
             "f1": 0.921875,
@@ -3657,30 +3662,30 @@
             "true_positives": 44
           },
           "LOCATION": {
-            "f1": 0.9385474860335197,
-            "false_negatives": 4,
-            "false_positives": 7,
-            "precision": 0.9230769230769231,
-            "recall": 0.9545454545454546,
-            "true_positives": 84
+            "f1": 0.9340659340659342,
+            "false_negatives": 3,
+            "false_positives": 9,
+            "precision": 0.9042553191489362,
+            "recall": 0.9659090909090909,
+            "true_positives": 85
           },
           "ORGANISATION": {
-            "f1": 0.7692307692307693,
-            "false_negatives": 42,
-            "false_positives": 12,
-            "precision": 0.8823529411764706,
-            "recall": 0.6818181818181818,
-            "true_positives": 90
+            "f1": 0.7565217391304347,
+            "false_negatives": 45,
+            "false_positives": 11,
+            "precision": 0.8877551020408163,
+            "recall": 0.6590909090909091,
+            "true_positives": 87
           },
           "PERSON": {
-            "f1": 0.9569160997732427,
-            "false_negatives": 9,
-            "false_positives": 10,
-            "precision": 0.9547511312217195,
-            "recall": 0.9590909090909091,
-            "true_positives": 211
+            "f1": 0.9435665914221218,
+            "false_negatives": 11,
+            "false_positives": 14,
+            "precision": 0.9372197309417041,
+            "recall": 0.95,
+            "true_positives": 209
           },
-          "PHONE_NUMBER": {
+          "PHONE": {
             "f1": 0.8941176470588236,
             "false_negatives": 12,
             "false_positives": 6,
@@ -3691,20 +3696,20 @@
         },
         "by_language": {
           "ar": {
-            "f1": 0.773109243697479,
-            "false_negatives": 14,
-            "false_positives": 13,
-            "precision": 0.7796610169491526,
-            "recall": 0.7666666666666667,
-            "true_positives": 46
+            "f1": 0.7758620689655172,
+            "false_negatives": 15,
+            "false_positives": 11,
+            "precision": 0.8035714285714286,
+            "recall": 0.75,
+            "true_positives": 45
           },
           "bn": {
-            "f1": 0.882882882882883,
-            "false_negatives": 11,
-            "false_positives": 2,
-            "precision": 0.9607843137254902,
-            "recall": 0.8166666666666667,
-            "true_positives": 49
+            "f1": 0.8545454545454546,
+            "false_negatives": 13,
+            "false_positives": 3,
+            "precision": 0.94,
+            "recall": 0.7833333333333333,
+            "true_positives": 47
           },
           "de": {
             "f1": 0.9915966386554621,
@@ -3723,28 +3728,28 @@
             "true_positives": 60
           },
           "es": {
-            "f1": 0.9833333333333333,
-            "false_negatives": 1,
-            "false_positives": 1,
-            "precision": 0.9833333333333333,
-            "recall": 0.9833333333333333,
-            "true_positives": 59
+            "f1": 1.0,
+            "false_negatives": 0,
+            "false_positives": 0,
+            "precision": 1.0,
+            "recall": 1.0,
+            "true_positives": 60
           },
           "hi": {
-            "f1": 0.905982905982906,
-            "false_negatives": 7,
-            "false_positives": 4,
-            "precision": 0.9298245614035088,
-            "recall": 0.8833333333333333,
-            "true_positives": 53
+            "f1": 0.9743589743589743,
+            "false_negatives": 3,
+            "false_positives": 0,
+            "precision": 1.0,
+            "recall": 0.95,
+            "true_positives": 57
           },
           "ja": {
-            "f1": 0.7368421052631577,
-            "false_negatives": 18,
-            "false_positives": 12,
-            "precision": 0.7777777777777778,
-            "recall": 0.7,
-            "true_positives": 42
+            "f1": 0.6551724137931035,
+            "false_negatives": 22,
+            "false_positives": 18,
+            "precision": 0.6785714285714286,
+            "recall": 0.6333333333333333,
+            "true_positives": 38
           },
           "nl": {
             "f1": 0.9333333333333333,
@@ -3755,67 +3760,67 @@
             "true_positives": 56
           },
           "ta": {
-            "f1": 0.8947368421052632,
+            "f1": 0.8739495798319329,
+            "false_negatives": 8,
+            "false_positives": 7,
+            "precision": 0.8813559322033898,
+            "recall": 0.8666666666666667,
+            "true_positives": 52
+          },
+          "th": {
+            "f1": 0.8717948717948718,
             "false_negatives": 9,
-            "false_positives": 3,
-            "precision": 0.9444444444444444,
+            "false_positives": 6,
+            "precision": 0.8947368421052632,
             "recall": 0.85,
             "true_positives": 51
           },
-          "th": {
-            "f1": 0.9152542372881356,
-            "false_negatives": 6,
-            "false_positives": 4,
-            "precision": 0.9310344827586207,
-            "recall": 0.9,
-            "true_positives": 54
-          },
           "zh": {
-            "f1": 0.8275862068965518,
+            "f1": 0.8347826086956521,
             "false_negatives": 12,
-            "false_positives": 8,
-            "precision": 0.8571428571428571,
+            "false_positives": 7,
+            "precision": 0.8727272727272727,
             "recall": 0.8,
             "true_positives": 48
           }
         },
         "by_slice": {
           "code-switch": {
-            "f1": 0.8735632183908046,
-            "false_negatives": 14,
-            "false_positives": 8,
-            "precision": 0.9047619047619048,
-            "recall": 0.8444444444444444,
-            "true_positives": 76
+            "f1": 0.7999999999999999,
+            "false_negatives": 20,
+            "false_positives": 15,
+            "precision": 0.8235294117647058,
+            "recall": 0.7777777777777778,
+            "true_positives": 70
           },
           "multilingual": {
-            "f1": 0.8959627329192547,
-            "false_negatives": 83,
-            "false_positives": 51,
-            "precision": 0.9187898089171974,
-            "recall": 0.8742424242424243,
-            "true_positives": 577
+            "f1": 0.8890612878200155,
+            "false_negatives": 87,
+            "false_positives": 56,
+            "precision": 0.9109697933227345,
+            "recall": 0.8681818181818182,
+            "true_positives": 573
           },
           "synthetic": {
-            "f1": 0.8959627329192547,
-            "false_negatives": 83,
-            "false_positives": 51,
-            "precision": 0.9187898089171974,
-            "recall": 0.8742424242424243,
-            "true_positives": 577
+            "f1": 0.8890612878200155,
+            "false_negatives": 87,
+            "false_positives": 56,
+            "precision": 0.9109697933227345,
+            "recall": 0.8681818181818182,
+            "true_positives": 573
           }
         },
         "model": "sct-default",
         "overall": {
-          "f1": 0.8959627329192547,
-          "false_negatives": 83,
-          "false_positives": 51,
-          "precision": 0.9187898089171974,
-          "recall": 0.8742424242424243,
-          "true_positives": 577
+          "f1": 0.8890612878200155,
+          "false_negatives": 87,
+          "false_positives": 56,
+          "precision": 0.9109697933227345,
+          "recall": 0.8681818181818182,
+          "true_positives": 573
         }
       },
-      "seconds": 9.5
+      "seconds": 26.3
     }
   },
   "platform": "macOS-27.2-arm64-arm-64bit-Mach-O",

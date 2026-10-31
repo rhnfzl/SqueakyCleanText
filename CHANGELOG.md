@@ -19,7 +19,7 @@ Haystack), score columns and data cards (`sct-report`), a reworked MCP server an
   TP/FP/FN 82/2/2 (P = R = F1 = 0.98) and 0 of 67 PII values leaked, identical to 0.7.1.
   `evaluation/results/benchmark-0.8.0.md`.
 - New multilingual PII eval (220 synthetic records, 11 languages): the default ONNX
-  ensemble scores 0.87 / 0.92 recall / precision overall. GLiNER multi v2.1 (0.45 / 0.68)
+  ensemble scores 0.87 / 0.91 recall / precision overall. GLiNER multi v2.1 (0.45 / 0.68)
   and GLiNER multi PII v1 (0.57 / 0.91) score lower, so the default model is not switched.
   `docs/MULTILINGUAL_EVAL.md`.
 - Linux worker processes (`fork`, `forkserver`) are tested in CI; a crash when a forked
@@ -178,7 +178,7 @@ Haystack), score columns and data cards (`sct-report`), a reworked MCP server an
 - GLiNER2 runs one chunk per call; torch models and GLiNER keep one lock per model, so they do not run in parallel across threads.
 - `ner_chunk_overlap` (off by default) can still cut an entity longer than the overlap that starts at the very end of a chunk.
 - The email regex takes CJK text glued before an address (`请发送至wangfang@example.com` is one `<EMAIL>`) and an Arabic comma `،` after it. No PII leaks, but spans and nearby text are wrong. `06-12345678` becomes `06-<PHONE>`.
-- ORGANISATION is the weakest NER label in the multilingual eval (0.68 recall), mostly in non-Latin scripts; Bengali and Tamil name spans can be a few characters off.
+- ORGANISATION is the weakest NER label in the multilingual eval (0.66 recall), mostly in non-Latin scripts; Bengali and Tamil name spans can be a few characters off. WordPiece widening makes the mBERT and XLM-RoBERTa spans agree more often, and the ensemble averages their scores, so a weak mBERT score can drop an agreed span below the threshold: 5 ar/bn/ta organisation names and 1 Thai name masked by the pre-review 0.8.0 code are not masked now (`docs/MULTILINGUAL_EVAL.md`). A Latin name glued to kana or a Thai prefix widens over it (`David Millerは`).
 - A URL with a path swallows a trailing sentence period (`see https://x.org/a.` becomes `see <URL>`).
 - Adversarial strings such as `+000000000(000)0` can leave `(000)0` after phone replacement (Python `re` takes the first alternative that matches, not the longest).
 - Score B's quality head was tested with a small ONNX graph, not the exported FineWeb2-HQ-Plus model; its speed is not measured. GLiNER PII mode (`ner_mode="pii"`) was not run end to end for this release.

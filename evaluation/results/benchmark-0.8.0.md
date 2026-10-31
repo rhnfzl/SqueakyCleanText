@@ -1,9 +1,9 @@
 # Release benchmark: SCT 0.8.0
 
-Commit `5f56bec64e642e40e7e87d1f18bde7e2b38d0e8d`, macOS-27.2-arm64-arm-64bit-Mach-O, Python 3.13.12.
+Commit `3a01635c61f5619a691741973ad52ef8462d910b`, macOS-27.2-arm64-arm-64bit-Mach-O, Python 3.13.12.
 Dataset `release_benchmark.jsonl`: 30 documents, 84 entities. Exact label + span match.
 
-Speed (default config, single process): **10.256 docs/s**, mean 97.505 ms, p95 538.899 ms.
+Speed (default config, single process): **7.546 docs/s**, mean 132.517 ms, p95 526.178 ms.
 Leaks: **0 / 67** PII values still in output (partial: 0).
 
 ## By label
@@ -17,7 +17,7 @@ Leaks: **0 / 67** PII values still in output (partial: 0).
 | NUMBER | 8 | 0 | 0 | 1.00 | 1.00 | 1.00 |
 | ORGANISATION | 2 | 0 | 0 | 1.00 | 1.00 | 1.00 |
 | PERSON | 25 | 0 | 0 | 1.00 | 1.00 | 1.00 |
-| PHONE_NUMBER | 16 | 0 | 0 | 1.00 | 1.00 | 1.00 |
+| PHONE | 16 | 0 | 0 | 1.00 | 1.00 | 1.00 |
 | URL | 2 | 0 | 0 | 1.00 | 1.00 | 1.00 |
 | YEAR | 9 | 0 | 0 | 1.00 | 1.00 | 1.00 |
 
