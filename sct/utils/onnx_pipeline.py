@@ -118,6 +118,9 @@ class ONNXNERPipeline:
         self._tokenizer = tokenizer_wrapper
         self._id2label = id2label
         self._pad_id = pad_id
+        # WordPiece marks a word's continuation pieces ("##e"); entities end on whole words.
+        model = getattr(getattr(tokenizer_wrapper, '_tokenizer', None), 'model', None)
+        self._subword_prefix = getattr(model, 'continuing_subword_prefix', None) or None
 
         # Detect which inputs the model expects (BERT needs token_type_ids,
         # XLM-RoBERTa does not).
@@ -237,6 +240,7 @@ class ONNXNERPipeline:
                 bio_prefix, entity_type = 'B', label
 
             pre_entities.append({
+                'idx': idx,
                 'bio': bio_prefix,
                 'entity_type': entity_type,
                 'score': token_score,
@@ -274,6 +278,17 @@ class ONNXNERPipeline:
             entity_type = group[0]['entity_type']
             start = group[0]['start']
             end = group[-1]['end']
+            tokens = getattr(encoding, 'tokens', None) if self._subword_prefix else None
+            if tokens:
+                # Widen to whole words so "John Do" + "##e" never leaves "e" behind.
+                first, last = group[0]['idx'], group[-1]['idx'] + 1
+                while first > 0 and tokens[first].startswith(self._subword_prefix) \
+                        and not special_tokens_mask[first - 1]:
+                    first -= 1
+                while last < len(tokens) and not special_tokens_mask[last] \
+                        and tokens[last].startswith(self._subword_prefix):
+                    last += 1
+                start, end = offsets[first][0], offsets[last - 1][1]
             avg_score = float(np.mean([t['score'] for t in group]))
             word = text[start:end]
 

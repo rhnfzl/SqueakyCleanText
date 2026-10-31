@@ -120,3 +120,15 @@ def test_forked_handle_pins_the_parent_commits(monkeypatch):
     assert copied.config.ner_model_revisions["ENGLISH"] == commit
     monkeypatch.setattr(rt.os, "getpid", lambda: -1)  # as in a forked child
     assert handle.get().cfg.ner_model_revisions["ENGLISH"] == commit
+
+
+# --- Mac D: WordPiece entities cover the whole word, not "John Do" + a visible "e" ---
+
+def test_wordpiece_entity_ends_on_a_whole_word():
+    from sct.utils.onnx_pipeline import load_onnx_ner_model
+
+    pipe, _ = load_onnx_ner_model(TEST_NER_MODELS["ENGLISH"])
+    text = "Contact John Doe today."
+    spans = [(e["start"], e["end"]) for e in pipe(text)[0] if e["entity_group"] == "PER"]
+    assert spans and all(text[end] in " ." for _, end in spans)
+    assert any(text[s:e].endswith("Doe") for s, e in spans)
