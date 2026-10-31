@@ -6,6 +6,7 @@ ONNX sessions. Pickling keeps only the config.
 """
 
 import os
+import threading
 from typing import Any, Mapping, Optional, Sequence, Union
 
 from sct.config import TextCleanerConfig
@@ -13,6 +14,12 @@ from sct.presets import preset_config
 from sct.sct import TextCleaner
 
 OUTPUTS = ("overwrite", "new_column")
+
+# One lock for first builds: threads sharing a handle build one cleaner, not one each.
+_BUILD_LOCK = threading.Lock()
+if hasattr(os, "register_at_fork"):
+    # A child forked while another thread held the lock must not inherit it locked.
+    os.register_at_fork(after_in_child=lambda: globals().update(_BUILD_LOCK=threading.Lock()))
 
 
 def resolve_config(config: Union[TextCleanerConfig, str, None]) -> TextCleanerConfig:
@@ -40,11 +47,12 @@ class CleanerHandle:
         self._pid: Optional[int] = None
 
     def get(self) -> TextCleaner:
-        # shortcut: no lock, two threads racing on first use both build; fine for process workers.
         pid = os.getpid()
         if self._cleaner is None or self._pid != pid:
-            self._cleaner = TextCleaner(self.config)
-            self._pid = pid
+            with _BUILD_LOCK:
+                if self._cleaner is None or self._pid != pid:
+                    self._cleaner = TextCleaner(self.config)
+                    self._pid = pid
         return self._cleaner
 
     def __getstate__(self):

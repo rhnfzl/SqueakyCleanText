@@ -1,5 +1,6 @@
 """Streaming interfaces with explicit privacy guarantees."""
 
+import re
 import unicodedata
 
 from sct.sct import TextCleaner
@@ -8,6 +9,10 @@ from sct.utils import constants
 _CONTACT_REGEXES = (
     constants.EMAIL_REGEX, constants.PHONE_REGEX, constants.URL_REGEX, constants.IP_REGEX,
 )
+# A digit run at the end of the buffer may be a phone the next feed completes ("06 12 34").
+_PHONE_TAIL = re.compile(r"[+(]?\d[\d ()+./-]*\Z")
+# Longer than any phone the regex accepts; a longer digit tail (a number table) may still split.
+_PHONE_TAIL_MAX = 32
 
 
 class BufferedStreamingRedactor:
@@ -79,6 +84,9 @@ class WindowedStreamingRedactor:
             for match in regex.finditer(view)
             for index in range(match.start() + 1, match.end())
         }
+        tail = _PHONE_TAIL.search(view, max(0, len(view) - _PHONE_TAIL_MAX))
+        if tail:
+            inside.update(range(tail.start() + 1, len(view)))
         split_at = max(
             (
                 index

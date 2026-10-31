@@ -458,7 +458,8 @@ def load_onnx_ner_model(
     if quantize:
         from onnxruntime.quantization import QuantType, quantize_dynamic  # noqa: PLC0415
         _qcache = Path(cache_dir) if cache_dir else Path.home() / ".cache" / "sct_quantized"
-        quantized_path = _qcache / _quantized_dir(model_name, revision) / "model_quantized.onnx"
+        # Keyed by snapshot commit: a moved branch must not reuse another commit's weights.
+        quantized_path = _qcache / _quantized_dir(model_name, commit) / "model_quantized.onnx"
         quantized_path.parent.mkdir(parents=True, exist_ok=True)
         if not quantized_path.exists():
             logger.info("Quantizing model to INT8: %s", quantized_path)
