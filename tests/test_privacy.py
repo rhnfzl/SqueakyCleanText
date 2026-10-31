@@ -99,6 +99,9 @@ def test_text_cleaner_returns_policy_findings(monkeypatch):
         def __init__(self, **kwargs):
             pass
 
+        def uses_fallback_models(self, language):
+            return False
+
         def ner_process_detailed(self, text, *, privacy_policy, **kwargs):
             entity = DetectedEntity("PERSON", 0.95, "Maria", 0, 5)
             findings = privacy_policy.evaluate((entity,))
@@ -247,6 +250,9 @@ def test_text_cleaner_stores_reversible_map_externally(monkeypatch):
     class FakeNER:
         def __init__(self, **kwargs):
             pass
+
+        def uses_fallback_models(self, language):
+            return False
 
         def ner_process(self, text, *, anon_map, **kwargs):
             anon_map.add("<PERSON_0>", "Maria", "PERSON", 0, 5)

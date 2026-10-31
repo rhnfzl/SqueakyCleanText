@@ -297,6 +297,8 @@ class TextCleanerConfig:
     onnx_intra_op_threads: Optional[int] = None  # None = ONNX Runtime default (all cores)
     onnx_inter_op_threads: Optional[int] = None  # None = ONNX Runtime default
     ner_chunk_overlap: int = 0  # tokens of neighbouring text each NER window adds per side; 0 = 0.7.1 chunks
+    detect_all_languages: bool = True  # False = 0.7 detector over supported_languages only
+    language_confidence_warning: float = 0.5  # below this, metadata warns language_low_confidence
 
     def __post_init__(self):
         if self.gliclass_onnx:
@@ -399,6 +401,11 @@ class TextCleanerConfig:
                 raise ValueError(f"{name} must be None or >= 1, got {value}")
         if self.ner_chunk_overlap < 0:
             raise ValueError(f"ner_chunk_overlap must be >= 0, got {self.ner_chunk_overlap}")
+        if not 0.0 <= self.language_confidence_warning <= 1.0:
+            raise ValueError(
+                "language_confidence_warning must be in [0, 1], "
+                f"got {self.language_confidence_warning}"
+            )
 
         # GLiNER fields required for gliner/ensemble backends
         needs_gliner = self.ner_backend in GLINER_BACKENDS
@@ -546,23 +553,9 @@ class TextCleanerConfig:
         # Add languages from tuple-of-languages config
         if isinstance(self.language, tuple):
             langs.update(self.language)
+        # Any Lingua language is a valid pin (resolve_language raised above otherwise);
+        # supported_languages only means "has stopwords/dates/NER key".
         object.__setattr__(self, 'supported_languages', frozenset(langs))
-
-        # Validate language pin/restriction against supported set
-        if self.language is not None:
-            if isinstance(self.language, str):
-                if self.language not in self.supported_languages:
-                    raise ValueError(
-                        f"language='{self.language}' not in supported languages: "
-                        f"{sorted(self.supported_languages)}"
-                    )
-            elif isinstance(self.language, tuple):
-                for lang in self.language:
-                    if lang not in self.supported_languages:
-                        raise ValueError(
-                            f"language='{lang}' (from tuple) not in supported languages: "
-                            f"{sorted(self.supported_languages)}"
-                        )
 
     def __getstate__(self):
         # Restore the exact normalized state; never re-run __post_init__.
@@ -605,6 +598,8 @@ def _config_from_module_globals() -> TextCleanerConfig:
         onnx_intra_op_threads=getattr(m, 'ONNX_INTRA_OP_THREADS', None),
         onnx_inter_op_threads=getattr(m, 'ONNX_INTER_OP_THREADS', None),
         ner_chunk_overlap=getattr(m, 'NER_CHUNK_OVERLAP', 0),
+        detect_all_languages=getattr(m, 'DETECT_ALL_LANGUAGES', True),
+        language_confidence_warning=getattr(m, 'LANGUAGE_CONFIDENCE_WARNING', 0.5),
         check_replace_currency_symbols=m.CHECK_REPLACE_CURRENCY_SYMBOLS,
         check_ner_process=m.CHECK_NER_PROCESS,
         check_remove_isolated_letters=m.CHECK_REMOVE_ISOLATED_LETTERS,
@@ -663,6 +658,8 @@ REPLACE_NUMBERS_IN_WORDS = False
 ONNX_INTRA_OP_THREADS = None
 ONNX_INTER_OP_THREADS = None
 NER_CHUNK_OVERLAP = 0
+DETECT_ALL_LANGUAGES = True
+LANGUAGE_CONFIDENCE_WARNING = 0.5
 CHECK_REPLACE_CURRENCY_SYMBOLS = True
 CHECK_NER_PROCESS = True
 CHECK_REMOVE_ISOLATED_LETTERS = True

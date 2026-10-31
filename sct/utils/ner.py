@@ -259,7 +259,33 @@ class GeneralNER:
 
     def _get_ensemble_keys(self, language: str) -> tuple:
         """Return ordered model keys to run for the given language."""
-        return self._ensemble_models.get(language, self._ensemble_default_keys)
+        if language in self._ensemble_models:
+            return self._ensemble_models[language]
+        if self._has_own_model(language):
+            return (language,)
+        return self._ensemble_default_keys
+
+    def _has_own_model(self, language: str) -> bool:
+        """True when the user brought a model for *language* (e.g. ``ner_models={"HINDI": ...}``).
+
+        Built-in FR/PT/IT keys point at the default multilingual model and keep the fallback.
+        """
+        if language == 'MULTILINGUAL' or language not in self._model_names:
+            return False
+        if self._ner_backend in ('torch', 'ensemble_torch'):
+            from sct.config import DEFAULT_TORCH_NER_MODELS
+            defaults = DEFAULT_TORCH_NER_MODELS
+        else:
+            defaults = DEFAULT_NER_MODELS
+        return self._model_names[language] != defaults.get(language)
+
+    def uses_fallback_models(self, language: Optional[str]) -> bool:
+        """True when *language* has no dedicated NER route and runs the default keys."""
+        return (
+            bool(self._model_names)
+            and language not in self._ensemble_models
+            and not self._has_own_model(language)
+        )
 
     def load_language(self, lang_key: str) -> None:
         """Pre-load NER model for the given language key (stable public API)."""
@@ -595,6 +621,10 @@ class GeneralNER:
         # --- Presidio GLiNER backend: delegates everything to Presidio ---
         if self._ner_backend == 'presidio_gliner':
             analyzer_language = resources.language_to_iso(language) if language else 'en'
+            # Detection covers 75 languages; Presidio only analyzes those its NLP engine has.
+            supported = getattr(self._analyzer, 'supported_languages', None)
+            if supported is not None and analyzer_language not in supported:
+                analyzer_language = 'en'
             analyzer_results = self._analyzer.analyze(
                 text=text,
                 language=analyzer_language,

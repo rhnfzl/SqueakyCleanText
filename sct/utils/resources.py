@@ -95,6 +95,19 @@ def build_detector(supported_languages: frozenset):
     return LanguageDetectorBuilder.from_languages(*lingua_langs).build()
 
 
+_all_detector = None
+
+
+def build_all_detector():
+    """Lingua detector over all 75 languages (high accuracy), built once per process."""
+    global _all_detector
+    if _all_detector is None:
+        with _detector_lock:
+            if _all_detector is None:
+                _all_detector = LanguageDetectorBuilder.from_all_languages().build()
+    return _all_detector
+
+
 def language_to_iso(name: str) -> str:
     """Convert a Lingua language name to ISO 639-1 code.
 

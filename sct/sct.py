@@ -8,7 +8,7 @@ import re
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from sct.config import TextCleanerConfig, GLINER_BACKENDS, _config_from_module_globals
 from sct.privacy import PrivacyPolicy, ProcessingMetrics, TokenStore
@@ -49,9 +49,11 @@ class TextCleaner:
         self._metrics_callback = metrics_callback
         self._document_context = threading.local()
 
-        # Instance-scoped language detector — restricted when language is a tuple
+        # Language detector: tuple restricts; else all 75 Lingua languages unless turned off
         if isinstance(self.cfg.language, tuple):
             self._detector = resources.build_detector(frozenset(self.cfg.language))
+        elif self.cfg.detect_all_languages:
+            self._detector = resources.build_all_detector()
         else:
             self._detector = resources.build_detector(self.cfg.supported_languages)
 
@@ -211,35 +213,43 @@ class TextCleaner:
         for step_fn in cfg.custom_pipeline_steps:
             self._post_fuzzy_pipeline.append(step_fn)
 
-    def _detect_language(self, text: str) -> Optional[str]:
+    def _detect_language(self, text: str) -> Tuple[Optional[str], Optional[float], str]:
         """Detect language as a pure function (no instance mutation).
+
+        Returns ``(name, confidence, source)``; source is ``pinned``, ``detected``,
+        ``fallback`` (tuple restriction fell back to its first entry) or ``none``.
 
         Behavior depends on ``cfg.language``:
           - ``str``: pinned to that language (skip detection)
           - ``tuple``: restrict detection to those languages (detect per text)
-          - ``None``: full auto-detection among all supported languages
+          - ``None``: auto-detection (all 75 Lingua languages by default)
         """
         language_config = self.cfg.language
 
         # Pinned: single string → return immediately (already resolved to uppercase)
         if isinstance(language_config, str):
-            return language_config
+            return language_config, 1.0, 'pinned'
 
-        # Tuple: restrict detection to listed languages
-        if isinstance(language_config, tuple):
-            detected = self._detector.detect_language_of(text)
-            if detected is not None and detected.name in language_config:
-                return detected.name
-            return language_config[0]  # Fallback to first listed
+        restricted = isinstance(language_config, tuple)
+        if not restricted and not self._language_needed():
+            return None, None, 'none'
 
-        # None: full auto-detection
-        if any([self.cfg.check_detect_language, self.cfg.check_ner_process,
-                self.cfg.check_remove_stopwords]):
-            detected = self._detector.detect_language_of(text)
-            if detected is not None:
-                return detected.name
+        values = self._detector.compute_language_confidence_values(text)
+        # Same "unknown" rule as Lingua's detect_language_of: nothing scored, or a tie at the top.
+        if values and values[0].value > 0 and (len(values) < 2 or values[1].value < values[0].value):
+            top = values[0]
+            if not restricted or top.language.name in language_config:
+                return top.language.name, top.value, 'detected'
+        if restricted:
+            first = language_config[0]
+            conf = next((v.value for v in values if v.language.name == first), 0.0)
+            return first, conf, 'fallback'
+        return None, None, 'none'
 
-        return None
+    def _language_needed(self) -> bool:
+        """Whether auto-detection runs at all (else no language is expected)."""
+        return any([self.cfg.check_detect_language, self.cfg.check_ner_process,
+                    self.cfg.check_remove_stopwords])
 
     def _process_single(self, text: str) -> ProcessResult:
         try:
@@ -285,7 +295,8 @@ class TextCleaner:
     def _before_ner(self, text: str) -> tuple:
         """Every step before NER.
 
-        Returns ``(text, language, anon_map, doc_classes, started_at, regex_counts)``.
+        Returns ``(text, language, anon_map, doc_classes, started_at, regex_counts,
+        language_confidence, language_source)``.
         """
         started_at = time.perf_counter()
 
@@ -309,7 +320,7 @@ class TextCleaner:
             doc_classes = self._gliclass.classify(text)
 
         # Detect language (pure function, thread-safe)
-        language = self._detect_language(text)
+        language, language_confidence, language_source = self._detect_language(text)
 
         current_text = text
 
@@ -331,11 +342,13 @@ class TextCleaner:
         for step in self._post_fuzzy_pipeline:
             current_text = step(current_text)
 
-        return current_text, language, anon_map, doc_classes, started_at, regex_counts
+        return (current_text, language, anon_map, doc_classes, started_at, regex_counts,
+                language_confidence, language_source)
 
     def _after_ner(self, state: tuple, current_text: str, findings) -> ProcessResult:
         """Every step after NER, for the document *state* from ``_before_ner``."""
-        _, language, anon_map, doc_classes, started_at, regex_counts = state
+        (_, language, anon_map, doc_classes, started_at, regex_counts,
+         language_confidence, language_source) = state
 
         # Statistical model processing (always returns stext, even if None)
         stext = None
@@ -350,9 +363,23 @@ class TextCleaner:
             )
             entry['count'] += 1
             entry['chars'] += finding.entity.end - finding.entity.start
+        warnings = set()
+        if language is None and language_source == 'none' and self._language_needed():
+            warnings.add('language_unknown')
+        if language_source == 'fallback':
+            warnings.add('language_fallback')
+        if (language_source == 'detected'
+                and language_confidence < self.cfg.language_confidence_warning):
+            warnings.add('language_low_confidence')
+        if (self.cfg.check_ner_process and self.GeneralNER is not None
+                and self.GeneralNER.uses_fallback_models(language)):
+            warnings.add('ner_fallback_models')
         metadata: Dict[str, Any] = {
             'regex_counts': regex_counts,
             'entity_counts': entity_counts,
+            'language_confidence': language_confidence,
+            'language_source': language_source,
+            'warnings': sorted(warnings),
         }
         if anon_map is not None:
             if self._token_store is not None:

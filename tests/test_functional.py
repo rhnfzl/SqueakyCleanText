@@ -452,7 +452,9 @@ class TestNERBackends:
         result = tc.process("Test text for metadata check.")
         assert isinstance(result, ProcessResult)
         # Placeholder mode: only the value-free counts (no anon_map, no classes)
-        assert set(result.metadata) == {"regex_counts", "entity_counts"}
+        assert set(result.metadata) == {
+            "regex_counts", "entity_counts", "language_confidence", "language_source", "warnings",
+        }
 
     def test_d33_batch_processing(self):
         """process_batch handles multiple texts."""

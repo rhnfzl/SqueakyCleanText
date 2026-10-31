@@ -1229,10 +1229,11 @@ class TextCleanerTest(unittest.TestCase):
         self.assertNotIn('MULTILINGUAL', cfg.supported_languages)
 
     def test_language_pin_validation(self):
-        """language must be in supported set."""
+        """Any Lingua language is a valid pin; unknown names still raise."""
         with self.assertRaises(ValueError):
-            TextCleanerConfig(check_ner_process=False, language='POLISH')
-        # This should work when POLISH is in supported set:
+            TextCleanerConfig(check_ner_process=False, language='KLINGON')
+        cfg = TextCleanerConfig(check_ner_process=False, language='POLISH')
+        self.assertEqual(cfg.language, 'POLISH')
         cfg = TextCleanerConfig(
             check_ner_process=False, language='POLISH', extra_languages=('POLISH',)
         )

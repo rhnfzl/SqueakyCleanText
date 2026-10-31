@@ -43,7 +43,7 @@ SqueakyCleanText simplifies the process by automatically addressing common text 
   - Normalizes whitespace and handles currency symbols
   - Smart case folding (preserves NER tokens like `<PERSON>`)
 - **Language Support**:
-  - Automatic language detection (English, Dutch, German, Spanish)
+  - Automatic language detection over all 75 Lingua languages, with a confidence score
   - Language-specific NER models; French, Portuguese, Italian via multilingual model
   - Language-aware stopword removal
   - Extensible: add custom languages with stopwords, month names, and NER models
@@ -166,9 +166,20 @@ cfg = TextCleanerConfig(language='de', check_ner_process=False)
 # Restrict detection to specific languages (auto-detect among them)
 cfg = TextCleanerConfig(language=('en', 'nl', 'de'), check_ner_process=False)
 
-# Add extra languages for detection
+# Add extra languages (stopwords/dates/NER keys)
 cfg = TextCleanerConfig(extra_languages=('fr', 'pt'), check_ner_process=False)
+
+# Pin any of the 75 Lingua languages, e.g. Hindi
+cfg = TextCleanerConfig(language='hi', check_ner_process=False)
+
+# Bring your own NER model for a language: Hindi text runs only this model
+cfg = TextCleanerConfig(ner_models={'ENGLISH': '...', 'MULTILINGUAL': '...', 'HINDI': 'your/hindi-ner-onnx'})
 ```
+
+Auto-detection covers all 75 Lingua languages (`detect_all_languages=True`). Languages
+without their own NER model run the MULTILINGUAL + ENGLISH fallback; stopwords exist for
+EN/NL/DE/ES (others use English) and month names for 7 languages plus `custom_month_names`.
+`ner_backend='gliner'` is language independent, so any pinned language works with it.
 
 ### GLiNER: Zero-Shot Custom NER
 
@@ -290,7 +301,7 @@ import json
 json.dumps(anon_map.to_dict())
 ```
 
-> **Note**: `ProcessResult` from `process()` unpacks as a 3-tuple (`lm_text, stat_text, language`) for backward compatibility, but also exposes `.metadata` for reversible maps and document classification. `metadata` is always a dict with value-free counts: `metadata['regex_counts']` (e.g. `{"EMAIL": {"count": 1, "chars": 17}}`, one entry per regex replacement type) and `metadata['entity_counts']` (NER findings per type, same shape).
+> **Note**: `ProcessResult` from `process()` unpacks as a 3-tuple (`lm_text, stat_text, language`) for backward compatibility, but also exposes `.metadata` for reversible maps and document classification. `metadata` is always a dict with value-free counts: `metadata['regex_counts']` (e.g. `{"EMAIL": {"count": 1, "chars": 17}}`, one entry per regex replacement type) and `metadata['entity_counts']` (NER findings per type, same shape). It also holds `language_confidence` (Lingua top-1 confidence, `1.0` when pinned, `None` when unknown), `language_source` (`pinned`, `detected`, `fallback` when a `language` tuple fell back to its first entry, or `none`) and `warnings`, a sorted list of codes: `language_unknown`, `language_fallback`, `language_low_confidence`, `ner_fallback_models` (the language has no own NER model and ran MULTILINGUAL + ENGLISH).
 
 ### Document Classification (GLiClass)
 
@@ -578,7 +589,9 @@ new_cfg = dataclasses.replace(cfg, check_ner_process=False)
 
 | Field | Default | Description |
 |-------|---------|-------------|
-| `language` | `None` | Pin language (`'en'`), restrict detection to a set (`('en','nl')`), or `None` for auto-detect. Accepts Lingua names, ISO 639-1, ISO 639-3 codes. |
+| `language` | `None` | Pin language (`'en'`, any of the 75 Lingua languages), restrict detection to a set (`('en','nl')`), or `None` for auto-detect. Accepts Lingua names, ISO 639-1, ISO 639-3 codes. |
+| `detect_all_languages` | `True` | Auto-detect over all 75 Lingua languages. `False` = 0.7 detector over `supported_languages` only (EN/NL/DE/ES plus extras). A `language` tuple always restricts detection to its entries |
+| `language_confidence_warning` | `0.5` | Adds `language_low_confidence` to `metadata['warnings']` when the detected language's confidence is below this (0..1). Warning only, never changes routing |
 | `extra_languages` | `()` | Additional language names/codes for detection |
 | `custom_stopwords` | `None` | `{LANG: frozenset({...})}` custom stopword sets |
 | `custom_month_names` | `None` | `{LANG: ('Jan', 'Feb', ...)}` for date detection |
