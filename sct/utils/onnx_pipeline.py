@@ -21,7 +21,7 @@ from urllib.parse import quote
 
 import numpy as np
 import onnxruntime as ort
-from huggingface_hub import hf_hub_download
+from huggingface_hub import hf_hub_download, try_to_load_from_cache
 from tokenizers import Tokenizer
 
 logger = logging.getLogger(__name__)
@@ -413,13 +413,25 @@ def load_onnx_ner_model(
     model_path = hf_hub_download(model_name, 'model.onnx', **download_kwargs)
     # hub cache layout: .../snapshots/<commit>/model.onnx
     commit = Path(model_path).parent.name
+    if re.fullmatch(r'[0-9a-f]{40}', commit):
+        # The rest comes from this snapshot: a commit hash is served from the cache with no
+        # HTTP, so a forked worker does not resolve DNS (which can hang after fork).
+        download_kwargs['revision'] = commit
+
+    def optional_download(filename):
+        # The Hub's cached "no such file" answer counts too, so the probe needs no HEAD request.
+        cached = try_to_load_from_cache(
+            model_name, filename, cache_dir=cache_dir, revision=download_kwargs.get('revision'))
+        if cached is not None and not isinstance(cached, str):
+            raise FileNotFoundError(filename)
+        return cached or hf_hub_download(model_name, filename, **download_kwargs)
     config_path = hf_hub_download(model_name, 'config.json', **download_kwargs)
     tokenizer_path = hf_hub_download(model_name, 'tokenizer.json', **download_kwargs)
 
     # Large models (XLM-RoBERTa-large ~2.1GB) store weights in an external
     # data file. ONNX Runtime needs it in the real directory of model.onnx.
     try:
-        data_path = hf_hub_download(model_name, 'model.onnx_data', **download_kwargs)
+        data_path = optional_download('model.onnx_data')
     except Exception:  # noqa: S110
         pass  # Smaller models don't have this file
     else:
@@ -433,9 +445,7 @@ def load_onnx_ner_model(
     # Try to get tokenizer_config.json for model_max_length
     model_max_length = 512  # safe default
     try:
-        tok_config_path = hf_hub_download(
-            model_name, 'tokenizer_config.json', **download_kwargs
-        )
+        tok_config_path = optional_download('tokenizer_config.json')
         with open(tok_config_path) as f:
             tok_config = json.load(f)
         model_max_length = tok_config.get('model_max_length', 512)

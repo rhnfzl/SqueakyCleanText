@@ -7,6 +7,7 @@ ONNX sessions. Pickling keeps only the config.
 
 import os
 import threading
+from dataclasses import replace
 from typing import Any, Mapping, Optional, Sequence, Union
 
 from sct.config import TextCleanerConfig
@@ -38,6 +39,17 @@ def resolve_config(config: Union[TextCleanerConfig, str, None]) -> TextCleanerCo
     return config
 
 
+def _pin_loaded_revisions(cleaner: Optional[TextCleaner], config: TextCleanerConfig) -> TextCleanerConfig:
+    """Pin unpinned ONNX models to the commits *cleaner* loaded, so workers skip the Hub."""
+    ner = getattr(cleaner, "GeneralNER", None)
+    if ner is None or config.ner_backend not in ("onnx", "ensemble_onnx"):
+        return config
+    loaded = {key: p["revision"] for key, p in ner._provenance.items() if p.get("revision")}
+    if not loaded.keys() - config.ner_model_revisions.keys():
+        return config
+    return replace(config, ner_model_revisions={**loaded, **config.ner_model_revisions})
+
+
 class CleanerHandle:
     """Picklable owner of one ``TextCleaner`` per process."""
 
@@ -51,12 +63,14 @@ class CleanerHandle:
         if self._cleaner is None or self._pid != pid:
             with _BUILD_LOCK:
                 if self._cleaner is None or self._pid != pid:
+                    # Forked child: reuse the parent's resolved commits (no network after fork).
+                    self.config = _pin_loaded_revisions(self._cleaner, self.config)
                     self._cleaner = TextCleaner(self.config)
                     self._pid = pid
         return self._cleaner
 
     def __getstate__(self):
-        return {"config": self.config}
+        return {"config": _pin_loaded_revisions(self._cleaner, self.config)}
 
     def __setstate__(self, state):
         self.config = state["config"]

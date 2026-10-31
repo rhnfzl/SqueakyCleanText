@@ -92,3 +92,31 @@ def test_ner_leaves_regex_synthetic_fakes_alone():
         f"Write to {fake} today, Angela.", positional_tags=("PER",), ner_confidence_threshold=0.5)
     assert fake in result.text
     assert "Angela" not in result.text
+
+
+# --- Linux 1: a worker rebuilding the cleaner makes no Hub request from a warm cache ---
+
+def test_onnx_load_from_warm_cache_makes_no_hub_request(monkeypatch):
+    import huggingface_hub.file_download as fd
+    from sct.utils.onnx_pipeline import load_onnx_ner_model
+
+    model = TEST_NER_MODELS["ENGLISH"]
+    pipe, _ = load_onnx_ner_model(model)  # warms the cache, records the missing model.onnx_data
+    calls = []
+    monkeypatch.setattr(fd, "get_hf_file_metadata", lambda *a, **k: calls.append(a) or 1 / 0)
+    load_onnx_ner_model(model, revision=pipe.revision)
+    assert calls == []
+
+
+def test_forked_handle_pins_the_parent_commits(monkeypatch):
+    import pickle
+
+    from sct.integrations import _runtime as rt
+
+    handle = rt.CleanerHandle(TextCleanerConfig(ner_models=TEST_NER_MODELS))
+    handle.get().GeneralNER.load_language("ENGLISH")
+    commit = handle.get().GeneralNER._provenance["ENGLISH"]["revision"]
+    copied = pickle.loads(pickle.dumps(handle))  # noqa: S301 - own object
+    assert copied.config.ner_model_revisions["ENGLISH"] == commit
+    monkeypatch.setattr(rt.os, "getpid", lambda: -1)  # as in a forked child
+    assert handle.get().cfg.ner_model_revisions["ENGLISH"] == commit
