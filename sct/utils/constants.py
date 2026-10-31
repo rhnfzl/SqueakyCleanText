@@ -46,13 +46,38 @@ LEGACY_TYPE_NAMES = {'PHONE': 'PHONE_NUMBER', 'IP': 'IP_ADDRESS'}
 # "a@b.com（担当：鈴木）" or "a@b.com、" ends at ".com". The letters and numbers of the
 # CJK punctuation block (々 〆 〇, by Unicode category) stay, so "info@佐々木.jp" is whole.
 _CJK_SYMBOL_LETTERS = ''.join(chr(c) for c in range(0x3000, 0x3040) if unicodedata.category(chr(c))[0] in 'LN')
+
+
+def _class_ranges(categories, *spans):
+    """Character-class body (literal ranges) of the code points in *spans* whose category starts with one of *categories*."""
+    out, start = [], None
+    for lo, hi in spans:
+        for cp in range(lo, hi + 1):
+            hit = unicodedata.category(chr(cp))[0] in categories
+            if hit and start is None:
+                start = cp
+            elif not hit and start is not None:
+                out.append(chr(start) if start == cp - 1 else f"{chr(start)}-{chr(cp - 1)}")
+                start = None
+        if start is not None:
+            out.append(chr(start) if start == hi else f"{chr(start)}-{chr(hi)}")
+            start = None
+    return ''.join(out)
+
+
+# Combining marks of every script (Mn/Mc/Me: the vowel signs of প্রিয়া, संपर्क), which \w leaves out.
+MARKS = _class_ranges('M', (0x300, 0x3FFFF), (0xE0000, 0xE0FFF))
+# Letters, marks and digits beyond the BMP (𠮷野.jp): the BMP ranges below stop at U+FFFF.
+_SUPPLEMENTARY_ALNUM = _class_ranges('LMN', (0x10000, 0x3FFFF))
 _IDN_LETTER = (r"a-z\u00a1-\u1fff\u2070-\u2fff\u3040-\ufeff\uff21-\uff3a\uff41-\uff5a\uff66-\uffff"
-               + _CJK_SYMBOL_LETTERS)
+               + _CJK_SYMBOL_LETTERS + _SUPPLEMENTARY_ALNUM)
 # ZWNJ/ZWJ (U+200C/D) join letters inside IDNA labels (Persian, Devanagari conjuncts).
 _IDN_CHAR = _IDN_LETTER + r"0-9\uff10-\uff19\u200c\u200d"
+# A punycode TLD (xn--p1ai) is tried first, so ".xn" alone never ends the match.
+_TLD = rf"(?:xn--[a-z0-9-]*[a-z0-9]|[{_IDN_LETTER}]{{2,}})"
 EMAIL_REGEX = re.compile(
-    r"(?:^|(?<=[^\w@.)]))[\w+-](?:[\w!#$%&'*+-]|\.(?!\.))*?(?<!\.)(@|[(<{\[]at[)>}\]])"
-    rf"(?:(?:[{_IDN_CHAR}]-?)*[{_IDN_CHAR}]+)(?:\.(?:[{_IDN_CHAR}]-?)*[{_IDN_CHAR}]+)*(?:\.(?:[{_IDN_LETTER}]{{2,}}))",
+    rf"(?:^|(?<=[^\w@.){MARKS}]))[\w+-](?:[\w!#$%&'*+{MARKS}-]|\.(?!\.))*?(?<!\.)(@|[(<{{\[]at[)>}}\]])"
+    rf"(?:(?:[{_IDN_CHAR}]-*)*[{_IDN_CHAR}]+)(?:\.(?:[{_IDN_CHAR}]-*)*[{_IDN_CHAR}]+)*(?:\.{_TLD})",
     flags=re.IGNORECASE | re.UNICODE,
 )
 
@@ -154,17 +179,15 @@ URL_REGEX = re.compile(
     # bracketed IPv6 host; private and loopback IPv4 hosts match too, so the whole
     # URL (query values included) is replaced, not just the address
     r"\[[0-9a-f:.]*:[0-9a-f:.]*\]" r"|"
-    # IP address dotted notation octets
-    r"(?:[1-9]\d?|1\d\d|2[01]\d|22[0-3])"
-    r"(?:\.(?:1?\d{1,2}|2[0-4]\d|25[0-5])){2}"
-    r"(?:\.(?:[1-9]\d?|1\d\d|2[0-4]\d|25[0-4]))"
+    # IPv4 host, whole: a longer octet or another label after it is a host name
+    rf"{_IPV4}(?![0-9]|\.[0-9a-z])"
     r"|"
-    # host name (with proper Unicode support)
-    r"(?:(?:[a-z\u00a1-\uffff0-9]-?)*[a-z\u00a1-\uffff0-9]+)"
+    # host name (with proper Unicode support, beyond the BMP too)
+    rf"(?:(?:[a-z\u00a1-\uffff0-9{_SUPPLEMENTARY_ALNUM}]-*)*[a-z\u00a1-\uffff0-9{_SUPPLEMENTARY_ALNUM}]+)"
     # domain name
-    r"(?:\.(?:[a-z\u00a1-\uffff0-9]-?)*[a-z\u00a1-\uffff0-9]+)*"
-    # TLD identifier
-    r"(?:\.(?:[a-z\u00a1-\uffff]{2,}))" r"|" r"(?:(localhost))" r")"
+    rf"(?:\.(?:[a-z\u00a1-\uffff0-9{_SUPPLEMENTARY_ALNUM}]-*)*[a-z\u00a1-\uffff0-9{_SUPPLEMENTARY_ALNUM}]+)*"
+    # TLD identifier (punycode first, so ".xn" alone never ends the host)
+    rf"(?:\.(?:xn--[a-z0-9-]*[a-z0-9]|[a-z\u00a1-\uffff{_SUPPLEMENTARY_ALNUM}]{{2,}}))" r"|" r"(?:(localhost))" r")"
     # port number
     r"(?::\d{2,5}\b)?"
     # resource path, or a query/fragment right after the host ("?id=", "#token=");

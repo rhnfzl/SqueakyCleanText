@@ -36,9 +36,9 @@ def test_styled_pii_replaced(mode, text, styled, ascii_):
 
 
 def test_off_keeps_earlier_behaviour():
-    cfg = TextCleanerConfig(check_ner_process=False, check_to_ascii_unicode=False,
-                            fold_styled_characters=False)
-    assert "𝐞𝐱𝐚𝐦𝐩𝐥𝐞" in TextCleaner(cfg=cfg).process(CASES[0][0]).lm_text
+    # Folding off keeps the styled letters; the email itself is still found, since
+    # host names take letters beyond the BMP (round 15).
+    assert "𝐞𝐱𝐚𝐦𝐩𝐥𝐞" in NormaliseText().fix_bad_unicode(CASES[0][0], fold_styled_characters=False)
 
 
 def test_prose_keeps_its_characters():

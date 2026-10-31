@@ -132,6 +132,7 @@ class TextCleaner:
                         if self.cfg.gliner_label_descriptions else None
                     ),
                     'onnx': self.cfg.gliner_onnx,
+                    'legacy_type_names': self.cfg.legacy_type_names,
                 }
 
             # Determine torch model names (if needed)
@@ -239,6 +240,9 @@ class TextCleaner:
             self._post_fuzzy_pipeline.append(self._remove_isolated_special_symbols)
         if cfg.check_normalize_whitespace:
             self._post_fuzzy_pipeline.append(self._normalize_whitespace)
+        # Deferred values stay hidden through the cleanup above, so a tag it would remove
+        # ("[EMAIL]" under bracket removal) still carries its value to the swap after NER.
+        self._post_fuzzy_pipeline.append(self._restore_deferred)
         # User-provided custom steps — appended after all built-in steps
         for step_fn in cfg.custom_pipeline_steps:
             self._post_fuzzy_pipeline.append(step_fn)
@@ -643,14 +647,21 @@ class TextCleaner:
     def _restore_protected(self, text):
         protected = getattr(self._document_context, 'protected', None) or {}
         deferred = getattr(self._document_context, 'deferred', None)
-        if not deferred or not deferred[0]:
-            for value, key in protected.items():
+        tags = deferred[0] if deferred else {}
+        for value, key in protected.items():
+            if key not in tags:
                 text = text.replace(key, value)
+        return text
+
+    def _restore_deferred(self, text):
+        protected = getattr(self._document_context, 'protected', None) or {}
+        deferred = getattr(self._document_context, 'deferred', None)
+        if not deferred or not deferred[0]:
             return text
         # Deferred keys become their tag; every tag occurrence is recorded in order
         # (source text and plain tag emits as None) so _swap_deferred can pair them up.
         tags, order = deferred
-        values = {key: value for value, key in protected.items()}
+        values = {key: value for value, key in protected.items() if key in tags}
         tracked = set(tags.values())
         pattern = re.compile('|'.join(map(re.escape, sorted({*values, *tracked}, key=len, reverse=True))))
 
@@ -799,7 +810,7 @@ class TextCleaner:
         public_only = self.cfg.replace_ips_public_only
         reversible = self._replace_reversible(
             text,
-            constants.IP_REGEX,
+            contact.IP_VIEW,
             self._ip_type,
             keep=lambda orig: not contact.is_replaceable_ip(orig, public_only),
         )
@@ -846,7 +857,7 @@ class TextCleaner:
     def _replace_phone_numbers(self, text):
         reversible = self._replace_reversible(
             text,
-            constants.PHONE_REGEX,
+            contact.PHONE_VIEW,
             self._phone_type,
         )
         if reversible is not None:

@@ -7,6 +7,7 @@ import functools
 import hashlib
 import locale as _stdlib_locale
 import logging
+import os
 import random
 import threading
 from typing import Dict, Optional
@@ -16,6 +17,9 @@ logger = logging.getLogger(__name__)
 # Some locale providers (th_TH, uk_UA ssn; uk_UA plates) draw from the module-level
 # random, which seed_instance() leaves alone; seeded calls hold this lock.
 _GLOBAL_RANDOM_LOCK = threading.Lock()
+if hasattr(os, "register_at_fork"):
+    # A child forked while another thread held the lock must not inherit it held.
+    os.register_at_fork(after_in_child=lambda: globals().update(_GLOBAL_RANDOM_LOCK=threading.Lock()))
 
 # Maps entity tags to Faker method names
 FAKER_GENERATORS: Dict[str, str] = {

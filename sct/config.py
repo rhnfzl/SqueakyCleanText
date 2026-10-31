@@ -127,6 +127,11 @@ PII_LABEL_MAP: dict[str, str] = {
     'phone_number': 'PHONE', 'ip_address': 'IP',
 }
 
+# legacy_type_names -> the label map PII mode derives (identity marks it as derived).
+_PII_MAPS = {legacy: MappingProxyType({k: v for k, v in PII_LABEL_MAP.items()
+                                       if not (legacy and v in ('PHONE', 'IP'))})
+             for legacy in (False, True)}
+
 PII_DEFAULT_MODEL = 'knowledgator/gliner-pii-base-v1.0'
 PII_DEFAULT_REVISION = '61726e0ad791dcab3e29339bbec3ad42ded65641'
 PII_DEFAULT_THRESHOLD = 0.3  # Recall > precision for PII
@@ -421,13 +426,15 @@ class TextCleanerConfig:
                 )
             if self.gliner_labels == ('person', 'organization', 'location'):
                 object.__setattr__(self, 'gliner_labels', PII_LABELS)
-            if self.gliner_label_map is None:
-                object.__setattr__(self, 'gliner_label_map', {
-                    k: v for k, v in PII_LABEL_MAP.items()
-                    if not (self.legacy_type_names and v in ('PHONE', 'IP'))
-                })
-            # Expand positional_tags to include all PII label tags
             pii_tags = set(self.positional_tags)
+            # Derived maps are shared objects, so a dataclasses.replace() clone re-derives them
+            # (and drops the other naming's phone/IP tags) when legacy_type_names changes.
+            if self.gliner_label_map is _PII_MAPS[True] or self.gliner_label_map is _PII_MAPS[False]:
+                pii_tags -= {'PHONE', 'IP', 'PHONE_NUMBER', 'IP_ADDRESS'}
+                object.__setattr__(self, 'gliner_label_map', None)
+            if self.gliner_label_map is None:
+                object.__setattr__(self, 'gliner_label_map', _PII_MAPS[self.legacy_type_names])
+            # Expand positional_tags to include all PII label tags
             for label in self.gliner_labels:
                 pii_tags.add(self.gliner_label_map.get(label, label.upper()))
             object.__setattr__(self, 'positional_tags', tuple(sorted(pii_tags)))
@@ -488,7 +495,7 @@ class TextCleanerConfig:
                 )
 
         # Freeze gliner_label_map
-        if self.gliner_label_map is not None:
+        if self.gliner_label_map is not None and not any(self.gliner_label_map is m for m in _PII_MAPS.values()):
             object.__setattr__(self, 'gliner_label_map',
                                MappingProxyType(dict(self.gliner_label_map)))
 
@@ -650,6 +657,9 @@ class TextCleanerConfig:
         frozen = [k for k, v in state.items() if isinstance(v, MappingProxyType)]
         for key in frozen:
             state[key] = dict(state[key])
+        if any(self.gliner_label_map is m for m in _PII_MAPS.values()):
+            state['gliner_label_map'] = None  # derived: re-shared on load
+            frozen.remove('gliner_label_map')
         return state, frozen
 
     def __setstate__(self, packed):
@@ -658,6 +668,8 @@ class TextCleanerConfig:
             if key in frozen:
                 value = MappingProxyType(value)
             object.__setattr__(self, key, value)
+        if self.ner_mode == 'pii' and self.gliner_label_map is None:
+            object.__setattr__(self, 'gliner_label_map', _PII_MAPS[self.legacy_type_names])
 
 
 def _config_from_module_globals() -> TextCleanerConfig:

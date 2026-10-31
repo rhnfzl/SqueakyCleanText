@@ -69,6 +69,14 @@ class ModelLoadError(Exception):
     pass
 
 
+def _presidio_type_map(gliner_config):
+    """Presidio entity type -> SCT type: the label map, and PHONE_NUMBER/IP_ADDRESS -> PHONE/IP."""
+    types = {} if gliner_config.get('legacy_type_names') else {
+        old: new for new, old in constants.LEGACY_TYPE_NAMES.items()}
+    types.update({label.upper(): tag for label, tag in (gliner_config.get('label_map') or {}).items()})
+    return types
+
+
 class GeneralNER:
     """NER processor with lazy model loading, multi-backend support, and ensemble voting.
 
@@ -283,6 +291,7 @@ class GeneralNER:
                 "Install with: pip install presidio-analyzer"
             )
         self._analyzer = AnalyzerEngine()
+        self._presidio_types = _presidio_type_map(gliner_config)
         try:
             from presidio_analyzer.predefined_recognizers import GLiNERRecognizer  # noqa: S404
             gliner_recognizer = GLiNERRecognizer(
@@ -708,6 +717,10 @@ class GeneralNER:
                 text=text,
                 language=analyzer_language,
             )
+            # Analyzer names (PHONE_NUMBER, a label's upper case) -> the configured type names.
+            types = getattr(self, '_presidio_types', None) or _presidio_type_map({})
+            for result in analyzer_results:
+                result.entity_type = types.get(result.entity_type, result.entity_type)
             entities = tuple(
                 DetectedEntity(
                     entity_type=result.entity_type,

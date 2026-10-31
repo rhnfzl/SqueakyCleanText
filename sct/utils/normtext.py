@@ -14,12 +14,14 @@ _FULLWIDTH_ALNUM = {c: c - 0xFEE0 for r in ((0xFF10, 0xFF19), (0xFF21, 0xFF3A), 
                     for c in range(r[0], r[1] + 1)}
 # Full-width @ . - _ + and ideographic space become ASCII only inside alphanumeric runs (emails,
 # phones; ＠ and ． also beside letters of any script), so CJK punctuation such as ， ： ！ keeps its width.
+# A word of any script may end in a combining mark (प्रिया), so marks count as its letters.
+_WORD_END = rf'(?<=[^\W_{constants.MARKS}])'
 _FULLWIDTH_JOINER_REGEX = re.compile(r'(?<=[0-9A-Za-z])[＠．－＿＋\u3000](?=[0-9A-Za-z])|＋(?=[0-9])'
-                                     r'|(?<=[^\W_])＠(?=[^\W_])|(?<=[^\W_])．(?=[0-9A-Za-z])|(?<=[0-9A-Za-z])．(?=[^\W_])')
+                                     rf'|{_WORD_END}＠(?=[^\W_])|{_WORD_END}．(?=[0-9A-Za-z])|(?<=[0-9A-Za-z])．(?=[^\W_])')
 _FULLWIDTH_JOINER = {'＠': '@', '．': '.', '－': '-', '＿': '_', '＋': '+', '\u3000': ' '}
 # Inside an address-shaped run (word characters around an @), full-width . - _ + fold whatever
 # script sits beside them (john@例え．テスト, josé＿smith@...); prose without an @ keeps them.
-_EMAIL_RUN_REGEX = re.compile(r'\w[\w．－＿＋]*[@＠][\w．－＿]*\w')
+_EMAIL_RUN_REGEX = re.compile(rf'\w[\w．－＿＋{constants.MARKS}]*[@＠][\w．－＿{constants.MARKS}]*\w')
 _EMAIL_RUN_JOINER = str.maketrans('＠．－＿＋', '@.-_+')
 
 
@@ -51,7 +53,7 @@ _RUN_NEIGHBOUR = re.compile(r'[0-9A-Za-z@.:/_+\-]')
 # syntax also beside letters of any script: ＠ between letters/digits, ． with an ASCII side
 # (例え．jp) and a ：／／ scheme after ASCII letters (https：／／例え.jp).
 _STYLED_JOINER_REGEX = re.compile(r'(?<=[0-9A-Za-z])[＠．－＿＋：／？＝＆＃％～\u3000]+(?=[0-9A-Za-z])|＋(?=[0-9])'
-                                  r'|(?<=[^\W_])＠(?=[^\W_])|(?<=[^\W_])．(?=[0-9A-Za-z])|(?<=[0-9A-Za-z])．(?=[^\W_])|(?<=[A-Za-z])：／／')
+                                  rf'|{_WORD_END}＠(?=[^\W_])|{_WORD_END}．(?=[0-9A-Za-z])|(?<=[0-9A-Za-z])．(?=[^\W_])|(?<=[A-Za-z])：／／')
 
 
 def _fold_circled_run(m):

@@ -175,6 +175,10 @@ Haystack), score columns and data cards (`sct-report`), a reworked MCP server an
 - Merged signals of a JSON value: `language_source` comes from the longest leaf of the chosen language, not the longest leaf overall.
 - The email domain stops at general, CJK and full-width punctuation. With `fix_character_width=False` (the new default) `seikyu@example.com（担当：鈴木花子）` was one `<EMAIL>` up to `）`, so the name inside was hidden from NER and labelled EMAIL; now the address ends at `.com`. Domains in any script (`例え.jp`, `उदाहरण.भारत`) still match, and the letters of the CJK punctuation block (`々 〆 〇`, by Unicode category) stay domain letters (`info@佐々木.jp`), as do the join controls ZWNJ and ZWJ (U+200C/D) that Persian and Devanagari domains use.
 - Isolated-symbol removal keeps a quote, dash, `*` or `%` that touches a letter, digit or mark of any script. Before only ASCII letters and digits counted, so `東京-大阪` became `東京大阪` and `ইসলাম-এর` became `ইসলামএর` (which also made a WordPiece model widen a name over the suffix).
+- Email local parts take combining marks (`প্রিয়া@example.com`, `संपर्क@example.com` were left whole or cut to `संपर्<EMAIL>` without ASCII folding); full-width `＠ ．` after a mark fold too. Email and URL hosts take letters beyond the BMP (`info@𠮷野.jp`) and punycode TLDs (`example.xn--p1ai` was cut at `.xn`); a URL with an IPv4 host takes every valid octet (`http://10.0.0.0/?...`, `.255`) and only a whole address, so query values no longer stay visible.
+- Phones and IPs are matched on a view where every decimal digit is ASCII and full-width `. -` are ASCII, with the source offsets kept: `٠٦ ١٢ ٣٤ ٥٦ ٧٨`, `٩٨٧٦٥ ٤٣٢١٠`, `١٩٢．١٦٨．١．١` are replaced and `1.2.3.4١` is one `<IP>`.
+- `dataclasses.replace(cfg, legacy_type_names=...)` on a `ner_mode="pii"` config re-derives the label map and positional tags (an explicit `gliner_label_map` stays); the `presidio_gliner` backend maps analyzer types through `gliner_label_map` and `PHONE_NUMBER`/`IP_ADDRESS` to `PHONE`/`IP` unless `legacy_type_names=True`.
+- With `ner_sees_tags`, a regex value stays hidden through the cleanup steps, so a tag they remove (`replace_with_email="[EMAIL]"` under bracket removal) no longer loses the value in reversible mode. A forked child gets a fresh synthetic random lock. `llms.txt` lists the current `check_replace_dates`, `language_confidence_warning` and `language_margin_warning` defaults.
 - `AGENTS.md` (contributors): no word-list fixes for model mistakes; every behaviour is a safe default plus a config option.
 
 ### Known limits
@@ -189,6 +193,7 @@ Haystack), score columns and data cards (`sct-report`), a reworked MCP server an
 - Adversarial strings such as `+000000000(000)0` can leave `(000)0` after phone replacement (Python `re` takes the first alternative that matches, not the longest).
 - Score B's quality head was tested with a small ONNX graph, not the exported FineWeb2-HQ-Plus model; its speed is not measured. GLiNER PII mode (`ner_mode="pii"`) was not run end to end for this release.
 - An unpinned NER model makes one Hub request per worker when the parent never loaded it before forking; pin `ner_model_revisions` or set `HF_HUB_OFFLINE=1`.
+- With an empty regex marker (`replace_with_email=""`) and `ner_sees_tags`, NER in synthetic/reversible mode reads the indexed placeholder or fake, not the empty text placeholder mode leaves, so its findings can differ there.
 - CI does not install the `mcp` extra; FastMCP-only tests skip there.
 
 ## 0.7.1 - 2026-10-30
