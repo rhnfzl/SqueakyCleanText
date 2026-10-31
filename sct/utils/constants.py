@@ -41,8 +41,13 @@ LEGACY_TYPE_NAMES = {'PHONE': 'PHONE_NUMBER', 'IP': 'IP_ADDRESS'}
 # Fixed: Unicode ranges use actual Unicode escapes (not literal \\u in raw strings)
 # Local part takes RFC 5322 punctuation (o'connor, jo&co, alice!) after a word start,
 # so no prefix of the address stays visible; it never ends in a dot.
+# Domain labels take any script but not general, CJK or full-width punctuation, so
+# "a@b.com（担当：鈴木）" or "a@b.com、" ends at ".com".
+_IDN_LETTER = r"a-z\u00a1-\u1fff\u2070-\u2fff\u3040-\ufeff\uff21-\uff3a\uff41-\uff5a\uff66-\uffff"
+_IDN_CHAR = _IDN_LETTER + r"0-9\uff10-\uff19"
 EMAIL_REGEX = re.compile(
-    r"(?:^|(?<=[^\w@.)]))[\w+-](?:[\w!#$%&'*+-]|\.(?!\.))*?(?<!\.)(@|[(<{\[]at[)>}\]])(?:(?:[a-z\u00a1-\uffff0-9]-?)*[a-z\u00a1-\uffff0-9]+)(?:\.(?:[a-z\u00a1-\uffff0-9]-?)*[a-z\u00a1-\uffff0-9]+)*(?:\.(?:[a-z\u00a1-\uffff]{2,}))",
+    r"(?:^|(?<=[^\w@.)]))[\w+-](?:[\w!#$%&'*+-]|\.(?!\.))*?(?<!\.)(@|[(<{\[]at[)>}\]])"
+    rf"(?:(?:[{_IDN_CHAR}]-?)*[{_IDN_CHAR}]+)(?:\.(?:[{_IDN_CHAR}]-?)*[{_IDN_CHAR}]+)*(?:\.(?:[{_IDN_LETTER}]{{2,}}))",
     flags=re.IGNORECASE | re.UNICODE,
 )
 
@@ -400,10 +405,9 @@ ISOLATED_SPECIAL_SYMBOLS_REGEX = re.compile(
 # Pre-compiled bracket/brace removal patterns (moved from special.py runtime)
 BRACKET_CONTENT_REGEX = re.compile(r'\[[^\]]+\]')
 BRACE_CONTENT_REGEX = re.compile(r'\{[^}]+\}')
-ISOLATED_QUOTES_REGEX = re.compile(
-    r"(?<![a-zA-Z0-9])['\"\-*%](?![a-zA-Z0-9])",
-    flags=re.UNICODE | re.IGNORECASE,
-)
+# A quote, dash, * or % is isolated unless a letter, digit or mark of any script touches it
+# (special.py checks the neighbours), so "ইসলাম-এর" and "東京-大阪" keep their hyphen.
+ISOLATED_QUOTES_REGEX = re.compile(r"['\"\-*%]")
 
 # Pre-compiled punctuation pattern (was re-compiled on every call in special.py)
 PUNCTUATION_REGEX = re.compile('[' + re.escape(string.punctuation) + ']')

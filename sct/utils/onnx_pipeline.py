@@ -134,7 +134,8 @@ class ONNXNERPipeline:
     # Public API
     # ------------------------------------------------------------------
 
-    def __call__(self, texts, batch_size: int = 1, max_workers: int = 1) -> List[List[dict]]:
+    def __call__(self, texts, batch_size: int = 1, max_workers: int = 1,
+                 subword_widen: Optional[float] = 1.0) -> List[List[dict]]:
         """Run NER on one or more texts.
 
         Parameters
@@ -146,6 +147,9 @@ class ONNXNERPipeline:
             in the batch; ``1`` runs each text alone with no padding.
         max_workers : int
             Threads running batches at once (``session.run`` is thread-safe).
+        subword_widen : float | None
+            WordPiece only: widen an entity to its whole word when the added text is at
+            most this many times the tagged span; ``None`` always, ``0`` never.
 
         Returns
         -------
@@ -183,7 +187,7 @@ class ONNXNERPipeline:
 
             for row, i in enumerate(rows):
                 scores = self._softmax(logits[row, :len(encodings[i].ids)])
-                all_results[i] = self._aggregate_simple(texts[i], encodings[i], scores)
+                all_results[i] = self._aggregate_simple(texts[i], encodings[i], scores, subword_widen)
 
         batches = [order[i:i + batch_size] for i in range(0, len(order), batch_size)]
         if max_workers > 1 and len(batches) > 1:
@@ -206,7 +210,8 @@ class ONNXNERPipeline:
         exp = np.exp(shifted)
         return exp / exp.sum(axis=-1, keepdims=True)
 
-    def _aggregate_simple(self, text: str, encoding, scores: np.ndarray) -> List[dict]:
+    def _aggregate_simple(self, text: str, encoding, scores: np.ndarray,
+                          subword_widen: Optional[float] = 1.0) -> List[dict]:
         """Reimplements HuggingFace ``aggregation_strategy="simple"``.
 
         For each non-special token:
@@ -278,7 +283,7 @@ class ONNXNERPipeline:
             entity_type = group[0]['entity_type']
             start = group[0]['start']
             end = group[-1]['end']
-            tokens = getattr(encoding, 'tokens', None) if self._subword_prefix else None
+            tokens = getattr(encoding, 'tokens', None) if self._subword_prefix and subword_widen != 0 else None
             if tokens:
                 # Widen to whole words so "John Do" + "##e" never leaves "e" behind.
                 first, last = group[0]['idx'], group[-1]['idx'] + 1
@@ -288,7 +293,10 @@ class ONNXNERPipeline:
                 while last < len(tokens) and not special_tokens_mask[last] \
                         and tokens[last].startswith(self._subword_prefix):
                     last += 1
-                start, end = offsets[first][0], offsets[last - 1][1]
+                wide_start, wide_end = offsets[first][0], offsets[last - 1][1]
+                # Unspaced scripts (Thai, kana) make a whole clause one word: widen only a short tail.
+                if subword_widen is None or (wide_end - wide_start) - (end - start) <= subword_widen * (end - start):
+                    start, end = wide_start, wide_end
             avg_score = float(np.mean([t['score'] for t in group]))
             word = text[start:end]
 

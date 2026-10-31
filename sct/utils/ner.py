@@ -91,6 +91,7 @@ class GeneralNER:
                  torch_model_names: Optional[Dict[str, str]] = None,
                  torch_model_revisions: Optional[Dict[str, str]] = None,
                  ner_batch_size: int = 8,
+                 ner_subword_widen: Optional[float] = 1.0,
                  ensemble_models: Optional[Dict] = None,
                  ensemble_default_keys: Optional[tuple] = None,
                  replacement_mode: str = 'placeholder',
@@ -124,6 +125,7 @@ class GeneralNER:
         _LIVE_NER.add(self)
         self._ner_backend = ner_backend
         self._ner_batch_size = ner_batch_size
+        self._ner_subword_widen = ner_subword_widen
         self._ner_chunk_overlap = ner_chunk_overlap
         self._replacement_mode = replacement_mode
         self._synthetic_replacer = synthetic_replacer
@@ -953,6 +955,7 @@ class GeneralNER:
                 if self._ner_backend in ('onnx', 'ensemble_onnx'):
                     batch = self._pipelines[key](
                         key_chunks, batch_size=self._ner_batch_size, max_workers=max_workers,
+                        subword_widen=self._ner_subword_widen,
                     )
                 else:
                     with self._get_lock(self._model_key(key)):

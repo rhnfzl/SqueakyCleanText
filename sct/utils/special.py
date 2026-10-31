@@ -1,4 +1,14 @@
+import unicodedata
+
 from sct.utils import constants
+
+
+def _drop_if_isolated(match):
+    text, i = match.string, match.start()
+    touches_word = any(
+        0 <= j < len(text) and unicodedata.category(text[j])[0] in 'LNM' for j in (i - 1, i + 1)
+    )
+    return match.group() if touches_word else ''
 
 
 class ProcessSpecialSymbols:
@@ -48,7 +58,7 @@ class ProcessSpecialSymbols:
         if remove_braces:
             cleaned_text = constants.BRACE_CONTENT_REGEX.sub('', cleaned_text)
         cleaned_text = constants.ISOLATED_SPECIAL_SYMBOLS_REGEX.sub('', cleaned_text)
-        cleaned_text = constants.ISOLATED_QUOTES_REGEX.sub('', cleaned_text)
+        cleaned_text = constants.ISOLATED_QUOTES_REGEX.sub(_drop_if_isolated, cleaned_text)
 
         return cleaned_text
 

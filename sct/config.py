@@ -322,6 +322,10 @@ class TextCleanerConfig:
     # True: phone and IP types use their pre-0.8.0 names PHONE_NUMBER / IP_ADDRESS in reversible
     # placeholders, metadata, signals and PII-mode NER tags; False = PHONE / IP everywhere
     legacy_type_names: bool = False
+    # WordPiece NER: widen an entity to its whole word when the added text is at most this many
+    # times the tagged span ("John Do" + "##e"); None = always (whole unspaced Thai/kana clauses
+    # too), 0 = never (0.7)
+    ner_subword_widen: Optional[float] = 1.0
 
     def __post_init__(self):
         if self.gliclass_onnx:
@@ -436,6 +440,8 @@ class TextCleanerConfig:
             value = getattr(self, name)
             if value is not None and not 0.0 <= value <= 1.0:
                 raise ValueError(f"{name} must be None or in [0, 1], got {value}")
+        if self.ner_subword_widen is not None and self.ner_subword_widen < 0:
+            raise ValueError(f"ner_subword_widen must be None or >= 0, got {self.ner_subword_widen}")
         if not 0.0 <= self.language_confidence_warning <= 1.0:
             raise ValueError(
                 "language_confidence_warning must be in [0, 1], "
@@ -671,6 +677,7 @@ def _config_from_module_globals() -> TextCleanerConfig:
         language_margin_warning=getattr(m, 'LANGUAGE_MARGIN_WARNING', 0.15),
         fix_character_width=getattr(m, 'FIX_CHARACTER_WIDTH', False),
         legacy_type_names=getattr(m, 'LEGACY_TYPE_NAMES', False),
+        ner_subword_widen=getattr(m, 'NER_SUBWORD_WIDEN', 1.0),
         check_replace_currency_symbols=m.CHECK_REPLACE_CURRENCY_SYMBOLS,
         check_ner_process=m.CHECK_NER_PROCESS,
         check_remove_isolated_letters=m.CHECK_REMOVE_ISOLATED_LETTERS,
@@ -771,6 +778,7 @@ SYNTHETIC_PER_DOCUMENT = True
 LANGUAGE_MARGIN_WARNING = 0.15
 FIX_CHARACTER_WIDTH = False
 LEGACY_TYPE_NAMES = False
+NER_SUBWORD_WIDEN = 1.0
 GLINER_ONNX = False
 LANGUAGE = None
 
