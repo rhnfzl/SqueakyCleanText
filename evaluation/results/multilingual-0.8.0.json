@@ -3,7 +3,7 @@
   "dataset_sha256": "d946043dc567a8246657f7cbb443aa773d038c5ca1c7fc6f44e68981bd2540c1",
   "documents": 220,
   "entities": 660,
-  "git_commit": "3a01635c61f5619a691741973ad52ef8462d910b",
+  "git_commit": "3f3242e8d801532dc6f6516c7ebe1b0cf3648775",
   "models": {
     "sct-default": {
       "config": "TextCleanerConfig(**{'replacement_mode': 'reversible', 'check_to_ascii_unicode': False})",
@@ -2069,7 +2069,7 @@
         ],
         "ja-hr-012": [
           {
-            "end": 13,
+            "end": 12,
             "label": "PERSON",
             "start": 0
           },
@@ -2086,7 +2086,7 @@
         ],
         "ja-hr-017": [
           {
-            "end": 12,
+            "end": 11,
             "label": "PERSON",
             "start": 0
           },
@@ -2108,9 +2108,9 @@
             "start": 0
           },
           {
-            "end": 23,
+            "end": 22,
             "label": "PERSON",
-            "start": 9
+            "start": 10
           },
           {
             "end": 44,
@@ -2137,9 +2137,9 @@
             "start": 0
           },
           {
-            "end": 22,
+            "end": 21,
             "label": "PERSON",
-            "start": 9
+            "start": 10
           },
           {
             "end": 43,
@@ -3008,7 +3008,7 @@
           {
             "end": 90,
             "label": "PERSON",
-            "start": 75
+            "start": 81
           }
         ],
         "th-billing-020": [
@@ -3604,28 +3604,28 @@
       "report": {
         "by_domain": {
           "billing": {
-            "f1": 0.801556420233463,
-            "false_negatives": 29,
-            "false_positives": 22,
-            "precision": 0.824,
-            "recall": 0.7803030303030303,
-            "true_positives": 103
+            "f1": 0.8093385214007782,
+            "false_negatives": 28,
+            "false_positives": 21,
+            "precision": 0.832,
+            "recall": 0.7878787878787878,
+            "true_positives": 104
           },
           "hr": {
-            "f1": 0.888030888030888,
-            "false_negatives": 17,
-            "false_positives": 12,
-            "precision": 0.905511811023622,
-            "recall": 0.8712121212121212,
-            "true_positives": 115
+            "f1": 0.9034749034749034,
+            "false_negatives": 15,
+            "false_positives": 10,
+            "precision": 0.9212598425196851,
+            "recall": 0.8863636363636364,
+            "true_positives": 117
           },
           "office": {
-            "f1": 0.9384615384615383,
-            "false_negatives": 10,
-            "false_positives": 6,
-            "precision": 0.953125,
-            "recall": 0.9242424242424242,
-            "true_positives": 122
+            "f1": 0.9538461538461539,
+            "false_negatives": 8,
+            "false_positives": 4,
+            "precision": 0.96875,
+            "recall": 0.9393939393939394,
+            "true_positives": 124
           },
           "security": {
             "f1": 0.8949416342412451,
@@ -3678,12 +3678,12 @@
             "true_positives": 87
           },
           "PERSON": {
-            "f1": 0.9435665914221218,
-            "false_negatives": 11,
-            "false_positives": 14,
-            "precision": 0.9372197309417041,
-            "recall": 0.95,
-            "true_positives": 209
+            "f1": 0.9661399548532731,
+            "false_negatives": 6,
+            "false_positives": 9,
+            "precision": 0.9596412556053812,
+            "recall": 0.9727272727272728,
+            "true_positives": 214
           },
           "PHONE": {
             "f1": 0.8941176470588236,
@@ -3744,12 +3744,12 @@
             "true_positives": 57
           },
           "ja": {
-            "f1": 0.6551724137931035,
-            "false_negatives": 22,
-            "false_positives": 18,
-            "precision": 0.6785714285714286,
-            "recall": 0.6333333333333333,
-            "true_positives": 38
+            "f1": 0.7241379310344827,
+            "false_negatives": 18,
+            "false_positives": 14,
+            "precision": 0.75,
+            "recall": 0.7,
+            "true_positives": 42
           },
           "nl": {
             "f1": 0.9333333333333333,
@@ -3768,12 +3768,12 @@
             "true_positives": 52
           },
           "th": {
-            "f1": 0.8717948717948718,
-            "false_negatives": 9,
-            "false_positives": 6,
-            "precision": 0.8947368421052632,
-            "recall": 0.85,
-            "true_positives": 51
+            "f1": 0.8888888888888888,
+            "false_negatives": 8,
+            "false_positives": 5,
+            "precision": 0.9122807017543859,
+            "recall": 0.8666666666666667,
+            "true_positives": 52
           },
           "zh": {
             "f1": 0.8347826086956521,
@@ -3786,41 +3786,41 @@
         },
         "by_slice": {
           "code-switch": {
-            "f1": 0.7999999999999999,
-            "false_negatives": 20,
-            "false_positives": 15,
-            "precision": 0.8235294117647058,
-            "recall": 0.7777777777777778,
-            "true_positives": 70
+            "f1": 0.8571428571428571,
+            "false_negatives": 15,
+            "false_positives": 10,
+            "precision": 0.8823529411764706,
+            "recall": 0.8333333333333334,
+            "true_positives": 75
           },
           "multilingual": {
-            "f1": 0.8890612878200155,
-            "false_negatives": 87,
-            "false_positives": 56,
-            "precision": 0.9109697933227345,
-            "recall": 0.8681818181818182,
-            "true_positives": 573
+            "f1": 0.8968192397207136,
+            "false_negatives": 82,
+            "false_positives": 51,
+            "precision": 0.918918918918919,
+            "recall": 0.8757575757575757,
+            "true_positives": 578
           },
           "synthetic": {
-            "f1": 0.8890612878200155,
-            "false_negatives": 87,
-            "false_positives": 56,
-            "precision": 0.9109697933227345,
-            "recall": 0.8681818181818182,
-            "true_positives": 573
+            "f1": 0.8968192397207136,
+            "false_negatives": 82,
+            "false_positives": 51,
+            "precision": 0.918918918918919,
+            "recall": 0.8757575757575757,
+            "true_positives": 578
           }
         },
         "model": "sct-default",
         "overall": {
-          "f1": 0.8890612878200155,
-          "false_negatives": 87,
-          "false_positives": 56,
-          "precision": 0.9109697933227345,
-          "recall": 0.8681818181818182,
-          "true_positives": 573
+          "f1": 0.8968192397207136,
+          "false_negatives": 82,
+          "false_positives": 51,
+          "precision": 0.918918918918919,
+          "recall": 0.8757575757575757,
+          "true_positives": 578
         }
       },
-      "seconds": 26.3
+      "seconds": 22.9
     }
   },
   "platform": "macOS-27.2-arm64-arm-64bit-Mach-O",

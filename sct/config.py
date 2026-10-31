@@ -330,6 +330,9 @@ class TextCleanerConfig:
     # URL punctuation (：／？) inside ASCII runs so styled emails/URLs/phones are replaced without
     # check_to_ascii_unicode; False = earlier 0.8.0 (full-width letters/digits and ＠．－＿＋ only)
     fold_styled_characters: bool = True
+    # WordPiece NER widening stops where the Unicode script of the letters changes, so a Latin
+    # name glued to kana or Thai ("David Millerは") keeps its own span; False = widen across scripts
+    ner_subword_widen_same_script: bool = True
 
     def __post_init__(self):
         if self.gliclass_onnx:
@@ -683,6 +686,7 @@ def _config_from_module_globals() -> TextCleanerConfig:
         legacy_type_names=getattr(m, 'LEGACY_TYPE_NAMES', False),
         ner_subword_widen=getattr(m, 'NER_SUBWORD_WIDEN', 1.0),
         fold_styled_characters=getattr(m, 'FOLD_STYLED_CHARACTERS', True),
+        ner_subword_widen_same_script=getattr(m, 'NER_SUBWORD_WIDEN_SAME_SCRIPT', True),
         check_replace_currency_symbols=m.CHECK_REPLACE_CURRENCY_SYMBOLS,
         check_ner_process=m.CHECK_NER_PROCESS,
         check_remove_isolated_letters=m.CHECK_REMOVE_ISOLATED_LETTERS,
@@ -785,6 +789,7 @@ FIX_CHARACTER_WIDTH = False
 LEGACY_TYPE_NAMES = False
 NER_SUBWORD_WIDEN = 1.0
 FOLD_STYLED_CHARACTERS = True
+NER_SUBWORD_WIDEN_SAME_SCRIPT = True
 GLINER_ONNX = False
 LANGUAGE = None
 

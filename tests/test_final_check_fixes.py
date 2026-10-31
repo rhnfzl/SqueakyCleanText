@@ -85,3 +85,35 @@ def test_subword_widen_config_and_legacy_global(monkeypatch):
         TextCleanerConfig(ner_subword_widen=-1)
     monkeypatch.setattr(cfg_module, "NER_SUBWORD_WIDEN", None)
     assert cfg_module._config_from_module_globals().ner_subword_widen is None
+
+
+@pytest.mark.parametrize("same_script, expected", [(True, (3, 15)), (False, (2, 17))])
+def test_wordpiece_widening_stops_at_a_script_change(same_script, expected):
+    # mBERT reads "はDavid Millerで" as one word: the Latin name must not take the kana around it.
+    text = "名前はDavid Millerです"
+    tokens = ["[CLS]", "名", "前", "は", "##Dav", "##id", "Miller", "##で", "##す", "[SEP]"]
+    offsets = [(0, 0), (0, 1), (1, 2), (2, 3), (3, 6), (6, 8), (9, 15), (15, 16), (16, 17), (0, 0)]
+    pipe = object.__new__(ONNXNERPipeline)
+    pipe._id2label, pipe._subword_prefix = {0: "O", 1: "B-PER", 2: "I-PER"}, "##"
+    scores = np.zeros((len(tokens), 3))
+    scores[:, 0] = 1.0
+    scores[4], scores[5], scores[6] = [0, 1, 0], [0, 0, 1], [0, 0, 1]
+    mask = [1] + [0] * (len(tokens) - 2) + [1]
+    encoding = types.SimpleNamespace(tokens=tokens, offsets=offsets, special_tokens_mask=mask)
+    found = pipe._aggregate_simple(text, encoding, scores, None, same_script)
+    assert [(e["start"], e["end"]) for e in found] == [expected]
+
+
+def test_wordpiece_widening_still_completes_a_same_script_word():
+    tokens = ["[CLS]", "ถึง", "##คุณ", "##Sar", "##ah", "[SEP]"]
+    text = "ถึงคุณSarah"
+    offsets = [(0, 0), (0, 3), (3, 6), (6, 9), (9, 11), (0, 0)]
+    assert _aggregate(text, tokens, offsets, {3: 1}) == [(6, 11)]
+
+
+def test_widen_same_script_config_and_legacy_global(monkeypatch):
+    from sct import config as cfg_module
+
+    assert TextCleanerConfig().ner_subword_widen_same_script is True
+    monkeypatch.setattr(cfg_module, "NER_SUBWORD_WIDEN_SAME_SCRIPT", False)
+    assert cfg_module._config_from_module_globals().ner_subword_widen_same_script is False

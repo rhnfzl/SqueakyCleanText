@@ -105,8 +105,11 @@ Code-switch slice: 0.84 / 0.90, 0.76 / 0.83, 0.78 / 0.82.
 What still differs from `371a873` (all from WordPiece widening, which hides a name's last
 subword and so is kept on by default):
 
-- A Latin name glued to kana or a Thai prefix widens over it: `David Millerは`,
-  `ถึงคุณSarah Lee` (4 ja, 2 th). The name is still masked, the span is just wider.
+- A Latin name glued to kana or a Thai prefix widened over it (`David Millerは`,
+  `ถึงคุณSarah Lee`). Fixed after `3a01635` by `ner_subword_widen_same_script` (default
+  `True`): widening stops where the letters' Unicode script changes. 573/56/87 to 578/51/82,
+  code-switch 0.78 / 0.82 to 0.83 / 0.88, ja 0.70 / 0.75, th 0.87 / 0.91, PERSON
+  0.97 / 0.96; the tables above are the `3a01635` numbers.
 - 5 organisation names in ar, bn and ta are no longer masked, and 1 Thai name. Widening makes
   the mBERT span equal to the XLM-RoBERTa span, so the two scores are averaged; a weak mBERT
   score (0.63) pulls an agreed span below the 0.85 threshold, where the XLM-RoBERTa span

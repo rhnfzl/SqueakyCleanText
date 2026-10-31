@@ -146,6 +146,7 @@ class TextCleaner:
                 ),
                 ner_batch_size=self.cfg.ner_batch_size,
                 ner_subword_widen=self.cfg.ner_subword_widen,
+                ner_subword_widen_same_script=self.cfg.ner_subword_widen_same_script,
                 ensemble_models=dict(self.cfg.ner_ensemble) if self.cfg.ner_ensemble is not None else None,
                 ensemble_default_keys=(
                     tuple(self.cfg.ner_ensemble_default_keys)

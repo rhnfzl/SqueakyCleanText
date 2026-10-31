@@ -13,6 +13,7 @@ import os
 import re
 import shutil
 import sys
+import unicodedata
 import uuid
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
@@ -135,7 +136,8 @@ class ONNXNERPipeline:
     # ------------------------------------------------------------------
 
     def __call__(self, texts, batch_size: int = 1, max_workers: int = 1,
-                 subword_widen: Optional[float] = 1.0) -> List[List[dict]]:
+                 subword_widen: Optional[float] = 1.0,
+                 subword_same_script: bool = True) -> List[List[dict]]:
         """Run NER on one or more texts.
 
         Parameters
@@ -150,6 +152,9 @@ class ONNXNERPipeline:
         subword_widen : float | None
             WordPiece only: widen an entity to its whole word when the added text is at
             most this many times the tagged span; ``None`` always, ``0`` never.
+        subword_same_script : bool
+            WordPiece only: never widen over a piece whose letters are in another Unicode
+            script than the entity's edge letter (``David Miller`` + ``##は``).
 
         Returns
         -------
@@ -187,7 +192,8 @@ class ONNXNERPipeline:
 
             for row, i in enumerate(rows):
                 scores = self._softmax(logits[row, :len(encodings[i].ids)])
-                all_results[i] = self._aggregate_simple(texts[i], encodings[i], scores, subword_widen)
+                all_results[i] = self._aggregate_simple(
+                    texts[i], encodings[i], scores, subword_widen, subword_same_script)
 
         batches = [order[i:i + batch_size] for i in range(0, len(order), batch_size)]
         if max_workers > 1 and len(batches) > 1:
@@ -211,7 +217,8 @@ class ONNXNERPipeline:
         return exp / exp.sum(axis=-1, keepdims=True)
 
     def _aggregate_simple(self, text: str, encoding, scores: np.ndarray,
-                          subword_widen: Optional[float] = 1.0) -> List[dict]:
+                          subword_widen: Optional[float] = 1.0,
+                          subword_same_script: bool = True) -> List[dict]:
         """Reimplements HuggingFace ``aggregation_strategy="simple"``.
 
         For each non-special token:
@@ -287,11 +294,18 @@ class ONNXNERPipeline:
             if tokens:
                 # Widen to whole words so "John Do" + "##e" never leaves "e" behind.
                 first, last = group[0]['idx'], group[-1]['idx'] + 1
+                # Letters of an added piece must share the script of the entity's edge letter.
+                span = _letter_scripts(text[start:end]) if subword_same_script else None
+                left, right = ({span[0]}, {span[-1]}) if span else (None, None)
+
+                def same(idx, edge):
+                    return not edge or set(_letter_scripts(text[slice(*offsets[idx])])) <= edge
+
                 while first > 0 and tokens[first].startswith(self._subword_prefix) \
-                        and not special_tokens_mask[first - 1]:
+                        and not special_tokens_mask[first - 1] and same(first - 1, left):
                     first -= 1
                 while last < len(tokens) and not special_tokens_mask[last] \
-                        and tokens[last].startswith(self._subword_prefix):
+                        and tokens[last].startswith(self._subword_prefix) and same(last, right):
                     last += 1
                 wide_start, wide_end = offsets[first][0], offsets[last - 1][1]
                 # Unspaced scripts (Thai, kana) make a whole clause one word: widen only a short tail.
@@ -309,6 +323,16 @@ class ONNXNERPipeline:
             })
 
         return entities
+
+
+def _letter_scripts(text: str) -> List[str]:
+    """Script of each letter, from its Unicode name after NFKC ("LATIN", "HIRAGANA", "THAI").
+
+    Marks, digits, punctuation and modifier letters (ー, ๆ) belong to no script here.
+    """
+    return [unicodedata.name(c, ' ').split(' ', 1)[0]
+            for c in unicodedata.normalize('NFKC', text)
+            if unicodedata.category(c) in ('Lu', 'Ll', 'Lt', 'Lo')]
 
 
 # ---------------------------------------------------------------------------
