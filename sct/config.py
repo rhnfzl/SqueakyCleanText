@@ -326,6 +326,10 @@ class TextCleanerConfig:
     # times the tagged span ("John Do" + "##e"); None = always (whole unspaced Thai/kana clauses
     # too), 0 = never (0.7)
     ner_subword_widen: Optional[float] = 1.0
+    # Part of check_fix_bad_unicode. True folds math-alphanumeric (𝐞𝐱), circled (ⓙ) and full-width
+    # URL punctuation (：／？) inside ASCII runs so styled emails/URLs/phones are replaced without
+    # check_to_ascii_unicode; False = earlier 0.8.0 (full-width letters/digits and ＠．－＿＋ only)
+    fold_styled_characters: bool = True
 
     def __post_init__(self):
         if self.gliclass_onnx:
@@ -678,6 +682,7 @@ def _config_from_module_globals() -> TextCleanerConfig:
         fix_character_width=getattr(m, 'FIX_CHARACTER_WIDTH', False),
         legacy_type_names=getattr(m, 'LEGACY_TYPE_NAMES', False),
         ner_subword_widen=getattr(m, 'NER_SUBWORD_WIDEN', 1.0),
+        fold_styled_characters=getattr(m, 'FOLD_STYLED_CHARACTERS', True),
         check_replace_currency_symbols=m.CHECK_REPLACE_CURRENCY_SYMBOLS,
         check_ner_process=m.CHECK_NER_PROCESS,
         check_remove_isolated_letters=m.CHECK_REMOVE_ISOLATED_LETTERS,
@@ -779,6 +784,7 @@ LANGUAGE_MARGIN_WARNING = 0.15
 FIX_CHARACTER_WIDTH = False
 LEGACY_TYPE_NAMES = False
 NER_SUBWORD_WIDEN = 1.0
+FOLD_STYLED_CHARACTERS = True
 GLINER_ONNX = False
 LANGUAGE = None
 

@@ -1,5 +1,6 @@
 import logging
 import re
+import unicodedata
 from typing import Optional, Set
 from ftfy import fix_text
 from unidecode import unidecode
@@ -16,12 +17,51 @@ _FULLWIDTH_ALNUM = {c: c - 0xFEE0 for r in ((0xFF10, 0xFF19), (0xFF21, 0xFF3A), 
 _FULLWIDTH_JOINER_REGEX = re.compile(r'(?<=[0-9A-Za-z])[＠．－＿＋\u3000](?=[0-9A-Za-z])|＋(?=[0-9])')
 _FULLWIDTH_JOINER = {'＠': '@', '．': '.', '－': '-', '＿': '_', '＋': '+', '\u3000': ' '}
 
+
+def _nfkc_ascii_alnum(tags):
+    """Characters with one of the Unicode decomposition ``tags`` whose NFKC form is ASCII alnum."""
+    table = {}
+    for cp in range(0x20000):  # BMP + SMP hold every such character (Unicode 15)
+        ch = chr(cp)
+        if unicodedata.decomposition(ch).split(' ', 1)[0] in tags:
+            folded = unicodedata.normalize('NFKC', ch)
+            if folded.isascii() and folded.isalnum():
+                table[cp] = folded
+    return table
+
+
+# fold_styled_characters: font variants (math bold/italic/script/double-struck 𝐞 ℝ 𝟎) and
+# full-width letters/digits always fold; circled ones (ⓙ ①) only next to ASCII alnum or URL/email
+# punctuation, so a lone ① list marker in CJK prose stays. Super/subscripts (m², H₂O, nº) and
+# squared CJK units (㎏) are prose, not PII, and stay.
+_STYLED_ALNUM = _nfkc_ascii_alnum({'<font>', '<wide>'})
+_CIRCLED_ALNUM = _nfkc_ascii_alnum({'<circle>'})
+_CIRCLED_RUN_REGEX = re.compile('[%s]+' % ''.join(map(chr, _CIRCLED_ALNUM)))
+_RUN_NEIGHBOUR = re.compile(r'[0-9A-Za-z@.:/_+\-]')
+# URL/email/phone/date punctuation in compatibility form folds only between ASCII alnum.
+_STYLED_JOINER_REGEX = re.compile(r'(?<=[0-9A-Za-z])[＠．－＿＋：／？＝＆＃％～\u3000]+(?=[0-9A-Za-z])|＋(?=[0-9])')
+
+
+def _fold_circled_run(m):
+    s, a, b = m.string, m.start(), m.end()
+    if b - a > 1 or (a and _RUN_NEIGHBOUR.match(s, a - 1)) or (b < len(s) and _RUN_NEIGHBOUR.match(s, b)):
+        return m.group().translate(_CIRCLED_ALNUM)
+    return m.group()
+
+
+def fold_styled(text):
+    """Fold styled/compatibility letters, digits and in-run URL punctuation to ASCII."""
+    text = _CIRCLED_RUN_REGEX.sub(_fold_circled_run, text.translate(_STYLED_ALNUM))
+    return _STYLED_JOINER_REGEX.sub(lambda m: unicodedata.normalize('NFKC', m.group()), text)
+
+
 class NormaliseText:
 
     def __init__(self):
         pass
 
-    def fix_bad_unicode(self, text, normalization="NFC", decode_escapes=True, fix_character_width=False):
+    def fix_bad_unicode(self, text, normalization="NFC", decode_escapes=True, fix_character_width=False,
+                        fold_styled_characters=True):
         """
         Fix unicode text that's "broken" using `ftfy <http://ftfy.readthedocs.org/>`_;
         this includes mojibake, HTML entities and other code cruft,
@@ -31,6 +71,8 @@ class NormaliseText:
         ``fix_character_width=False`` keeps full-width CJK punctuation and half-width katakana and
         only turns full-width ASCII letters/digits (and @ . - _ + inside them) into ASCII, so
         full-width emails and phones are still found; ``True`` is ftfy's full width fix (0.7).
+        ``fold_styled_characters=True`` also folds math-alphanumeric (𝐞), circled (ⓙ) and full-width
+        URL punctuation (``：／？``) inside ASCII runs, so styled emails, URLs and phones are found.
         """
         if decode_escapes:
             try:
@@ -38,9 +80,11 @@ class NormaliseText:
             except (UnicodeDecodeError, UnicodeEncodeError):
                 logger.debug("Unicode escape decoding failed, using original text", exc_info=True)
 
+        text = fix_text(text, normalization=normalization, fix_character_width=fix_character_width)
+        if fold_styled_characters:
+            return fold_styled(text)
         if fix_character_width:
-            return fix_text(text, normalization=normalization)
-        text = fix_text(text, normalization=normalization, fix_character_width=False)
+            return text
         text = text.translate(_FULLWIDTH_ALNUM)
         return _FULLWIDTH_JOINER_REGEX.sub(lambda m: _FULLWIDTH_JOINER[m.group()], text)
 
