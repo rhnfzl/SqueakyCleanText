@@ -10,11 +10,14 @@ letters and digits, native decimal digits of any script, decomposed letters
 (base + combining mark), zero-width characters where they are legal, invisible
 break hints (ZWSP, WJ, soft hyphen) inside the value,
 typeset phone and date separators (no-break or thin space, non-breaking hyphen, en dash),
+IDNA dot separators (。 ｡) in a mail domain or URL host, upper-case addresses (so squared
+letters 🄹 occur), break hints between non-Latin letters of a mail domain,
 and glued to CJK/Thai prose without a space. Every variant comes from Unicode
 data (decomposition tag, NFKC, decimal value, category), and every
 rendered value folds back to the plain value (NFKC, Cf removed, Nd -> ASCII).
 
-The cleaner runs with NER off on the ``training`` preset and the default
+The cleaner runs with NER off on the ``training`` preset (also with
+``check_replace_dates`` on, so a date has no year step behind it) and the default
 config, with ``fold_styled_characters`` on and off, in placeholder, synthetic,
 reversible (restore must give every value back) and streaming
 (``WindowedStreamingRedactor``, compared with the whole-document output) modes.
@@ -30,6 +33,7 @@ mode. Failures with ``fold_styled_characters=False`` are recorded, not counted.
 
 import argparse
 from collections import Counter, defaultdict
+from encodings.idna import dots as IDNA_DOTS
 from functools import lru_cache, partial
 import json
 import multiprocessing
@@ -42,7 +46,9 @@ import unicodedata
 from sct import TextCleaner, TextCleanerConfig
 from sct.streaming import WindowedStreamingRedactor
 
-PRESETS = ("training", "sct")
+PRESETS = ("training", "sct", "training+dates")
+PRESET_ARGS = {"training": ("training", {}), "sct": ("sct", {}),
+               "training+dates": ("training", {"check_replace_dates": True})}
 MODES = ("placeholder", "synthetic", "reversible", "stream")
 CHECKS = ("leak", "restore", "restore_exact", "false_positive", "stream_mismatch")
 STREAM_PARAMS = ((48, 12), (80, 24), (160, 48))
@@ -68,6 +74,8 @@ PUNCT = {
     "devanagari": (" । ", ", "), "thai": (" ",), "cjk": ("，", "。", "、", "！", "？", "：", "・"),
 }
 TLDS = ("com", "org", "net", "nl", "de", "jp", "io", "in")
+# Label separators IDNA reads as "." (。 ｡ ．), from Python's idna codec.
+IDNA_DOT_CHARS = "".join(ch for ch in map(chr, range(0x80, 0x10000)) if IDNA_DOTS.fullmatch(ch))
 
 
 def _unicode_tables():
@@ -105,8 +113,8 @@ _DIGIT_FOLD = {cp: str(unicodedata.decimal(chr(cp))) for zero in DIGIT_ZEROS for
 
 
 def fold(text: str) -> str:
-    """The oracle fold: drop Cf, NFKC, any decimal digit -> ASCII, any dash (Pd) -> "-", casefold."""
-    text = "".join(ch for ch in text if unicodedata.category(ch) != "Cf")
+    """The oracle fold: drop Cf, NFKC, any decimal digit -> ASCII, any dash (Pd) -> "-", IDNA dot -> ".", casefold."""
+    text = "".join("." if ch in IDNA_DOT_CHARS else ch for ch in text if unicodedata.category(ch) != "Cf")
     text = unicodedata.normalize("NFKC", text).translate(_DIGIT_FOLD)
     return "".join("-" if unicodedata.category(ch) == "Pd" else ch for ch in text).casefold()
 
@@ -341,6 +349,48 @@ def _email_shape(rng, plain, cores):
     return f"{plain.rsplit('@', 1)[0]}@{label}.{_word(rng, script, 2, 4)}", cores[:-1] + [("str", label)]
 
 
+def _upper(rng, plain):
+    """An address written in capitals (JOHN@EXAMPLE.COM), so squared letters (🄹) have a target;
+    own RNG so the cases of earlier rounds stay the same."""
+    return plain.upper() if rng.random() < 0.2 else plain
+
+
+def _host_span(plain, typ):
+    """Start and end of the mail domain or the URL host in ``plain``."""
+    if typ == "EMAIL":
+        return plain.rindex("@") + 1, len(plain)
+    start = plain.index("://") + 3 if "://" in plain else 0
+    return start, re.search(r"[/?#]|$", plain[start:]).start() + start
+
+
+def _idna_dot(rng, plain, slots, kinds, typ):
+    """Host dots typed as an IDNA separator (example。com, as CJK input methods write them) where a
+    Latin letter or digit follows; own RNG so the cases of earlier rounds stay the same."""
+    start, end = _host_span(plain, typ)
+    free = [index for index in range(start, end - 1) if plain[index] == "." and slots[index] is None
+            and plain[index + 1].isascii() and plain[index + 1].isalnum()]
+    if not free or rng.random() >= 0.25:
+        return kinds
+    for index in free:
+        if rng.random() < 0.7:
+            slots[index] = ("idna_dot", rng.choice(IDNA_DOT_CHARS))
+    return sorted(set(kinds) | {"idna_dot"}) if any(slot and slot[0] == "idna_dot" for slot in slots) else kinds
+
+
+def _zw_domain(rng, plain, inserts, kinds):
+    """A break hint (ZWSP, WJ, soft hyphen) between two non-Latin letters of a mail domain (例\u200bえ.jp),
+    copied from wrapped text; own RNG so the cases of earlier rounds stay the same."""
+    start = plain.rindex("@") + 1
+    free = [index for index in range(start + 1, len(plain)) if index not in inserts
+            and not plain[index - 1].isascii() and not plain[index].isascii()
+            and plain[index - 1].isalpha() and plain[index].isalpha()]
+    if not free or rng.random() >= 0.25:
+        return kinds
+    for index in rng.sample(free, rng.randint(1, min(2, len(free)))):
+        inserts[index] = ("zw_domain", rng.choice((ZWSP, WJ, SHY)))
+    return sorted(kinds + ["zw_domain"])
+
+
 def make_case(seed: int) -> dict:
     rng = random.Random(seed)  # noqa: S311  # reproducible test data, not crypto
     scripts = rng.sample(sorted(SCRIPT_RANGES), rng.choice((1, 2)))
@@ -352,8 +402,13 @@ def make_case(seed: int) -> dict:
             plain = _url_shape(random.Random(f"{seed}-{len(values)}-url"), plain)  # noqa: S311
         if typ == "EMAIL":
             plain, cores = _email_shape(random.Random(f"{seed}-{len(values)}-mail"), plain, cores)  # noqa: S311
+            plain = _upper(random.Random(f"{seed}-{len(values)}-upper"), plain)  # noqa: S311
         slots, inserts, kinds = _plan(rng, plain, _legal_join(plain, typ))
         kinds = _zw_inside(random.Random(f"{seed}-{len(values)}-zw"), plain, inserts, kinds)  # noqa: S311
+        if typ in ("EMAIL", "URL"):
+            kinds = _idna_dot(random.Random(f"{seed}-{len(values)}-idna"), plain, slots, kinds, typ)  # noqa: S311
+        if typ == "EMAIL":
+            kinds = _zw_domain(random.Random(f"{seed}-{len(values)}-zwd"), plain, inserts, kinds)  # noqa: S311
         if typ in ("PHONE", "DATE"):
             kinds = _typo_sep(random.Random(f"{seed}-{len(values)}-sep"), plain, slots, kinds)  # noqa: S311
         glue = rng.random() < 0.5
@@ -410,7 +465,8 @@ def steps(value):
 
 @lru_cache(maxsize=None)
 def cleaner(preset: str, fold_styled: bool, mode: str) -> TextCleaner:
-    cfg = TextCleanerConfig.from_preset(preset, check_ner_process=False, fold_styled_characters=fold_styled,
+    name, extra = PRESET_ARGS[preset]
+    cfg = TextCleanerConfig.from_preset(name, check_ner_process=False, fold_styled_characters=fold_styled, **extra,
                                         replacement_mode="placeholder" if mode == "stream" else mode)
     return TextCleaner(cfg)
 
@@ -514,7 +570,7 @@ def check_case(seed: int, modes=MODES, folds=(True, False)) -> dict:
             placeholder = cleaner(preset, fold_styled, "placeholder")
             # false positives: prose without PII comes out unchanged (training) or without PII tags (default)
             prose = placeholder.process(context_doc).lm_text
-            if prose != context_doc if preset == "training" else re.search(r"<[A-Z_]+>", prose):
+            if prose != context_doc if preset.startswith("training") else re.search(r"<[A-Z_]+>", prose):
                 failures.append(_record(case, context_doc, "false_positive", preset, fold_styled, "placeholder", prose,
                                         signature=f"false_positive|{preset}|{'+'.join(case['scripts'])}{suffix}"))
             whole = placeholder.process(doc).lm_text
@@ -539,7 +595,7 @@ def check_case(seed: int, modes=MODES, folds=(True, False)) -> dict:
                             steps=steps(value), minimal_kinds=kinds,
                             signature=f"{check}|{value['type']}|{'+'.join(kinds) or 'plain'}|{mode}{suffix}"))
                         break  # one record per output is enough to cluster
-                    if is_restore and preset == "training" and text_fold != fold(doc):
+                    if is_restore and preset.startswith("training") and text_fold != fold(doc):
                         # training keeps the prose, so restore gives the whole input back (up to the fold)
                         def restore_differs(off):
                             changed = build_doc(case, off)

@@ -1,6 +1,7 @@
 import logging
 import re
 import unicodedata
+from encodings.idna import dots as _idna_dots
 from typing import Optional, Set
 from ftfy import fix_text
 from unidecode import unidecode
@@ -48,9 +49,10 @@ def _nfkc_ascii_alnum(tags):
 # fold_styled_characters: font variants (math bold/italic/script/double-struck 𝐞 ℝ 𝟎) and
 # full-width letters/digits always fold; circled ones (ⓙ ①) only next to ASCII alnum or URL/email
 # punctuation, so a lone ① list marker in CJK prose stays. Super/subscripts (m², H₂O, nº) and
-# squared CJK units (㎏) are prose, not PII, and stay.
+# squared CJK units (㎏) are prose, not PII, and stay; squared single letters (🄹) fold like circled ones.
 _STYLED_ALNUM = _nfkc_ascii_alnum({'<font>', '<wide>'})
-_CIRCLED_ALNUM = _nfkc_ascii_alnum({'<circle>'})
+_CIRCLED_ALNUM = {**_nfkc_ascii_alnum({'<circle>'}),
+                  **{cp: ch for cp, ch in _nfkc_ascii_alnum({'<square>'}).items() if len(ch) == 1}}
 _CIRCLED_RUN_REGEX = re.compile('[%s]+' % ''.join(map(chr, _CIRCLED_ALNUM)))
 # Contact punctuation in every compatibility form (full-width ＠, small ﹫, font ﬩ for +), picked by
 # decomposition tag and NFKC value so every rule below folds the same set; ideographic space too.
@@ -65,9 +67,17 @@ def _forms(ascii_chars):
 
 
 _STYLED_PUNCT = _forms('@.-_+:/?=&#%~ ')
+# IDNA label separators (。 ｡ ．, as Python's idna codec reads them) are a dot in a mail domain or URL
+# host when an ASCII letter or digit follows (example。com); before other text 。 ends a CJK sentence.
+_IDNA_DOTS = re.escape(''.join(ch for ch in map(chr, range(0x80, 0x10000)) if _idna_dots.fullmatch(ch)))
+_IDNA_DOT = f'[{_IDNA_DOTS}](?=[0-9A-Za-z])'
+_IDNA_DOT_REGEX = re.compile(_IDNA_DOT)
 _PUNCT_ANY = _STYLED_PUNCT + re.escape('@.-_+:/?=&#%~')
-# A circled run folds beside ASCII alnum, any decimal digit (⑩꤈) or contact punctuation in any form.
-_RUN_NEIGHBOUR = re.compile(rf'[0-9A-Za-z{_PUNCT_ANY}]|\d')
+# Dashes of any form (Pd: hyphen, non-breaking hyphen, en dash) join phone groups like "-" (06\u2011 12).
+_DASHES = re.escape(''.join(chr(cp) for cp in range(0x110000) if unicodedata.category(chr(cp)) == 'Pd'))
+# A circled run folds beside ASCII alnum, any decimal digit (⑩꤈), any dash (2026\u2013⑩) or contact
+# punctuation in any form.
+_RUN_NEIGHBOUR = re.compile(rf'[0-9A-Za-z{_PUNCT_ANY}{_DASHES}]|\d')
 # URL/email/phone/date punctuation in compatibility form folds between ASCII letters or digits of
 # any script (a run may mix forms: http：/／x); contact syntax also beside letters of any script:
 # ＠ between letters/digits, ． with an ASCII side (例え．jp) and a ：／／ scheme after ASCII letters (https：／／例え.jp).
@@ -81,22 +91,34 @@ _STYLED_JOINER_REGEX = re.compile(
 # whatever script the host is in (https://例え.テスト？email=...), and so do dots in the host
 # (https://例え．テスト/), so the whole URL, query values included, is one match.
 _URL_RUN_REGEX = re.compile(
-    rf'(?:[A-Za-z][A-Za-z0-9+.\-]*://|(?<![A-Za-z0-9_/.{_forms(".")}])www\d{{0,3}}[.{_forms(".")}])\S+',
+    rf'(?:[A-Za-z][A-Za-z0-9+.\-]*://|(?<![A-Za-z0-9_/.{_forms(".")}])www\d{{0,3}}(?:[.{_forms(".")}]|{_IDNA_DOT}))\S+',
     re.IGNORECASE)
 _URL_RUN_JOINER = str.maketrans({ch: plain for ch, plain in _STYLED_SEP.items() if plain in ':/?=&#%~'})
 # Dots fold only in a host (up to the path), so prose glued after a URL keeps its ．; a run may hold
 # several URLs glued by CJK prose, each with its own host.
-_URL_AUTHORITY = re.compile(rf'(?:[A-Za-z][A-Za-z0-9+.\-]*://|www\d{{0,3}}[.{_forms(".")}])[^/?#]*', re.IGNORECASE)
+_URL_AUTHORITY = re.compile(rf'(?:[A-Za-z][A-Za-z0-9+.\-]*://|www\d{{0,3}}(?:[.{_forms(".")}]|{_IDNA_DOT}))[^/?#]*',
+                            re.IGNORECASE)
 _DOT_JOINER = str.maketrans({ch: plain for ch, plain in _STYLED_SEP.items() if plain == '.'})
 
 
 def _fold_url_run(m):
-    return _URL_AUTHORITY.sub(lambda a: a.group().translate(_DOT_JOINER), m.group().translate(_URL_RUN_JOINER))
+    return _URL_AUTHORITY.sub(lambda a: _IDNA_DOT_REGEX.sub('.', a.group().translate(_DOT_JOINER)),
+                              m.group().translate(_URL_RUN_JOINER))
 # Inside an address-shaped run every styled form of @ . - _ + folds (the full-width-only rule above, widened).
 _STYLED_EMAIL_RUN_REGEX = re.compile(
     rf'\w[\w{_forms(".-_+")}{constants.MARKS}{_FORMAT_CHARS}]*[@{_forms("@")}]'
-    rf'[\w{_forms(".-_")}{constants.MARKS}{_FORMAT_CHARS}]*\w')
+    rf'(?:[\w.\-{_forms(".-_")}{constants.MARKS}{_FORMAT_CHARS}]|{_IDNA_DOT})*\w')
 _STYLED_EMAIL_RUN_JOINER = str.maketrans({ch: plain for ch, plain in _STYLED_SEP.items() if plain in '@.-_+'})
+# In the domain every format character but the join controls (ZWNJ/ZWJ, which spell words) is a
+# copied layout hint (例\u200bえ.jp), whatever script sits beside it.
+_DOMAIN_HINTS = {cp: None for cp in range(0x110000)
+                 if unicodedata.category(chr(cp)) == 'Cf' and chr(cp) not in '\u200c\u200d'}
+
+
+def _fold_styled_email_run(m):
+    run = m.group().translate(_STYLED_EMAIL_RUN_JOINER)
+    at = run.index('@')
+    return run[:at] + _IDNA_DOT_REGEX.sub('.', run[at:]).translate(_DOMAIN_HINTS)
 
 
 # Invisible format characters (category Cf: ZWSP, word joiner, soft hyphen, bidi marks) beside a
@@ -106,9 +128,7 @@ _STYLED_EMAIL_RUN_JOINER = str.maketrans({ch: plain for ch, plain in _STYLED_SEP
 # ("06\u200b 12") or the text edge. Between two other letters they stay (ZWNJ in Persian, ZWSP
 # between Thai words).
 _INVISIBLE_REGEX = re.compile(f'[{_FORMAT_CHARS}]+')
-# Dashes of any form (Pd: hyphen, non-breaking hyphen, en dash) join phone groups like "-" (06\u2011 12).
-_DASHES = re.escape(''.join(chr(cp) for cp in range(0x110000) if unicodedata.category(chr(cp)) == 'Pd'))
-_RUN_CHAR = re.compile('[A-Za-z\\d%s%s%s]' % (''.join(map(chr, _CIRCLED_ALNUM)), _PUNCT_ANY, _DASHES))
+_RUN_CHAR = re.compile('[A-Za-z\\d%s%s%s%s]' % (''.join(map(chr, _CIRCLED_ALNUM)), _PUNCT_ANY, _DASHES, _IDNA_DOTS))
 _LETTER = re.compile(rf'[^\W_]|[{constants.MARKS}]')
 
 
@@ -147,7 +167,7 @@ def fold_styled(text):
     text = _CIRCLED_RUN_REGEX.sub(_fold_circled_run, text)
     text = _STYLED_JOINER_REGEX.sub(lambda m: unicodedata.normalize('NFKC', m.group()), text)
     text = _URL_RUN_REGEX.sub(_fold_url_run, text)
-    return _STYLED_EMAIL_RUN_REGEX.sub(lambda m: m.group().translate(_STYLED_EMAIL_RUN_JOINER), text)
+    return _STYLED_EMAIL_RUN_REGEX.sub(_fold_styled_email_run, text)
 
 
 class NormaliseText:

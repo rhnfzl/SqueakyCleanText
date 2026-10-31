@@ -46,7 +46,7 @@ ENTITY_TYPE_MAP = {
 # A regex step's placeholder (<PHONE>, <EMAIL_0>); NER spans inside one are dropped,
 # so "call <PHONE>" never becomes "call <<MISC>>". Marker-shaped text already in the
 # source (*source_markers*, e.g. "<LONDON>") gets no protection, so it cannot hide PII.
-# shortcut: matches upper-case <TAG> markers only; custom replace_with_* text is not protected.
+# Custom replace_with_* markers ("EMAIL") are protected the same way through *regex_markers*.
 _PLACEHOLDER_TOKEN = re.compile(r"<[A-Z][A-Z0-9_]*>")
 
 
@@ -105,6 +105,7 @@ class GeneralNER:
                  ensemble_default_keys: Optional[tuple] = None,
                  replacement_mode: str = 'placeholder',
                  synthetic_replacer=None,
+                 regex_markers: Sequence[str] = (),
                  onnx_intra_op_threads: Optional[int] = None,
                  onnx_inter_op_threads: Optional[int] = None,
                  ner_chunk_overlap: int = 0,
@@ -124,6 +125,8 @@ class GeneralNER:
             torch_model_names: Language-keyed dict of PyTorch model repo IDs.
                 Required when ner_backend involves torch.
             synthetic_replacer: Shared SyntheticReplacer instance (from TextCleaner).
+            regex_markers: Custom regex-step markers (``replace_with_email="EMAIL"``) protected
+                like ``<EMAIL>`` unless the source already holds them.
             onnx_intra_op_threads, onnx_inter_op_threads: ONNX Runtime session
                 thread counts; None keeps the ONNX Runtime default.
             ner_chunk_overlap: Tokens of neighbouring text each NER window adds on
@@ -139,6 +142,7 @@ class GeneralNER:
         self._ner_chunk_overlap = ner_chunk_overlap
         self._replacement_mode = replacement_mode
         self._synthetic_replacer = synthetic_replacer
+        self._regex_markers = tuple(regex_markers)
         self._model_revisions = dict(model_revisions or {})
         self._torch_model_revisions = dict(torch_model_revisions or {})
         self._onnx_intra_op_threads = onnx_intra_op_threads
@@ -1059,6 +1063,9 @@ class GeneralNER:
             # Fakes the regex steps inserted (emails, phones...) are protected like placeholders.
             for fake in set(self._synthetic_replacer._get_cache().values()):
                 markers += [m.span() for m in re.finditer(re.escape(fake), text)]
+        for marker in getattr(self, '_regex_markers', ()):
+            if not source_markers or marker not in source_markers:
+                markers += [m.span() for m in re.finditer(re.escape(marker), text)]
         if markers:
             ensemble_results = [
                 item for item in ensemble_results

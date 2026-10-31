@@ -413,10 +413,10 @@ def build_date_regex(month_names_dict=None):
     """
     names = month_names_dict or MONTH_NAMES_MULTILINGUAL
     alt = '|'.join(sorted(names.keys(), key=len, reverse=True))
+    # A numeric date glued to letters of an unspaced script (Thai, CJK) is a date, as numbers are.
     return re.compile(
-        r'\b(?:'
-        + _NUMERIC_DATE +
-        r'|'
+        r'(?<![\d_' + _SPACED_LETTERS + r'])' + _NUMERIC_DATE + r'(?![\d_' + _SPACED_LETTERS + r'])'
+        r'|\b(?:'
         r'(?:' + alt + r')'
         r'\.?\s+\d{1,2}(?:st|nd|rd|th)?,?\s+\d{4}'
         r'|'

@@ -124,11 +124,11 @@ def build_browser_manifest(config: TextCleanerConfig) -> dict[str, Any]:
                 config.replace_with_ips,
                 config.check_replace_ips,
             ), "fold_decimal_digits": True},
-            "date": _rule(
+            "date": {**_rule(
                 constants.DATE_REGEX,
                 config.replace_with_dates,
                 config.check_replace_dates,
-            ),
+            ), "fold_decimal_digits": True},
             "year": _rule(
                 constants.YEAR_REGEX,
                 config.replace_with_years,

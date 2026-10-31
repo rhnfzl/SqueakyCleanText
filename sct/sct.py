@@ -61,6 +61,9 @@ class TextCleaner:
             self._phone_type: self.cfg.replace_with_phone_numbers,
             'NUMBER': self.cfg.replace_with_numbers, 'CURRENCY': self.cfg.replace_with_currency_symbols,
         }
+        # Markers that are not <TAG>-shaped ("EMAIL"): NER protects them like <EMAIL> (ner.regex_markers).
+        self._custom_markers = tuple(sorted({
+            tag for tag in self._tags.values() if tag and not ner._PLACEHOLDER_TOKEN.fullmatch(tag)}))
 
         # Language detector: tuple restricts; else all 75 Lingua languages unless turned off
         if isinstance(self.cfg.language, tuple):
@@ -95,6 +98,10 @@ class TextCleaner:
             )
         else:
             self.ProcessDateTime = datetime.ProcessDateTime()
+        # fold_styled_characters: dates, like phones, read any space as " " and any dash as "-" (1987\u201105\u201112).
+        self._date_view = (
+            contact.DigitView(self.ProcessDateTime._date_regex.pattern, contact.SEPARATOR_VIEW)
+            if self.cfg.fold_styled_characters else self.ProcessDateTime._date_regex)
 
         self.ProcessContacts = contact.ProcessContacts()
         self.ProcessSpecialSymbols = special.ProcessSpecialSymbols()
@@ -171,6 +178,7 @@ class TextCleaner:
                 ),
                 replacement_mode=self.cfg.replacement_mode,
                 synthetic_replacer=self._synthetic_replacer,
+                regex_markers=self._custom_markers,
                 onnx_intra_op_threads=self.cfg.onnx_intra_op_threads,
                 onnx_inter_op_threads=self.cfg.onnx_inter_op_threads,
                 ner_chunk_overlap=self.cfg.ner_chunk_overlap,
@@ -383,7 +391,8 @@ class TextCleaner:
         # "&lt;LONDON&gt;"): NER gives them no protection and reversible mode never
         # allocates them.
         source_markers = frozenset(ner._PLACEHOLDER_TOKEN.findall(text)) | frozenset(
-            ner._PLACEHOLDER_TOKEN.findall(current_text))
+            ner._PLACEHOLDER_TOKEN.findall(current_text)) | frozenset(
+            tag for tag in self._custom_markers if tag in text or tag in current_text)
         if anon_map is not None:
             anon_map.reserved.update(source_markers)
         for step in self._pipeline[self._normalise_steps:]:
@@ -839,14 +848,12 @@ class TextCleaner:
     def _replace_dates(self, text):
         reversible = self._replace_reversible(
             text,
-            self.ProcessDateTime._date_regex,
+            self._date_view,
             'DATE',
         )
         if reversible is not None:
             return reversible
-        return self.ProcessDateTime.replace_dates(
-            text, replace_with=lambda m: self._emit('DATE', m.group(), self.cfg.replace_with_dates),
-        )
+        return self._date_view.sub(lambda m: self._emit('DATE', m.group(), self.cfg.replace_with_dates), text)
 
     def _replace_years(self, text):
         reversible = self._replace_reversible(

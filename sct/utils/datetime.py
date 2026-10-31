@@ -1,4 +1,5 @@
 from sct.utils import constants
+from sct.utils.contact import DigitView
 
 
 class ProcessDateTime:
@@ -11,7 +12,8 @@ class ProcessDateTime:
             fuzzy_vocabulary: Tuple of full month names for fuzzy matching.
             fuzzy_vocabulary_by_lang: Dict mapping language -> tuple of month names.
         """
-        self._date_regex = date_regex or constants.DATE_REGEX
+        # Matched on the decimal-digit view, so ١٥/٠١/١٩٩٠ and १५/०१/१९९० are dates like 15/01/1990.
+        self._date_regex = DigitView(date_regex or constants.DATE_REGEX)
         self._fuzzy_vocabulary = fuzzy_vocabulary or constants.FUZZY_MONTH_VOCABULARY
         self._fuzzy_vocabulary_by_lang = fuzzy_vocabulary_by_lang or constants.FUZZY_MONTH_VOCABULARY_BY_LANG
 
