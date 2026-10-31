@@ -386,8 +386,9 @@ ISOLATED_LETTERS_REGEX = re.compile(
     flags=re.UNICODE | re.IGNORECASE,
 )
 
+# Isolated = whitespace (or text edge) on both sides, so "(born <YEAR>)." keeps its ")." in any script.
 ISOLATED_SPECIAL_SYMBOLS_REGEX = re.compile(
-    r"(?<![a-zA-Z0-9])[:_.|><;·}@~!?+#)({,/\\\\^]+(?![a-zA-Z0-9])",
+    r"(?<!\S)[:_.|><;·}@~!?+#)({,/\\\\^]+(?!\S)",
     flags=re.UNICODE | re.IGNORECASE,
 )
 

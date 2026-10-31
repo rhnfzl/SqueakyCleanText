@@ -2,6 +2,8 @@
 
 import types
 
+import pytest
+
 from sct import TextCleaner, TextCleanerConfig
 
 
@@ -24,3 +26,17 @@ def test_import_sct_does_not_load_presidio():
     out = subprocess.run(  # noqa: S603 - fixed argv, own interpreter
         [sys.executable, "-c", code], capture_output=True, text=True, check=True)
     assert out.stdout.strip() == "False"
+
+
+# --- Mac C: isolated-symbol removal keeps brackets and punctuation glued to a word or placeholder ---
+
+@pytest.mark.parametrize("text, expected", [
+    ("He was (born 1980) here.", "He was (born <YEAR>) here."),
+    ("He was (born 1980).", "He was (born <YEAR>)."),
+    ("He was (born in Paris). Ok", "He was (born in Paris). Ok"),
+    ("Voor vragen, bel +31 20 123 4567.", "Voor vragen, bel <PHONE>."),
+    ("end , start", "end start"),
+])
+def test_isolated_symbols_need_space_on_both_sides(text, expected):
+    cleaner = TextCleaner(TextCleanerConfig(check_ner_process=False))
+    assert cleaner.process(text).lm_text == expected
