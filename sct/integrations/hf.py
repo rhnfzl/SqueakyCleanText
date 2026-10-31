@@ -24,9 +24,14 @@ class SCTMap:
 
     def __call__(self, batch: dict) -> dict:
         out = clean_columns(self.handle, batch, self.columns, self.output, score=self.score)
-        # HF merges the returned columns back after remove_columns, so returning
-        # untouched input columns would resurrect the raw text the caller dropped.
-        return {k: v for k, v in out.items() if k not in batch or (self.output == "overwrite" and k in self.columns)}
+        # HF merges the returned columns back after remove_columns, so return only the
+        # columns SCT wrote: pass-through columns would resurrect dropped raw text, and
+        # dropping a written column would keep a stale same-named input column.
+        produced = [c if self.output == "overwrite" else f"{c}_clean" for c in self.columns]
+        if self.score:
+            from sct.score import SCORE_A_COLUMNS
+            produced += SCORE_A_COLUMNS
+        return {k: out[k] for k in produced if k in out}
 
 
 def clean_dataset(

@@ -62,3 +62,9 @@ def test_clean_dataset_with_test_ner_model():
     cfg = preset_config("training", ner_models=TEST_NER_MODELS, language="ENGLISH")
     ds = datasets.Dataset.from_dict({"text": ["Angela Merkel visited Paris."]})
     assert "Merkel" not in clean_dataset(ds, config=cfg)["text"][0]
+
+
+def test_map_overwrites_existing_clean_column():
+    # A stale input `text_clean` with raw text must be replaced, not kept.
+    out = SCTMap(output="new_column", config=FAST)({"text": ["mail a@b.com"], "text_clean": ["mail a@b.com"]})
+    assert out == {"text_clean": ["mail <EMAIL>"]}
