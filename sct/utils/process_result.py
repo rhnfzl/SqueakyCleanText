@@ -15,6 +15,10 @@ class ProcessResult:
     compatibility, but carries an optional ``.metadata`` dict for extended
     features.
 
+    Always present (from ``TextCleaner``; value-free):
+        ``regex_counts``  — ``{TYPE: {"count": int, "chars": int}}`` per regex replacement
+        ``entity_counts`` — same shape, per NER entity type
+
     Metadata keys (all optional, ``None`` when feature is inactive):
         ``anon_map``  — :class:`AnonymizationMap` when ``replacement_mode='reversible'``
         ``anon_map_reference`` — opaque external token-store reference

@@ -26,6 +26,7 @@ CURRENCIES = {
 CURRENCY_REGEX = re.compile(
     "({})+".format("|".join(re.escape(c) for c in CURRENCIES.keys()))
 )
+CURRENCY_SYMBOL_REGEX = re.compile("|".join(re.escape(c) for c in CURRENCIES))
 
 # Fixed: bounded quantifiers to prevent ReDoS (was nested + quantifiers)
 ACRONYM_REGEX = re.compile(

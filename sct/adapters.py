@@ -1,12 +1,10 @@
 """Boundary adapters for structured data and retrieval pipelines."""
 
-import re
 from dataclasses import dataclass
 from typing import Any, Iterable, Mapping, Optional
 
 from sct.privacy import EntityFinding
 from sct.sct import TextCleaner
-from sct.utils import constants
 
 
 @dataclass(frozen=True)
@@ -62,48 +60,13 @@ def _require_adapter_mode(cleaner: TextCleaner) -> None:
         )
 
 
-def is_sensitive_result(
-    cleaner: TextCleaner,
-    source: str,
-    result: Any,
-) -> bool:
-    """Return whether processing found or replaced sensitive content."""
+def is_sensitive_result(result: Any) -> bool:
+    """Return whether processing found an entity or made a regex replacement."""
     metadata = result.metadata or {}
-    if metadata.get("findings"):
-        return True
-    if (
-        cleaner.cfg.replacement_mode == "synthetic"
-        and result.lm_text != source
-    ):
-        return True
-    # The HTML step rewrites marker-like tags already in the source, so they
-    # cannot offset markers emitted later (``<EMAIL> Alice`` -> ``<PERSON>``).
-    baseline = source
-    if cleaner.cfg.check_replace_html:
-        baseline = constants.HTML_REGEX.sub("", source)
-    configured_markers = (
-        cleaner.cfg.replace_with_url,
-        cleaner.cfg.replace_with_html,
-        cleaner.cfg.replace_with_email,
-        cleaner.cfg.replace_with_ips,
-        cleaner.cfg.replace_with_years,
-        cleaner.cfg.replace_with_dates,
-        cleaner.cfg.replace_with_phone_numbers,
-        cleaner.cfg.replace_with_numbers,
-        cleaner.cfg.replace_with_currency_symbols,
-    )
-    if any(
-        isinstance(marker, str)
-        and marker
-        and result.lm_text.count(marker) > baseline.count(marker)
-        for marker in configured_markers
-    ):
-        return True
-    # Compare counts, not presence: a source that already holds a marker
-    # still gains one per replacement.
-    marker_pattern = r"<[A-Z][A-Z0-9_]*>"
-    return len(re.findall(marker_pattern, result.lm_text)) > len(
-        re.findall(marker_pattern, baseline)
+    return bool(
+        metadata.get("regex_counts")
+        or metadata.get("entity_counts")
+        or metadata.get("findings")
     )
 
 
@@ -117,11 +80,7 @@ def process_json(cleaner: TextCleaner, value: Any) -> StructuredResult:
         nonlocal sensitive
         if isinstance(item, str):
             result = cleaner.process(item)
-            sensitive = sensitive or is_sensitive_result(
-                cleaner,
-                item,
-                result,
-            )
+            sensitive = sensitive or is_sensitive_result(result)
             if result.metadata:
                 findings.extend(
                     PathFinding(path, finding)
@@ -178,11 +137,7 @@ def process_rag_chunks(
         )
         metadata = processed_metadata.value
         metadata["sensitive"] = (
-            is_sensitive_result(
-                cleaner,
-                chunk.text,
-                result,
-            )
+            is_sensitive_result(result)
             or processed_metadata.sensitive
         )
         processed.append(ProcessedRAGChunk(

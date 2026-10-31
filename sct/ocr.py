@@ -39,7 +39,7 @@ def select_redaction_regions(
     selected = []
     for span in spans:
         result = cleaner.process(span.text)
-        if is_sensitive_result(cleaner, span.text, result):
+        if is_sensitive_result(result):
             selected.append(span)
     return tuple(selected)
 

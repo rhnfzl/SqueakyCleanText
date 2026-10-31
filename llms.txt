@@ -29,7 +29,8 @@ lm_text, stat_text, lang = result  # backward-compatible 3-tuple unpacking
 - `cleaner.process_batch(texts) -> List[ProcessResult]` — thread-parallel batch
 - `cleaner.aprocess_batch(texts) -> List[ProcessResult]` — async (FastAPI/aiohttp)
 - `cleaner.warmup(languages=None)` — pre-load NER models at startup
-- `ProcessResult.metadata` — dict with `anon_map` (reversible mode) and `classes` (GLiClass)
+- `ProcessResult.metadata` — always a dict: `regex_counts` and `entity_counts` (`{TYPE: {"count", "chars"}}`, value-free), plus `anon_map` (reversible mode), `classes` (GLiClass), `findings` (opt-in)
+- `sct.adapters.is_sensitive_result(result)` — True when any regex replacement or NER finding was counted
 - `AnonymizationMap.deanonymize(text)` — restore original text from reversible placeholders
 - `AnonymizationMap.to_dict()` / `.from_dict(data)` — serialization for storage
 - `sct.evaluation.evaluate_pii(examples, predictions, model=...)` — exact-span PII evaluation

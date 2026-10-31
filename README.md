@@ -290,7 +290,7 @@ import json
 json.dumps(anon_map.to_dict())
 ```
 
-> **Note**: `ProcessResult` from `process()` unpacks as a 3-tuple (`lm_text, stat_text, language`) for backward compatibility, but also exposes `.metadata` for reversible maps and document classification.
+> **Note**: `ProcessResult` from `process()` unpacks as a 3-tuple (`lm_text, stat_text, language`) for backward compatibility, but also exposes `.metadata` for reversible maps and document classification. `metadata` is always a dict with value-free counts: `metadata['regex_counts']` (e.g. `{"EMAIL": {"count": 1, "chars": 17}}`, one entry per regex replacement type) and `metadata['entity_counts']` (NER findings per type, same shape).
 
 ### Document Classification (GLiClass)
 

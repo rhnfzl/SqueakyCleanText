@@ -247,6 +247,7 @@ class TextCleaner:
         finally:
             self._document_context.anon_map = None
             self._document_context.protected = None
+            self._document_context.regex_counts = None
 
     def _process_single_with_context(self, text: str) -> ProcessResult:
         """Process a single text through the entire pipeline.
@@ -257,32 +258,19 @@ class TextCleaner:
         state = self._before_ner(text)
         current_text, language, anon_map = state[0], state[1], state[2]
 
-        # NER processing
+        # NER processing; always detailed (same detection) so entity counts are known.
         findings = ()
         if self.cfg.check_ner_process and self.GeneralNER is not None:
-            if (
-                self._privacy_policy is not None
-                or self._include_entities
-                or self._metrics_callback is not None
-            ):
-                detailed = self.GeneralNER.ner_process_detailed(
-                    current_text,
-                    positional_tags=self.cfg.positional_tags,
-                    ner_confidence_threshold=self.cfg.ner_confidence_threshold,
-                    language=language,
-                    anon_map=anon_map,
-                    privacy_policy=self._privacy_policy,
-                )
-                current_text = detailed.text
-                findings = detailed.findings
-            else:
-                current_text = self.GeneralNER.ner_process(
-                    current_text,
-                    positional_tags=self.cfg.positional_tags,
-                    ner_confidence_threshold=self.cfg.ner_confidence_threshold,
-                    language=language,
-                    anon_map=anon_map,
-                )
+            detailed = self.GeneralNER.ner_process_detailed(
+                current_text,
+                positional_tags=self.cfg.positional_tags,
+                ner_confidence_threshold=self.cfg.ner_confidence_threshold,
+                language=language,
+                anon_map=anon_map,
+                privacy_policy=self._privacy_policy,
+            )
+            current_text = detailed.text
+            findings = detailed.findings
         return self._after_ner(state, current_text, findings)
 
     def _before_ner_isolated(self, text: str) -> tuple:
@@ -292,11 +280,12 @@ class TextCleaner:
         finally:
             self._document_context.anon_map = None
             self._document_context.protected = None
+            self._document_context.regex_counts = None
 
     def _before_ner(self, text: str) -> tuple:
         """Every step before NER.
 
-        Returns ``(text, language, anon_map, doc_classes, started_at)``.
+        Returns ``(text, language, anon_map, doc_classes, started_at, regex_counts)``.
         """
         started_at = time.perf_counter()
 
@@ -310,6 +299,9 @@ class TextCleaner:
             anon_map = AnonymizationMap()
         self._document_context.anon_map = anon_map
         self._document_context.protected = {}
+        # The dict travels in the returned state, so it survives the context reset.
+        regex_counts: Dict[str, Dict[str, int]] = {}
+        self._document_context.regex_counts = regex_counts
 
         # Document-level classification (before any text modification)
         doc_classes = None
@@ -330,7 +322,7 @@ class TextCleaner:
         if self.cfg.check_fuzzy_replace_dates:
             current_text = self.ProcessDateTime.fuzzy_replace_dates(
                 current_text,
-                replace_with=self._protect(self.cfg.replace_with_dates),
+                replace_with=lambda orig: self._emit('DATE', orig, self.cfg.replace_with_dates),
                 score_cutoff=self.cfg.fuzzy_date_score_cutoff,
                 language=language,
             )
@@ -339,36 +331,42 @@ class TextCleaner:
         for step in self._post_fuzzy_pipeline:
             current_text = step(current_text)
 
-        return current_text, language, anon_map, doc_classes, started_at
+        return current_text, language, anon_map, doc_classes, started_at, regex_counts
 
     def _after_ner(self, state: tuple, current_text: str, findings) -> ProcessResult:
         """Every step after NER, for the document *state* from ``_before_ner``."""
-        _, language, anon_map, doc_classes, started_at = state
+        _, language, anon_map, doc_classes, started_at, regex_counts = state
 
         # Statistical model processing (always returns stext, even if None)
         stext = None
         if self.cfg.check_statistical_model_processing:
             stext = self._statistical_model_processing(current_text, language)
 
-        # Build metadata dict (only when extended features are active)
-        metadata: Optional[Dict[str, Any]] = None
+        # Value-free counts are always present; entity text only on opt-in below.
+        entity_counts: Dict[str, Dict[str, int]] = {}
+        for finding in findings:
+            entry = entity_counts.setdefault(
+                finding.entity.entity_type, {'count': 0, 'chars': 0},
+            )
+            entry['count'] += 1
+            entry['chars'] += finding.entity.end - finding.entity.start
+        metadata: Dict[str, Any] = {
+            'regex_counts': regex_counts,
+            'entity_counts': entity_counts,
+        }
         if anon_map is not None:
-            metadata = metadata or {}
             if self._token_store is not None:
                 metadata['anon_map_reference'] = self._token_store.save(anon_map)
             else:
                 metadata['anon_map'] = anon_map
         if doc_classes is not None:
-            metadata = metadata or {}
             metadata['classes'] = doc_classes
         if self._privacy_policy is not None:
-            metadata = metadata or {}
             metadata['policy'] = {
                 'name': self._privacy_policy.name,
                 'version': self._privacy_policy.version,
             }
         if self._include_entities or self._privacy_policy is not None:
-            metadata = metadata or {}
             metadata['findings'] = findings
             detector_models: Dict[str, Dict[str, Optional[str]]] = {}
             if self.cfg.ner_backend in ('onnx', 'ensemble_onnx'):
@@ -409,16 +407,12 @@ class TextCleaner:
             }
 
         if self._metrics_callback is not None:
-            entity_counts: Dict[str, int] = {}
-            for finding in findings:
-                entity_type = finding.entity.entity_type
-                entity_counts[entity_type] = entity_counts.get(entity_type, 0) + 1
             self._metrics_callback(ProcessingMetrics(
                 duration_ms=(time.perf_counter() - started_at) * 1000,
                 language=language,
                 backend=self.cfg.ner_backend if self.cfg.check_ner_process else None,
                 policy=self._privacy_policy.name if self._privacy_policy else None,
-                entity_counts=entity_counts,
+                entity_counts={k: v['count'] for k, v in entity_counts.items()},
             ))
 
         return ProcessResult(current_text, stext, language, metadata=metadata)
@@ -533,6 +527,15 @@ class TextCleaner:
 
     # --- Pipeline step methods (private, used by _init_pipeline) ---
 
+    def _emit(self, entity_type, original, value):
+        """Count one regex replacement of *original*, then protect its *value*."""
+        counts = getattr(self._document_context, 'regex_counts', None)
+        if counts is not None:
+            entry = counts.setdefault(entity_type, {'count': 0, 'chars': 0})
+            entry['count'] += 1
+            entry['chars'] += len(original)
+        return self._protect(value)
+
     def _protect(self, value):
         """Hide an emitted value from later regex steps (``<EMAIL1>``, kept IPs)."""
         protected = getattr(self._document_context, 'protected', None)
@@ -563,7 +566,7 @@ class TextCleaner:
                 match.start(),
                 match.end(),
             )
-            return placeholder
+            return self._emit(entity_type, match.group(), placeholder)
 
         return pattern.sub(replace, text)
 
@@ -584,7 +587,9 @@ class TextCleaner:
         )
         if reversible is not None:
             return reversible
-        return self.ProcessContacts.replace_html(text, replace_with=self._protect(self.cfg.replace_with_html))
+        return self.ProcessContacts.replace_html(
+            text, replace_with=lambda m: self._emit('HTML', m.group(), self.cfg.replace_with_html),
+        )
 
     def _replace_urls(self, text):
         reversible = self._replace_reversible(
@@ -596,9 +601,11 @@ class TextCleaner:
             return reversible
         if self._synthetic_replacer:
             return self.ProcessContacts.replace_urls_with_fn(
-                text, lambda orig: self._protect(self._synthetic_replacer.get_replacement('URL', orig)),
+                text, lambda orig: self._emit('URL', orig, self._synthetic_replacer.get_replacement('URL', orig)),
             )
-        return self.ProcessContacts.replace_urls(text, replace_with=self._protect(self.cfg.replace_with_url))
+        return self.ProcessContacts.replace_urls_with_fn(
+            text, lambda orig: self._emit('URL', orig, self.cfg.replace_with_url),
+        )
 
     def _replace_emails(self, text):
         reversible = self._replace_reversible(
@@ -610,9 +617,11 @@ class TextCleaner:
             return reversible
         if self._synthetic_replacer:
             return self.ProcessContacts.replace_emails_with_fn(
-                text, lambda orig: self._protect(self._synthetic_replacer.get_replacement('EMAIL', orig)),
+                text, lambda orig: self._emit('EMAIL', orig, self._synthetic_replacer.get_replacement('EMAIL', orig)),
             )
-        return self.ProcessContacts.replace_emails(text, replace_with=self._protect(self.cfg.replace_with_email))
+        return self.ProcessContacts.replace_emails_with_fn(
+            text, lambda orig: self._emit('EMAIL', orig, self.cfg.replace_with_email),
+        )
 
     def _replace_ips(self, text):
         public_only = self.cfg.replace_ips_public_only
@@ -632,8 +641,9 @@ class TextCleaner:
                 return self.cfg.replace_with_ips
         return self.ProcessContacts.replace_ips_with_fn(
             text,
-            lambda orig: self._protect(
-                emit(orig) if contact.is_replaceable_ip(orig, public_only) else orig
+            lambda orig: (
+                self._emit('IP_ADDRESS', orig, emit(orig))
+                if contact.is_replaceable_ip(orig, public_only) else self._protect(orig)
             ),
         )
 
@@ -645,7 +655,9 @@ class TextCleaner:
         )
         if reversible is not None:
             return reversible
-        return self.ProcessDateTime.replace_dates(text, replace_with=self._protect(self.cfg.replace_with_dates))
+        return self.ProcessDateTime.replace_dates(
+            text, replace_with=lambda m: self._emit('DATE', m.group(), self.cfg.replace_with_dates),
+        )
 
     def _replace_years(self, text):
         reversible = self._replace_reversible(
@@ -655,7 +667,9 @@ class TextCleaner:
         )
         if reversible is not None:
             return reversible
-        return self.ProcessDateTime.replace_years(text, replace_with=self._protect(self.cfg.replace_with_years))
+        return self.ProcessDateTime.replace_years(
+            text, replace_with=lambda m: self._emit('YEAR', m.group(), self.cfg.replace_with_years),
+        )
 
     def _replace_phone_numbers(self, text):
         reversible = self._replace_reversible(
@@ -667,10 +681,12 @@ class TextCleaner:
             return reversible
         if self._synthetic_replacer:
             return self.ProcessContacts.replace_phone_numbers_with_fn(
-                text, lambda orig: self._protect(self._synthetic_replacer.get_replacement('PHONE_NUMBER', orig)),
+                text, lambda orig: self._emit(
+                    'PHONE_NUMBER', orig, self._synthetic_replacer.get_replacement('PHONE_NUMBER', orig),
+                ),
             )
-        return self.ProcessContacts.replace_phone_numbers(
-            text, replace_with=self._protect(self.cfg.replace_with_phone_numbers),
+        return self.ProcessContacts.replace_phone_numbers_with_fn(
+            text, lambda orig: self._emit('PHONE_NUMBER', orig, self.cfg.replace_with_phone_numbers),
         )
 
     def _replace_numbers(self, text):
@@ -695,11 +711,12 @@ class TextCleaner:
             return reversible
         if self._synthetic_replacer:
             return self.ProcessContacts.replace_numbers_with_fn(
-                text, lambda orig: self._synthetic_replacer.get_replacement('NUMBER', orig),
+                text, lambda orig: self._emit('NUMBER', orig, self._synthetic_replacer.get_replacement('NUMBER', orig)),
                 in_words=self.cfg.replace_numbers_in_words,
             )
-        return self.ProcessContacts.replace_numbers(
-            text, replace_with=self.cfg.replace_with_numbers, in_words=self.cfg.replace_numbers_in_words,
+        return self.ProcessContacts.replace_numbers_with_fn(
+            text, lambda orig: self._emit('NUMBER', orig, self.cfg.replace_with_numbers),
+            in_words=self.cfg.replace_numbers_in_words,
         )
 
     def _replace_currency_symbols(self, text):
@@ -710,7 +727,15 @@ class TextCleaner:
         )
         if reversible is not None:
             return reversible
-        return self.ProcessSpecialSymbols.replace_currency_symbols(text, replace_with=self.cfg.replace_with_currency_symbols)
+        replace_with = self.cfg.replace_with_currency_symbols
+        if replace_with is None:
+            # Symbol -> ISO code, one count per symbol occurrence.
+            return self.ProcessSpecialSymbols.replace_currency_symbols_with_fn(
+                text, lambda symbol: self._emit('CURRENCY', symbol, constants.CURRENCIES[symbol]),
+            )
+        return self.ProcessSpecialSymbols.replace_currency_symbols(
+            text, replace_with=lambda m: self._emit('CURRENCY', m.group(), replace_with),
+        )
 
     def _remove_isolated_letters(self, text):
         return self.ProcessSpecialSymbols.remove_isolated_letters(text)

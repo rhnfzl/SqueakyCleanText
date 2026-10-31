@@ -446,13 +446,13 @@ class TestNERBackends:
         assert lang is not None
 
     def test_d32_process_result_metadata(self):
-        """ProcessResult.metadata available (None when no extended features)."""
+        """ProcessResult.metadata always carries the value-free counts."""
         cfg = _make_ner_cfg()
         tc = TextCleaner(cfg=cfg)
         result = tc.process("Test text for metadata check.")
         assert isinstance(result, ProcessResult)
-        # In placeholder mode, metadata is None (no anon_map, no classes)
-        assert result.metadata is None
+        # Placeholder mode: only the value-free counts (no anon_map, no classes)
+        assert set(result.metadata) == {"regex_counts", "entity_counts"}
 
     def test_d33_batch_processing(self):
         """process_batch handles multiple texts."""

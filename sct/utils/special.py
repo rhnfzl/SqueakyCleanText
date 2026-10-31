@@ -17,11 +17,12 @@ class ProcessSpecialSymbols:
                 (e.g. "*CURRENCY*")
         """
         if replace_with is None:
-            for k, v in constants.CURRENCIES.items():
-                text = text.replace(k, v)
-            return text
-        else:
-            return constants.CURRENCY_REGEX.sub(replace_with, text)
+            return self.replace_currency_symbols_with_fn(text, constants.CURRENCIES.__getitem__)
+        return constants.CURRENCY_REGEX.sub(replace_with, text)
+
+    def replace_currency_symbols_with_fn(self, text, replace_fn):
+        """Replace each single currency symbol: replace_fn(symbol) -> replacement."""
+        return constants.CURRENCY_SYMBOL_REGEX.sub(lambda m: replace_fn(m.group()), text)
 
 
     def remove_isolated_letters(self, text):
