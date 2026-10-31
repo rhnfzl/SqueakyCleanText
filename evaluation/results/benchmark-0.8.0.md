@@ -1,17 +1,17 @@
 # Release benchmark: SCT 0.8.0
 
-Commit `4b7e9f99d3d72f07e147afbce22633d7cfd4e1ba`, macOS-27.2-arm64-arm-64bit-Mach-O, Python 3.13.12.
+Commit `678a59b93e5bb43e9b30b60261050532e0d7c361`, macOS-27.2-arm64-arm-64bit-Mach-O, Python 3.13.12.
 Dataset `release_benchmark.jsonl`: 30 documents, 84 entities. Exact label + span match.
 
-Speed (default config, single process): **9.648 docs/s**, mean 103.645 ms, p95 510.389 ms.
+Speed (default config, single process): **7.195 docs/s**, mean 138.985 ms, p95 623.978 ms.
 Leaks: **0 / 67** PII values still in output (partial: 0).
 
 ## By label
 
 | | TP | FP | FN | P | R | F1 |
 |---|---|---|---|---|---|---|
-| **overall** | 82 | 2 | 2 | 0.98 | 0.98 | 0.98 |
-| EMAIL | 6 | 1 | 1 | 0.86 | 0.86 | 0.86 |
+| **overall** | 83 | 1 | 1 | 0.99 | 0.99 | 0.99 |
+| EMAIL | 7 | 0 | 0 | 1.00 | 1.00 | 1.00 |
 | IP | 9 | 0 | 0 | 1.00 | 1.00 | 1.00 |
 | LOCATION | 5 | 1 | 1 | 0.83 | 0.83 | 0.83 |
 | NUMBER | 8 | 0 | 0 | 1.00 | 1.00 | 1.00 |
@@ -33,7 +33,7 @@ Leaks: **0 / 67** PII values still in output (partial: 0).
 | ja | 4 | 0 | 0 | 1.00 | 1.00 | 1.00 |
 | nl | 8 | 0 | 0 | 1.00 | 1.00 | 1.00 |
 | ta | 2 | 0 | 0 | 1.00 | 1.00 | 1.00 |
-| zh | 6 | 2 | 2 | 0.75 | 0.75 | 0.75 |
+| zh | 7 | 1 | 1 | 0.88 | 0.88 | 0.88 |
 
 ## Leaks
 

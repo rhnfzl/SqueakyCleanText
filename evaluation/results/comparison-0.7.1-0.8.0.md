@@ -18,13 +18,19 @@ were within noise of each other) and is not comparable to the 10.3 docs/s of `5f
 The final Mac check at `4b7e9f9` (styled-character folding, same-script widening, per-language
 synthetic fakes, NER reading placeholder-mode tags) gives the same TP/FP/FN, leaks and 30 of 30
 byte-identical outputs as `3a01635`; only the speed line changed (9.6 docs/s, mean 104 ms, same
-machine at lower load, not a code speed-up claim). `benchmark-0.8.0.json` / `.md` are now from
-that run.
+machine at lower load, not a code speed-up claim).
+The last Mac check at `678a59b` (fuzz rounds, Codex rounds 19-25) gives 83/1/1 (was 82/2/2) and
+0 / 67 leaks; 29 of 30 outputs are byte-identical to `4b7e9f9`. The one change is `zh-long-001`:
+`邮箱是<EMAIL_0>` instead of `<EMAIL_0>`, because an email local part now ends where glued CJK
+prose meets a Latin letter (fuzz round 3, `d6e047c`), so the predicted EMAIL span matches the gold
+span. The speed line (7.2 docs/s) is a single loaded-machine run, not a code slow-down claim.
+`benchmark-0.8.0.json` / `.md` are now from that run.
 
 ## Headline
 
-- Correctness on the release benchmark is identical: exact-span TP/FP/FN equal for every
-  label, language and domain (overall 82/2/2, P = R = 0.98), 0 / 67 leaks, 0 partial leaks.
+- Correctness on the release benchmark: overall 83/1/1 (P = R = 0.99; 0.7.1 82/2/2), one
+  more zh EMAIL span exact (`zh-long-001`, fuzz round 3); every other label, language and
+  domain is equal. 0 / 67 leaks, 0 partial leaks.
 - `process_batch` on 16 Linux cores: **4.2x** on short documents (3.69 -> 15.55 docs/s, 16
   workers) and **3.2x** on long documents (0.65 -> 2.08 docs/s).
 - Single-document `process`: unchanged within noise (1.10x on 16 cores, 0.95x on 4 cores,
@@ -41,9 +47,9 @@ Full numbers: `benchmark-0.8.0.md` / `.json`.
 
 | | 0.7.1 | 0.8.0 |
 |---|---|---|
-| Overall TP / FP / FN | 82 / 2 / 2 | 82 / 2 / 2 |
-| Labels with a TP/FP/FN change | | none |
-| Languages with a TP/FP/FN change | | none |
+| Overall TP / FP / FN | 82 / 2 / 2 | 83 / 1 / 1 |
+| Labels with a TP/FP/FN change | | EMAIL 6/1/1 -> 7/0/0 |
+| Languages with a TP/FP/FN change | | zh 6/2/2 -> 7/1/1 |
 | Full / partial leaks | 0 / 0 | 0 / 0 |
 | Reversible `lm_text`, 30 documents | | 29 identical to the committed 0.7.1 outputs; `zh-glued-001` fixed (below) |
 | Speed, docs/s (single run, default config) | 6.923 | 7.462 |

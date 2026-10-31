@@ -393,8 +393,11 @@ def _idna_dot(rng, plain, slots, kinds, typ):
     """Host dots typed as an IDNA separator (example。com, as CJK input methods write them) where a
     Latin letter or digit follows; own RNG so the cases of earlier rounds stay the same."""
     start, end = _host_span(plain, typ)
+    # the next character must render as ASCII too: a native digit after 。 is a native-digit host
+    # label (rejected, Codex round 25 id 3)
     free = [index for index in range(start, end - 1) if plain[index] == "." and slots[index] is None
-            and plain[index + 1].isascii() and plain[index + 1].isalnum()]
+            and plain[index + 1].isascii() and plain[index + 1].isalnum()
+            and (slots[index + 1] is None or slots[index + 1][0] != "native_digit")]
     if not free or rng.random() >= 0.25:
         return kinds
     for index in free:
@@ -477,6 +480,12 @@ def build_doc(case, disabled=None) -> str:
         off = disabled.get(index, frozenset())
         glue = value["glue"] and "glue" not in off
         left, right = case["context_scripts"][index], case["context_scripts"][index + 1]
+        # an address, a sentence and a mail local part glued all in one run have no boundary to find
+        # (a@b.jpกขคฅก＋x@y.th: the prose may be either address), so the second address keeps its space
+        prev = case["values"][index - 1] if index else None
+        if (prev and prev["glue"] and "glue" not in disabled.get(index - 1, frozenset())
+                and prev["type"] in ("EMAIL", "URL") and value["type"] == "EMAIL"):
+            glue = False
         doc += ("" if glue and left in UNSPACED else " ") + render(value, off)
         doc += ("" if glue and right in UNSPACED else " ") + case["context"][index + 1]
     return doc
