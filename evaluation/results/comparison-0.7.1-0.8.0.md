@@ -1,8 +1,10 @@
 # Release benchmark: 0.7.1 vs 0.8.0
 
-0.8.0 is a speed release. 0.7.1 is tag `v0.7.1`; 0.8.0 is branch `perf/v0.8.0-speed`.
+0.8.0 is the speed release (plus features, see CHANGELOG). 0.7.1 is tag `v0.7.1`; 0.8.0 is branch `perf/v0.8.0-speed`.
 Correctness and output parity were re-run at `ef3f245` (`sct.__version__` 0.8.0); the Linux
 speed runs were made earlier at `c88e3ca`. Default config unless a row says otherwise.
+A final re-run at `371a873` (all 0.8.0 features and fixes) gave the same TP/FP/FN, leaks
+and 30 of 30 byte-identical outputs as `ef3f245`.
 
 ## Headline
 

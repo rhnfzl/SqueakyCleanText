@@ -30,6 +30,8 @@ lm_text, stat_text, lang = result  # backward-compatible 3-tuple unpacking
 - `cleaner.aprocess_batch(texts) -> List[ProcessResult]` — async (FastAPI/aiohttp)
 - `cleaner.warmup(languages=None)` — pre-load NER models at startup
 - `ProcessResult.metadata` — always a dict: `regex_counts` and `entity_counts` (`{TYPE: {"count", "chars"}}`, value-free), `language_confidence` (float, 1.0 pinned, None unknown), `language_source` (`pinned`/`detected`/`fallback`/`none`), `warnings` (sorted codes: `language_unknown`, `language_fallback`, `language_low_confidence`, `ner_fallback_models`, `cuda_fallback`), `provenance` (`{"backend", "models": [{"key", "id", "revision", "provider"}]}` of the NER models run), plus `anon_map` (reversible mode), `classes` (GLiClass), `findings` (opt-in)
+- `ProcessResult.signals` — value-free view, same keys for every input: `language`, `language_confidence`, `language_source`, `chars`, `pii_count`, `pii_chars`, `pii_share`, `pii_types`, `regex_counts`, `entity_counts`, `sensitive`, `warnings` (adds `ner_off`, `empty_input`), `models`. Never entity text (`sct.signals.public_view`, `merge_views`, `PUBLIC_VIEW_KEYS`)
+- `preset_config(name, **overrides)` / `TextCleanerConfig.from_preset(name, ...)` / `PRESETS` — `"training"` (PII only) or `"sct"` (library defaults)
 - `sct.adapters.is_sensitive_result(result)` — True when any regex replacement or NER finding was counted
 - `AnonymizationMap.deanonymize(text)` — restore original text from reversible placeholders
 - `AnonymizationMap.to_dict()` / `.from_dict(data)` — serialization for storage
@@ -42,6 +44,10 @@ lm_text, stat_text, lang = result  # backward-compatible 3-tuple unpacking
 - `redact_image` / `TesseractOCRProvider` — optional OCR image redaction
 - `assess_reidentification_risk` — corpus k-anonymity summary
 - `MODEL_CANDIDATES` / `run_model_benchmark` — pinned model evaluation
+- `sct.integrations.hf.clean_dataset(ds, columns=, output=, config=, score=, **map_kwargs)` — Hugging Face datasets (`[datasets]` extra)
+- `sct.integrations.datatrove.SCTCleaner` / `sct.integrations.langchain.SCTDocumentTransformer` / `sct.integrations.haystack.SCTDocumentCleaner` — framework adapters (`[datatrove]`, `[langchain]`, `[haystack]`); shared options `columns`, `output='overwrite'|'new_column'`, `config` (default `"training"` preset); write `metadata["sct"]`
+- `sct.integrations._runtime.CleanerHandle` / `clean_columns` — one cleaner per process for Ray, Spark, Polars, DuckDB, dlt, Daft (docs/RECIPES.md)
+- `sct.score.score_record(result)` / `score_records(results, texts, ScoreConfig(...))` — flat `sct_*` columns; Score B (quality, MinHash, `[score]` extra) off by default; `build_data_card` / `render_data_card`
 
 ## PII Evaluation
 
@@ -80,12 +86,17 @@ pseudonymized personal data.
 ## Boundary Commands
 
 ```
-printf 'Email maria@example.com' | sct-clean --no-ner
+printf 'Email maria@example.com' | sct-clean --no-ner --preset training
+sct-report data.jsonl --text-column text --preset training --minhash \
+    --quasi-identifiers city,age_band --k 5 --out report.json --card card.md
 pip install 'squeakycleantext[mcp]'
-sct-mcp
+SCT_MCP_PRESET=training SCT_MCP_ROOT=~/notes sct-mcp
 ```
 
-FastMCP loads only when the MCP server starts. OCR requires the `ocr` extra and
+FastMCP loads only when the MCP server starts. MCP tools `clean_text` (`text` or `path`)
+and `clean_json` return `{warnings, summary, text|value, signals}`, plus value-free
+`findings` with `detail="full"`. `path` input is off unless `SCT_MCP_ROOT` is set
+(`SCT_MCP_MAX_BYTES`, default 1 MiB). `SCT_MCP_PRESET` defaults to `sct`. OCR requires the `ocr` extra and
 a local Tesseract executable when using `TesseractOCRProvider`.
 
 ## TextCleanerConfig — Key Fields
@@ -123,6 +134,7 @@ cuda_device_id=0                    # GPU index for ONNX/torch/GLiNER (and GLiCl
 onnx_cuda_provider_options=None     # extra CUDAExecutionProvider options, e.g. {'gpu_mem_limit': 8 << 30}
 ner_chunk_overlap=0                 # NER window overlap in tokens per side for long docs (0 = 0.7.1 chunks)
 detect_all_languages=True           # Auto-detect over all 75 Lingua languages; False = 0.7 detector (EN/NL/DE/ES + extras)
+json_key_cleaning='pii'             # process_json keys: 'pii' = PII steps only | 'full' = whole config (0.7) | 'off' = raw
 language_confidence_warning=0.5     # metadata warning 'language_low_confidence' below this confidence (0..1, never changes routing)
 positional_tags=('PER','LOC','ORG','MISC')
 
@@ -198,6 +210,15 @@ A: Pass `extra_languages=('FRENCH',)` in `TextCleanerConfig`. NER and detection 
 **Q: Can I add custom text transformation steps?**
 A: Yes — `custom_pipeline_steps=(my_fn,)` where `my_fn` accepts and returns `str`. Steps run after all built-in steps.
 
+**Q: How do I clean a Hugging Face dataset or a LangChain/Haystack/DataTrove pipeline?**
+A: Use the adapters in `sct.integrations` (see docs/INTEGRATIONS.md). They default to the `training` preset (PII only).
+
+**Q: How do I get per-row PII stats or a data card without exposing values?**
+A: `sct.score.score_record(result)` or the `sct-report` command (docs/SCORE.md).
+
+**Q: How fast is it, and should I use a GPU?**
+A: See docs/PERFORMANCE.md: `process_batch` with about 16 workers on CPU; a GPU for bulk work.
+
 **Q: What's the difference between lm_text and stat_text?**
 A: `lm_text` preserves sentence structure with replacement tokens (for LLM fine-tuning/inference). `stat_text` is lowercased, stopword-free, no punctuation (for TF-IDF, embeddings, classical ML).
 
@@ -213,11 +234,21 @@ sct/utils/anonymization_map.py   — AnonymizationMap: reversible anonymization 
 sct/utils/process_result.py      — ProcessResult: backward-compatible result with metadata
 sct/utils/synthetic.py           — SyntheticReplacer: Faker-based entity replacement
 sct/utils/onnx_pipeline.py       — ONNXNERPipeline: ONNX inference, BIO aggregation
+sct/signals.py                   — public value-free view (ProcessResult.signals)
+sct/presets.py                   — training / sct presets
+sct/integrations/                — HF datasets, DataTrove, LangChain, Haystack adapters
+sct/score.py / sct/report_cli.py — score columns, data card, sct-report
+sct/mcp_server.py                — FastMCP server (sct-mcp)
 sct/utils/constants.py           — Pre-compiled regexes (URL, email, phone, date, currency, etc.)
 sct/utils/stopwords.py           — Language-aware stopword removal (O(1) set lookup)
 sct/utils/resources.py           — Lingua language detector (lazy singleton)
 tests/test_sct.py                — Full test suite (hypothesis, faker, pytest-timeout)
 ```
+
+## Docs
+
+- docs/PERFORMANCE.md (CPU/GPU throughput, CUDA setup), docs/INTEGRATIONS.md, docs/RECIPES.md,
+  docs/SCORE.md, docs/MCP.md, docs/MULTILINGUAL_EVAL.md, docs/ADDING_LANGUAGES.md, CHANGELOG.md
 
 ## Resources
 

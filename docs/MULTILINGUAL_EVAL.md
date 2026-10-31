@@ -57,13 +57,45 @@ Commit `39a5ca3`, macOS arm64, Python 3.13, CPU. Raw report and predictions:
 | IP | 0.00 / 0.00 | 0.18 / 0.73 | 0.93 / 1.00 |
 Code-switch slice, sct-default: recall 0.76, precision 0.82.
 
+## Final 0.8.0 re-run (sct-default)
+
+Commit `371a873` (0.8.0 release code: grouped national phone numbers, RFC email local
+parts, URL and source-marker fixes), same machine and settings. Raw report and predictions:
+`evaluation/results/multilingual-0.8.0.json`. GLiNER rows were not re-run. Cells are recall / precision.
+
+| language | 39a5ca3 | 0.8.0 |
+|---|---|---|
+| ar | 0.77 / 0.78 | 0.77 / 0.78 |
+| bn | 0.82 / 0.96 | 0.82 / 0.96 |
+| de | 0.98 / 1.00 | 0.98 / 1.00 |
+| en | 1.00 / 1.00 | 1.00 / 1.00 |
+| es | 0.87 / 0.98 | 0.98 / 0.98 |
+| hi | 0.82 / 0.88 | 0.88 / 0.93 |
+| ja | 0.62 / 0.67 | 0.70 / 0.78 |
+| nl | 0.93 / 0.93 | 0.93 / 0.93 |
+| ta | 0.78 / 0.85 | 0.85 / 0.94 |
+| th | 0.90 / 0.93 | 0.90 / 0.93 |
+| zh | 0.77 / 0.82 | 0.80 / 0.86 |
+| overall | 0.84 / 0.89 | 0.87 / 0.92 |
+
+| label | 39a5ca3 | 0.8.0 |
+|---|---|---|
+| PERSON | 0.95 / 0.95 | 0.96 / 0.95 |
+| LOCATION | 0.97 / 0.92 | 0.95 / 0.92 |
+| ORGANISATION | 0.68 / 0.88 | 0.68 / 0.88 |
+| EMAIL | 0.82 / 0.82 | 0.82 / 0.82 |
+| PHONE_NUMBER | 0.65 / 0.73 | 0.86 / 0.93 |
+| IP | 0.93 / 1.00 | 1.00 / 1.00 |
+
+Code-switch slice: recall 0.84, precision 0.90 (was 0.76 / 0.82).
+
 ## What the misses are (sct-default)
 
 - **EMAIL in zh / ja**: the email regex takes the CJK text glued before the address
   (`请发送至wangfang@example.com` becomes one EMAIL). In ar it takes the Arabic comma `،`
-  after the address. Regex boundary bugs, not model gaps.
-- **PHONE_NUMBER**: numbers with a space between groups are cut (`010-6552 1234` ->
-  `010-6552`, `06-12345678` -> `12345678`, `699 123 456` missed). Affects every language.
+  after the address. Regex boundary bugs, not model gaps; still open in 0.8.0.
+- **PHONE_NUMBER**: grouped national numbers (`010-6552 1234`, `699 123 456`,
+  `06 12 34 56 78`) are matched whole since 0.8.0; `06-12345678` still loses its `06-`.
 - **ORGANISATION**: weakest label (0.68 recall); in ar, bn, ja, th, zh, ta the multilingual
   model misses or splits organisation names.
 - **Span edges in bn / ta**: names cut a few characters short (`সুমাইয়া আক্ত`) or run into the
@@ -71,13 +103,13 @@ Code-switch slice, sct-default: recall 0.76, precision 0.82.
 
 ## Recommendation
 
-Keep today's default ensemble: it wins overall (0.84 / 0.89) and in every language.
+Keep today's default ensemble: it wins overall (0.84 / 0.89 at `39a5ca3`, 0.87 / 0.92 in
+0.8.0) and in every language.
 GLiNER multi v2.1 is far behind outside Latin scripts. GLiNER multi PII v1 has the best
 EMAIL / PHONE precision and the best Arabic row, but recall in hi, bn, ta, ja, zh is
 0.07 to 0.35, so it is not a default candidate either. **The default NER model is NOT
-switched in 0.8.0.** The cheaper wins are the regex bugs above (email boundary with
-CJK and Arabic punctuation, grouped phone numbers); they are core changes, not part of
-this branch. GlotLID / ICU / SaT extras: no gap traced to language ID or segmentation
+switched in 0.8.0.** The cheaper wins were the regex bugs above: grouped phone numbers
+are fixed in 0.8.0, the email boundary with CJK and Arabic punctuation is not yet. GlotLID / ICU / SaT extras: no gap traced to language ID or segmentation
 here, so they stay out.
 
 ## Limits

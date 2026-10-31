@@ -47,12 +47,18 @@ SqueakyCleanText simplifies the process by automatically addressing common text 
   - Language-specific NER models; French, Portuguese, Italian via multilingual model
   - Language-aware stopword removal
   - Extensible: add custom languages with stopwords, month names, and NER models
+- **Pipelines and tools**:
+  - `training` preset: remove only PII, keep code, numbers, case and non-Latin text as written
+  - Value-free `result.signals` (language, PII counts and types, warnings, model provenance)
+  - Adapters for Hugging Face `datasets`, DataTrove, LangChain and Haystack; recipes for Ray, Spark, Polars, DuckDB, dlt and Daft
+  - Score columns, data cards and the `sct-report` command (PII share, optional quality score and PII-normalised MinHash, k-anonymity)
+  - MCP server (`sct-mcp`) with warnings-first output and optional file input
 - **Dual Output Formats**:
   - Language Model format (preserves structure with tokens)
   - Statistical Model format (optimized for classical ML)
 - **Performance**:
   - ONNX Runtime inference (torch-free base install, ~3-5x faster than PyTorch)
-  - Thread-parallel batch processing via `ThreadPoolExecutor`
+  - Thread-parallel batch processing with NER batched across documents (`process_batch` 3-4x faster than 0.7.1 on CPU, see [docs/PERFORMANCE.md](docs/PERFORMANCE.md))
   - Async batch processing (`aprocess_batch`) for FastAPI / aiohttp
   - Lazy model loading (only loads models as needed)
   - Shared ONNX sessions for same-model languages (saves ~600 MB for FR/PT/IT)
@@ -103,6 +109,11 @@ The base install uses **ONNX Runtime** for NER inference - no PyTorch or Transfo
 | Presidio | `pip install SqueakyCleanText[presidio]` | Presidio-analyzer for `presidio_gliner` backend |
 | Classify | `pip install SqueakyCleanText[classify]` | GLiClass document-level pre-classification |
 | MCP | `pip install SqueakyCleanText[mcp]` | FastMCP server with text and JSON cleaning tools |
+| Datasets | `pip install SqueakyCleanText[datasets]` | Hugging Face `datasets` adapter ([docs/INTEGRATIONS.md](docs/INTEGRATIONS.md)) |
+| DataTrove | `pip install SqueakyCleanText[datatrove]` | DataTrove pipeline step |
+| LangChain | `pip install SqueakyCleanText[langchain]` | LangChain document transformer |
+| Haystack | `pip install SqueakyCleanText[haystack]` | Haystack document cleaner component |
+| Score | `pip install SqueakyCleanText[score]` | MinHash signatures for score columns and `sct-report` ([docs/SCORE.md](docs/SCORE.md)) |
 | OCR | `pip install SqueakyCleanText[ocr]` | Pillow image redaction and Tesseract OCR adapter |
 | All NER | `pip install SqueakyCleanText[all-ner]` | All NER backends combined |
 | Development | `pip install SqueakyCleanText[dev]` | Testing and linting tools |
@@ -318,7 +329,7 @@ import json
 json.dumps(anon_map.to_dict())
 ```
 
-> **Note**: `ProcessResult` from `process()` unpacks as a 3-tuple (`lm_text, stat_text, language`) for backward compatibility, but also exposes `.metadata` for reversible maps and document classification. `metadata` is always a dict with value-free counts: `metadata['regex_counts']` (e.g. `{"EMAIL": {"count": 1, "chars": 17}}`, one entry per regex replacement type) and `metadata['entity_counts']` (NER findings per type, same shape). It also holds `language_confidence` (Lingua top-1 confidence, `1.0` when pinned, `None` when unknown), `language_source` (`pinned`, `detected`, `fallback` when a `language` tuple fell back to its first entry, or `none`) and `warnings`, a sorted list of codes: `language_unknown`, `language_fallback`, `language_low_confidence`, `ner_fallback_models` (the language has no own NER model and ran MULTILINGUAL + ENGLISH), `cuda_fallback` (CUDA was requested but a model ran on CPU). `metadata['provenance']` is `{"backend", "models"}`, one `{"key", "id", "revision", "provider"}` entry per NER model that runs for the document's language (`revision` is the resolved Hub commit for ONNX models, `provider` the ONNX execution provider or the torch device); `{"backend": None, "models": []}` when NER is off.
+> **Note**: `ProcessResult` from `process()` unpacks as a 3-tuple (`lm_text, stat_text, language`) for backward compatibility, but also exposes `.metadata` for reversible maps and document classification. `metadata` is always a dict with value-free counts: `metadata['regex_counts']` (e.g. `{"EMAIL": {"count": 1, "chars": 17}}`, one entry per regex replacement type) and `metadata['entity_counts']` (NER findings per type, same shape). It also holds `language_confidence` (Lingua top-1 confidence, `1.0` when pinned, `None` when unknown), `language_source` (`pinned`, `detected`, `fallback` when a `language` tuple fell back to its first entry, or `none`) and `warnings`, a sorted list of codes: `language_unknown`, `language_fallback`, `language_low_confidence`, `ner_fallback_models` (the language has no own NER model and ran MULTILINGUAL + ENGLISH), `cuda_fallback` (CUDA was requested but a model ran on CPU), `empty_input`. `metadata['provenance']` is `{"backend", "models"}`, one `{"key", "id", "revision", "provider"}` entry per NER model that runs for the document's language (`revision` is the resolved Hub commit for ONNX models, `provider` the ONNX execution provider or the torch device); `{"backend": None, "models": []}` when NER is off.
 
 ### Document Classification (GLiClass)
 
@@ -378,6 +389,12 @@ cfg = TextCleanerConfig(
 cleaner = TextCleaner(cfg=cfg)
 # Descriptions are used for inference, results are mapped back to original label names
 ```
+
+`result.signals` is the value-free view of that metadata, with the same keys for every input:
+`language`, `language_confidence`, `language_source`, `chars`, `pii_count`, `pii_chars`,
+`pii_share`, `pii_types`, `regex_counts`, `entity_counts`, `sensitive`, `warnings` (adds
+`ner_off`) and `models`. It never holds entity text, so it is safe to log or store next to
+cleaned data. Score columns, `sct-report`, the adapters and the MCP server read it.
 
 ### Batch Processing
 
@@ -603,6 +620,7 @@ new_cfg = dataclasses.replace(cfg, check_ner_process=False)
 | `gliner_label_map` | `None` | Maps GLiNER labels to NER tags |
 | `gliner_threshold` | `None` | GLiNER confidence threshold (0..1). `None` = 0.4, or 0.3 in PII mode |
 | `gliner_label_descriptions` | `None` | ZERONER-style: `{label: "description"}` for improved zero-shot accuracy |
+| `json_key_cleaning` | `'pii'` | How `process_json` (and `sct-clean --json-input`, MCP `clean_json`, RAG chunk metadata) cleans dict keys: `'pii'` = PII steps only, `'full'` = the whole config (0.7), `'off'` = keys as written (can carry PII) |
 | `fuzzy_date_score_cutoff` | `85` | Fuzzy matching threshold (0-100) for misspelled months |
 | `custom_pipeline_steps` | `()` | Tuple of `(text: str) -> str` callables appended after all built-in steps |
 
@@ -706,6 +724,51 @@ manifest, but it does not copy model files or Python language detection.
 Corpus owners can call `assess_reidentification_risk` to measure k-anonymity
 for selected quasi-identifiers. Reports contain counts only, not source values.
 
+### Framework integrations
+
+```python
+from sct.integrations.hf import clean_dataset
+
+ds = clean_dataset(ds, columns=["text"], num_proc=4)          # Hugging Face datasets
+```
+
+`sct.integrations.datatrove.SCTCleaner`, `sct.integrations.langchain.SCTDocumentTransformer`
+and `sct.integrations.haystack.SCTDocumentCleaner` take the same options: `columns`,
+`output="overwrite"` or `"new_column"` (`<col>_clean`), and `config` (default the `training`
+preset; reversible mode is rejected). Document adapters write `metadata["sct"]`. Each needs
+its extra. See [docs/INTEGRATIONS.md](docs/INTEGRATIONS.md); other engines (Ray, Spark,
+Polars, DuckDB, dlt, Daft) in [docs/RECIPES.md](docs/RECIPES.md).
+
+### Score columns and `sct-report`
+
+```python
+from sct.score import score_record
+row = score_record(cleaner.process(text))   # sct_language, sct_pii_count, sct_pii_share, ...
+```
+
+```sh
+sct-report data.jsonl --text-column text --preset training \
+    --minhash --quasi-identifiers city,age_band --k 5 \
+    --out report.json --card card.md --scores scores.jsonl
+```
+
+Score A (language, PII count, share and types, warnings) is always on. Score B is off by
+default: a quality score on the original text and a PII-normalised MinHash of the cleaned
+text (`[score]` extra). The report and data card hold counts, shares and hashes only.
+See [docs/SCORE.md](docs/SCORE.md).
+
+### MCP server
+
+```sh
+pip install 'SqueakyCleanText[mcp]'
+SCT_MCP_PRESET=training SCT_MCP_ROOT=~/notes sct-mcp
+```
+
+Tools `clean_text` (`text` or `path`) and `clean_json` return `warnings`, a one-line
+`summary`, the cleaned `text` / `value` and `signals`; `detail="full"` adds value-free
+findings. `path` input is off unless `SCT_MCP_ROOT` is set (`SCT_MCP_MAX_BYTES`, default
+1 MiB). `SCT_MCP_PRESET` (default `sct`) picks the config preset. See [docs/MCP.md](docs/MCP.md).
+
 ## PII Evaluation
 
 Model changes need ground-truth privacy evaluation, not only backend agreement.
@@ -731,6 +794,13 @@ python -m scripts.benchmark_models \
   --candidate gliner2-pii \
   --output evaluation/results/gliner2-pii.json
 ```
+
+The multilingual set `evaluation/multilingual_pii.jsonl` (220 synthetic records, en, nl, de,
+es, zh, ja, th, ar, hi, bn, ta) scores the default ensemble at 0.87 recall / 0.92 precision
+in 0.8.0, ahead of the GLiNER multilingual models; see
+[docs/MULTILINGUAL_EVAL.md](docs/MULTILINGUAL_EVAL.md). The release benchmark
+(`scripts/benchmark_release.py`, 30 documents in 9 languages) gives 0.98 exact-span F1 and
+0 of 67 leaks. Throughput by hardware: [docs/PERFORMANCE.md](docs/PERFORMANCE.md).
 
 Published third-party results are reference data only. `assess_candidate`
 requires local recall, exact-span F1, latency, and ONNX parity before adoption.
@@ -771,6 +841,17 @@ Input Text
 Each step is toggled by a `TextCleanerConfig` field. The pipeline is built once at initialization; disabled steps are skipped entirely (zero overhead).
 
 ## What's New
+
+**v0.8.0** (breaking changes, see [CHANGELOG.md](CHANGELOG.md))
+- **Speed**: NER batched across the documents of `process_batch`; ONNX sessions run in parallel. 4.2x (short) and 3.2x (long documents) faster on 16 CPU cores; GPU device choice (`ner_device`, `cuda_device_id`).
+- **All 75 Lingua languages** detected, with confidence and warnings; pin any language; bring your own model per language.
+- **`training` preset**, `json_key_cleaning`, `check_decode_unicode_escapes`, `ner_chunk_overlap`.
+- **`result.signals`**: value-free view for logging and data cards; provenance of every model run.
+- **Integrations**: Hugging Face `datasets`, DataTrove, LangChain, Haystack; recipes for other engines.
+- **Score columns, data cards, `sct-report`**, k-anonymity on named columns.
+- **MCP server**: new output shape, `outputSchema`, annotations, file input under `SCT_MCP_ROOT`.
+- **Multilingual PII eval** (11 languages) and a required Linux worker CI job (fork crash fixed).
+- Python 3.12+ only.
 
 **v0.7.0**
 - **Privacy policies**: Apply versioned entity rules, allowlists, thresholds, and redaction actions.

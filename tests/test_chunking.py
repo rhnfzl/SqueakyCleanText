@@ -332,6 +332,8 @@ def test_overlap_config_validation_and_module_global(monkeypatch):
     assert TextCleanerConfig(check_ner_process=False).ner_chunk_overlap == 0
     monkeypatch.setattr(config, "NER_CHUNK_OVERLAP", 16)
     assert config._config_from_module_globals().ner_chunk_overlap == 16
+    monkeypatch.setattr(config, "NER_BATCH_SIZE", 2)
+    assert config._config_from_module_globals().ner_batch_size == 2
 
 
 def test_overlap_with_real_tokenizer():

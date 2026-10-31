@@ -1,23 +1,83 @@
 # Changelog
 
-## 0.8.0 - 2026-10-30
+## 0.8.0 - 2026-10-31
 
-This is a speed release. NER model calls run in batches, also across the documents of one
-`process_batch` call, and ONNX models no longer queue on a lock. On the release benchmark
-(`evaluation/results/comparison-0.7.1-0.8.0.md`) `process_batch` on 16 Linux cores is 4.2x
-faster on short documents (3.69 to 15.55 docs/s) and 3.2x faster on long documents (0.65 to
-2.08 docs/s). Single-document `process` is unchanged within noise (0.95x to 1.10x).
-Exact-span TP/FP/FN, recall (0.98) and leaks (0 of 67) are identical to 0.7.1, and 29 of 30
-default-config outputs are byte-identical; the other one is the documented chunk-boundary
-placeholder merge below.
+0.8.0 makes batch cleaning faster, detects all 75 Lingua languages, and adds a value-free
+signal view that feeds new framework adapters (Hugging Face `datasets`, DataTrove, LangChain,
+Haystack), score columns and data cards (`sct-report`), a reworked MCP server and a
+`training` preset. It has many breaking changes; read "Behaviour changes" before upgrading.
+
+### Highlights
+
+- Speed: on the release benchmark (`evaluation/results/comparison-0.7.1-0.8.0.md`)
+  `process_batch` on 16 Linux cores is 4.2x faster on short documents (3.69 to 15.55 docs/s)
+  and 3.2x faster on long documents (0.65 to 2.08 docs/s); on 64 cores 29.2 docs/s (short).
+  Single-document `process` is unchanged within noise (0.95x to 1.10x). On an RTX 4090,
+  single documents are about 17x and batches about 4.5x faster than 64 CPU cores. CPU and
+  GPU numbers, hardware advice and CUDA setup: `docs/PERFORMANCE.md`.
+- Correctness, release benchmark (30 documents, 84 entities, 9 languages): exact-span
+  TP/FP/FN 82/2/2 (P = R = F1 = 0.98) and 0 of 67 PII values leaked, identical to 0.7.1.
+  `evaluation/results/benchmark-0.8.0.md`.
+- New multilingual PII eval (220 synthetic records, 11 languages): the default ONNX
+  ensemble scores 0.87 / 0.92 recall / precision overall. GLiNER multi v2.1 (0.45 / 0.68)
+  and GLiNER multi PII v1 (0.57 / 0.91) score lower, so the default model is not switched.
+  `docs/MULTILINGUAL_EVAL.md`.
+- Linux worker processes (`fork`, `forkserver`) are tested in CI; a crash when a forked
+  child freed an inherited ONNX session is fixed.
+
+### Added
+
+- `ProcessResult.signals`: a value-free public view (language, confidence, PII counts,
+  share and types, regex and entity counts, warnings, model provenance). Never entity text.
+  Details under "Behaviour changes".
+- Presets: `sct.preset_config("training", **overrides)`, `TextCleanerConfig.from_preset()`,
+  `sct.PRESETS`. `training` removes only PII and repairs broken unicode, for training and
+  RAG text. Details under "New options".
+- Framework adapters (`docs/INTEGRATIONS.md`), each behind its extra:
+  `sct.integrations.hf.clean_dataset` / `SCTMap` (`[datasets]`, `Dataset` and
+  `IterableDataset`, `score=True` adds score columns), `sct.integrations.datatrove.SCTCleaner`
+  (`[datatrove]`, counts `pii`, `pii_<TYPE>` and `sensitive` stats),
+  `sct.integrations.langchain.SCTDocumentTransformer` (`[langchain]`) and
+  `sct.integrations.haystack.SCTDocumentCleaner` (`[haystack]`, `to_dict` / `from_dict`
+  round-trip through `Pipeline.dumps`). Shared options: `columns` (default the main text
+  field), `output="overwrite"` (default) or `"new_column"` (`<col>_clean`, raw kept),
+  `config` (default the `training` preset; reversible mode is rejected). Document adapters
+  write `metadata["sct"]` = signals of the first column. `sct.integrations._runtime`
+  (`CleanerHandle`, `clean_columns`, `clean_records`) keeps one cleaner per process, rebuilt
+  after a fork and pickled as config only. `docs/RECIPES.md` covers Ray, Spark, Polars,
+  DuckDB, dlt and Daft (Polars and DuckDB run by hand).
+- Score columns and data cards (`docs/SCORE.md`): `sct.score.score_record` /
+  `score_records` give flat `sct_*` columns. Score A (language, language score, PII count,
+  share and types, warnings) is always on. Score B is off by default (`ScoreConfig`): a
+  quality score on the original text (`ONNXQualityScorer`, any `QualityScorer` callable;
+  `scripts/export_quality_head.py` exports FineWeb2-HQ-Plus to one ONNX graph) and a
+  PII-normalised MinHash of the cleaned text (`[score]` extra, character shingles for
+  Han, Kana, Thai, Lao, Khmer and Myanmar text). `build_data_card` / `render_data_card`.
+- `sct-report` command: JSONL or Parquet in; value-free report JSON, optional Markdown data
+  card (`--card`), per-row score JSONL (`--scores`), MinHash metadata, and k-anonymity on
+  the columns named in `--quasi-identifiers` only.
+- MCP server (`docs/MCP.md`): warnings-first output, `outputSchema`, tool annotations,
+  `ToolError`s with a remedy, optional file input (`clean_text(path=...)` under
+  `SCT_MCP_ROOT`), `SCT_MCP_PRESET`. Details under "Behaviour changes".
+- Language: detection over all 75 Lingua languages with a confidence score; any Lingua
+  language can be pinned; a language's own `ner_models` entry runs only that model.
+- GPU choice: `ner_device`, `cuda_device_id`, `onnx_cuda_provider_options`; every result
+  records which models, revisions and execution providers ran (`metadata['provenance']`).
+- Multilingual PII eval set: `evaluation/multilingual_pii.jsonl` (en, nl, de, es, zh, ja,
+  th, ar, hi, bn, ta; native-script names, a code-switch slice), built deterministically by
+  `scripts/build_multilingual_eval.py` and scored by `scripts/run_multilingual_eval.py`.
+- New extras: `datasets`, `datatrove`, `langchain`, `haystack`, `score`.
+- CI: a required `linux-workers` job (Python 3.13 `fork`, 3.14 `forkserver`) runs the
+  worker-process tests and the adapter tests with their own coverage gate; lint covers
+  `scripts/`.
 
 ### Behaviour changes
 
 - Python 3.11 is no longer supported; 0.8.0 needs Python 3.12 or newer. pip on Python 3.11 keeps resolving to 0.7.1.
 - `lingua-language-detector` minimum raised from 2.1.0 to 2.2. Lingua 2.2 can detect the language of some texts differently from 2.1.1, which changes the language-specific NER model, stopwords and date handling chosen for those texts.
 - ONNX NER models no longer share one lock per model: threads in `process_batch` now run ONNX inference at the same time (`InferenceSession.run` is thread-safe). Output is unchanged. Torch models and GLiNER still run one call at a time. With the ONNX Runtime default threads, a session uses every physical core of the machine and ignores `taskset`/CPU affinity; set `onnx_intra_op_threads` to cap CPU use. On the benchmark, fewer threads per session was slower, not faster, because the batched NER pass runs a few large calls rather than one per worker.
-- Two language keys that use the same model repo with different revisions now load each revision. Before, the second key silently reused the first key's revision. The INT8 quantized cache directory now includes the revision (`<model>@<digest>`, a lowercase hash of the revision, so revisions that differ only in case do not share a directory on case-insensitive filesystems), so a quantized file from one revision is not reused for another.
-- `ner_batch_size` (default 8) now batches model calls: NER chunks of one document, and of all documents in one `process_batch` call, go through each ONNX, torch or GLiNER model `ner_batch_size` chunks per forward pass (rows right-padded). `process_batch` runs the steps before NER per document in threads, then one batched NER pass over all documents (ONNX batches run on the same number of threads), then the steps after NER. Output text, languages and finding spans are unchanged; padded batches can move scores in the last digits (max 5e-6 on the release and long-document sets with the default models). `ner_batch_size=1` keeps the 0.7.1 call pattern and scores exactly. GLiNER2 still runs one chunk per call.
+- Two language keys that use the same model repo with different revisions now load each revision. Before, the second key silently reused the first key's revision. The INT8 quantized cache directory is now keyed by the resolved Hub commit (`<model>@<digest>`, a lowercase hash of the commit), so a quantized file is only reused for the exact weights it came from, also when a branch such as `main` moves. The 0.7.1 directory (`org__model`) is not reused, so each quantized model is quantized again once.
+- `ner_batch_size` (default 8, new legacy module global `NER_BATCH_SIZE`) now batches model calls: NER chunks of one document, and of all documents in one `process_batch` call, go through each ONNX, torch or GLiNER model `ner_batch_size` chunks per forward pass (rows right-padded). `process_batch` runs the steps before NER per document in threads, then one batched NER pass over all documents (ONNX batches run on the same number of threads), then the steps after NER. Output text, languages and finding spans are unchanged; padded batches can move scores in the last digits (max 5e-6 on the release and long-document sets with the default models). `ner_batch_size=1` keeps the 0.7.1 call pattern and scores exactly. GLiNER2 still runs one chunk per call.
 - Throughput with the default models on a 16-core CPU (`scripts/benchmark_release.py --batch 64`, docs/s, `ner_batch_size` 1 vs 8): short documents 14.8 vs 14.9; long documents (about 8 joined documents each) 2.66 vs 2.38 with cpu-count workers, 1.50 vs 1.64 with one worker. With many workers on CPU, threads already fill the cores, so batching mainly adds padding and memory (peak RSS on the long set about 6 GB vs 12 GB). The release benchmark on another machine (Threadripper, 16 cores) measured the opposite: `ner_batch_size` 8 vs 1 was 15.55 vs 10.31 docs/s (short) and 2.08 vs 1.82 (long) with 16 workers. Which setting is faster depends on the CPU; measure before changing it. `ner_batch_size=1` always uses less memory.
 - With `ner_batch_size > 1` and NER on, `metrics_callback` `duration_ms` includes the time a document waits for the shared NER pass of its batch.
 - NER now collects the spans of all chunks of a document in document coordinates, votes once and replaces once per document, instead of voting and replacing chunk by chunk. Chunks and model input are unchanged. Differences, only for documents longer than one chunk:
@@ -29,7 +89,6 @@ placeholder merge below.
 - New `ProcessResult.signals` (`sct/signals.py`: `public_view`, `merge_views`, `PUBLIC_VIEW_KEYS`, `WARNING_CODES`): a value-free view with the same keys for every input, including empty text and `process_json` (language, confidence and source, `chars`, PII count, chars, share and types, regex and entity counts, `sensitive`, warnings, model provenance). Metadata gains `source_chars`; empty or whitespace input now gets full metadata with the `empty_input` warning instead of `None`. `StructuredResult.signals` merges every string leaf; `process_rag_chunks` puts `metadata["sct"]`. Score columns, `sct-report`, the framework adapters and the MCP server read it.
 - `repr(ProcessResult)` shows only `lm_text`, `language` and `signals`; `repr` of `DetectedEntity`, `MapEntry` and `AnonymizationMap` no longer shows entity text or originals.
 - `sct.adapters.is_sensitive_result(result)` now takes only the result and reads these counts (any regex replacement or NER finding). The old `(cleaner, source, result)` signature and the marker-count guessing are gone; it was wrong for empty or custom markers (a phone replaced with `""` was not sensitive). `process_json`, `process_rag_chunks` and OCR region selection use the new counts.
-
 - Language detection now covers all 75 Lingua languages (high accuracy, about 1.4 ms per short document and 246 MB peak for the detector). Text in Hindi, Thai, Arabic, Chinese, Japanese, Bengali, Tamil and other languages is labelled with its own language instead of English/Dutch/German/Spanish or `None`. EN/NL/DE/ES labels are unchanged on a 41-sentence regression set, and release-benchmark outputs and scores are identical (its zh/ja/hi/bn/ta documents were `None` and ran the same MULTILINGUAL + ENGLISH models). Texts in other languages (French, Italian, Portuguese, Polish, ...) that were mislabelled as one of the four now get their own label, so they run the MULTILINGUAL + ENGLISH NER fallback and English stopwords instead of the mislabelled language's. Very short or ambiguous texts can get a near language (for example `"xyz"` is now POLISH with low confidence). `detect_all_languages=False` restores the 0.7 detector.
 - `language=` accepts any Lingua language as a pin or in a tuple (`language='hi'` raised `ValueError` before unless the language was also in `extra_languages`/`ner_models`/...). `supported_languages` now only means "has stopwords, dates or an NER key".
 - A language with its own entry in `ner_models` / `torch_ner_models` (for example `{"HINDI": "your/model"}`) and no `ner_ensemble` route now runs only that model; before, it ran MULTILINGUAL + ENGLISH. The built-in FRENCH/PORTUGUESE/ITALIAN keys, which point at the default multilingual model, keep the fallback.
@@ -39,6 +98,17 @@ placeholder merge below.
 - `metadata['warnings']` gets `cuda_fallback` when CUDA was requested but a model runs on CPU.
 - `ner_device=None` (auto) keeps GLiClass on CPU as before; only `ner_device='cuda'` moves it to the GPU.
 - The URL regex no longer takes `"`, `<` or `>` into the path (they are never raw in a URL). `<a href="https://x.org/a">docs</a>` now becomes `<a href="<URL>">docs</a>` instead of `<a href="<URL> ...` eating the rest of the tag; this only shows when HTML is kept (`check_replace_html=False`).
+- URL regex: user info (`user:pw@`) stops at `/ ? # " < > @`, so `https://x.org/?to=alice@example.com&cc=bob%40example.net` is one `<URL>` (the percent-encoded email leaked before) and `<a href="https://x.org">alice@example.com</a>` keeps its markup. A bare host with a query or fragment (`x.org/?q=1`, `host#frag`) is replaced whole; a bare trailing `?` stays punctuation.
+- Phone regex: grouped national numbers with a trunk 0 (`06 12 34 56 78`, `010-6552 1234`, `020 7946 0958`, 9 or more digits, optional extension) and 3-3-3 groups (`699 123 456`) are now replaced whole; before they were missed or cut. `00` stays the international prefix. Number tables with such groups can now become `<PHONE>`.
+- Email regex: the local part accepts RFC punctuation after its first character (`! # $ % & ' * + -`) and single dots, and cannot end with a dot, so `o'brien@x.org` and `a!b@x.org` are replaced whole. `= / | { } ~ ^ ?` and backtick stay out, so `key=alice@x.org` keeps `key=`.
+- Marker-shaped text already in the input (`<LONDON>`, also after unicode repair: `＜LONDON＞`, `&lt;LONDON&gt;`) is no longer protected from NER, and reversible mode never assigns a placeholder spelled like one already in the input. Only SCT's own placeholders are protected.
+- `metadata['entity_counts']` counts overlapping findings once (merged under the label with the highest score, the label that is replaced).
+- `WindowedStreamingRedactor` never splits an email, phone, URL or IP between windows (matched on an NFKC view, so fullwidth digits count), and holds back a phone-like digit run at the end of a feed until the next feed completes it. If no safe split point is left, it raises `BufferError`.
+- `process_dataframe` reads cells by position, so frames with duplicate row or column labels are cleaned (before, those cells were skipped).
+- Reversible mode on empty input returns an empty `AnonymizationMap` (or stores one in the token store); `sct-clean --token-map` writes it.
+- `sct.risk.assess_reidentification_risk` groups on `(type, value)`, so `True` and `1`, or `1` and `1.0`, are different quasi-identifier values. `sct-report` JSON-encodes values the same way (`[1]` and `"[1]"` differ).
+- MCP `clean_text` / `clean_json` return `{warnings, summary, text|value, signals}` in that order; `detail="full"` adds value-free `findings` (`entity_type, score, start, end, action, reason`, plus `path` for JSON). `stat_text`, `language`, `policy` and the nested `findings[].entity` / `findings[].finding` shape are gone. Both tools declare `outputSchema` and read-only, non-destructive, idempotent, closed-world annotations. Errors are `fastmcp.exceptions.ToolError` with a remedy (a PII-mode mismatch raised `ValueError`). `create_mcp_server(cleaner=None, *, root=None, max_bytes=None, preset=None)`; concurrent first calls build one cleaner.
+- GLiNER on CUDA: after an ONNX-to-torch fallback, and for GLiNER2, the model now moves to the chosen GPU; `presidio_gliner` passes the torch device (`map_location`) and reports it in provenance.
 
 ### New options
 
@@ -50,6 +120,9 @@ placeholder merge below.
 - `json_key_cleaning` (default `'pii'`, legacy module global `JSON_KEY_CLEANING`): how `process_json` (and `sct-clean --json-input`, the MCP `clean_json` tool, RAG chunk metadata) cleans dict keys. `'pii'` runs only the PII steps on keys (the steps the `training` preset turns off stay off), so with the library default `{"k": 1}` keeps its key instead of becoming `{"": 1}`, `{"b": 1, "c": 2}` no longer raises "duplicate key", and keys are not ASCII-folded. `'full'` cleans keys with the whole config (0.7 behaviour); `'off'` keeps keys as written (keys can then carry PII). Values are unchanged.
 - `sct-clean --preset {sct,training}` (default `sct`) and `SCT_MCP_PRESET` / `create_mcp_server(preset=...)` (default `sct`) pick the config preset; `training` keeps non-Latin text, numbers and case as written instead of the library default's ASCII folding (`日本語` became `Ri Ben Yu`).
 - `onnx_intra_op_threads` and `onnx_inter_op_threads` (default `None`, the ONNX Runtime default, same as 0.7.1). Legacy module globals `ONNX_INTRA_OP_THREADS` / `ONNX_INTER_OP_THREADS`. Not applied to GLiNER's own ONNX session (`gliner_onnx=True`).
+- `SCT_MCP_ROOT` (default unset = off) and `SCT_MCP_MAX_BYTES` (default 1 MiB): let MCP `clean_text(path=...)` read regular UTF-8 files under the root. Relative paths only; `..`, hidden parts and symlinks are refused (opened folder by folder with `O_NOFOLLOW`); off on Windows.
+- `ScoreConfig` (`sct.score`, not `TextCleanerConfig`): `quality=False`, `quality_model=None`, `quality_revision=None`, `minhash=False`, `minhash_num_perm=128`, `minhash_seed=1`, `minhash_shingle=5`, `minhash_min_tokens=5`, `data_card=False`.
+- Adapter options `columns`, `output` (`"overwrite"`), `config` (`None` = `"training"`); a single string for `columns` is one column.
 - `ner_chunk_overlap` (default `0`, legacy module global `NER_CHUNK_OVERLAP`): each NER window adds this many tokens of the neighbouring text on both sides of its chunk (GLiNER-only: 2 characters per token), and a span is kept from the window whose chunk holds its start; a neighbouring window's span is kept too when no span of the owning window that passes the confidence threshold (and, with a privacy policy, is replaced or redacted by it) covers it. A span seen by several windows is one vote per model, with its best score and that score's label, so repeated context (even with a different label) never counts as extra models in ensemble voting. A document that fits one window is never split, so overlap only affects documents that are chunked. This finds entities that a chunk boundary would split (sentence, whitespace or hard cut). The default `0` keeps the 0.7.1 chunks; overlap changes the context the model sees in long documents, so detections can change either way, and inference grows by about `2 * overlap / window`. An entity longer than the overlap that starts at the very end of a chunk can still be cut. Must satisfy `2 * overlap < window // 2`; this is checked again for each document, so a model loaded later with a smaller limit raises `ValueError` instead of running with a negative chunk budget.
 
 ### Fixes
@@ -62,10 +135,15 @@ placeholder merge below.
 - Overlapping detections (for example `John Paul Smith` and `Paul` from two ensemble models) are merged into one span before replacement in reversible and synthetic mode and when a custom label is present. Before, right-to-left replacement left part of the outer entity visible (`<PERSON_1> Smith`). Placeholder mode with standard labels already merged them through Presidio. In the release benchmark, reversible output of `zh-glued-001` changes from the garbled `<LOCATION_1>OCATION_0>` to `<LOCATION_0>`.
 - ONNX models exported with a fixed batch dimension of 1 run one row per call instead of failing under `ner_batch_size > 1`.
 - `replacement_mode='synthetic'`: the regex steps and NER now share one consistency cache per document under `ner_batch_size > 1`, so the same value replaced by both gets the same fake value (as with `ner_batch_size=1`).
-- The INT8 quantized cache directory name is collision-free: revisions are hashed (`release/v1` and `release__v1` no longer share a directory), and repo ids that contain `__` are %-quoted. Plain `org/name` ids keep the 0.7.1 `org__name` directory.
+- The INT8 quantized cache directory name is collision-free: commits are hashed and repo ids that contain `__` are %-quoted.
 - ONNX models with external weights (the default XLM-RoBERTa-large models) load from a huggingface-hub cache that stores each blob in its own directory (`hub/blobs/<xx>/<sha256>`, seen with huggingface-hub 1.32.0). onnxruntime refused them with "External data path escapes model directory"; 0.7.1 fails the same way. In that layout SCT now hard-links `model.onnx` and `model.onnx_data` into `~/.cache/sct_linked/<model>@<commit hash>` (under `cache_dir` when set; one directory per snapshot, so a branch that moves back to an already-cached commit loads that commit's weights) and loads them from there; if hard links are not possible (another filesystem) the files are copied once (about 2.2 GB per model) and a warning is logged; later loads, and other processes starting at the same time, reuse the copy while its size matches and its source blob is not newer. Other cache layouts load in place as before.
 - Chunk planning ignores fixed padding set in a model's `tokenizer.json`. Such a tokenizer counted every text as its padded length, so NER windows were split down to single characters and entities were missed (0.7.1 had this for the primary tokenizer; 0.8.0 had spread it to every ensemble tokenizer). None of the default models set padding.
 - Custom `replace_with_numbers` / `replace_with_currency_symbols` markers are inserted literally; before, a backslash in them was read as a regex group reference.
+- Linux worker processes: freeing a cleaner (its ONNX session) inside a forked child crashed (exit 139) or hung in garbage collection, for example in Hugging Face `num_proc` or DataTrove workers. Live NER objects are now pinned in the child at fork (`os.register_at_fork`) and never destroyed there. `forkserver` was not affected.
+- Framework adapters build one cleaner per handle also when several threads ask at once; the lock is replaced after a fork so a child never deadlocks.
+- Hugging Face `clean_dataset` returns only the columns SCT wrote, so `remove_columns=["text"]` with `output="new_column"` really drops the raw text, and a stale input column named like an output column is replaced. Its cache fingerprint is stable across runs (`datasets` hashed a frozenset in per-process order).
+- NER windows respect a tokenizer's saved truncation `max_length` when it is below `model_max_length`, so inference never cuts a planned window.
+- A language route given as a list (`["ENGLISH", ...]`) is no longer changed in place when GLiNER is added to it.
 - `scripts/benchmark_release.py` imports on Windows (no `resource` module); peak RSS is reported as `null` there.
 
 ### Known limits
@@ -74,6 +152,13 @@ placeholder merge below.
 - Only `process_batch` is faster. `process` of one document is not batched across documents.
 - GLiNER2 runs one chunk per call; torch models and GLiNER keep one lock per model, so they do not run in parallel across threads.
 - `ner_chunk_overlap` (off by default) can still cut an entity longer than the overlap that starts at the very end of a chunk.
+- The email regex takes CJK text glued before an address (`请发送至wangfang@example.com` is one `<EMAIL>`) and an Arabic comma `،` after it. No PII leaks, but spans and nearby text are wrong. `06-12345678` becomes `06-<PHONE>`.
+- ORGANISATION is the weakest NER label in the multilingual eval (0.68 recall), mostly in non-Latin scripts; Bengali and Tamil name spans can be a few characters off.
+- A URL with a path swallows a trailing sentence period (`see https://x.org/a.` becomes `see <URL>`).
+- Adversarial strings such as `+000000000(000)0` can leave `(000)0` after phone replacement (Python `re` takes the first alternative that matches, not the longest).
+- Score B's quality head was tested with a small ONNX graph, not the exported FineWeb2-HQ-Plus model; its speed is not measured. GLiNER PII mode (`ner_mode="pii"`) was not run end to end for this release.
+- The library default config (also the default of `sct-clean` and `sct-mcp`) ASCII-folds non-Latin text (`日本語` becomes `Ri Ben Yu`); use the `training` preset to keep it.
+- CI does not install the `mcp` extra; FastMCP-only tests skip there.
 
 ## 0.7.1 - 2026-10-30
 

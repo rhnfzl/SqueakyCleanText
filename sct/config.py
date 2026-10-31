@@ -633,6 +633,7 @@ def _config_from_module_globals() -> TextCleanerConfig:
         replace_numbers_in_words=getattr(m, 'REPLACE_NUMBERS_IN_WORDS', False),
         onnx_intra_op_threads=getattr(m, 'ONNX_INTRA_OP_THREADS', None),
         onnx_inter_op_threads=getattr(m, 'ONNX_INTER_OP_THREADS', None),
+        ner_batch_size=getattr(m, 'NER_BATCH_SIZE', 8),
         ner_chunk_overlap=getattr(m, 'NER_CHUNK_OVERLAP', 0),
         detect_all_languages=getattr(m, 'DETECT_ALL_LANGUAGES', True),
         language_confidence_warning=getattr(m, 'LANGUAGE_CONFIDENCE_WARNING', 0.5),
@@ -698,6 +699,7 @@ CHECK_REPLACE_NUMBERS = True
 REPLACE_NUMBERS_IN_WORDS = False
 ONNX_INTRA_OP_THREADS = None
 ONNX_INTER_OP_THREADS = None
+NER_BATCH_SIZE = 8
 NER_CHUNK_OVERLAP = 0
 DETECT_ALL_LANGUAGES = True
 LANGUAGE_CONFIDENCE_WARNING = 0.5
