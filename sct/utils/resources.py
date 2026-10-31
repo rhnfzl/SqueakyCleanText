@@ -1,3 +1,4 @@
+import os
 import warnings
 import threading
 
@@ -52,6 +53,9 @@ LANGUAGE_NAME = [(language.name).lower() for language in LANGUAGES]
 # Lazy language detector: built on first use, not at import time
 _detector = None
 _detector_lock = threading.Lock()
+if hasattr(os, "register_at_fork"):
+    # A child forked while another thread built a detector must not inherit the lock held.
+    os.register_at_fork(after_in_child=lambda: globals().update(_detector_lock=threading.Lock()))
 
 
 def _get_detector():

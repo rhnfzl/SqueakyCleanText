@@ -893,7 +893,7 @@ class GeneralNER:
         if self.tokenizer is not None:
             tokens = [
                 (start, end)
-                for start, end in self.tokenizer(text, return_offsets_mapping=True).offset_mapping
+                for start, end in counter(text, return_offsets_mapping=True).offset_mapping  # route's tokens
                 if end > start
             ]
             starts = [start for start, _ in tokens]

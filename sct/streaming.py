@@ -1,5 +1,6 @@
 """Streaming interfaces with explicit privacy guarantees."""
 
+import html
 import re
 import unicodedata
 
@@ -13,6 +14,8 @@ _CONTACT_REGEXES = (
 _PHONE_TAIL = re.compile(r"[+(]?\d[\d ()+./-]*\Z")
 # Longer than any phone the regex accepts; a longer digit tail (a number table) may still split.
 _PHONE_TAIL_MAX = 32
+# One HTML entity (decoded later by the cleaner's ftfy step) or one character.
+_VIEW_UNIT = re.compile(r"&(?:#[0-9]+|#[xX][0-9a-fA-F]+|[A-Za-z][A-Za-z0-9]*);|.", re.DOTALL)
 
 
 class BufferedStreamingRedactor:
@@ -72,21 +75,31 @@ class WindowedStreamingRedactor:
             return ""
 
         cutoff = len(self._buffer) - self._overlap_chars
-        # Never split inside a contact token that holds spaces ("06 12 34 56 78"). Match
-        # on a per-character NFKC view (same offsets) so fullwidth "０６ １２" counts too.
-        view = "".join(
-            folded if len(folded := unicodedata.normalize("NFKC", character)) == 1 else character
-            for character in self._buffer
-        )
+        # Never split inside a contact token that holds spaces ("06 12 34 56 78"). Match on a
+        # view close to what the cleaner sees: HTML entities decoded ("12&#32;34") and each
+        # character NFKC-folded ("０６ １２"); starts/ends map view offsets back to the buffer.
+        view, starts, ends = [], [], []
+        for unit in _VIEW_UNIT.finditer(self._buffer):
+            decoded = html.unescape(unit.group())
+            if len(decoded) != 1:  # an unknown entity stays as its raw characters
+                decoded, unit_ends = unit.group(), range(unit.start() + 1, unit.end() + 1)
+            else:
+                unit_ends = (unit.end(),)
+            for character, end in zip(decoded, unit_ends):
+                folded = unicodedata.normalize("NFKC", character)
+                view.append(folded if len(folded) == 1 else character)
+                starts.append(end - 1 if len(unit_ends) > 1 else unit.start())
+                ends.append(end)
+        view = "".join(view)
         inside = {
             index
             for regex in _CONTACT_REGEXES
             for match in regex.finditer(view)
-            for index in range(match.start() + 1, match.end())
+            for index in range(starts[match.start()] + 1, ends[match.end() - 1])
         }
         tail = _PHONE_TAIL.search(view, max(0, len(view) - _PHONE_TAIL_MAX))
         if tail:
-            inside.update(range(tail.start() + 1, len(view)))
+            inside.update(range(starts[tail.start()] + 1, len(self._buffer)))
         split_at = max(
             (
                 index
