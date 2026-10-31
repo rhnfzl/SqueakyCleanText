@@ -34,6 +34,22 @@ class SCTMap:
         return {k: out[k] for k in produced if k in out}
 
 
+def _output_features(features: Any, fn: SCTMap, remove_columns: Any) -> Any:
+    from datasets import Features, Sequence as HFSequence, Value
+    removed = {remove_columns} if isinstance(remove_columns, str) else set(remove_columns or ())
+    out = Features({k: v for k, v in features.items() if k not in removed})
+    for col in fn.columns:
+        # Non-str cells pass through, so a written column keeps its source type.
+        out[col if fn.output == "overwrite" else f"{col}_clean"] = features[col]
+    if fn.score:
+        out.update({
+            "sct_language": Value("string"), "sct_language_score": Value("float64"),
+            "sct_pii_count": Value("int64"), "sct_pii_share": Value("float64"),
+            "sct_pii_types": HFSequence(Value("string")), "sct_warnings": HFSequence(Value("string")),
+        })
+    return out
+
+
 def clean_dataset(
     ds: Any,
     *,
@@ -52,6 +68,10 @@ def clean_dataset(
     if num_proc is not None:
         map_kwargs["num_proc"] = num_proc
     fn = SCTMap(columns, output, config, score)
+    if getattr(ds, "features", None) is not None and "features" not in map_kwargs:
+        # Declare the written columns, or datasets types a first batch of None or []
+        # as null and fails on the next batch.
+        map_kwargs["features"] = _output_features(ds.features, fn, map_kwargs.get("remove_columns"))
     if getattr(ds, "_fingerprint", None) and "new_fingerprint" not in map_kwargs:
         # datasets hashes frozensets in pickle order, which changes per process
         # (PYTHONHASHSEED), so the cache would never hit; hash a sorted view instead.

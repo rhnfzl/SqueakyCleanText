@@ -19,6 +19,15 @@ class ReidentificationRiskReport:
     class_size_counts: Mapping[int, int]
 
 
+def _tagged(value: Any) -> Any:
+    """Type-tag recursively, since True == 1 and 1 == 1.0 would merge distinct values."""
+    if isinstance(value, tuple):
+        return type(value), tuple(_tagged(v) for v in value)
+    if isinstance(value, frozenset):
+        return type(value), frozenset(_tagged(v) for v in value)
+    return type(value), value
+
+
 def assess_reidentification_risk(
     records: Sequence[Mapping[str, Any]],
     *,
@@ -36,8 +45,7 @@ def assess_reidentification_risk(
         missing = set(quasi_identifiers).difference(record)
         if missing:
             raise KeyError(f"Missing quasi-identifiers: {sorted(missing)}")
-        # Type-tagged, since True == 1 and 1 == 1.0 would merge distinct values.
-        combinations[tuple((type(record[key]), record[key]) for key in quasi_identifiers)] += 1
+        combinations[tuple(_tagged(record[key]) for key in quasi_identifiers)] += 1
 
     class_size_counts = Counter(combinations.values())
     at_risk_records = sum(

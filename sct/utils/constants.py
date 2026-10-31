@@ -152,8 +152,10 @@ URL_REGEX = re.compile(
     r"(?::\d{2,5}\b)?"
     # resource path, or a query/fragment right after the host ("?id=", "#token=");
     # " < > are never raw in a URL, so markup around it survives. A bare trailing "?"
-    # stays punctuation.
-    r"(?:\/[^\)\]\}\s\"<>]*|[?#][^\)\]\}\s\"<>]+)?",
+    # stays punctuation. ) ] } belong to the URL only when more URL text follows
+    # ("?f=(a)&email=..."), so a closing bracket around a URL stays outside it.
+    r"(?:\/(?:[^\)\]\}\s\"<>]|[\)\]\}](?=[\w&=/?#%+~-]))*"
+    r"|[?#](?:[^\)\]\}\s\"<>]|[\)\]\}](?=[\w&=/?#%+~-]))+)?",
     flags=re.UNICODE | re.IGNORECASE,
 )
 

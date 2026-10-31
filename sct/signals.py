@@ -66,12 +66,16 @@ def merge_views(views: Iterable[dict[str, Any]]) -> dict[str, Any]:
     views = list(views)
     if not views:
         return public_view(_Empty())
-    # Start from the longest leaf so language_source follows it.
+    # Start from the longest leaf.
     merged = dict(max(views, key=lambda v: v["chars"]))
     lang_chars: dict[Any, int] = {}
     for view in views:
         lang_chars[view["language"]] = lang_chars.get(view["language"], 0) + view["chars"]
     language = max(lang_chars, key=lang_chars.get)
+    # Source follows the longest leaf of the chosen language, not of the whole value.
+    merged["language_source"] = max(
+        (v for v in views if v["language"] == language), key=lambda v: v["chars"]
+    )["language_source"]
     same = [v for v in views if v["language"] == language and v["language_confidence"] is not None]
     weight = sum(v["chars"] for v in same)
     merged["language"] = language
