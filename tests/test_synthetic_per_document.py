@@ -148,3 +148,47 @@ def test_localised_fakes_reproduce_in_a_new_process():
     expected = handle.get().process(text).lm_text
     clone = pickle.loads(pickle.dumps(handle))  # noqa: S301 - trusted round trip
     assert clone.get().process(text).lm_text == expected
+
+
+def test_low_confidence_detection_uses_the_fallback_locale():
+    text = "Neem contact op met jan.devries@voorbeeld.nl over de vergadering van morgen in het kantoor."
+    dutch = _regex_cleaner(check_detect_language=True, language_margin_warning=0.0).process(text)
+    us = _regex_cleaner(check_detect_language=True, synthetic_locale='en_US').process(text)
+    # margin 1.0: every detection is low confidence
+    low = _regex_cleaner(check_detect_language=True, language_margin_warning=1.0).process(text)
+    assert low.language == 'DUTCH' and 'language_low_confidence' in low.metadata['warnings']
+    assert low.lm_text == us.lm_text != dutch.lm_text
+    follow = _regex_cleaner(check_detect_language=True, language_margin_warning=1.0,
+                            synthetic_low_confidence_locale=None).process(text)
+    assert follow.lm_text == dutch.lm_text
+    assert _regex_cleaner(check_detect_language=True, language_margin_warning=1.0,
+                          synthetic_low_confidence_locale='de_DE').process(text).lm_text not in (
+        us.lm_text, dutch.lm_text)
+    old = config_module.SYNTHETIC_LOW_CONFIDENCE_LOCALE
+    try:
+        config_module.SYNTHETIC_LOW_CONFIDENCE_LOCALE = None
+        assert config_module._config_from_module_globals().synthetic_low_confidence_locale is None
+    finally:
+        config_module.SYNTHETIC_LOW_CONFIDENCE_LOCALE = old
+
+
+class _SuffixReplacer(SyntheticReplacer):
+    def get_replacement(self, entity_group, original_text):
+        return 'Anna Weber B.Eng.'
+
+
+def test_fake_ending_in_a_period_does_not_double_the_full_stop():
+    text = "Ich traf Hans Meier. Dann Hans Meier und mehr"
+    data = [{'entity_group': 'PER', 'word': 'Hans Meier', 'start': 9, 'end': 19},
+            {'entity_group': 'PER', 'word': 'Hans Meier', 'start': 26, 'end': 36}]
+    assert _SuffixReplacer(collapse_period=True).generate_for_entities(text, data) == \
+        "Ich traf Anna Weber B.Eng. Dann Anna Weber B.Eng. und mehr"
+    assert _SuffixReplacer().generate_for_entities(text, data).startswith("Ich traf Anna Weber B.Eng..")
+    assert TextCleanerConfig().synthetic_collapse_period is True
+    old = config_module.SYNTHETIC_COLLAPSE_PERIOD
+    try:
+        config_module.SYNTHETIC_COLLAPSE_PERIOD = False
+        assert config_module._config_from_module_globals().synthetic_collapse_period is False
+    finally:
+        config_module.SYNTHETIC_COLLAPSE_PERIOD = old
+    assert _regex_cleaner()._synthetic_replacer._collapse_period is True

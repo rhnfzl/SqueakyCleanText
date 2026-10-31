@@ -107,6 +107,8 @@ class TextCleaner:
             self._synthetic_replacer = SyntheticReplacer(
                 seed=self.cfg.synthetic_seed, per_document=self.cfg.synthetic_per_document,
                 locale=self.cfg.synthetic_locale,
+                low_confidence_locale=self.cfg.synthetic_low_confidence_locale,
+                collapse_period=self.cfg.synthetic_collapse_period,
             )
 
         self.GeneralNER: Optional[ner.GeneralNER] = None
@@ -282,6 +284,12 @@ class TextCleaner:
         return any([self.cfg.check_detect_language, self.cfg.check_ner_process,
                     self.cfg.check_remove_stopwords])
 
+    def _language_low_confidence(self, source, confidence, margin) -> bool:
+        """Whether a detected language gets the language_low_confidence warning."""
+        return source == 'detected' and (
+            confidence < self.cfg.language_confidence_warning
+            or margin < self.cfg.language_margin_warning)
+
     def _process_single(self, text: str) -> ProcessResult:
         try:
             return self._process_single_with_context(text)
@@ -358,7 +366,8 @@ class TextCleaner:
         # Reset per-document synthetic consistency cache (thread-safe via threading.local);
         # the language picks the Faker locale.
         if self._synthetic_replacer:
-            self._synthetic_replacer.reset_cache(text, language)
+            self._synthetic_replacer.reset_cache(text, language, self._language_low_confidence(
+                language_source, language_confidence, language_margin))
 
         current_text = text
 
@@ -427,9 +436,7 @@ class TextCleaner:
             warnings.add('language_unknown')
         if language_source == 'fallback':
             warnings.add('language_fallback')
-        if language_source == 'detected' and (
-                language_confidence < self.cfg.language_confidence_warning
-                or language_margin < self.cfg.language_margin_warning):
+        if self._language_low_confidence(language_source, language_confidence, language_margin):
             warnings.add('language_low_confidence')
         ner_on = self.cfg.check_ner_process and self.GeneralNER is not None
         if ner_on and self.GeneralNER.uses_fallback_models(language):

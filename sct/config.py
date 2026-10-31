@@ -341,6 +341,12 @@ class TextCleanerConfig:
     # the fakes / indexed placeholders go in after NER, so every mode finds the same entities;
     # False = 0.7 order (NER reads the fakes / <EMAIL_0>)
     ner_sees_tags: bool = True
+    # synthetic_locale=None: Faker locale for documents whose detection gets the
+    # language_low_confidence warning; None = follow the detected language anyway (earlier 0.8.0)
+    synthetic_low_confidence_locale: Optional[str] = 'en_US'
+    # synthetic: drop a fake's final '.' when a '.' follows the entity ('B.Eng..' -> 'B.Eng.');
+    # False = keep both (earlier 0.8.0)
+    synthetic_collapse_period: bool = True
 
     def __post_init__(self):
         if self.gliclass_onnx:
@@ -697,6 +703,8 @@ def _config_from_module_globals() -> TextCleanerConfig:
         ner_subword_widen_same_script=getattr(m, 'NER_SUBWORD_WIDEN_SAME_SCRIPT', True),
         synthetic_locale=getattr(m, 'SYNTHETIC_LOCALE', None),
         ner_sees_tags=getattr(m, 'NER_SEES_TAGS', True),
+        synthetic_low_confidence_locale=getattr(m, 'SYNTHETIC_LOW_CONFIDENCE_LOCALE', 'en_US'),
+        synthetic_collapse_period=getattr(m, 'SYNTHETIC_COLLAPSE_PERIOD', True),
         check_replace_currency_symbols=m.CHECK_REPLACE_CURRENCY_SYMBOLS,
         check_ner_process=m.CHECK_NER_PROCESS,
         check_remove_isolated_letters=m.CHECK_REMOVE_ISOLATED_LETTERS,
@@ -802,6 +810,8 @@ FOLD_STYLED_CHARACTERS = True
 NER_SUBWORD_WIDEN_SAME_SCRIPT = True
 SYNTHETIC_LOCALE = None
 NER_SEES_TAGS = True
+SYNTHETIC_LOW_CONFIDENCE_LOCALE = 'en_US'
+SYNTHETIC_COLLAPSE_PERIOD = True
 GLINER_ONNX = False
 LANGUAGE = None
 

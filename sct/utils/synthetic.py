@@ -83,6 +83,7 @@ class _DocumentCache(dict):
 
     seed: Optional[int] = None
     language: Optional[str] = None
+    locale: Optional[str] = None  # overrides the language's locale (low-confidence detection)
 
 
 class SyntheticReplacer:
@@ -99,12 +100,19 @@ class SyntheticReplacer:
 
     ``locale=None`` picks the Faker locale from the document language passed to
     ``reset_cache``; a string forces that locale (``'en_US'`` = 0.7).
+    ``low_confidence_locale`` replaces the language's locale for documents whose
+    detection is low confidence (None = follow the language anyway).
+    ``collapse_period`` drops a fake's final ``.`` when the text already has one
+    right after the entity (``B.Eng..`` -> ``B.Eng.``).
     """
 
-    def __init__(self, seed: int = 42, per_document: bool = True, locale: Optional[str] = None):
+    def __init__(self, seed: int = 42, per_document: bool = True, locale: Optional[str] = None,
+                 low_confidence_locale: Optional[str] = None, collapse_period: bool = False):
         self._seed = seed
         self._per_document = per_document
         self._locale = locale
+        self._low_confidence_locale = low_confidence_locale
+        self._collapse_period = collapse_period
         self._local = threading.local()
 
     def _get_faker(self, locale: Optional[str] = None):
@@ -125,14 +133,18 @@ class SyntheticReplacer:
             fakers[locale] = fake
         return fakers[locale]
 
-    def reset_cache(self, text: Optional[str] = None, language: Optional[str] = None) -> None:
+    def reset_cache(self, text: Optional[str] = None, language: Optional[str] = None,
+                    low_confidence: bool = False) -> None:
         """Start a document: fresh consistency cache, fakes seeded from *text*.
 
         *language* is the document's Lingua language name; it picks the Faker locale
-        unless the replacer was given a fixed one.
+        unless the replacer was given a fixed one, or *low_confidence* flags the
+        detection and a ``low_confidence_locale`` is set.
         """
         self._local.cache = _DocumentCache()
         self._local.cache.language = language
+        if low_confidence:
+            self._local.cache.locale = self._low_confidence_locale
         if self._per_document and text is not None:
             digest = hashlib.blake2b(
                 text.encode('utf-8', 'surrogatepass'), digest_size=8,
@@ -166,7 +178,8 @@ class SyntheticReplacer:
         if cache_key in cache:
             return cache[cache_key]
 
-        fake = self._get_faker(self._locale or faker_locale_for(getattr(cache, 'language', None)))
+        fake = self._get_faker(self._locale or getattr(cache, 'locale', None)
+                               or faker_locale_for(getattr(cache, 'language', None)))
         doc_seed = getattr(cache, 'seed', None)
         if doc_seed is not None:
             # The ordinal travels with the cache, so a document's fakes do not
@@ -196,5 +209,7 @@ class SyntheticReplacer:
         sorted_data = sorted(filtered_data, key=lambda x: x['start'], reverse=True)
         for item in sorted_data:
             replacement = self.get_replacement(item['entity_group'], item['word'])
+            if self._collapse_period and replacement.endswith('.') and text.startswith('.', item['end']):
+                replacement = replacement[:-1]
             text = text[:item['start']] + replacement + text[item['end']:]
         return text
