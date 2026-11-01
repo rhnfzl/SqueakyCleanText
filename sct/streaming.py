@@ -92,6 +92,11 @@ class WindowedStreamingRedactor:
             for character, end in zip(decoded, unit_ends):
                 if unicodedata.category(character) == "Cf":
                     continue  # invisible ("06\u00ad12"): the cleaner's fold drops it inside a contact run
+                # a combining mark composes with the letter before it, as the cleaner's NFC step ("fe\u0301vrier")
+                composed = unicodedata.normalize("NFC", view[-1] + character) if view else ""
+                if unicodedata.category(character).startswith("M") and len(composed) == 1:
+                    view[-1], ends[-1] = composed, end
+                    continue
                 folded = unicodedata.normalize("NFKC", character).translate(table)
                 # punctuation folds only where the cleaner does (contact punctuation, the phone view's
                 # dashes), so a "（" glued after a phone stays wide and does not end the match early

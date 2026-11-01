@@ -50,6 +50,7 @@ import unicodedata
 
 from sct import TextCleaner, TextCleanerConfig
 from sct.streaming import WindowedStreamingRedactor
+from sct.utils import constants
 
 PRESETS = ("training", "sct", "training+dates")
 PRESET_ARGS = {"training": ("training", {}), "sct": ("sct", {}),
@@ -338,6 +339,15 @@ def _typo_sep(rng, plain, slots, kinds):
     return sorted(set(kinds) | {"typo_sep"}) if any(slot and slot[0] == "typo_sep" for slot in slots) else kinds
 
 
+def _month_date(rng, plain, cores):
+    """A day, a month name the date rule reads (février, so the "decomposed" kind can split its accent) and a
+    year; own RNG so the cases of earlier rounds stay the same."""
+    if rng.random() >= 0.3:
+        return None
+    day, name = str(rng.randint(1, 28)), rng.choice(sorted(constants.MONTH_NAMES_MULTILINGUAL))
+    return f"{day} {name} {rng.randint(1950, 2030)}", [("str", f"{day} {name}")]
+
+
 def _url_shape(rng, plain):
     """A host of two labels in one non-Latin script (例え.テスト, as IDNA allows) and a scheme-less
     www introducer, which URL_REGEX also accepts; own RNG so the cases of earlier rounds stay the same."""
@@ -510,7 +520,14 @@ def make_case(seed: int) -> dict:
             plain = _upper(random.Random(f"{seed}-{len(values)}-upper"), plain)  # noqa: S311
         if typ in ("EMAIL", "URL"):
             plain, cores = _host_hyphen(random.Random(f"{seed}-{len(values)}-hyphen"), plain, cores, typ)  # noqa: S311
+        month = typ == "DATE" and _month_date(random.Random(f"{seed}-{len(values)}-month"), plain, cores)  # noqa: S311
+        if month:
+            plain, cores = month
         slots, inserts, kinds = _plan(rng, plain, _legal_join(plain, typ))
+        if month:  # known gaps (round 29 notes): styled digits, circled letters, no space beside CJK/Thai
+            slots = [None if slot and (plain[index].isdigit() or slot[0].startswith("enclosed")) else slot
+                     for index, slot in enumerate(slots)]
+            kinds = sorted({slot[0] for slot in slots if slot} | {insert[0] for insert in inserts.values()})
         kinds = _zw_inside(random.Random(f"{seed}-{len(values)}-zw"), plain, inserts, kinds)  # noqa: S311
         if typ in ("EMAIL", "URL"):
             kinds = _idna_dot(random.Random(f"{seed}-{len(values)}-idna"), plain, slots, kinds, typ)  # noqa: S311
@@ -522,9 +539,9 @@ def make_case(seed: int) -> dict:
             kinds = _zw_domain(random.Random(f"{seed}-{len(values)}-zwh"), plain, inserts, kinds, typ)  # noqa: S311
         if typ in ("PHONE", "DATE"):
             kinds = _typo_sep(random.Random(f"{seed}-{len(values)}-sep"), plain, slots, kinds)  # noqa: S311
-        glue = rng.random() < 0.5
+        glue = rng.random() < 0.5 and not month
         values.append({"type": typ, "plain": plain, "cores": cores, "slots": slots, "inserts": inserts,
-                       "kinds": kinds + (["glue"] if glue else []), "glue": glue})
+                       "kinds": kinds + (["glue"] if glue else []), "glue": glue, "month": bool(month)})
     context_scripts = [rng.choice(scripts) for _ in range(len(values) + 1)]
     context = [_sentence(rng, script) for script in context_scripts]
     case = {"seed": seed, "scripts": scripts, "context": context, "context_scripts": context_scripts, "values": values}
@@ -680,6 +697,9 @@ def check_case(seed: int, modes=MODES, folds=(True, False)) -> dict:
     doc = build_doc(case)
     context_doc = " ".join(case["context"])
     failures, stream_errors = [], 0
+    # a window keeps a spaced token whole only when it fits in the overlap; a month-name date may not (48/12)
+    short = {f"{size}/{overlap}" for size, overlap in STREAM_PARAMS
+             if any(value["month"] and len(render(value)) > overlap for value in case["values"])}
     for preset in PRESETS:
         cores = active_cores(case, preset)
         for fold_styled in folds:
@@ -694,8 +714,8 @@ def check_case(seed: int, modes=MODES, folds=(True, False)) -> dict:
             for mode in modes:
                 out = outputs(doc, preset, fold_styled, mode, seed)
                 for key, text in out.items():
-                    if text is None:
-                        stream_errors += mode == "stream"
+                    if text is None or (mode == "stream" and key in short):
+                        stream_errors += text is None and mode == "stream"
                         continue
                     text_fold = fold(text)
                     is_restore = key == "restored"

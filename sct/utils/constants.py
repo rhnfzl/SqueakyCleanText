@@ -257,9 +257,10 @@ URL_REGEX = re.compile(
     # " < > are never raw in a URL, so markup around it survives. A bare trailing "?"
     # stays punctuation. CJK and full-width punctuation (，。！（ ・) ends it, as in an email
     # domain, so CJK prose glued after a URL stays. ) ] } belong to the URL only when more URL text follows
-    # ("?f=(a)&email=...", "report(1).pdf"), so a closing bracket around a URL stays outside it.
-    rf"(?:\/(?:{_NO_GLUE}[^\)\]\}}\s\"<>{_WIDE_PUNCT}]|[\)\]\}}](?=[\w&=/?#%+~-]|\.\w))*"
-    rf"|[?#](?:{_NO_GLUE}[^\)\]\}}\s\"<>{_WIDE_PUNCT}]|[\)\]\}}](?=[\w&=/?#%+~-]|\.\w))+)?"
+    # ("?f=(a)&email=...", "report(1).pdf", a run as in "/(S(id))/a.aspx"), so a closing bracket around a URL
+    # stays outside it.
+    rf"(?:\/(?:{_NO_GLUE}[^\)\]\}}\s\"<>{_WIDE_PUNCT}]|[\)\]\}}]+(?=[\w&=/?#%+~-]|\.\w))*"
+    rf"|[?#](?:{_NO_GLUE}[^\)\]\}}\s\"<>{_WIDE_PUNCT}]|[\)\]\}}]+(?=[\w&=/?#%+~-]|\.\w))+)?"
     # Safety net: a scheme-led run whose host fails the grammar above (a look-alike character in it) is
     # still a URL up to a space or prose punctuation, so its query values never stay visible.
     rf"|(?:https?|ftp):\/\/(?:{_NO_GLUE}[^\s\"<>{_WIDE_PUNCT}])+(?<=[^\W_]|[{MARKS}]))",

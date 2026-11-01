@@ -184,6 +184,7 @@ Haystack), score columns and data cards (`sct-report`), a reworked MCP server an
 - A worker forked while another thread was building the language detector gets a fresh detector lock instead of inheriting it held (a possible hang).
 - URLs whose host is a private or loopback IPv4 address (`10.x`, `127.x`, `172.16-31.x`, `169.254.x`, `192.168.x`) or a bracketed IPv6 address (`[::1]:8080`) become one `<URL>`. Before, such a URL was not matched as a URL and query values such as `?email=alice%40example.com` stayed in the text.
 - URLs keep interior `)`, `]` and `}` when more URL text follows (`?f=(a)&email=...`, or a dot and a word: `report(1).pdf?email=...`), so the rest of the query is replaced too; a bracket closing around a URL still stays outside it.
+- URLs keep a run of closing brackets when more URL text follows it (ASP.NET `/(S(id))/a.aspx?email=...`, `?q=f(a(b))&email=...`), so the query after it is replaced too.
 - NER: when one model gives two labels for the same span (repeated window context, WordPiece widening), it is one vote with its best score and that score's label, also without `ner_chunk_overlap`. Before, the two labels could average a 0.99 `PER` below the confidence threshold.
 - `sct.integrations.hf.clean_dataset` declares the output column features, so a first batch of only `None` or `[]` no longer types a column as null and fails on the next batch.
 - `assess_reidentification_risk` type-tags values inside tuples and frozensets too, so `(1,)` and `(True,)` are different quasi-identifier values.
@@ -223,6 +224,7 @@ Haystack), score columns and data cards (`sct-report`), a reworked MCP server an
 - A URL path or query ends at CJK and full-width prose punctuation (`，。！（ ・`; full-width URL syntax `／？＃％＆＠：．－＿` excepted), so CJK prose glued after a URL is no longer swallowed with a phone after it (`...?q=zz（備考）！06 08 66 90 80` left `08 66 90 80`).
 - Trunk-0 phones count 9+ digits from the first two, so `018 566 00 17` (3-3-2-2) is one `<PHONE>`; before, a 3-digit area code needed 11 digits.
 - `WindowedStreamingRedactor` folds punctuation on its split-guard view only where the cleaner does (contact punctuation forms), so a phone glued before `（` is no longer cut between windows.
+- `WindowedStreamingRedactor` composes a combining mark with the letter before it on its split-guard view, as the cleaner's NFC step does, so a date with a decomposed accent (`15 fe\u0301vrier 1990`) is no longer cut between windows and left unredacted. No option.
 - `AGENTS.md` (contributors): no word-list fixes for model mistakes; every behaviour is a safe default plus a config option.
 
 ### Known limits
