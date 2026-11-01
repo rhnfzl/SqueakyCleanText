@@ -225,6 +225,7 @@ Haystack), score columns and data cards (`sct-report`), a reworked MCP server an
 - Trunk-0 phones count 9+ digits from the first two, so `018 566 00 17` (3-3-2-2) is one `<PHONE>`; before, a 3-digit area code needed 11 digits.
 - `WindowedStreamingRedactor` folds punctuation on its split-guard view only where the cleaner does (contact punctuation forms), so a phone glued before `（` is no longer cut between windows.
 - `WindowedStreamingRedactor` composes a combining mark with the letter before it on its split-guard view, as the cleaner's NFC step does, so a date with a decomposed accent (`15 fe\u0301vrier 1990`) is no longer cut between windows and left unredacted. No option.
+- `WindowedStreamingRedactor` decodes backslash escapes (`\uXXXX`, `\UXXXXXXXX`, `\xNN`, `\N{...}`, octal and one-letter escapes) on its split-guard view with the cleaner's own codec when `check_decode_unicode_escapes=True` (the default), so a JSON-escaped phone or date (`06 12\u0033\u0034 56 78`, `06 12\u00a034 56 78`, `15 f\u00e9vrier 1990`) is no longer cut between windows and left unredacted. With `check_fuzzy_replace_dates=True` every fuzzy date candidate (`15 Janury 1990`, `Janury 15, 1990`) is kept in one window too. No new option; both follow the existing ones.
 - `AGENTS.md` (contributors): no word-list fixes for model mistakes; every behaviour is a safe default plus a config option.
 
 ### Known limits

@@ -17,7 +17,9 @@ letters 🄹 occur), break hints between non-Latin letters of a mail domain or U
 area-code parentheses glued to the digits (+49(30)123456), URL user info whose password ends
 in punctuation (https://alice:p4ss!@host/), mail local parts mixing separators and other punctuation
 (josé_smith.work@, anna.smith!@) with their hyphens and dots typed as another form (john\u2011smith@),
-and glued to CJK/Thai prose without a space. Every variant comes from Unicode
+and glued to CJK/Thai prose without a space. For a config that decodes backslash escapes
+(``check_decode_unicode_escapes``, the default) some characters are also written as literal
+``\\uXXXX`` / ``\\U........`` / ``\\xNN`` escapes, as JSON-escaped text carries them. Every variant comes from Unicode
 data (decomposition tag, NFKC, decimal value, category), and every
 rendered value folds back to the plain value (NFKC, Cf removed, Nd -> ASCII).
 
@@ -550,6 +552,37 @@ def make_case(seed: int) -> dict:
     return case
 
 
+def _escape(rng, text):
+    """Each character as a literal backslash escape the cleaner's escape step decodes."""
+    def forms(cp):
+        return [f for f, ok in (("\\x%02x", cp < 0x100), ("\\u%04x", cp < 0x10000), ("\\U%08x", True)) if ok]
+    return "".join(rng.choice(forms(ord(ch))) % ord(ch) for ch in text)
+
+
+def escaped_case(case):
+    """The case with a few characters of some values written as backslash escapes (``06 12\\u0033\\x34``); own RNG
+    per value, so the unescaped case stays the same."""
+    values = []
+    for index, value in enumerate(case["values"]):
+        rng = random.Random(f"{case['seed']}-{index}-escape")  # noqa: S311
+        value = dict(value, slots=list(value["slots"]), inserts=dict(value["inserts"]))
+        positions = [i for i, slot in enumerate(value["slots"]) if slot is None or slot[1]]
+        if rng.random() < 0.3:
+            for i in rng.sample(positions, min(len(positions), rng.randint(1, 3))):
+                slot = value["slots"][i]
+                value["slots"][i] = ("escaped", _escape(rng, value["plain"][i] if slot is None else slot[1]))
+            for i, (kind, text) in list(value["inserts"].items()):
+                if rng.random() < 0.5:
+                    value["inserts"][i] = ("escaped", _escape(rng, text))
+            value["kinds"] = sorted({slot[0] for slot in value["slots"] if slot}
+                                    | {insert[0] for insert in value["inserts"].values()}) + (
+                ["glue"] if value["glue"] else [])
+            decoded = render(value).encode("latin", "backslashreplace").decode("unicode-escape")
+            assert fold(decoded) == fold(value["plain"]), (case["seed"], value["plain"], render(value))
+        values.append(value)
+    return dict(case, values=values)
+
+
 def render(value, disabled=frozenset()):
     out = []
     for index, ch in enumerate(value["plain"] + "\0"):
@@ -588,7 +621,7 @@ def steps(value):
         if slot:
             out[slot[0]].append(f"{value['plain'][index]}->{slot[1] or '(joined)'}")
     for index, (kind, ch) in sorted(value["inserts"].items()):
-        out[kind].append(f"+U+{ord(ch):04X}@{index}")
+        out[kind].append(f"+U+{ord(ch):04X}@{index}" if len(ch) == 1 else f"+{ch}@{index}")  # escaped: as written
     if value["glue"]:
         out["glue"].append("no space beside CJK/Thai")
     return dict(out)
@@ -693,14 +726,18 @@ def _record(case, doc, check, preset, fold_styled, mode, output, **extra):
 
 
 def check_case(seed: int, modes=MODES, folds=(True, False)) -> dict:
-    case = make_case(seed)
-    doc = build_doc(case)
-    context_doc = " ".join(case["context"])
+    plain_case = make_case(seed)
+    context_doc = " ".join(plain_case["context"])
     failures, stream_errors = [], 0
-    # a window keeps a spaced token whole only when it fits in the overlap; a month-name date may not (48/12)
-    short = {f"{size}/{overlap}" for size, overlap in STREAM_PARAMS
-             if any(value["month"] and len(render(value)) > overlap for value in case["values"])}
     for preset in PRESETS:
+        decodes = cleaner(preset, True, "placeholder").cfg.check_decode_unicode_escapes
+        case = escaped_case(plain_case) if decodes else plain_case
+        doc = build_doc(case)
+        # a window keeps a spaced token whole only when it fits in the overlap; a month-name date or a value
+        # written with escapes (6-10 characters per escaped one) may not (48/12)
+        short = {f"{size}/{overlap}" for size, overlap in STREAM_PARAMS
+                 if any((value["month"] or "escaped" in value["kinds"]) and len(render(value)) > overlap
+                        for value in case["values"])}
         cores = active_cores(case, preset)
         for fold_styled in folds:
             suffix = "" if fold_styled else "|fold_off"
@@ -753,7 +790,7 @@ def check_case(seed: int, modes=MODES, folds=(True, False)) -> dict:
                             minimal_kinds=kinds,
                             signature=f"stream_mismatch|{preset}|{'+'.join(kinds) or 'plain'}{suffix}"))
     return {"seed": seed, "failures": failures, "stream_errors": stream_errors,
-            "types": [v["type"] for v in case["values"]]}
+            "types": [v["type"] for v in plain_case["values"]]}
 
 
 def run(seeds, workers=1, modes=MODES):

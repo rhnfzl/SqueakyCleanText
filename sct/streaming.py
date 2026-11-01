@@ -16,8 +16,25 @@ _CONTACT_REGEXES = (
 _PHONE_TAIL = re.compile(r"[+(]?\d[\d ()+./-]*\Z")
 # Longer than any phone the regex accepts; a longer digit tail (a number table) may still split.
 _PHONE_TAIL_MAX = 32
-# One HTML entity (decoded later by the cleaner's ftfy step) or one character.
-_VIEW_UNIT = re.compile(r"&(?:#[0-9]+|#[xX][0-9a-fA-F]+|[A-Za-z][A-Za-z0-9]*);|.", re.DOTALL)
+# One HTML entity (decoded later by the cleaner's ftfy step), one backslash escape (decoded by the
+# cleaner's check_decode_unicode_escapes step, "12\\u0033") or one character.
+_VIEW_UNIT = re.compile(
+    r"&(?:#[0-9]+|#[xX][0-9a-fA-F]+|[A-Za-z][A-Za-z0-9]*);"
+    r"|\\(?:u[0-9a-fA-F]{4}|U[0-9a-fA-F]{8}|x[0-9a-fA-F]{2}|N\{[^}]*\}|[0-7]{1,3}|[\\'\"abfnrtv])|.",
+    re.DOTALL,
+)
+
+
+def _decode_unit(unit: str, decode_escapes: bool) -> str:
+    """Decode one view unit the way the cleaner's fix_bad_unicode step does."""
+    if unit[0] != "\\":
+        return html.unescape(unit)
+    if not decode_escapes:
+        return unit
+    try:  # the cleaner's own codec, so the view decodes exactly what it decodes
+        return unit.encode("latin", "backslashreplace").decode("unicode-escape")
+    except UnicodeDecodeError:  # "\\N{unknown}" stays as its raw characters
+        return unit
 
 
 class BufferedStreamingRedactor:
@@ -83,9 +100,10 @@ class WindowedStreamingRedactor:
         # ASCII ("٠٦ ١٢", as the cleaner's digit view); starts/ends map view offsets back to the buffer.
         view, starts, ends = [], [], []
         table = SEPARATOR_VIEW if self._cleaner.cfg.fold_styled_characters else _DIGIT_VIEW  # as the phone step
+        decode_escapes = self._cleaner.cfg.check_decode_unicode_escapes
         for unit in _VIEW_UNIT.finditer(self._buffer):
-            decoded = html.unescape(unit.group())
-            if len(decoded) != 1:  # an unknown entity stays as its raw characters
+            decoded = _decode_unit(unit.group(), decode_escapes)
+            if len(decoded) != 1:  # an unknown entity or escape stays as its raw characters
                 decoded, unit_ends = unit.group(), range(unit.start() + 1, unit.end() + 1)
             else:
                 unit_ends = (unit.end(),)
@@ -111,9 +129,12 @@ class WindowedStreamingRedactor:
                     starts.append(end - 1 if len(unit_ends) > 1 else unit.start())
                     ends.append(end)
         view = "".join(view)
-        # a configured date ("15 January 1990") is one token too; the cleaner's own (custom) date regex
+        # a configured date ("15 January 1990") is one token too; the cleaner's own (custom) date regex,
+        # and with fuzzy dates on every candidate its fuzzy step may mask ("15 Janury 1990")
+        cfg = self._cleaner.cfg
         regexes = _CONTACT_REGEXES + (
-            (self._cleaner.ProcessDateTime._date_regex.pattern,) if self._cleaner.cfg.check_replace_dates else ())
+            (self._cleaner.ProcessDateTime._date_regex.pattern,) if cfg.check_replace_dates else ()) + (
+            (constants.FUZZY_DATE_CANDIDATE_REGEX,) if cfg.check_fuzzy_replace_dates else ())
         inside = {
             index
             for regex in regexes
