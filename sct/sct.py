@@ -84,6 +84,7 @@ class TextCleaner:
         )
 
         # Instance-scoped datetime (with custom month names -> per-instance regex)
+        mn_dict = None
         if self.cfg.custom_month_names:
             extra = {}
             for lang, names in self.cfg.custom_month_names.items():
@@ -102,9 +103,10 @@ class TextCleaner:
             )
         else:
             self.ProcessDateTime = datetime.ProcessDateTime()
-        # fold_styled_characters: dates, like phones, read any space as " " and any dash as "-" (1987\u201105\u201112).
+        # fold_styled_characters: dates, like phones, read any space as " " and any dash as "-" (1987\u201105\u201112),
+        # any dot form as "." (1990﹒ 1﹒ 15﹒), and a month-name date's day may be a circled number (⑮ January 1990).
         self._date_view = (
-            contact.DigitView(self.ProcessDateTime._date_regex.pattern, contact.SEPARATOR_VIEW)
+            contact.DigitView(constants.build_date_regex(mn_dict, styled=True), contact.DATE_SEPARATOR_VIEW)
             if self.cfg.fold_styled_characters else self.ProcessDateTime._date_regex)
 
         self.ProcessContacts = contact.ProcessContacts()

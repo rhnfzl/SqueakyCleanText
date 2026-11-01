@@ -17,6 +17,10 @@ SEPARATOR_VIEW = {**_DIGIT_VIEW, **{cp: ' ' if unicodedata.category(chr(cp)) == 
                                     for cp in range(0x80, 0x20000) if unicodedata.category(chr(cp)) in ('Zs', 'Pd')},
                   **str.maketrans(constants.PHONE_PARENS)}
 
+# Dates (fold_styled_characters) also read every character whose NFKC form is "." as "." (1990﹒ 1﹒ 15﹒).
+DATE_SEPARATOR_VIEW = {**SEPARATOR_VIEW, **{cp: '.' for cp in range(0x80, 0x20000)
+                                             if unicodedata.normalize('NFKC', chr(cp)) == '.'}}
+
 
 class _SourceMatch:
     """A match found in the view, read from the source text."""

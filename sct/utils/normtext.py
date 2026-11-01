@@ -87,9 +87,9 @@ _HOST_SEP = {cp: '-' if unicodedata.category(chr(cp)) == 'Pd' else '.' for cp in
              if unicodedata.category(chr(cp)) == 'Pd' or unicodedata.normalize('NFKC', chr(cp)) == '.'}
 _HOST_SEP_CHARS = re.escape(''.join(map(chr, _HOST_SEP)))
 _HOST_DOTS = re.escape(''.join(chr(cp) for cp, plain in _HOST_SEP.items() if plain == '.'))
-# A circled run folds beside ASCII alnum, any decimal digit (⑩꤈), any dash (2026\u2013⑩) or contact
-# punctuation in any form.
-_RUN_NEIGHBOUR = re.compile(rf'[0-9A-Za-z{_PUNCT_ANY}{_DASHES}]|\d')
+# A circled run folds beside ASCII alnum, a letter of the Latin script it folds to (ⓓé: décembre), any decimal
+# digit (⑩꤈), any dash (2026\u2013⑩) or contact punctuation in any form.
+_RUN_NEIGHBOUR = re.compile(rf'[0-9{constants.LATIN_LETTERS}{_PUNCT_ANY}{_DASHES}]|\d')
 # Phone parentheses in any form (+49（30）123456).
 _PARENS = re.escape('()' + ''.join(constants.PHONE_PARENS))
 # URL/email/phone/date punctuation in compatibility form folds between ASCII letters or digits of
@@ -161,7 +161,8 @@ def _fold_styled_email_run(m):
 # contact-run character (ASCII alnum, any decimal digit, circled alnum, contact or mail local-part punctuation or a phone
 # parenthesis in any form) are line-break or layout hints copied with the text ("06\u00ad12" reads "0612"): a run of
 # them drops when its other side is a run character, a letter of any script (例え\u200b．jp), a space
-# ("06\u200b 12") or the text edge. Between two other letters they stay (ZWNJ in Persian, ZWSP
+# ("06\u200b 12") or the text edge; between a letter of any script and a space or the text edge it joins nothing
+# and drops too (1990년 6월\u2060 1일). Between two other letters they stay (ZWNJ in Persian, ZWSP
 # between Thai words).
 _INVISIBLE_REGEX = re.compile(f'[{_FORMAT_CHARS}]+')
 _RUN_CHAR = re.compile('[A-Za-z\\d%s%s%s%s%s%s%s%s]' % (''.join(map(chr, _CIRCLED_ALNUM)), _PUNCT_ANY, _DASHES, _IDNA_DOTS,
@@ -173,9 +174,9 @@ def _drop_invisible(m):
     s, a, b = m.string, m.start(), m.end()
     # a text edge counts as a space, so a window of a stream that ends there folds as the whole text does
     left, right = s[a - 1] if a else ' ', s[b] if b < len(s) else ' '
-    run_left, run_right = _RUN_CHAR.match(left), _RUN_CHAR.match(right)
-    if (run_left and (run_right or right.isspace() or _LETTER.match(right))) or (
-            run_right and (left.isspace() or _LETTER.match(left))):
+    word_left, word_right = _RUN_CHAR.match(left) or _LETTER.match(left), _RUN_CHAR.match(right) or _LETTER.match(right)
+    if (_RUN_CHAR.match(left) and word_right) or (_RUN_CHAR.match(right) and word_left) or (
+            word_left and right.isspace()) or (word_right and left.isspace()):
         return ''
     return m.group()
 

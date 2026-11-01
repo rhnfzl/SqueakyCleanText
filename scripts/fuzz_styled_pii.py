@@ -376,6 +376,34 @@ def _month_date(rng, plain, cores):
     return f"{day} {name} {rng.randint(1950, 2030)}", [("str", f"{day} {name}")]
 
 
+def _han(number):
+    """``number`` (1-9999) in Han numerals as dates write them: digit by digit for a year, with 十 for 10-31."""
+    digits = "〇一二三四五六七八九"
+    if number > 31:
+        return "".join(digits[int(d)] for d in str(number))
+    tens, ones = divmod(number, 10)
+    return ("" if tens < 2 else digits[tens]) + ("十" if tens else "") + (digits[ones] if ones else "")
+
+
+def _date_shape(rng, plain, cores):
+    """A date as CJK and Korean text writes it: unit characters (1990年1月15日, 1990년 1월 15일), dots each followed
+    by a space (1990. 1. 15.), no zero padding (1990/1/15) or Han numerals (一九九〇年一月十五日); own RNG so the cases
+    of earlier rounds stay the same. Returns (plain, cores, spaced) or None."""
+    if rng.random() >= 0.3:
+        return None
+    year, month, day = rng.randint(1950, 2030), rng.randint(1, 12), rng.randint(1, 28)
+    shape = rng.randrange(5)
+    if shape == 0:
+        return f"{year}/{month}/{day}", [("digits", f"{year}{month}{day}")], False
+    if shape == 4:
+        year, month, day = _han(year), _han(month), _han(day)
+    units, gap = (("年", "月", "日"), "") if shape in (1, 4) else (("년", "월", "일"), " ") if shape == 2 else (
+        (".", ".", "."), " ")
+    value = f"{year}{units[0]}{gap}{month}{units[1]}{gap}{day}{units[2]}"
+    return value, [("str", f"{year}{units[0]}{gap}{month}{units[1]}"), ("str", f"{month}{units[1]}{gap}{day}{units[2]}")], \
+        bool(gap)
+
+
 def _url_shape(rng, plain):
     """A host of two labels in one non-Latin script (例え.テスト, as IDNA allows) and a scheme-less
     www introducer, which URL_REGEX also accepts; own RNG so the cases of earlier rounds stay the same."""
@@ -560,12 +588,15 @@ def make_case(seed: int) -> dict:
         if typ == "URL":
             plain = _final_dot(random.Random(f"{seed}-{len(values)}-finaldot"), plain)  # noqa: S311
         month = typ == "DATE" and _month_date(random.Random(f"{seed}-{len(values)}-month"), plain, cores)  # noqa: S311
+        shape = typ == "DATE" and not month and _date_shape(
+            random.Random(f"{seed}-{len(values)}-dateshape"), plain, cores)  # noqa: S311
         if month:
             plain, cores = month
+        if shape:
+            plain, cores, month = shape  # a spaced shape, like a month-name date, may be longer than the overlap
         slots, inserts, kinds = _plan(rng, plain, _legal_join(plain, typ))
-        if month:  # known gaps (round 29 notes): styled digits, circled letters, no space beside CJK/Thai
-            slots = [None if slot and (plain[index].isdigit() or slot[0].startswith("enclosed")) else slot
-                     for index, slot in enumerate(slots)]
+        if shape:  # known limit: a circled number glued to a unit character (1月⑮日) stays a list marker
+            slots = [None if slot and slot[0].startswith("enclosed") else slot for slot in slots]
             kinds = sorted({slot[0] for slot in slots if slot} | {insert[0] for insert in inserts.values()})
         kinds = _zw_inside(random.Random(f"{seed}-{len(values)}-zw"), plain, inserts, kinds)  # noqa: S311
         kinds = _cruft_inside(random.Random(f"{seed}-{len(values)}-cruft"), plain, inserts, kinds)  # noqa: S311
@@ -579,7 +610,7 @@ def make_case(seed: int) -> dict:
             kinds = _zw_domain(random.Random(f"{seed}-{len(values)}-zwh"), plain, inserts, kinds, typ)  # noqa: S311
         if typ in ("PHONE", "DATE"):
             kinds = _typo_sep(random.Random(f"{seed}-{len(values)}-sep"), plain, slots, kinds)  # noqa: S311
-        glue = rng.random() < 0.5 and not month
+        glue = rng.random() < 0.5
         values.append({"type": typ, "plain": plain, "cores": cores, "slots": slots, "inserts": inserts,
                        "kinds": kinds + (["glue"] if glue else []), "glue": glue, "month": bool(month)})
     context_scripts = [rng.choice(scripts) for _ in range(len(values) + 1)]

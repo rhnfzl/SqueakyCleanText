@@ -84,6 +84,11 @@ MARKS = _class_ranges('M', (0x300, 0x3FFFF), (0xE0000, 0xE0FFF))
 _SUPPLEMENTARY_ALNUM = _class_ranges('LMN', (0x10000, 0x3FFFF))
 # Latin, Greek and Cyrillic letters, which sit between spaces in prose.
 _SPACED_LETTERS = "A-Za-z\u00C0-\u024F\u0370-\u03FF\u0400-\u04FF"
+# Letters of the Latin script (Script=Latin, any block: é, ŀ, ḁ), which styled letters fold to.
+LATIN_LETTERS = ''.join(
+    f"{chr(lo)}-{chr(hi)}" if hi > lo else chr(lo) for lo, hi in _cp_spans(
+        cp for cp in range(0x110000)
+        if unicodedata.category(chr(cp))[0] == 'L' and regex.match(r'\p{Script=Latin}', chr(cp))))
 # Letters and marks of scripts written without spaces between words (Thai, Lao, Khmer, Myanmar, CJK, kana:
 # Unicode line-break class SA, ID or CJ; not full-width Latin). Where one touches a Latin/Greek/Cyrillic letter or a digit, a
 # word ends, so prose glued to an address ("ดูa@b.jpกขค", "https://x.com/aปถว06 10") stays outside it.
@@ -442,9 +447,13 @@ _MONTH = r'(?:0?[1-9]|1[0-2])'
 # Year-last takes day-month or month-day, so one part must be a month (no 31/31/2024).
 # Year-first with dots needs 2-digit month/day so CalVer "2024.1.5" stays; a digit
 # joined by . or , on either side means a version, IP or decimal ("10.1.12.2024").
+# CJK and Korean write the year, month and day with unit characters (1990年1月15日, 1990년 1월 15일), and Korean
+# also as dots each followed by a space (1990. 1. 15.); the unit characters are separators like "/".
 _NUMERIC_DATE = (
     r'(?<!\d[.,])(?:'
-    r'\d{4}(?:([-/])' + _MONTH + r'\1' + _DAY + r'|\.(?:0[1-9]|1[0-2])\.(?:0[1-9]|[12]\d|3[01]))'
+    r'\d{4}(?:([-/])' + _MONTH + r'\1' + _DAY + r'|\.(?:0[1-9]|1[0-2])\.(?:0[1-9]|[12]\d|3[01])'
+    r'|\s?年\s?' + _MONTH + r'\s?月\s?' + _DAY + r'\s?日|년\s?' + _MONTH + r'월\s?' + _DAY + r'일'
+    r'|\.\s' + _MONTH + r'\.\s' + _DAY + r'\.)'
     r'|' + _DAY + r'([-/.])' + _MONTH + r'\2\d{4}|' + _MONTH + r'([-/.])' + _DAY + r'\3\d{4}'
     r')'
     r'(?:[T ]\d{1,2}:\d{2}(?::\d{2})?(?:[.,]\d+)?(?:\s?Z|\s?[+-]\d{2}:?\d{2})?)?'
@@ -452,27 +461,55 @@ _NUMERIC_DATE = (
 )
 
 
-def build_date_regex(month_names_dict=None):
+# A date is a word of its own where no digit, "_" or letter of a spaced script (Latin, Greek, Cyrillic) touches it;
+# letters of an unspaced script (Thai, CJK) end a word, as they do for numbers (生日是15 January 1990谢谢).
+_DATE_START = r'(?<![\d_' + _SPACED_LETTERS + r'])'
+_DATE_END = r'(?![\d_' + _SPACED_LETTERS + r'])'
+
+
+def _han_numerals(*values):
+    """Han-script numerals (〇 一 十 廿, financial forms) whose Unicode numeric value is in *values*."""
+    return ''.join(chr(cp) for cp in range(0x3000, 0x2FA20) if unicodedata.numeric(chr(cp), None) in values
+                   and regex.match(r'\p{Script=Han}', chr(cp)))
+
+
+_HAN_DIGIT, _HAN_1_9 = f'[{_han_numerals(*range(10))}]', f'[{_han_numerals(*range(1, 10))}]'
+_HAN_TEN = f'[{_han_numerals(10)}]'
+# A date in Han numerals (一九九〇年一月十五日): four digits of value 0-9, a month 1-12 and a day 1-31 by numeric value.
+_HAN_DATE = (
+    rf'{_HAN_DIGIT}{{4}}年(?:{_HAN_TEN}[{_han_numerals(1, 2)}]?|{_HAN_1_9})月'
+    rf'(?:[{_han_numerals(2)}]{_HAN_TEN}{_HAN_1_9}?|[{_han_numerals(3)}]{_HAN_TEN}[{_han_numerals(1)}]?'
+    rf'|[{_han_numerals(20, 30)}]{_HAN_1_9}?|{_HAN_TEN}{_HAN_1_9}?|{_HAN_1_9})日'
+)
+# fold_styled_characters: a circled day number (⑮ January 1990), which the fold keeps where no digit sits beside it.
+_CIRCLED_DAYS = ''.join(chr(cp) for cp in range(0x2460, 0x3300)
+                        if unicodedata.decomposition(chr(cp)).startswith('<circle>')
+                        and unicodedata.normalize('NFKC', chr(cp)).isdigit()
+                        and 1 <= int(unicodedata.normalize('NFKC', chr(cp))) <= 31)
+
+
+def build_date_regex(month_names_dict=None, styled=False):
     """Build DATE_REGEX from a month-names dict.
 
     Args:
         month_names_dict: output of build_month_names_dict().
                          Uses module-level MONTH_NAMES_MULTILINGUAL if None.
+        styled: a month-name date's day may be a circled number (fold_styled_characters).
     Returns:
         Compiled regex pattern
     """
     names = month_names_dict or MONTH_NAMES_MULTILINGUAL
     alt = '|'.join(sorted(names.keys(), key=len, reverse=True))
+    day = rf'(?:\d{{1,2}}|[{_CIRCLED_DAYS}])' if styled else r'\d{1,2}'
     # A numeric date glued to letters of an unspaced script (Thai, CJK) is a date, as numbers are.
     return re.compile(
-        r'(?<![\d_' + _SPACED_LETTERS + r'])' + _NUMERIC_DATE + r'(?![\d_' + _SPACED_LETTERS + r'])'
-        r'|\b(?:'
+        _DATE_START + _NUMERIC_DATE + _DATE_END + '|' + _HAN_DATE + '|' + _DATE_START + r'(?:'
         r'(?:' + alt + r')'
-        r'\.?\s+\d{1,2}(?:st|nd|rd|th)?,?\s+\d{4}'
+        r'\.?\s+' + day + r'(?:st|nd|rd|th)?,?\s+\d{4}'
         r'|'
-        r'\d{1,2}\.?\s+(?:de\s+)?(?:' + alt + r')'
+        + day + r'\.?\s+(?:de\s+)?(?:' + alt + r')'
         r'(?:\s+de)?\s+\d{4}'
-        r')\b',
+        r')' + _DATE_END,
         flags=re.IGNORECASE,
     )
 
@@ -502,13 +539,13 @@ DATE_REGEX = build_date_regex()
 # Candidate pattern for fuzzy date matching: a word near a number that could be a date.
 # Matches patterns like "Janury 15, 2024" or "15 Feburary 2024" where the month is misspelled.
 FUZZY_DATE_CANDIDATE_REGEX = re.compile(
-    r'\b(?:'
+    _DATE_START + r'(?:'
     # Word then day then year: "Janury 15, 2024"
     r'([A-Za-z\u00e0-\u00fc]{3,12})\.?\s+\d{1,2}(?:st|nd|rd|th)?,?\s+\d{4}'
     r'|'
     # Day then word then year: "15 Feburary 2024" or "15. Janur 2024" or "15 de enro de 2024"
     r'\d{1,2}\.?\s+(?:de\s+)?([A-Za-z\u00e0-\u00fc]{3,12})(?:\s+de)?\s+\d{4}'
-    r')\b',
+    r')' + _DATE_END,
     flags=re.IGNORECASE,
 )
 

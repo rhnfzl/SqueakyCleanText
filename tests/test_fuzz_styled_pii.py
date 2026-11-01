@@ -172,6 +172,17 @@ FIXED_CLUSTERS = {
     "stream_mismatch|training|PHONE:glue": 283,
     "stream_mismatch|training|PHONE:enclosed_pair+PHONE:glue": 15673,
     "stream_mismatch|training+dates|PHONE:enclosed_pair+PHONE:glue": 15673,
+    # date shapes (CJK/Korean units, Han numerals, styled and glued month-name dates), seeds on the old code
+    "leak|DATE|plain|placeholder": 20,
+    "leak|DATE|plain|stream": 20,
+    "leak|DATE|glue|placeholder": 16,
+    "leak|DATE|glue|stream": 16,
+    "leak|DATE|enclosed_alnum|placeholder": 39,
+    "leak|DATE|enclosed_alnum|stream": 39,
+    "leak|DATE|enclosed_pair|placeholder": 224,
+    "leak|DATE|enclosed_pair|stream": 224,
+    "leak|DATE|small_sep|placeholder": 315,
+    "leak|DATE|entity|placeholder": 671,
 }
 # Extra seeds (round 3): PHONE|glue leaking again by another root cause, and URLs whose query holds a
 # percent-encoded email with a Thai/CJK domain (%40ถมยฌฒ.in), which the round-3 fix must keep whole.
