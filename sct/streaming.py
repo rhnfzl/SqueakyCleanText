@@ -5,7 +5,8 @@ import unicodedata
 from itertools import groupby
 
 from ftfy import fix_encoding
-from ftfy.fixes import unescape_html
+from ftfy.chardata import CONTROL_CHARS
+from ftfy.fixes import ANSI_RE, unescape_html
 
 from sct.sct import TextCleaner
 from sct.utils import constants
@@ -21,9 +22,10 @@ _PHONE_TAIL = re.compile(r"[+(]?\d[\d ()+./-]*\Z")
 _PHONE_TAIL_MAX = 32
 # One HTML entity, escaped again any number of times ("&amp;#32;", decoded later by the cleaner's ftfy step to
 # a fixpoint), one backslash escape (decoded by the
-# cleaner's check_decode_unicode_escapes step, "12\\u0033") or one character.
+# cleaner's check_decode_unicode_escapes step, "12\\u0033"), one terminal escape (removed by ftfy, "\x1b[32m")
+# or one character.
 _VIEW_UNIT = re.compile(
-    r"&(?:amp;)*(?:#[0-9]+|#[xX][0-9a-fA-F]+|[A-Za-z][A-Za-z0-9]*);"
+    ANSI_RE.pattern + r"|&(?:amp;)*(?:#[0-9]+|#[xX][0-9a-fA-F]+|[A-Za-z][A-Za-z0-9]*);"
     r"|\\(?:u[0-9a-fA-F]{4}|U[0-9a-fA-F]{8}|x[0-9a-fA-F]{2}|N\{[^}]*\}|[0-7]{1,3}|[\\'\"abfnrtv])|.",
     re.DOTALL,
 )
@@ -31,6 +33,8 @@ _VIEW_UNIT = re.compile(
 
 def _decode_unit(unit: str, decode_escapes: bool) -> str:
     """Decode one view unit the way the cleaner's fix_bad_unicode step does."""
+    if unit[0] == "\x1b" and len(unit) > 1:  # a terminal colour code, which ftfy removes
+        return ""
     if unit[0] != "\\":
         while (decoded := unescape_html(unit)) != unit:  # ftfy's own decode ("&#59;" stays), to its fixpoint
             unit = decoded
@@ -124,6 +128,8 @@ class WindowedStreamingRedactor:
         for character, start, end in repaired_units:
                 if unicodedata.category(character) == "Cf":
                     continue  # invisible ("06\u00ad12"): the cleaner's fold drops it inside a contact run
+                if ord(character) in CONTROL_CHARS:
+                    continue  # a control ("15\x00", U+FFFC) that ftfy's remove_control_chars drops
                 # a combining mark composes with the letter before it, as the cleaner's NFC step ("fe\u0301vrier")
                 composed = unicodedata.normalize("NFC", view[-1] + character) if view else ""
                 if unicodedata.category(character).startswith("M") and len(composed) == 1:

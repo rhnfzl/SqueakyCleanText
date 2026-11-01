@@ -20,20 +20,20 @@ from typing import Dict, Optional
 logger = logging.getLogger(__name__)
 
 # Some locale providers (th_TH, uk_UA ssn; uk_UA plates) draw from the module-level
-# random, which seed_instance() leaves alone; seeded calls hold this lock.
+# random, which seed_instance() leaves alone; seeded calls swap it for a seeded Random under this lock.
 _GLOBAL_RANDOM_LOCK = threading.Lock()
 _CLOCK_LOCK = threading.Lock()
-# (module, name, original) of the clock patch the _CLOCK_LOCK holder has applied, if any.
-_CLOCK_PATCHES = []
+# (module, name, original) of every global swap a lock holder has applied, if any.
+_SWAPPED = []
 
 
 def _after_fork_in_child():
     # A child forked while another thread held a lock must not inherit it held, nor keep the
     # held clock that thread would have restored (it does not exist in the child).
     global _GLOBAL_RANDOM_LOCK, _CLOCK_LOCK
-    for mod, name, value in _CLOCK_PATCHES:
+    for mod, name, value in _SWAPPED:
         setattr(mod, name, value)
-    _CLOCK_PATCHES.clear()
+    _SWAPPED.clear()
     _GLOBAL_RANDOM_LOCK, _CLOCK_LOCK = threading.Lock(), threading.Lock()
 
 
@@ -73,18 +73,41 @@ def _clock_at(reference, modules):
     module = types.SimpleNamespace(**vars(_datetime_module))
     module.date, module.datetime = Date, DateTime
     held = {id(_datetime_module): module, id(datetime): DateTime, id(date): Date}
-    with _CLOCK_LOCK:
+    with _swap_globals(_CLOCK_LOCK, modules, held):
+        yield
+
+
+@contextlib.contextmanager
+def _seeded_random(seed, modules):
+    """Faker code in *modules* draws from a Random seeded with *seed*, not the shared global one.
+
+    The global random stays untouched, so another thread drawing from it meanwhile neither
+    changes these values nor loses its own draws. shortcut: like _clock_at, a Faker call
+    outside SCT on another thread meanwhile draws from this Random too.
+    """
+    rng = random.Random(seed)  # noqa: S311  # reproducible fakes, not crypto
+    held = {id(random): rng}  # "import random" and "from random import randint" alike
+    held.update((id(value), getattr(rng, name)) for name, value in vars(random).items()
+                if isinstance(getattr(value, '__self__', None), random.Random))
+    with _swap_globals(_GLOBAL_RANDOM_LOCK, modules, held):
+        yield
+
+
+@contextlib.contextmanager
+def _swap_globals(lock, modules, held):
+    """Under *lock*, swap each global of *modules* that *held* maps (by id) for its stand-in."""
+    with lock:
         saved = [(mod, name, value) for mod in modules for name, value in vars(mod).items()
                  if id(value) in held]
-        _CLOCK_PATCHES[:] = saved
+        _SWAPPED.extend(saved)
         for mod, name, value in saved:
             setattr(mod, name, held[id(value)])
         try:
             yield
         finally:
-            for mod, name, value in saved:
-                setattr(mod, name, value)
-            _CLOCK_PATCHES.clear()
+            for patch in saved:
+                setattr(patch[0], patch[1], patch[2])
+                _SWAPPED.remove(patch)
 
 # Maps entity tags to Faker method names
 FAKER_GENERATORS: Dict[str, str] = {
@@ -279,21 +302,16 @@ class SyntheticReplacer:
             generate = functools.partial(fake.date_between_dates,
                                          self._reference - timedelta(days=115 * 365 + 28),
                                          self._reference)
+        method = getattr(generate, 'func', generate)
+        modules = {sys.modules.get(getattr(method, '__module__', None))} - {None}
         if self._reference is not None:
-            method = getattr(generate, 'func', generate)
-            modules = {sys.modules.get(getattr(method, '__module__', None)),
-                       sys.modules.get('faker.providers.date_time')} - {None}
-            generate = functools.partial(self._at_reference, generate, modules)
+            clock_modules = modules | ({sys.modules.get('faker.providers.date_time')} - {None})
+            generate = functools.partial(self._at_reference, generate, clock_modules)
         if doc_seed is None:
             replacement = str(generate())
         else:
-            with _GLOBAL_RANDOM_LOCK:
-                state = random.getstate()
-                random.seed(doc_seed + len(cache))
-                try:
-                    replacement = str(generate())
-                finally:
-                    random.setstate(state)
+            with _seeded_random(doc_seed + len(cache), modules):
+                replacement = str(generate())
 
         cache[cache_key] = replacement
         return replacement

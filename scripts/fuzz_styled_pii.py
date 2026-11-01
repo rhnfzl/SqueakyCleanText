@@ -20,7 +20,9 @@ in punctuation (https://alice:p4ss!@host/), mail local parts mixing separators a
 and glued to CJK/Thai prose without a space. For a config that decodes backslash escapes
 (``check_decode_unicode_escapes``, the default) some characters are also written as literal
 ``\\uXXXX`` / ``\\U........`` / ``\\xNN`` escapes, as JSON-escaped text carries them, and some as HTML
-entities, also escaped twice (``&#51;``, ``&amp;#51;``), as scraped text carries them. Every variant comes from Unicode
+entities, also escaped twice (``&#51;``, ``&amp;#51;``), as scraped text carries them. Terminal colour
+codes (``\\x1b[32m``) and controls ftfy removes (NUL, U+FFFC) may sit inside a value,
+as coloured logs carry them. Every variant comes from Unicode
 data (decomposition tag, NFKC, decimal value, category), and every
 rendered value folds back to the plain value (NFKC, Cf removed, Nd -> ASCII).
 
@@ -51,7 +53,8 @@ import re
 import sys
 import unicodedata
 
-from ftfy.fixes import unescape_html
+from ftfy.chardata import CONTROL_CHARS
+from ftfy.fixes import ANSI_RE, unescape_html
 
 from sct import TextCleaner, TextCleanerConfig
 from sct.streaming import WindowedStreamingRedactor
@@ -129,7 +132,9 @@ _DIGIT_FOLD = {cp: str(unicodedata.decimal(chr(cp))) for zero in DIGIT_ZEROS for
 
 
 def fold(text: str) -> str:
-    """The oracle fold: drop Cf, NFKC, any decimal digit -> ASCII, any dash (Pd) -> "-", IDNA dot -> ".", casefold."""
+    """The oracle fold: drop terminal escapes, ftfy's controls and Cf,
+    NFKC, any decimal digit -> ASCII, any dash (Pd) -> "-", IDNA dot -> ".", casefold."""
+    text = ANSI_RE.sub("", text).translate(CONTROL_CHARS)
     text = "".join("." if ch in IDNA_DOT_CHARS else ch for ch in text if unicodedata.category(ch) != "Cf")
     text = unicodedata.normalize("NFKC", text).translate(_DIGIT_FOLD)
     return "".join("-" if unicodedata.category(ch) == "Pd" else ch for ch in text).casefold()
@@ -329,6 +334,23 @@ def _zw_inside(rng, plain, inserts, kinds):
     for index in rng.sample(free, rng.randint(1, min(3, len(free)))):
         inserts[index] = ("zw_inside", rng.choice((ZWSP, WJ, SHY)))
     return sorted(kinds + ["zw_inside"])
+
+
+# Controls ftfy's remove_control_chars drops (NUL, U+FFFC ...), but not whitespace or Cf (zw_inside has those).
+CRUFT_CONTROLS = "".join(chr(cp) for cp in sorted(CONTROL_CHARS)
+                         if not chr(cp).isspace() and unicodedata.category(chr(cp)) != "Cf")
+
+
+def _cruft_inside(rng, plain, inserts, kinds):
+    """Terminal colour codes (``\x1b[32m``) and controls the cleaner's ftfy step removes, between characters of a
+    value, as coloured logs and binary-tainted exports carry them; own RNG so earlier cases stay the same."""
+    free = [index for index in range(len(plain) + 1) if index not in inserts]
+    if not free or rng.random() >= 0.15:
+        return kinds
+    for index in rng.sample(free, rng.randint(1, min(2, len(free)))):
+        ansi = "\x1b[%sm" % rng.choice(("0", "1", "32", "1;31", "38;5;208"))
+        inserts[index] = ("cruft", ansi if rng.random() < 0.5 else rng.choice(CRUFT_CONTROLS))
+    return sorted(kinds + ["cruft"])
 
 
 def _typo_sep(rng, plain, slots, kinds):
@@ -534,6 +556,7 @@ def make_case(seed: int) -> dict:
                      for index, slot in enumerate(slots)]
             kinds = sorted({slot[0] for slot in slots if slot} | {insert[0] for insert in inserts.values()})
         kinds = _zw_inside(random.Random(f"{seed}-{len(values)}-zw"), plain, inserts, kinds)  # noqa: S311
+        kinds = _cruft_inside(random.Random(f"{seed}-{len(values)}-cruft"), plain, inserts, kinds)  # noqa: S311
         if typ in ("EMAIL", "URL"):
             kinds = _idna_dot(random.Random(f"{seed}-{len(values)}-idna"), plain, slots, kinds, typ)  # noqa: S311
             kinds = _host_sep(random.Random(f"{seed}-{len(values)}-hostsep"), plain, slots, kinds, typ)  # noqa: S311
@@ -596,8 +619,9 @@ def escaped_case(case, kind="escaped", encode=_escape, decode=_unescape_backslas
             for i in rng.sample(positions, min(len(positions), rng.randint(1, 3))):
                 slot = value["slots"][i]
                 value["slots"][i] = (kind, encode(rng, value["plain"][i] if slot is None else slot[1]))
-            for i, (_, text) in list(value["inserts"].items()):
-                if rng.random() < 0.5:
+            for i, (insert_kind, text) in list(value["inserts"].items()):
+                # a terminal code stays raw: written as an escape, ftfy would see "[32m" after the decoded ESC
+                if rng.random() < 0.5 and insert_kind != "cruft":
                     value["inserts"][i] = (kind, encode(rng, text))
             value["kinds"] = sorted({slot[0] for slot in value["slots"] if slot}
                                     | {insert[0] for insert in value["inserts"].values()}) + (
@@ -761,7 +785,8 @@ def check_case(seed: int, modes=MODES, folds=(True, False)) -> dict:
         # a window keeps a spaced token whole only when it fits in the overlap; a month-name date or a value
         # written with escapes (6-10 characters per escaped one) may not (48/12)
         short = {f"{size}/{overlap}" for size, overlap in STREAM_PARAMS
-                 if any((value["month"] or {"escaped", "entity"} & set(value["kinds"])) and len(render(value)) > overlap
+                 if any((value["month"] or {"escaped", "entity", "cruft"} & set(value["kinds"]))
+                        and len(render(value)) > overlap
                         for value in case["values"])}
         cores = active_cores(case, preset)
         for fold_styled in folds:
