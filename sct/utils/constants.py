@@ -109,15 +109,34 @@ _IDN_CHAR = _IDN_LETTER + r"0-9\uff10-\uff19\u200c\u200d"
 # The one punctuation IDNA2008 allows in a label in a Latin context (RFC 5892 A.3): the middle dot between
 # two l's (col·legi.cat, Catalan); elsewhere it stays punctuation that ends a label.
 _MIDDLE_DOT = "(?<=l)\u00b7(?=l)"
-# One run of label characters (X+ with middle dots inside), so a label stays X+(-+X+)*.
-_IDN_RUN = rf"[{_IDN_CHAR}]+(?:{_MIDDLE_DOT}[{_IDN_CHAR}]+)*"
+
+
+def _script_class(*scripts):
+    """Character-class body of the code points of *scripts* (Unicode Script property)."""
+    script = regex.compile('[%s]' % ''.join(rf'\p{{Script={name}}}' for name in scripts))
+    return ''.join(f"{chr(lo)}-{chr(hi)}" if hi > lo else chr(lo)
+                   for lo, hi in _cp_spans(cp for cp in range(0x110000) if script.match(chr(cp))))
+
+
+# The other CONTEXTO punctuation of RFC 5892 (A.4, A.5, A.7): Hebrew geresh and gershayim after a Hebrew character
+# (צ׳.co.il) and the katakana middle dot in a label with Hiragana, Katakana or Han (例・え.jp).
+# shortcut: the middle dot needs such a character right beside it, not anywhere in the label; widen if one shows up.
+_KANA_HAN = _script_class('Hiragana', 'Katakana', 'Han')
+_KATAKANA_MIDDLE_DOT = f"(?:(?<=[{_KANA_HAN}])\u30fb|\u30fb(?=[{_KANA_HAN}]))"
+_GERESH = f"(?<=[{_script_class('Hebrew')}])[\u05f3\u05f4]"
+# One run of label characters (X+ with those marks inside, a geresh also at its end), so a label stays X+(-+X+)*.
+_IDN_RUN = rf"[{_IDN_CHAR}]+(?:(?:{_MIDDLE_DOT}|{_KATAKANA_MIDDLE_DOT})[{_IDN_CHAR}]+|{_GERESH}[{_IDN_CHAR}]*)*"
 # A punycode TLD (xn--p1ai) is tried first, so ".xn" alone never ends the match; ZWNJ/ZWJ join
 # letters inside it as in any other label.
 _TLD = (rf"(?:xn--[a-z0-9-]*[a-z0-9]"
         rf"|{_NO_GLUE}[{_IDN_LETTER}](?:[\u200c\u200d]*{_NO_GLUE}[{_IDN_LETTER}])+)")
+_LOCAL_CHAR = rf"{_NO_GLUE}[\w!#$%&'*+{MARKS}\u200c\u200d-]|\.(?!\.)|{_MIDDLE_DOT}"
 EMAIL_REGEX = re.compile(
-    rf"(?:^|(?<=[^\w@.){MARKS}])|(?={_GLUE}))[\w+-]"
-    rf"(?:{_NO_GLUE}[\w!#$%&'*+{MARKS}\u200c\u200d-]|\.(?!\.)|{_MIDDLE_DOT}){{0,63}}?(?<!\.)(@|[(<{{\[]at[)>}}\]])"
+    rf"(?:(?:^|(?<=[^\w@.){MARKS}])|(?={_GLUE}))[\w+-](?:{_LOCAL_CHAR}){{0,63}}?"
+    # A longer local part is taken whole from the start of its run (or a script change), so it is masked, not
+    # left as text; one scan per run, so this stays linear too.
+    rf"|(?:(?<![\w!#$%&'*+.@)\u00b7{MARKS}\u200c\u200d-])|(?={_GLUE}))[\w!#$%&'*+-](?:{_LOCAL_CHAR}){{64,}})"
+    rf"(?<!\.)(@|[(<{{\[]at[)>}}\]])"
     # Host labels as X+(-+X+)*: one way to split a label, so a host with no TLD fails in linear time.
     rf"{_IDN_RUN}(?:-+{_IDN_RUN})*(?:\.{_IDN_RUN}(?:-+{_IDN_RUN})*)*(?:\.{_TLD})",
     flags=re.IGNORECASE | re.UNICODE,

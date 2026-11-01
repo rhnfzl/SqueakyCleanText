@@ -106,12 +106,13 @@ _STYLED_JOINER_REGEX = re.compile(
 # (https://例え．テスト/), so the whole URL, query values included, is one match.
 # CJK and full-width prose punctuation (，、「) ends the run, as it ends URL_REGEX, so prose glued after keeps
 # its ：; an IDNA dot before an ASCII letter or digit (例え。jp) and punctuation before an @ (user info
-# https://alice:pass！＠example.com) stay in it.
+# https://alice:pass！＠example.com) and a katakana middle dot beside kana or Han (例・え.jp, as in URL_REGEX) stay in it.
 # A scheme from the start of its [A-Za-z0-9+.-] run (leading digits and +.- are left as they are), so the
 # scan runs once per run, not once per letter (linear time).
 _SCHEME = r'(?<![A-Za-z0-9+.\-])[0-9+.\-]*+[A-Za-z][A-Za-z0-9+.\-]*+://'
 _URL_RUN_REGEX = re.compile(
-    rf'(?:{_SCHEME}|(?<![A-Za-z0-9_/.{_HOST_DOTS}])www\d{{0,3}}(?:[.{_HOST_DOTS}]|{_IDNA_DOT}))(?:[^\s{constants._WIDE_PUNCT}]|{_IDNA_DOT}|[{constants._WIDE_PUNCT}]+(?=[@{_forms("@")}]))+',
+    rf'(?:{_SCHEME}|(?<![A-Za-z0-9_/.{_HOST_DOTS}])www\d{{0,3}}(?:[.{_HOST_DOTS}]|{_IDNA_DOT}))(?:[^\s{constants._WIDE_PUNCT}]|{_IDNA_DOT}|{constants._KATAKANA_MIDDLE_DOT}'
+    rf'|[{constants._WIDE_PUNCT}]+(?=[@{_forms("@")}]))+',
     re.IGNORECASE)
 _URL_RUN_JOINER = str.maketrans({ch: plain for ch, plain in _STYLED_SEP.items() if plain in ':/?=&#%~'})
 # Dots fold only in a host (up to the path), so prose glued after a URL keeps its ．; a run may hold
@@ -129,16 +130,21 @@ def _fold_url_run(m):
     # layout hints drop in the authority as in a mail domain (https://例\u200bえ.jp)
     return _URL_AUTHORITY.sub(
         lambda a: _IDNA_DOT_REGEX.sub('.', a.group().translate(_AUTHORITY_JOINER)).translate(_DOMAIN_HINTS),
-        m.group().translate(_URL_RUN_JOINER))
+        m.group().translate(_URL_RUN_JOINER).translate(_CIRCLED_ALNUM))
 # Inside an address-shaped run every styled form of @ . - _ + folds (the full-width-only rule above, widened),
 # and in the local part, as in the domain, any dash is a hyphen and any NFKC dot a dot (john.smith\u2011billing@).
 # Styled forms of the other local-part punctuation (anna＆co＠, ＊＠) fold there too.
 _LOCAL_FORMS = _forms("!#$%&'*+-._", _COMPAT_PUNCT)
-_STYLED_EMAIL_RUN_LOCAL = rf'\w{_LOCAL_FORMS}{constants.MARKS}{_FORMAT_CHARS}{_LOCAL_ATEXT}{_HOST_SEP_CHARS}'
+# Circled and squared letters and digits (ⓣ, 🅂) are address characters there too and fold by NFKC whatever sits
+# beside them (ab@éⓣ.net, a@Ŗ🅂Ń.io); outside an address run they keep the neighbour rule below (list markers).
+_CIRCLED = re.escape(''.join(map(chr, _CIRCLED_ALNUM)))
+_STYLED_EMAIL_RUN_LOCAL = rf'\w{_CIRCLED}{_LOCAL_FORMS}{constants.MARKS}{_FORMAT_CHARS}{_LOCAL_ATEXT}{_HOST_SEP_CHARS}'
 _STYLED_EMAIL_RUN_REGEX = re.compile(
     rf'(?<![{_STYLED_EMAIL_RUN_LOCAL}])[{_STYLED_EMAIL_RUN_LOCAL}]*+[@{_forms("@")}]'
-    rf'(?:[\w.\-{_forms(".-_")}{_HOST_SEP_CHARS}{constants.MARKS}{_FORMAT_CHARS}]|{_IDNA_DOT})*\w')
-_STYLED_EMAIL_RUN_JOINER = str.maketrans({ch: plain for ch, plain in _COMPAT_PUNCT.items() if plain in "@!#$%&'*+-._"})
+    rf'(?:[\w{_CIRCLED}.\-{_forms(".-_")}{_HOST_SEP_CHARS}{constants.MARKS}{_FORMAT_CHARS}]|{_IDNA_DOT}'
+    rf'|{constants._KATAKANA_MIDDLE_DOT}|{constants._GERESH})*[\w{_CIRCLED}]')
+_STYLED_EMAIL_RUN_JOINER = {**str.maketrans({ch: plain for ch, plain in _COMPAT_PUNCT.items() if plain in "@!#$%&'*+-._"}),
+                            **_CIRCLED_ALNUM}
 # In the domain every format character but the join controls (ZWNJ/ZWJ, which spell words) is a
 # copied layout hint (例\u200bえ.jp), whatever script sits beside it.
 _DOMAIN_HINTS = {cp: None for cp in range(0x110000)
