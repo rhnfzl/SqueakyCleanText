@@ -10,7 +10,7 @@ Cleans one text. It runs `process_batch([text])` and returns its one result. A
 `ProcessResult` unpacks as a 3-tuple `(lm_text, stat_text, language)`:
   - Cleaned text formatted for language models.
   - Cleaned text formatted for statistical models (`None` if `check_statistical_model_processing` is `False`).
-  - Detected language of the text (`None` if language detection is disabled).
+  - Detected language of the text. `None` when it is unknown, or when no step needs it: `check_detect_language`, `check_ner_process` and `check_remove_stopwords` all `False` and no `language` set. NER and stopword removal run detection even with `check_detect_language=False`.
 
 ### `process_batch(texts: List[str], batch_size: Optional[int] = None) -> List[ProcessResult]`
 

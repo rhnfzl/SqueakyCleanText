@@ -19,7 +19,7 @@ Each subsystem can be extended independently. A language doesn't need support in
 
 - **PII mode** (`ner_mode='pii'`) applies to all supported languages — PII labels are language-agnostic
 - **Replacement modes** (`replacement_mode='placeholder'|'synthetic'|'reversible'`) work for all languages
-- **ModernBERT** is available as an alternative English-only backend with 8192-token context (vs 512 for XLM-RoBERTa). Set via `ner_models={'ENGLISH': 'rhnfzl/modernbert-base-ner-conll03-english-onnx'}` once exported
+- **ModernBERT** is available as an alternative English-only backend with 8192-token context (vs 512 for XLM-RoBERTa). Set via `ner_models={**DEFAULT_NER_MODELS, 'ENGLISH': 'rhnfzl/modernbert-base-ner-conll03-english-onnx'}` once exported (the dict must name `ENGLISH` and `MULTILINGUAL`)
 - **GLiClass** document classification is language-independent (zero-shot, works with any input language)
 
 ---
@@ -93,7 +93,7 @@ result = cleaner.process("Spotkanie z Janem Kowalskim 15 styczen 2025 w Warszawi
 
 ### What each field does
 
-**`extra_languages`**: Tuple of language identifiers (e.g. `'POLISH'`, `'pl'`, `'pol'`). Accepts Lingua names, ISO 639-1, or ISO 639-3 codes. This extends the Lingua detector to consider these languages during auto-detection.
+**`extra_languages`**: Tuple of language identifiers (e.g. `'POLISH'`, `'pl'`, `'pol'`). Accepts Lingua names, ISO 639-1, or ISO 639-3 codes. They join `supported_languages`, which sets the stopword lists loaded up front and the languages `warmup()` loads. With the default `detect_all_languages=True`, Lingua already considers all 75 languages, so the detector does not change. Only with `detect_all_languages=False` does `extra_languages` add these languages to the detector.
 
 **`custom_stopwords`**: Dict mapping language name to frozenset of stopwords. If provided for a language, **replaces** (not merges with) any auto-detected stopwords. If not provided, the `stop-words` package is queried using the language's ISO 639-1 code.
 
@@ -152,10 +152,10 @@ There are two tiers of built-in support:
 
 | Tier | What it means | Steps required |
 |------|--------------|----------------|
-| **Opt-in** | Users enable via `extra_languages=('FRENCH',)` | Steps 1, 3 (NER only), 7 |
-| **Full default** | Language auto-detected for all users by default | Steps 1, 2, 3, 7 |
+| **Opt-in** | Detected by default (all 75 Lingua languages); users add it to the `detect_all_languages=False` detector via `extra_languages=('FRENCH',)` | Steps 1, 3 (NER only), 7 |
+| **Full default** | In `DEFAULT_LANGUAGES`, so also in the `detect_all_languages=False` detector | Steps 1, 2, 3, 7 |
 
-**FR/PT/IT were added as opt-in (v0.5.0)**: users set `extra_languages=('FRENCH',)` etc. — no changes to `resources.py` `DEFAULT_LANGUAGES` required. `build_detector()` is already fully dynamic and handles any Lingua language name.
+With the default `detect_all_languages=True`, every Lingua language is detected, so FR/PT/IT and Polish need no setting. The tiers only differ when a user sets `detect_all_languages=False`: then only `supported_languages` are detected, and an opt-in language needs `extra_languages=('FRENCH',)`. `build_detector()` handles any Lingua language name.
 
 To permanently add a new language (e.g. French) to the package defaults, follow these steps in dependency order.
 
@@ -210,7 +210,7 @@ The module-level `DATE_REGEX`, `FUZZY_MONTH_VOCABULARY`, and `FUZZY_MONTH_VOCABU
 
 ### Step 2: `sct/utils/resources.py` — Update default languages (full-default tier only)
 
-> **Skip this step for opt-in languages** — `build_detector()` dynamically handles any language in `supported_languages`. Only needed to add the language to the *automatic* detection set for all users.
+> **Skip this step for opt-in languages** — `build_detector()` dynamically handles any language in `supported_languages`. Only needed to add the language to the detector used with `detect_all_languages=False`; the default detector already covers all 75 Lingua languages.
 
 Add the language to `LANGUAGES` (module-level Lingua preset) and `DEFAULT_LANGUAGES`:
 
@@ -429,7 +429,7 @@ The ONNX pipeline (`sct/utils/onnx_pipeline.py`) handles download, caching, and 
 
 ## Language Support Matrix
 
-Current built-in support (v0.5.0+):
+Current built-in support (0.8.0). "Yes (auto)" means detected with the default `detect_all_languages=True`; the last column is only needed with `detect_all_languages=False`:
 
 | Language | Lingua (default) | Stopwords | Date Regex | Fuzzy Dates | NER Model | Opt-in via |
 |----------|-----------------|-----------|------------|-------------|-----------|------------|
@@ -437,29 +437,29 @@ Current built-in support (v0.5.0+):
 | Dutch | Yes (auto) | Yes | Yes | Yes | `rhnfzl/xlm-roberta-large-conll02-dutch-onnx` | — |
 | German | Yes (auto) | Yes | Yes | Yes | `rhnfzl/xlm-roberta-large-conll03-german-onnx` | — |
 | Spanish | Yes (auto) | Yes | Yes | Yes | `rhnfzl/xlm-roberta-large-conll02-spanish-onnx` | — |
-| French | No | Yes (stop-words) | Yes | Yes | `rhnfzl/wikineural-multilingual-ner-onnx` (multilingual) | `extra_languages=('FRENCH',)` |
-| Portuguese | No | Yes (stop-words) | Yes | Yes | `rhnfzl/wikineural-multilingual-ner-onnx` (multilingual) | `extra_languages=('PORTUGUESE',)` |
-| Italian | No | Yes (stop-words) | Yes | Yes | `rhnfzl/wikineural-multilingual-ner-onnx` (multilingual) | `extra_languages=('ITALIAN',)` |
+| French | Yes (auto) | Yes (stop-words) | Yes | Yes | `rhnfzl/wikineural-multilingual-ner-onnx` (multilingual) | `extra_languages=('FRENCH',)` |
+| Portuguese | Yes (auto) | Yes (stop-words) | Yes | Yes | `rhnfzl/wikineural-multilingual-ner-onnx` (multilingual) | `extra_languages=('PORTUGUESE',)` |
+| Italian | Yes (auto) | Yes (stop-words) | Yes | Yes | `rhnfzl/wikineural-multilingual-ner-onnx` (multilingual) | `extra_languages=('ITALIAN',)` |
 
 User-extensible via `TextCleanerConfig` (no source changes needed):
 
 | Feature | How to enable | Auto-detected? |
 |---------|--------------|----------------|
-| Lingua detection | `extra_languages=('POLISH',)` | N/A |
+| Lingua detection | Default (all 75 languages); with `detect_all_languages=False`, `extra_languages=('POLISH',)` | Yes |
 | Stopwords | Auto from `stop-words` pkg | Yes (33 languages) |
 | Custom stopwords | `custom_stopwords={'POLISH': frozenset({...})}` | No |
 | Date regex | `custom_month_names={'POLISH': (...)}` | No |
-| NER model | `ner_models={'POLISH': 'model-id'}` | Falls back to MULTILINGUAL |
+| NER model | `ner_models={**DEFAULT_NER_MODELS, 'POLISH': 'model-id'}` | Falls back to MULTILINGUAL |
 
 ### Languages supported by the `stop-words` package
 
-Arabic, Bulgarian, Catalan, Czech, Danish, Dutch, English, Finnish, French, German, Greek, Hindi, Hungarian, Indonesian, Irish, Italian, Japanese, Korean, Lithuanian, Latvian, Norwegian, Persian, Polish, Portuguese, Romanian, Russian, Slovak, Slovenian, Spanish, Swedish, Thai, Turkish, Ukrainian.
+Arabic, Bulgarian, Catalan, Chinese, Czech, Danish, Dutch, English, Finnish, French, German, Greek, Gujarati, Hebrew, Hindi, Hungarian, Indonesian, Italian, Japanese, Korean, Malay, Norwegian, Persian, Polish, Portuguese, Romanian, Russian, Slovak, Spanish, Swedish, Turkish, Ukrainian, Vietnamese (33, from the package's `languages.json`).
 
 ---
 
 ## Checklist for Adding a New Built-In Language
 
-### Opt-in tier (users activate via `extra_languages`)
+### Opt-in tier (auto-detected by default; `extra_languages` only for `detect_all_languages=False`)
 - [ ] Add month names to `MONTH_NAMES_MULTILINGUAL` in `constants.py` (check for shared names!)
 - [ ] Add ISO code to `_LANG_TO_VOCAB` in `constants.py`
 - [ ] Add to `DEFAULT_NER_MODELS` (dedicated ONNX model or MULTILINGUAL fallback) in `config.py`
@@ -473,9 +473,9 @@ Arabic, Bulgarian, Catalan, Czech, Danish, Dutch, English, Finnish, French, Germ
 - [ ] (Optional) Add NER tests if dedicated model added
 - [ ] Verify: `ruff check sct/ tests/` clean
 - [ ] Verify: `pytest tests/ -v` all pass
-- [ ] Bump version in `pyproject.toml`
+- [ ] Bump `__version__` in `sct/__init__.py` (`pyproject.toml` reads it)
 
-### Full-default tier (language auto-detected for all users)
+### Full-default tier (also in the `detect_all_languages=False` detector)
 All of the above, plus:
 - [ ] Add `Language.XXX` to `LANGUAGES` list in `resources.py`
 - [ ] Add to `DEFAULT_LANGUAGES` in both `resources.py` and `config.py`

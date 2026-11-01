@@ -63,3 +63,6 @@ result = cleaner.process("Dear Sir, please find attached the contract...")
 print(result.metadata['classes'])
 # [{"label": "email", "score": 0.92}, {"label": "legal", "score": 0.78}]
 ```
+
+GLiClass runs in torch only. The gliclass package has no ONNX loader, so `gliclass_onnx=True`
+raises `ValueError`. Configs from before 0.7 that set it must drop it.

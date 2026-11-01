@@ -262,7 +262,7 @@ class TextCleaner:
         # Deferred values stay hidden through the cleanup above, so a tag it would remove
         # ("[EMAIL]" under bracket removal) still carries its value to the swap after NER.
         self._post_fuzzy_pipeline.append(self._restore_deferred)
-        # User-provided custom steps — appended after all built-in steps
+        # User-provided custom steps: after the built-in pre-NER steps, before NER and _after_ner
         for step_fn in cfg.custom_pipeline_steps:
             self._post_fuzzy_pipeline.append(step_fn)
 

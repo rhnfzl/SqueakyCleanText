@@ -9,8 +9,10 @@
   German and Spanish run their own model plus the English and multilingual models. Every
   other language runs the multilingual and English models (`ner_ensemble_default_keys`)
   and gets the `ner_fallback_models` warning, unless you bring a model for it with
-  `ner_models={"HINDI": "..."}`.
-- Models load lazily, per language, on first use. `warmup()` loads them up front.
+  `ner_models`. That dict must name `ENGLISH` and `MULTILINGUAL` too, so start from the
+  defaults: `ner_models={**DEFAULT_NER_MODELS, "HINDI": "..."}` (`from sct.config import DEFAULT_NER_MODELS`).
+- The English and multilingual models load when `TextCleaner` is built. Other language models
+  load on first use. `warmup()` loads them up front.
 - Languages that point at the same model share one ONNX session (French, Portuguese
   and Italian use the multilingual model, which saves about 600 MB of RAM).
 - Long documents are cut into token-bounded chunks (CJK and Arabic safe);
@@ -49,11 +51,11 @@ SqueakyCleanText supports six NER backends, selectable via the `ner_backend` con
 | Model | Architecture | Context | Languages | Best for |
 |-------|-------------|---------|-----------|----------|
 | `knowledgator/gliner-bi-base-v2.0` | Bi-encoder (ModernBERT) | 2048 | Multi | General NER, long documents |
-| `knowledgator/gliner-pii-base-v1.0` | Bi-encoder | 2048 | Multi | PII detection (60+ entity types) |
+| `knowledgator/gliner-pii-base-v1.0` | Uni-encoder (DeBERTa) | 2048 | Multi | PII detection (60+ entity types) |
 | `urchade/gliner_large-v2.1` | Uni-encoder (DeBERTa) | 512 | Multi | Legacy, high accuracy on short texts |
 | `MatteoFasulo/ModernBERT-base-NER` | ModernBERT | 8192 | English | English-only, very long context |
 
-> **GLiNER2 note**: `pip install squeakycleantext[gliner2]` installs [Knowledgator's gliner2 package](https://github.com/Knowledgator/GLiNER), not Fastino AI's GLiNER2 from EMNLP 2025 (different API).
+> **GLiNER2 note**: `pip install squeakycleantext[gliner2]` installs the PyPI `gliner2` package, [Fastino AI's GLiNER2](https://github.com/fastino-ai/GLiNER2). Its API differs from Knowledgator's `gliner` package; SCT wraps both. GLiNER2 has no ONNX loader and always runs in torch.
 
 ## GLiNER Label Mapping
 
@@ -129,6 +131,8 @@ lm_text, stat_text, lang = cleaner.process(
 ```
 
 PII mode auto-configures: `ner_backend='gliner'`, uses [`knowledgator/gliner-pii-base-v1.0`](https://huggingface.co/knowledgator/gliner-pii-base-v1.0), uses `gliner_threshold` 0.3 and the same final `ner_confidence_threshold` (recall-focused), and expands positional tags. Both thresholds default to `None` ("not set"); any value you pass, even 0.85 or 0.4, is used as given. `cfg.effective_ner_confidence_threshold` and `cfg.effective_gliner_threshold` give the values that run.
+
+`gliner_onnx=True` loads a GLiNER model from its pre-built ONNX weights on the Hub. It works only with uni-encoder models. PII mode sets it for you when `ner_backend` is left at `'onnx'`.
 
 **Alternative PII models** (pass as `gliner_model`):
 

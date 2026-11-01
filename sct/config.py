@@ -285,7 +285,7 @@ class TextCleanerConfig:
     gliclass_onnx: bool = False
 
     # Plugin: user-provided pipeline steps, each callable (text: str) -> str.
-    # Appended after all built-in steps in _init_pipeline().
+    # Appended to the pre-NER pipeline in _init_pipeline(), so they run before NER.
     custom_pipeline_steps: Tuple = ()
 
     # Language extensibility — extend Lingua detection, stopwords, dates, NER

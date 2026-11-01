@@ -148,7 +148,8 @@ so is kept on by default):
 ## Recommendation
 
 Keep today's default ensemble: it wins overall (0.84 / 0.89 at `39a5ca3`, 0.93 / 0.95 in
-0.8.0) and in every language.
+0.8.0). It does not win every language: GLiNER multi PII v1 scores higher in Arabic (0.93 / 1.00
+against 0.82 / 0.88 in 0.8.0) and slightly higher in Dutch (0.95 / 0.93 against 0.93 / 0.93).
 GLiNER multi v2.1 is far behind outside Latin scripts. GLiNER multi PII v1 has the best
 EMAIL / PHONE precision and the best Arabic row, but recall in hi, bn, ta, ja, zh is
 0.07 to 0.35, so it is not a default candidate either. **The default NER model is NOT

@@ -28,6 +28,8 @@ sct-mcp
 
 `BufferedStreamingRedactor` holds a full document for cross-chunk NER safety.
 `WindowedStreamingRedactor` provides bounded latency for contact tokens.
+When its buffer passes `max_buffer_chars` (default 4096) and has no safe whitespace split, it raises
+`BufferError`. Raise `max_buffer_chars` or use `BufferedStreamingRedactor` for such input.
 It never splits a window inside an email, phone, URL, IP (or a date or number when those steps are on): it reads the
 cleaner's own `TextCleaner.normalise` view of the buffer, so its split points follow every pre-regex step.
 

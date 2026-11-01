@@ -16,7 +16,7 @@ The base install uses **ONNX Runtime** for NER inference - no PyTorch or Transfo
 | Fuzzy dates | `pip install SqueakyCleanText[fuzzy]` | Fuzzy month name matching ([rapidfuzz](https://github.com/rapidfuzz/RapidFuzz)) |
 | PyTorch NER | `pip install SqueakyCleanText[torch]` | PyTorch/Transformers NER backend |
 | GLiNER | `pip install SqueakyCleanText[gliner]` | [GLiNER](https://github.com/urchade/GLiNER) zero-shot NER |
-| GLiNER2 | `pip install SqueakyCleanText[gliner2]` | [GLiNER2](https://github.com/Knowledgator/GLiNER) (knowledgator) backend |
+| GLiNER2 | `pip install SqueakyCleanText[gliner2]` | [GLiNER2](https://github.com/fastino-ai/GLiNER2) (Fastino AI) backend |
 | Synthetic | `pip install SqueakyCleanText[synthetic]` | Faker-based synthetic replacement (realistic fake values instead of `<TAG>` tokens) |
 | Presidio | `pip install SqueakyCleanText[presidio]` | Presidio-analyzer for `presidio_gliner` backend |
 | Classify | `pip install SqueakyCleanText[classify]` | GLiClass document-level pre-classification |

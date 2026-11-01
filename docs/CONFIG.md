@@ -96,7 +96,7 @@ new_cfg = dataclasses.replace(cfg, check_ner_process=False)
 | `check_replace_ips` | `True` | Replace IPv4/IPv6 addresses (runs before dates, phones, years) |
 | `replace_ips_public_only` | `False` | Keep private, loopback and reserved IPs; replace only public ones |
 | `check_replace_years` | `True` | Replace years (1900-2099) |
-| `check_replace_dates` | `True` | Replace full dates and date-times with one `<DATE>` (ISO 8601, numeric with `-` `/` `.` in digits of any script and any 4-digit year, so Buddhist-era `15/01/2533` too, month names, CJK/Korean unit dates `1990年1月15日` `1990년 1월 15일`, Korean `1990. 1. 15.`, Han-numeral `一九九〇年一月十五日` read by Unicode numeric value); runs before phones, years and numbers. A date ends where no digit or Latin/Greek/Cyrillic letter touches it, so one glued to Thai or CJK text is found (`生日是15 January 1990谢谢`). Only full dates: `1990年1月`, `1月15日`, Japanese era years (`令和6年1月15日`), `1990.1.15.` (CalVer-shaped) and month names outside the 7 built-in languages (add them with `custom_month_names`) stay. `False`: digits fall to the year and number steps |
+| `check_replace_dates` | `True` | Replace full dates and date-times with one `<DATE>` (ISO 8601, numeric with `-` `/` `.` in digits of any script and any 4-digit year, so Buddhist-era `15/01/2533` too, month names, CJK/Korean unit dates `1990年1月15日` `1990년 1월 15일`, Korean `1990. 1. 15.`, Han-numeral `一九九〇年一月十五日` read by Unicode numeric value); runs before phones, years and numbers. A date ends where no digit or Latin/Greek/Cyrillic letter touches it, so one glued to Thai or CJK text is found (`生日是15 January 1990谢谢`). Only full dates become one `<DATE>`: `1990年1月`, `1月15日`, Japanese era years (`令和6年1月15日`), `1990.1.15.` (CalVer-shaped) and month names outside the 7 built-in languages (add them with `custom_month_names`) do not, and the year and number steps can still change them (`1990年1月` becomes `<YEAR>年<NUMBER>月`). `False`: digits fall to the year and number steps |
 | `check_fuzzy_replace_dates` | `False` | Fuzzy match misspelled months (requires `[fuzzy]`) |
 | `check_replace_phone_numbers` | `True` | Replace phone numbers |
 | `check_replace_numbers` | `True` | Replace standalone numbers |
@@ -113,7 +113,7 @@ new_cfg = dataclasses.replace(cfg, check_ner_process=False)
 | `check_smart_casefold` | `False` | Lowercase but preserve NER tokens |
 | `check_remove_stopwords` | `True` | Remove stopwords from stat output |
 | `check_remove_punctuation` | `True` | Remove punctuation from stat output |
-| `check_remove_stext_custom_stop_words` | `True` | Remove custom stop words from stat output |
+| `check_remove_stext_custom_stop_words` | `True` | Not used: no step reads it. `custom_stopwords` sets are removed whenever `check_remove_stopwords` is on |
 | `check_remove_emoji` | `False` | Remove emoji characters |
 
 **Replacement tokens** (all `str`):
@@ -138,6 +138,8 @@ new_cfg = dataclasses.replace(cfg, check_ner_process=False)
 |-------|---------|-------------|
 | `ner_backend` | `'onnx'` | Backend: `onnx`, `torch`, `gliner`, `ensemble_onnx`, `ensemble_torch`, `presidio_gliner` |
 | `ner_mode` | `'standard'` | `'standard'` or `'pii'` (auto-configures GLiNER for PII detection) |
+| `gliner_onnx` | `False` | Load the GLiNER model from its pre-built ONNX weights on the Hub (uni-encoder models only). PII mode sets it when `ner_backend` is `'onnx'` |
+| `gliclass_onnx` | `False` | Must stay `False`: the gliclass package has no ONNX loader, so `True` raises `ValueError` |
 | `replacement_mode` | `'placeholder'` | `'placeholder'`, `'synthetic'` (Faker), or `'reversible'` (indexed placeholders + deanonymize map) |
 | `synthetic_seed` | `42` | Base seed for `replacement_mode='synthetic'` |
 | `synthetic_per_document` | `True` | Seed each document's fakes from `synthetic_seed` + its text: fakes differ across documents, the same document always gets the same fakes (any worker count or order). `False` = 0.7: one Faker stream per thread, so batched documents could all get the same first fake |
@@ -165,7 +167,7 @@ new_cfg = dataclasses.replace(cfg, check_ner_process=False)
 | `gliner_label_descriptions` | `None` | ZERONER-style: `{label: "description"}` for improved zero-shot accuracy |
 | `json_key_cleaning` | `'pii'` | How `process_json` (and `sct-clean --json-input`, MCP `clean_json`, RAG chunk metadata) cleans dict keys: `'pii'` = regex PII steps only (no NER: models tag lone words such as `message` out of context), `'pii_ner'` = PII steps plus NER, `'full'` = the whole config (0.7), `'off'` = keys as written (can carry PII) |
 | `fuzzy_date_score_cutoff` | `85` | Fuzzy matching threshold (0-100) for misspelled months |
-| `custom_pipeline_steps` | `()` | Tuple of `(text: str) -> str` callables appended after all built-in steps |
+| `custom_pipeline_steps` | `()` | Tuple of `(text: str) -> str` callables. They run after the built-in fixes, regex replacements and cleanup, and before NER and the `stat_text` steps, so they never see NER tags |
 
 **Language settings**:
 

@@ -64,9 +64,10 @@
 <text x="996" y="428" font-size="16" fill="#1e1e1e" xml:space="preserve">language</text>
 <rect x="980" y="540" width="240" height="140" rx="8" fill="#f8f9fa" stroke="#343a40" stroke-width="2"/>
 <text x="996" y="572" font-size="20" font-weight="bold" fill="#343a40">metadata, signals</text>
-<text x="996" y="606" font-size="16" fill="#1e1e1e" xml:space="preserve">counts, regex_counts</text>
-<text x="996" y="630" font-size="16" fill="#1e1e1e" xml:space="preserve">warnings, provenance</text>
-<text x="996" y="654" font-size="16" fill="#1e1e1e" xml:space="preserve">no raw values</text>
+<text x="996" y="600" font-size="16" fill="#1e1e1e" xml:space="preserve">counts, regex_counts</text>
+<text x="996" y="622" font-size="16" fill="#1e1e1e" xml:space="preserve">warnings, provenance</text>
+<text x="996" y="644" font-size="16" fill="#1e1e1e" xml:space="preserve">signals: no raw values</text>
+<text x="996" y="666" font-size="16" fill="#1e1e1e" xml:space="preserve">anon_map, findings: raw</text>
 <rect x="20" y="620" width="920" height="60" rx="8" fill="#f8f9fa" stroke="#868e96" stroke-width="2"/>
 <polyline points="246,125 300,125" fill="none" stroke="#1e1e1e" stroke-width="2" marker-end="url(#ah)"/>
 <polyline points="560,125 620,125" fill="none" stroke="#1e1e1e" stroke-width="2" marker-end="url(#ah)"/>
@@ -78,7 +79,7 @@
 <polyline points="1100,490 1100,540" fill="none" stroke="#1e1e1e" stroke-width="2" marker-end="url(#ah)"/>
 <text x="1080" y="232" font-size="15" text-anchor="middle" font-weight="normal" fill="#c26a00" xml:space="preserve">counted in regex_counts</text>
 <text x="273" y="112" font-size="15" text-anchor="middle" font-weight="normal" fill="#495057" xml:space="preserve">text</text>
-<text x="450" y="505" font-size="14" text-anchor="middle" font-weight="normal" fill="#6741d9" xml:space="preserve">long text: overlapping chunk windows</text>
+<text x="450" y="505" font-size="14" text-anchor="middle" font-weight="normal" fill="#6741d9" xml:space="preserve">long text: chunk windows (overlap: ner_chunk_overlap)</text>
 <text x="790" y="604" font-size="14" text-anchor="middle" font-weight="normal" fill="#2b8a3e" xml:space="preserve">map holds personal data</text>
 <text x="40" y="646" font-size="16" text-anchor="start" font-weight="normal" fill="#343a40" xml:space="preserve">process_batch: threads per document, NER batched across documents (ner_batch_size)</text>
 <text x="40" y="668" font-size="16" text-anchor="start" font-weight="normal" fill="#343a40" xml:space="preserve">device: CPU or CUDA (ner_device)    preset &quot;training&quot;: PII only, keeps numbers, HTML, case</text>

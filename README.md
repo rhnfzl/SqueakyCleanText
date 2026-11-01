@@ -79,10 +79,10 @@ For more PII types (IDs, bank numbers, health data and more), use the GLiNER PII
 
 1. **Detect language.** Lingua reads the raw input and picks one of 75 languages. Pin it with `language="de"` or limit it with `language=("en", "nl")`.
 2. **Fix the text.** ftfy repairs broken unicode and HTML entities, styled characters such as `𝐣𝐨𝐡𝐧` are folded, and HTML tags are replaced. Emoji removal and ASCII folding are off by default.
-3. **Regex PII.** URLs, emails, IPs, dates, phones, years, numbers and currency symbols become tags, then isolated letters and symbols, bracket content and extra whitespace are cleaned up. Each type is counted.
-4. **NER.** By default an ensemble of ONNX models per language finds persons, locations, organisations and misc entities. Long texts are cut into chunk windows. You can switch to PyTorch, GLiNER or the GLiNER PII mode, and apply a privacy policy.
+3. **Regex PII.** URLs, emails, IPs, dates, phones, years and numbers become tags. Currency symbols become ISO codes by default (`€100` becomes `EUR<NUMBER>`); set `replace_with_currency_symbols="<CURRENCY>"` to get a tag. Then isolated letters and symbols, bracket content and extra whitespace are cleaned up. Each type is counted.
+4. **NER.** By default an ensemble of ONNX models per language finds persons, locations, organisations and misc entities. Long texts are cut into chunk windows (no overlap unless you set `ner_chunk_overlap`). You can switch to PyTorch, GLiNER or the GLiNER PII mode, and apply a privacy policy.
 5. **Replace.** Found values become `<TAG>`s (default), fake values (`synthetic`) or indexed placeholders such as `<PERSON_0>` with a map to restore them (`reversible`).
-6. **Output.** `lm_text`, `stat_text` and `language`, plus `metadata` and `signals` that hold counts, warnings and model provenance, never the raw values.
+6. **Output.** `lm_text`, `stat_text` and `language`, plus `metadata` and `signals`. `signals` holds counts, warnings and model ids, never raw values. `metadata` holds the same counts, and it can hold raw values: the reversible map (`anon_map`, unless you pass a `TokenStore`) and `findings` with entity text (with `include_entities=True` or a privacy policy).
 
 <picture>
   <source srcset="resources/sct_flow.svg" type="image/svg+xml">
@@ -93,7 +93,7 @@ For more PII types (IDs, bank numbers, health data and more), use the GLiNER PII
 <summary>The diagram as text</summary>
 
 - Entry points: `process()`, `process_batch()`, the `sct-clean` CLI, the `sct-mcp` server, the Hugging Face `datasets`, DataTrove, LangChain and Haystack adapters, the JSON, DataFrame and RAG adapters, and the streaming redactors. All of them pass text to the same pipeline.
-- 1 Detect language (Lingua, 75 languages, on the raw input) -> 2 Fix the text -> 3 Regex PII (counted in `regex_counts`) -> 4 NER (overlapping chunk windows for long text) -> 5 Replace (`<TAG>`, synthetic fakes, or reversible `<PERSON_0>` with a map kept in a `TokenStore`) -> 6 Output (`lm_text`, `stat_text`, `language`) and `metadata` / `signals` (no raw values).
+- 1 Detect language (Lingua, 75 languages, on the raw input) -> 2 Fix the text -> 3 Regex PII (counted in `regex_counts`) -> 4 NER (chunk windows for long text, overlap only with `ner_chunk_overlap`) -> 5 Replace (`<TAG>`, synthetic fakes, or reversible `<PERSON_0>` with a map in `metadata` or a `TokenStore`) -> 6 Output (`lm_text`, `stat_text`, `language`) and `metadata` / `signals` (`signals` has no raw values; `metadata` can hold the reversible map and `findings`).
 - Across all stages: `process_batch` runs documents in threads and batches NER across them (`ner_batch_size`); NER runs on CPU or CUDA (`ner_device`); the `training` preset turns stages on and off.
 
 </details>
@@ -157,7 +157,7 @@ print(TextCleaner(privacy_policy=policy).process("Maria Chen from Acme Corp wrot
 
 **GPU.** Install the `gpu` extra and set `TextCleanerConfig(ner_device="cuda", cuda_device_id=0)`. If CUDA cannot load, NER runs on CPU and each result gets the `cuda_fallback` warning ([docs/PERFORMANCE.md](docs/PERFORMANCE.md)).
 
-**Your own entity labels.** With the `gliner` extra, set `ner_backend="gliner"` and `gliner_labels=("person", "product", "event")`; unmapped labels become tags such as `<PRODUCT>` ([docs/NER_BACKENDS.md](docs/NER_BACKENDS.md)).
+**Your own entity labels.** With the `gliner` extra, set `ner_backend="gliner"`, `gliner_model="urchade/gliner_multi-v2.1"` and `gliner_labels=("person", "product", "event")`; unmapped labels become tags such as `<PRODUCT>` ([docs/NER_BACKENDS.md](docs/NER_BACKENDS.md)).
 
 ## Use it in your stack
 
@@ -210,18 +210,18 @@ Language detection covers 75 languages. Full NER models cover 4 (English, Dutch,
 <details>
 <summary>Known limits of 0.8.0 (details in <a href="CHANGELOG.md">CHANGELOG.md</a>)</summary>
 
-- Dates: only full dates. `1990年1月`, `1月15日`, Japanese era years and `1990.1.15.` stay; `生日1990.1.15谢谢` becomes `<YEAR><NUMBER>.15`; Thai month names need `custom_month_names`.
+- Dates: only full dates become one `<DATE>`. `1990年1月`, `1月15日`, Japanese era years and `1990.1.15.` do not; the year and number steps still change them (`1990年1月` becomes `<YEAR>年<NUMBER>月`, `生日1990.1.15谢谢` becomes `<YEAR><NUMBER>.15`). A circled number glued to a unit character (`1月⑮日`) stays a list marker. Thai month names need `custom_month_names`.
 - In ensembles with GLiNER, windows are sized for the token-classification models, not for GLiNER's own word limit. GLiNER2 runs one chunk per call; torch models and GLiNER keep one lock per model, so they do not run in parallel across threads.
 - Only `process_batch` is faster; `process` of one document is not batched across documents.
 - `ner_chunk_overlap` (off by default) can still cut an entity longer than the overlap that starts at the very end of a chunk.
 - `06-12345678` becomes `06-<PHONE>`. Adversarial strings such as `+000000000(000)0` can leave `(000)0` after phone replacement.
 - Two addresses glued with no separator in a script written without spaces can be read as one address or split at the wrong place.
 - ORGANISATION is the weakest NER label (0.75 recall in the multilingual eval); Bengali and Tamil name spans can be a few characters off.
-- A URL with a path swallows a trailing sentence period (`see https://x.org/a.` becomes `see <URL>`). Rare styled URL hosts and mail addresses (`https://ab｡⑧․cd.ex.com/...`, `INFO@COL·LEGI。CAT`) are not fully replaced.
+- A URL with a path swallows a trailing sentence period (`see https://x.org/a.` becomes `see <URL>`). A URL path that switches from Latin letters or digits straight into a script written without spaces is replaced only up to the switch (`https://x.org/a東京secret` becomes `<URL>東京secret`). Rare styled URL hosts and mail addresses (`https://ab｡⑧․cd.ex.com/...`, `INFO@COL·LEGI。CAT`) are not fully replaced.
 - Score B's quality head was tested with a small ONNX graph only; GLiNER PII mode was not run end to end for this release. CI does not install the `mcp` extra; FastMCP-only tests skip there.
 - An unpinned NER model makes one Hub request per worker when the parent never loaded it before forking; pin `ner_model_revisions` or set `HF_HUB_OFFLINE=1`.
 - With an empty regex marker (`replace_with_email=""`), NER in synthetic or reversible mode can find other entities than in placeholder mode.
-- `WindowedStreamingRedactor` can cut an HTML tag that holds a space when the tag reaches past `overlap_chars`.
+- `WindowedStreamingRedactor` can cut an HTML tag that holds a space when the tag reaches past `overlap_chars`. It raises `BufferError` when the buffer passes `max_buffer_chars` (default 4096) with no safe whitespace split; raise the limit or use `BufferedStreamingRedactor`.
 
 </details>
 
