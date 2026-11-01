@@ -25,8 +25,10 @@ _FORMAT_CHARS = re.escape(''.join(chr(cp) for cp in range(0x110000) if unicodeda
 # Inside an address-shaped run (word characters around an @), full-width . - _ + fold whatever
 # script sits beside them (john@例え．テスト, josé＿smith@...); prose without an @ keeps them.
 # Format characters inside a word (ZWNJ in نامه\u200cای, ZWJ in क्\u200dष) continue the run and stay.
+# A start right after a word character (or one joiner after it) is covered by that earlier start, so
+# each run is scanned once (linear time); ＋ is left out, as a mail domain ends before it.
 _EMAIL_RUN_REGEX = re.compile(
-    rf'\w[\w．－＿＋{constants.MARKS}{_FORMAT_CHARS}]*[@＠][\w．－＿{constants.MARKS}{_FORMAT_CHARS}]*\w')
+    rf'(?<!\w)(?<!\w[．－＿{constants.MARKS}{_FORMAT_CHARS}])\w[\w．－＿＋{constants.MARKS}{_FORMAT_CHARS}]*[@＠][\w．－＿{constants.MARKS}{_FORMAT_CHARS}]*\w')
 _EMAIL_RUN_JOINER = str.maketrans('＠．－＿＋', '@.-_+')
 
 
@@ -101,16 +103,21 @@ _STYLED_JOINER_REGEX = re.compile(
 # CJK and full-width prose punctuation (，、「) ends the run, as it ends URL_REGEX, so prose glued after keeps
 # its ：; an IDNA dot before an ASCII letter or digit (例え。jp) and punctuation before an @ (user info
 # https://alice:pass！＠example.com) stay in it.
+# A scheme from the start of its [A-Za-z0-9+.-] run (leading digits and +.- are left as they are), so the
+# scan runs once per run, not once per letter (linear time).
+_SCHEME = r'(?<![A-Za-z0-9+.\-])[0-9+.\-]*+[A-Za-z][A-Za-z0-9+.\-]*+://'
 _URL_RUN_REGEX = re.compile(
-    rf'(?:[A-Za-z][A-Za-z0-9+.\-]*://|(?<![A-Za-z0-9_/.{_HOST_DOTS}])www\d{{0,3}}(?:[.{_HOST_DOTS}]|{_IDNA_DOT}))(?:[^\s{constants._WIDE_PUNCT}]|{_IDNA_DOT}|[{constants._WIDE_PUNCT}]+(?=[@{_forms("@")}]))+',
+    rf'(?:{_SCHEME}|(?<![A-Za-z0-9_/.{_HOST_DOTS}])www\d{{0,3}}(?:[.{_HOST_DOTS}]|{_IDNA_DOT}))(?:[^\s{constants._WIDE_PUNCT}]|{_IDNA_DOT}|[{constants._WIDE_PUNCT}]+(?=[@{_forms("@")}]))+',
     re.IGNORECASE)
 _URL_RUN_JOINER = str.maketrans({ch: plain for ch, plain in _STYLED_SEP.items() if plain in ':/?=&#%~'})
 # Dots fold only in a host (up to the path), so prose glued after a URL keeps its ．; a run may hold
 # several URLs glued by CJK prose, each with its own host (a host ends where the next scheme starts, so
 # 。 before a glued https:// stays a sentence end). ＠ folds there too, after any userinfo character
 # (https://alice:pass!＠example.com).
-_URL_AUTHORITY = re.compile(rf'(?:[A-Za-z][A-Za-z0-9+.\-]*://|www\d{{0,3}}(?:[.{_HOST_DOTS}]|{_IDNA_DOT}))'
-                            r'(?:(?![A-Za-z][A-Za-z0-9+.\-]*://)[^/?#])*', re.IGNORECASE)
+# Scheme-shaped runs are taken whole (possessive) and the lookahead runs once per run, so both stay linear.
+_URL_AUTHORITY = re.compile(rf'(?:{_SCHEME}|www\d{{0,3}}(?:[.{_HOST_DOTS}]|{_IDNA_DOT}))'
+                            r'(?:[0-9+.\-]*+[A-Za-z][A-Za-z0-9+.\-]*+(?!://)|[0-9+.\-]++(?![A-Za-z])'
+                            r'|[^/?#A-Za-z0-9+.\-])*', re.IGNORECASE)
 _AUTHORITY_JOINER = {**str.maketrans({ch: plain for ch, plain in _STYLED_SEP.items() if plain == '@'}), **_HOST_SEP}
 
 
@@ -121,7 +128,7 @@ def _fold_url_run(m):
         m.group().translate(_URL_RUN_JOINER))
 # Inside an address-shaped run every styled form of @ . - _ + folds (the full-width-only rule above, widened).
 _STYLED_EMAIL_RUN_REGEX = re.compile(
-    rf'\w[\w{_forms(".-_+")}{constants.MARKS}{_FORMAT_CHARS}]*[@{_forms("@")}]'
+    rf'(?<!\w)(?<!\w[{_forms(".-_")}{constants.MARKS}{_FORMAT_CHARS}])\w[\w{_forms(".-_+")}{constants.MARKS}{_FORMAT_CHARS}]*[@{_forms("@")}]'
     rf'(?:[\w.\-{_forms(".-_")}{_HOST_SEP_CHARS}{constants.MARKS}{_FORMAT_CHARS}]|{_IDNA_DOT})*\w')
 _STYLED_EMAIL_RUN_JOINER = str.maketrans({ch: plain for ch, plain in _STYLED_SEP.items() if plain in '@.-_+'})
 # In the domain every format character but the join controls (ZWNJ/ZWJ, which spell words) is a

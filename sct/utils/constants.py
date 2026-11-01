@@ -40,7 +40,8 @@ ACRONYM_REGEX = re.compile(
 LEGACY_TYPE_NAMES = {'PHONE': 'PHONE_NUMBER', 'IP': 'IP_ADDRESS'}
 
 # Fixed: Unicode ranges use actual Unicode escapes (not literal \\u in raw strings)
-# Local part takes RFC 5322 punctuation (o'connor, jo&co, alice!) after a word start,
+# Local part takes RFC 5322 punctuation (o'connor, jo&co, alice!) after a word start, at most 64 characters
+# (RFC 5321) so a long run with no "@" costs a bounded scan from each start (linear time),
 # so no prefix of the address stays visible; it never ends in a dot. ZWNJ/ZWJ join letters
 # in it as in a domain label (Devanagari half forms, Persian).
 # Domain labels take any script but not general, CJK or full-width punctuation, so
@@ -108,7 +109,7 @@ _TLD = (rf"(?:xn--[a-z0-9-]*[a-z0-9]"
         rf"|{_NO_GLUE}[{_IDN_LETTER}](?:[\u200c\u200d]*{_NO_GLUE}[{_IDN_LETTER}])+)")
 EMAIL_REGEX = re.compile(
     rf"(?:^|(?<=[^\w@.){MARKS}])|(?={_GLUE}))[\w+-]"
-    rf"(?:{_NO_GLUE}[\w!#$%&'*+{MARKS}\u200c\u200d-]|\.(?!\.))*?(?<!\.)(@|[(<{{\[]at[)>}}\]])"
+    rf"(?:{_NO_GLUE}[\w!#$%&'*+{MARKS}\u200c\u200d-]|\.(?!\.)){{0,63}}?(?<!\.)(@|[(<{{\[]at[)>}}\]])"
     # Host labels as X+(-+X+)*: one way to split a label, so a host with no TLD fails in linear time.
     rf"[{_IDN_CHAR}]+(?:-+[{_IDN_CHAR}]+)*(?:\.[{_IDN_CHAR}]+(?:-+[{_IDN_CHAR}]+)*)*(?:\.{_TLD})",
     flags=re.IGNORECASE | re.UNICODE,
@@ -222,7 +223,8 @@ URL_REGEX = re.compile(
     r"(?:(?:https?:\/\/|ftp:\/\/|www\d{0,3}\.))"
     # user:pass authentication; never across / ? # " < > so a later "@" in the
     # query or the markup is not taken as user info
-    r"(?:[^\s/?#\"<>@]+(?::[^\s/?#\"<>@]*)?@)?" r"(?:"
+    # (user up to the first ":", one way to split it, so a long run with no "@" fails in linear time)
+    r"(?:(?=[^\s/?#\"<>@])[^\s/?#\"<>@:]*(?::[^\s/?#\"<>@]*)?@)?" r"(?:"
     # bracketed IPv6 host; private and loopback IPv4 hosts match too, so the whole
     # URL (query values included) is replaced, not just the address
     r"\[[0-9a-f:.]*:[0-9a-f:.]*\]" r"|"
