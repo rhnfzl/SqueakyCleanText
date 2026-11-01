@@ -272,6 +272,9 @@ URL_REGEX = re.compile(
     # TLD identifier (punycode first, so ".xn" alone never ends the host)
     rf"(?:\.(?:xn--[a-z0-9-]*[a-z0-9]|(?:{_NO_GLUE}[{_IDN_LETTER}]){{2,}}))"
     r"|" r"(?:(localhost))" r")"
+    # fully qualified host's final dot ("example.com./?q="), only when a path, port or query follows,
+    # so a sentence-ending period stays outside the URL
+    r"(?:\.(?=/|:\d|[?#][^\s\"<>]))?"
     # port number
     r"(?::\d{2,5}\b)?"
     # resource path, or a query/fragment right after the host ("?id=", "#token=");

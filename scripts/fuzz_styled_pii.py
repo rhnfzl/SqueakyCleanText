@@ -14,7 +14,8 @@ typeset phone and date separators (no-break or thin space, non-breaking hyphen, 
 IDNA dot separators (。 ｡) in a mail domain or URL host, host hyphens and dots typed as
 another dash or dot form (my\u2010site, example\u2024com), upper-case addresses (so squared
 letters 🄹 occur), break hints between non-Latin letters of a mail domain or URL host,
-area-code parentheses glued to the digits (+49(30)123456), URL user info whose password ends
+area-code parentheses glued to the digits (+49(30)123456), a URL host with its final dot
+(example.com./?q=), URL user info whose password ends
 in punctuation (https://alice:p4ss!@host/), mail local parts mixing separators and other punctuation
 (josé_smith.work@, anna.smith!@) with their hyphens and dots typed as another form (john\u2011smith@),
 and glued to CJK/Thai prose without a space. For a config that decodes backslash escapes
@@ -451,6 +452,15 @@ def _upper(rng, plain):
     return plain.upper() if rng.random() < 0.2 else plain
 
 
+def _final_dot(rng, plain):
+    """A fully qualified URL host with its final dot (example.com./?q=), as RFC 1034 allows, where a path,
+    query or fragment follows; own RNG so the cases of earlier rounds stay the same."""
+    start, end = _host_span(plain, "URL")
+    if end == len(plain) or rng.random() >= 0.15:
+        return plain
+    return plain[:end] + "." + plain[end:]
+
+
 def _host_span(plain, typ):
     """Start and end of the mail domain or the URL host in ``plain``."""
     if typ == "EMAIL":
@@ -547,6 +557,8 @@ def make_case(seed: int) -> dict:
             plain = _upper(random.Random(f"{seed}-{len(values)}-upper"), plain)  # noqa: S311
         if typ in ("EMAIL", "URL"):
             plain, cores = _host_hyphen(random.Random(f"{seed}-{len(values)}-hyphen"), plain, cores, typ)  # noqa: S311
+        if typ == "URL":
+            plain = _final_dot(random.Random(f"{seed}-{len(values)}-finaldot"), plain)  # noqa: S311
         month = typ == "DATE" and _month_date(random.Random(f"{seed}-{len(values)}-month"), plain, cores)  # noqa: S311
         if month:
             plain, cores = month

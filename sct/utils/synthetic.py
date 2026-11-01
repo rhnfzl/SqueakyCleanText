@@ -14,7 +14,7 @@ import random
 import sys
 import threading
 import types
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 from typing import Dict, Optional
 
 logger = logging.getLogger(__name__)
@@ -45,6 +45,10 @@ class _HeldClock(type):
     """isinstance against a held-clock class still accepts every real date/datetime."""
     def __instancecheck__(cls, obj):
         return isinstance(obj, cls.__mro__[1])
+
+
+def _date_part(generate):
+    return generate().date()
 
 
 @contextlib.contextmanager
@@ -298,11 +302,15 @@ class SyntheticReplacer:
         if self._reference is not None and method_name == 'date':
             generate = functools.partial(fake.date, end_datetime=self._reference)
         elif self._reference is not None and method_name == 'date_of_birth':
-            # Faker's date_of_birth range (ages 0-115) ending on the reference date, not today.
-            generate = functools.partial(fake.date_between_dates,
-                                         self._reference - timedelta(days=115 * 365 + 28),
-                                         self._reference)
+            # Faker's date_of_birth range (ages 0-115) ending on the reference date, not today; drawn in
+            # UTC, since Faker reads a naive range in the worker's local timezone (fakes differ per machine).
+            between = functools.partial(fake.date_time_between_dates,
+                                        self._reference - timedelta(days=115 * 365 + 28),
+                                        self._reference, timezone.utc)
+            generate = functools.partial(_date_part, between)
         method = getattr(generate, 'func', generate)
+        if method is _date_part:  # the Faker call inside decides whose clock and random to hold
+            method = generate.args[0].func
         modules = {sys.modules.get(getattr(method, '__module__', None))} - {None}
         if self._reference is not None:
             clock_modules = modules | ({sys.modules.get('faker.providers.date_time')} - {None})
