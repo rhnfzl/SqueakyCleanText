@@ -183,7 +183,7 @@ Haystack), score columns and data cards (`sct-report`), a reworked MCP server an
 - `ner_chunk_overlap`: window offsets come from the tokenizer of the document's language route, not always the primary model's tokenizer.
 - A worker forked while another thread was building the language detector gets a fresh detector lock instead of inheriting it held (a possible hang).
 - URLs whose host is a private or loopback IPv4 address (`10.x`, `127.x`, `172.16-31.x`, `169.254.x`, `192.168.x`) or a bracketed IPv6 address (`[::1]:8080`) become one `<URL>`. Before, such a URL was not matched as a URL and query values such as `?email=alice%40example.com` stayed in the text.
-- URLs keep interior `)`, `]` and `}` when more URL text follows (`?f=(a)&email=...`), so the rest of the query is replaced too; a bracket closing around a URL still stays outside it.
+- URLs keep interior `)`, `]` and `}` when more URL text follows (`?f=(a)&email=...`, or a dot and a word: `report(1).pdf?email=...`), so the rest of the query is replaced too; a bracket closing around a URL still stays outside it.
 - NER: when one model gives two labels for the same span (repeated window context, WordPiece widening), it is one vote with its best score and that score's label, also without `ner_chunk_overlap`. Before, the two labels could average a 0.99 `PER` below the confidence threshold.
 - `sct.integrations.hf.clean_dataset` declares the output column features, so a first batch of only `None` or `[]` no longer types a column as null and fails on the next batch.
 - `assess_reidentification_risk` type-tags values inside tuples and frozensets too, so `(1,)` and `(True,)` are different quasi-identifier values.
