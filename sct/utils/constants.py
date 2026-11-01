@@ -217,7 +217,7 @@ _WIDE_PUNCT = re.escape(''.join(
 URL_REGEX = re.compile(
     # Only an ASCII letter or digit glues to the scheme, so a URL right after CJK/Thai text
     # (請見https://..., ดูhttps://...) is still found.
-    r"(?:^|(?<![A-Za-z0-9_\/\.]))"
+    r"(?:^|(?<![A-Za-z0-9_\/\.]))(?:"
     # protocol identifier
     r"(?:(?:https?:\/\/|ftp:\/\/|www\d{0,3}\.))"
     # user:pass authentication; never across / ? # " < > so a later "@" in the
@@ -247,7 +247,10 @@ URL_REGEX = re.compile(
     # domain, so CJK prose glued after a URL stays. ) ] } belong to the URL only when more URL text follows
     # ("?f=(a)&email=..."), so a closing bracket around a URL stays outside it.
     rf"(?:\/(?:{_NO_GLUE}[^\)\]\}}\s\"<>{_WIDE_PUNCT}]|[\)\]\}}](?=[\w&=/?#%+~-]))*"
-    rf"|[?#](?:{_NO_GLUE}[^\)\]\}}\s\"<>{_WIDE_PUNCT}]|[\)\]\}}](?=[\w&=/?#%+~-]))+)?",
+    rf"|[?#](?:{_NO_GLUE}[^\)\]\}}\s\"<>{_WIDE_PUNCT}]|[\)\]\}}](?=[\w&=/?#%+~-]))+)?"
+    # Safety net: a scheme-led run whose host fails the grammar above (a look-alike character in it) is
+    # still a URL up to a space or prose punctuation, so its query values never stay visible.
+    rf"|(?:https?|ftp):\/\/(?:{_NO_GLUE}[^\s\"<>{_WIDE_PUNCT}])+(?<=[^\W_]|[{MARKS}]))",
     flags=re.UNICODE | re.IGNORECASE,
 )
 

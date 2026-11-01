@@ -75,6 +75,12 @@ _IDNA_DOT_REGEX = re.compile(_IDNA_DOT)
 _PUNCT_ANY = _STYLED_PUNCT + re.escape('@.-_+:/?=&#%~')
 # Dashes of any form (Pd: hyphen, non-breaking hyphen, en dash) join phone groups like "-" (06\u2011 12).
 _DASHES = re.escape(''.join(chr(cp) for cp in range(0x110000) if unicodedata.category(chr(cp)) == 'Pd'))
+# In a URL host or mail domain any dash is a label hyphen and any character whose NFKC form is "." a label
+# dot (my\u2010site, a\u2024b.com, as copied from typeset text).
+_HOST_SEP = {cp: '-' if unicodedata.category(chr(cp)) == 'Pd' else '.' for cp in range(0x80, 0x110000)
+             if unicodedata.category(chr(cp)) == 'Pd' or unicodedata.normalize('NFKC', chr(cp)) == '.'}
+_HOST_SEP_CHARS = re.escape(''.join(map(chr, _HOST_SEP)))
+_HOST_DOTS = re.escape(''.join(chr(cp) for cp, plain in _HOST_SEP.items() if plain == '.'))
 # A circled run folds beside ASCII alnum, any decimal digit (⑩꤈), any dash (2026\u2013⑩) or contact
 # punctuation in any form.
 _RUN_NEIGHBOUR = re.compile(rf'[0-9A-Za-z{_PUNCT_ANY}{_DASHES}]|\d')
@@ -96,16 +102,16 @@ _STYLED_JOINER_REGEX = re.compile(
 # its ：; an IDNA dot before an ASCII letter or digit (例え。jp) and punctuation before an @ (user info
 # https://alice:pass！＠example.com) stay in it.
 _URL_RUN_REGEX = re.compile(
-    rf'(?:[A-Za-z][A-Za-z0-9+.\-]*://|(?<![A-Za-z0-9_/.{_forms(".")}])www\d{{0,3}}(?:[.{_forms(".")}]|{_IDNA_DOT}))(?:[^\s{constants._WIDE_PUNCT}]|{_IDNA_DOT}|[{constants._WIDE_PUNCT}]+(?=[@{_forms("@")}]))+',
+    rf'(?:[A-Za-z][A-Za-z0-9+.\-]*://|(?<![A-Za-z0-9_/.{_HOST_DOTS}])www\d{{0,3}}(?:[.{_HOST_DOTS}]|{_IDNA_DOT}))(?:[^\s{constants._WIDE_PUNCT}]|{_IDNA_DOT}|[{constants._WIDE_PUNCT}]+(?=[@{_forms("@")}]))+',
     re.IGNORECASE)
 _URL_RUN_JOINER = str.maketrans({ch: plain for ch, plain in _STYLED_SEP.items() if plain in ':/?=&#%~'})
 # Dots fold only in a host (up to the path), so prose glued after a URL keeps its ．; a run may hold
 # several URLs glued by CJK prose, each with its own host (a host ends where the next scheme starts, so
 # 。 before a glued https:// stays a sentence end). ＠ folds there too, after any userinfo character
 # (https://alice:pass!＠example.com).
-_URL_AUTHORITY = re.compile(rf'(?:[A-Za-z][A-Za-z0-9+.\-]*://|www\d{{0,3}}(?:[.{_forms(".")}]|{_IDNA_DOT}))'
+_URL_AUTHORITY = re.compile(rf'(?:[A-Za-z][A-Za-z0-9+.\-]*://|www\d{{0,3}}(?:[.{_HOST_DOTS}]|{_IDNA_DOT}))'
                             r'(?:(?![A-Za-z][A-Za-z0-9+.\-]*://)[^/?#])*', re.IGNORECASE)
-_AUTHORITY_JOINER = str.maketrans({ch: plain for ch, plain in _STYLED_SEP.items() if plain in '.@'})
+_AUTHORITY_JOINER = {**str.maketrans({ch: plain for ch, plain in _STYLED_SEP.items() if plain == '@'}), **_HOST_SEP}
 
 
 def _fold_url_run(m):
@@ -116,7 +122,7 @@ def _fold_url_run(m):
 # Inside an address-shaped run every styled form of @ . - _ + folds (the full-width-only rule above, widened).
 _STYLED_EMAIL_RUN_REGEX = re.compile(
     rf'\w[\w{_forms(".-_+")}{constants.MARKS}{_FORMAT_CHARS}]*[@{_forms("@")}]'
-    rf'(?:[\w.\-{_forms(".-_")}{constants.MARKS}{_FORMAT_CHARS}]|{_IDNA_DOT})*\w')
+    rf'(?:[\w.\-{_forms(".-_")}{_HOST_SEP_CHARS}{constants.MARKS}{_FORMAT_CHARS}]|{_IDNA_DOT})*\w')
 _STYLED_EMAIL_RUN_JOINER = str.maketrans({ch: plain for ch, plain in _STYLED_SEP.items() if plain in '@.-_+'})
 # In the domain every format character but the join controls (ZWNJ/ZWJ, which spell words) is a
 # copied layout hint (例\u200bえ.jp), whatever script sits beside it.
@@ -127,7 +133,7 @@ _DOMAIN_HINTS = {cp: None for cp in range(0x110000)
 def _fold_styled_email_run(m):
     run = m.group().translate(_STYLED_EMAIL_RUN_JOINER)
     at = run.index('@')
-    return run[:at] + _IDNA_DOT_REGEX.sub('.', run[at:]).translate(_DOMAIN_HINTS)
+    return run[:at] + _IDNA_DOT_REGEX.sub('.', run[at:].translate(_HOST_SEP)).translate(_DOMAIN_HINTS)
 
 
 # Invisible format characters (category Cf: ZWSP, word joiner, soft hyphen, bidi marks) beside a

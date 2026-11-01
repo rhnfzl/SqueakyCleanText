@@ -11,7 +11,8 @@ letters and digits, native decimal digits of any script, decomposed letters
 (base + combining mark), zero-width characters where they are legal, invisible
 break hints (ZWSP, WJ, soft hyphen) inside the value,
 typeset phone and date separators (no-break or thin space, non-breaking hyphen, en dash),
-IDNA dot separators (。 ｡) in a mail domain or URL host, upper-case addresses (so squared
+IDNA dot separators (。 ｡) in a mail domain or URL host, host hyphens and dots typed as
+another dash or dot form (my\u2010site, example\u2024com), upper-case addresses (so squared
 letters 🄹 occur), break hints between non-Latin letters of a mail domain or URL host,
 area-code parentheses glued to the digits (+49(30)123456), URL user info whose password ends
 in punctuation (https://alice:p4ss!@host/),
@@ -79,6 +80,11 @@ PUNCT = {
 TLDS = ("com", "org", "net", "nl", "de", "jp", "io", "in")
 # Label separators IDNA reads as "." (。 ｡ ．), from Python's idna codec.
 IDNA_DOT_CHARS = "".join(ch for ch in map(chr, range(0x80, 0x10000)) if IDNA_DOTS.fullmatch(ch))
+# Host separators as typeset text writes them: any dash (Pd) but the wide CJK wave dashes, which are prose
+# punctuation, for a label hyphen, and any character whose NFKC form is "." (․ ﹒ ．) for a label dot.
+HOST_DASHES = "".join(ch for ch in map(chr, range(0x80, 0x110000)) if unicodedata.category(ch) == "Pd"
+                      and unicodedata.east_asian_width(ch) != "W")
+HOST_DOTS = "".join(ch for ch in map(chr, range(0x80, 0x110000)) if unicodedata.normalize("NFKC", ch) == ".")
 
 
 def _unicode_tables():
@@ -406,6 +412,41 @@ def _idna_dot(rng, plain, slots, kinds, typ):
     return sorted(set(kinds) | {"idna_dot"}) if any(slot and slot[0] == "idna_dot" for slot in slots) else kinds
 
 
+def _host_hyphen(rng, plain, cores, typ):
+    """A hyphen between two letters of a mail domain or URL host label (my-site.com), so a typeset dash
+    can stand in for it; own RNG so the cases of earlier rounds stay the same."""
+    start, end = _host_span(plain, typ)
+    start += 4 if plain.startswith("www.") else 0  # keep the www introducer whole
+    end = plain.rfind(".", start, end)  # a TLD takes no hyphen
+    free = [index for index in range(start + 1, end) if plain[index - 1].isalpha() and plain[index].isalpha()]
+    if not free or rng.random() >= 0.25:
+        return plain, cores
+    index = rng.choice(free)
+    new_cores = []
+    for kind, core in cores:
+        at = plain.casefold().find(core.casefold(), max(0, index - len(core) + 1)) if kind == "str" else -1
+        if 0 <= at < index < at + len(core):
+            core = core[:index - at] + "-" + core[index - at:]
+        new_cores.append((kind, core))
+    return plain[:index] + "-" + plain[index:], new_cores
+
+
+def _host_sep(rng, plain, slots, kinds, typ):
+    """Host hyphens and dots typed as another dash or dot form (my\u2010site, example\u2024com), as copied from
+    typeset text; own RNG so the cases of earlier rounds stay the same."""
+    start, end = _host_span(plain, typ)
+    # a dot before a native digit makes a native-digit host label (rejected, Codex round 25 id 3)
+    free = [index for index in range(start, end - 1) if plain[index] in "-." and slots[index] is None
+            and plain[index + 1].isascii() and plain[index + 1].isalnum()
+            and (slots[index + 1] is None or slots[index + 1][0] != "native_digit")]
+    if not free or rng.random() >= 0.25:
+        return kinds
+    for index in free:
+        if rng.random() < 0.7:
+            slots[index] = ("host_sep", rng.choice(HOST_DASHES if plain[index] == "-" else HOST_DOTS))
+    return sorted(set(kinds) | {"host_sep"}) if any(slot and slot[0] == "host_sep" for slot in slots) else kinds
+
+
 def _zw_domain(rng, plain, inserts, kinds, typ="EMAIL"):
     """A break hint (ZWSP, WJ, soft hyphen) between two non-Latin letters of a mail domain or a URL host
     (例\u200bえ.jp), copied from wrapped text; own RNG so the cases of earlier rounds stay the same."""
@@ -439,10 +480,13 @@ def make_case(seed: int) -> dict:
         if typ == "EMAIL":
             plain, cores = _email_shape(random.Random(f"{seed}-{len(values)}-mail"), plain, cores)  # noqa: S311
             plain = _upper(random.Random(f"{seed}-{len(values)}-upper"), plain)  # noqa: S311
+        if typ in ("EMAIL", "URL"):
+            plain, cores = _host_hyphen(random.Random(f"{seed}-{len(values)}-hyphen"), plain, cores, typ)  # noqa: S311
         slots, inserts, kinds = _plan(rng, plain, _legal_join(plain, typ))
         kinds = _zw_inside(random.Random(f"{seed}-{len(values)}-zw"), plain, inserts, kinds)  # noqa: S311
         if typ in ("EMAIL", "URL"):
             kinds = _idna_dot(random.Random(f"{seed}-{len(values)}-idna"), plain, slots, kinds, typ)  # noqa: S311
+            kinds = _host_sep(random.Random(f"{seed}-{len(values)}-hostsep"), plain, slots, kinds, typ)  # noqa: S311
         if typ == "EMAIL":
             kinds = _zw_domain(random.Random(f"{seed}-{len(values)}-zwd"), plain, inserts, kinds)  # noqa: S311
         if typ == "URL":
