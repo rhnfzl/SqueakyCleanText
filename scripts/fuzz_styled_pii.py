@@ -708,7 +708,8 @@ def render(value, disabled=frozenset()):
     return "".join(out)
 
 
-def build_doc(case, disabled=None) -> str:
+def build_doc(case, disabled=None, spans=None) -> str:
+    """The document; *spans*, if a list, gets each rendered value's (start, end)."""
     disabled = disabled or {}
     doc = case["context"][0]
     for index, value in enumerate(case["values"]):
@@ -721,9 +722,21 @@ def build_doc(case, disabled=None) -> str:
         if (prev and prev["glue"] and "glue" not in disabled.get(index - 1, frozenset())
                 and prev["type"] in ("EMAIL", "URL") and value["type"] == "EMAIL"):
             glue = False
-        doc += ("" if glue and left in UNSPACED else " ") + render(value, off)
+        doc += "" if glue and left in UNSPACED else " "
+        if spans is not None:
+            spans.append((len(doc), len(doc) + len(render(value, off))))
+        doc += render(value, off)
         doc += ("" if glue and right in UNSPACED else " ") + case["context"][index + 1]
     return doc
+
+
+def longest_stretch(case, disabled=None) -> int:
+    """Longest stretch with no whitespace a stream may split at (a space inside a value is no split)."""
+    spans = []
+    doc = build_doc(case, disabled, spans)
+    inside = set().union(*(range(a, b) for a, b in spans))
+    cuts = [-1] + [i for i, ch in enumerate(doc) if ch.isspace() and i not in inside] + [len(doc)]
+    return max(b - a - 1 for a, b in zip(cuts, cuts[1:]))
 
 
 def steps(value):
@@ -887,14 +900,18 @@ def check_case(seed: int, modes=MODES, folds=(True, False)) -> dict:
                     if text is None or (mode == "stream" and key in short):
                         stream_errors += text is None and mode == "stream"
                         # a styled spelling no longer than the plain one must not cost a split the plain one has
-                        # ("⑫" -> "12"); glue stays on in both, it drops the spaces a split needs
-                        plain = build_doc(case, {i: frozenset(v["kinds"]) - {"glue"}
-                                                 for i, v in enumerate(case["values"])})
+                        # ("⑫" -> "12"); glue stays on in both, it drops the spaces a split needs. Compared on the
+                        # longest stretch with no split, not the whole document: a styled date that adds invisible
+                        # characters there can outgrow the window while a shorter styled phone elsewhere keeps the
+                        # document shorter (seed 11569)
+                        plain_off = {i: frozenset(v["kinds"]) - {"glue"} for i, v in enumerate(case["values"])}
+                        plain = build_doc(case, plain_off)
                         # a token longer than size - overlap leaves no split in some feed whatever its spelling,
                         # so there chunk alignment alone decides (the plain one fails on the same buffer)
                         size, overlap = map(int, key.split("/")) if mode == "stream" else (len(doc), 0)
                         fits = max(map(len, doc.split()), default=0) <= size - overlap
-                        if text is None and key not in short and fits and len(doc) <= len(plain) and outputs(
+                        no_longer = longest_stretch(case) <= longest_stretch(case, plain_off)
+                        if text is None and key not in short and fits and no_longer and outputs(
                                 plain, preset, fold_styled, mode, seed)[key] is not None:
                             kinds = _shrink_all(case, lambda off, key=key: outputs(
                                 build_doc(case, off), preset, fold_styled, "stream", seed)[key] is None)

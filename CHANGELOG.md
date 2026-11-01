@@ -72,7 +72,8 @@ Haystack), score columns and data cards (`sct-report`), a reworked MCP server an
   typeset spaces and dashes, glued CJK/Thai prose), runs every replacement mode and the
   stream, and reports leaks, restore errors, stream mismatches and stream errors (a styled
   value that leaves no split where its plain spelling does, counted only when every token fits
-  the window less its overlap), restore errors against the cleaner's own normalised text (so an
+  the window less its overlap and the longest stretch with no split, a space inside a value
+  included, is no longer than in the plain spelling), restore errors against the cleaner's own normalised text (so an
   ftfy mojibake repair is not a restore error), and a `slow` check (fold time on 2000 vs 8000
   characters of styled contact punctuation) with a shrunk minimal cause;
   `tests/test_fuzz_styled_pii.py` replays the seeds of every cluster found. Not generated, as

@@ -190,9 +190,11 @@ FIXED_CLUSTERS = {
 # addresses glued through one prose run (no boundary to find) are not generated; these seeds showed them.
 # 3894 and 9130: a URL token longer than 48 - 12 hit a BufferError at 48/12 only through chunk alignment
 # (its plain spelling fails on the same buffer), so it is not a counted stream_error.
+# 11569: a styled date adds invisible characters inside an 82-character stretch with no split (80/24), while a
+# shorter styled phone elsewhere kept the document shorter than its plain spelling; compared per stretch, not counted.
 # 15041: ftfy repairs the mojibake "Î\u00ad" in a mail domain to "έ" before redaction; restore is compared with the
 # cleaner's own normalised view, so it is not counted.
-EXTRA_SEEDS = {301478, 301690, 115, 100322, 200040, 300221, 202031, 202264, 300758, 3184, 3356, 3894, 9130, 15041}
+EXTRA_SEEDS = {301478, 301690, 115, 100322, 200040, 300221, 202031, 202264, 300758, 3184, 3356, 3894, 9130, 11569, 15041}
 SEEDS = sorted(set(range(10)) | set(KNOWN_CLUSTERS.values()) | set(FIXED_CLUSTERS.values()) | EXTRA_SEEDS)
 
 
