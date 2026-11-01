@@ -664,8 +664,9 @@ class TextCleanerConfig:
         frozen = [k for k, v in state.items() if isinstance(v, MappingProxyType)]
         for key in frozen:
             state[key] = dict(state[key])
-        if any(self.gliner_label_map is m for m in _PII_MAPS.values()):
-            state['gliner_label_map'] = None  # derived: re-shared on load
+        # derived only in PII mode (re-shared on load); a map kept after a replace() to another mode is data
+        if self.ner_mode == 'pii' and any(self.gliner_label_map is m for m in _PII_MAPS.values()):
+            state['gliner_label_map'] = None
             frozen.remove('gliner_label_map')
         return state, frozen
 

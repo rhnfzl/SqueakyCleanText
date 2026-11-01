@@ -1,8 +1,11 @@
 """Streaming interfaces with explicit privacy guarantees."""
 
-import html
 import re
 import unicodedata
+from itertools import groupby
+
+from ftfy import fix_encoding
+from ftfy.fixes import unescape_html
 
 from sct.sct import TextCleaner
 from sct.utils import constants
@@ -16,10 +19,11 @@ _CONTACT_REGEXES = (
 _PHONE_TAIL = re.compile(r"[+(]?\d[\d ()+./-]*\Z")
 # Longer than any phone the regex accepts; a longer digit tail (a number table) may still split.
 _PHONE_TAIL_MAX = 32
-# One HTML entity (decoded later by the cleaner's ftfy step), one backslash escape (decoded by the
+# One HTML entity, escaped again any number of times ("&amp;#32;", decoded later by the cleaner's ftfy step to
+# a fixpoint), one backslash escape (decoded by the
 # cleaner's check_decode_unicode_escapes step, "12\\u0033") or one character.
 _VIEW_UNIT = re.compile(
-    r"&(?:#[0-9]+|#[xX][0-9a-fA-F]+|[A-Za-z][A-Za-z0-9]*);"
+    r"&(?:amp;)*(?:#[0-9]+|#[xX][0-9a-fA-F]+|[A-Za-z][A-Za-z0-9]*);"
     r"|\\(?:u[0-9a-fA-F]{4}|U[0-9a-fA-F]{8}|x[0-9a-fA-F]{2}|N\{[^}]*\}|[0-7]{1,3}|[\\'\"abfnrtv])|.",
     re.DOTALL,
 )
@@ -28,7 +32,9 @@ _VIEW_UNIT = re.compile(
 def _decode_unit(unit: str, decode_escapes: bool) -> str:
     """Decode one view unit the way the cleaner's fix_bad_unicode step does."""
     if unit[0] != "\\":
-        return html.unescape(unit)
+        while (decoded := unescape_html(unit)) != unit:  # ftfy's own decode ("&#59;" stays), to its fixpoint
+            unit = decoded
+        return unit
     if not decode_escapes:
         return unit
     try:  # the cleaner's own codec, so the view decodes exactly what it decodes
@@ -95,19 +101,27 @@ class WindowedStreamingRedactor:
 
         cutoff = len(self._buffer) - self._overlap_chars
         # Never split inside a contact token that holds spaces ("06 12 34 56 78"). Match on a
-        # view close to what the cleaner sees: HTML entities decoded ("12&#32;34") and each letter,
+        # view close to what the cleaner sees: HTML entities decoded ("12&#32;34"), mojibake repaired, and each letter,
         # digit, space and contact punctuation NFKC-folded ("０６ １２") with any decimal digit as
         # ASCII ("٠٦ ١٢", as the cleaner's digit view); starts/ends map view offsets back to the buffer.
         view, starts, ends = [], [], []
         table = SEPARATOR_VIEW if self._cleaner.cfg.fold_styled_characters else _DIGIT_VIEW  # as the phone step
         decode_escapes = self._cleaner.cfg.check_decode_unicode_escapes
+        units = []  # (decoded character, source start, source end)
         for unit in _VIEW_UNIT.finditer(self._buffer):
             decoded = _decode_unit(unit.group(), decode_escapes)
-            if len(decoded) != 1:  # an unknown entity or escape stays as its raw characters
-                decoded, unit_ends = unit.group(), range(unit.start() + 1, unit.end() + 1)
-            else:
-                unit_ends = (unit.end(),)
-            for character, end in zip(decoded, unit_ends):
+            if decoded == unit.group():  # an unknown entity or escape stays as its raw characters
+                units += [(c, i, i + 1) for i, c in enumerate(decoded, unit.start())]
+            else:  # "&ThickSpace;" decodes to two characters, both on the entity's span
+                units += [(c, unit.start(), unit.end()) for c in decoded]
+        # mojibake ("fÃ©vrier") is repaired word by word as the cleaner's ftfy step repairs it; the word keeps its span
+        repaired_units = []
+        for is_space, group in groupby(units, key=lambda u: u[0].isspace()):
+            group = list(group)
+            word = "".join(u[0] for u in group)
+            repaired = word if is_space or word.isascii() else fix_encoding(word)
+            repaired_units += group if repaired == word else [(c, group[0][1], group[-1][2]) for c in repaired]
+        for character, start, end in repaired_units:
                 if unicodedata.category(character) == "Cf":
                     continue  # invisible ("06\u00ad12"): the cleaner's fold drops it inside a contact run
                 # a combining mark composes with the letter before it, as the cleaner's NFC step ("fe\u0301vrier")
@@ -126,7 +140,7 @@ class WindowedStreamingRedactor:
                     folded = character
                 for view_character in folded:
                     view.append(view_character)
-                    starts.append(end - 1 if len(unit_ends) > 1 else unit.start())
+                    starts.append(start)
                     ends.append(end)
         view = "".join(view)
         # a configured date ("15 January 1990") is one token too; the cleaner's own (custom) date regex,

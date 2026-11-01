@@ -19,7 +19,8 @@ in punctuation (https://alice:p4ss!@host/), mail local parts mixing separators a
 (josé_smith.work@, anna.smith!@) with their hyphens and dots typed as another form (john\u2011smith@),
 and glued to CJK/Thai prose without a space. For a config that decodes backslash escapes
 (``check_decode_unicode_escapes``, the default) some characters are also written as literal
-``\\uXXXX`` / ``\\U........`` / ``\\xNN`` escapes, as JSON-escaped text carries them. Every variant comes from Unicode
+``\\uXXXX`` / ``\\U........`` / ``\\xNN`` escapes, as JSON-escaped text carries them, and some as HTML
+entities, also escaped twice (``&#51;``, ``&amp;#51;``), as scraped text carries them. Every variant comes from Unicode
 data (decomposition tag, NFKC, decimal value, category), and every
 rendered value folds back to the plain value (NFKC, Cf removed, Nd -> ASCII).
 
@@ -49,6 +50,8 @@ import random
 import re
 import sys
 import unicodedata
+
+from ftfy.fixes import unescape_html
 
 from sct import TextCleaner, TextCleanerConfig
 from sct.streaming import WindowedStreamingRedactor
@@ -559,25 +562,47 @@ def _escape(rng, text):
     return "".join(rng.choice(forms(ord(ch))) % ord(ch) for ch in text)
 
 
-def escaped_case(case):
-    """The case with a few characters of some values written as backslash escapes (``06 12\\u0033\\x34``); own RNG
-    per value, so the unescaped case stays the same."""
+def _entity(rng, text):
+    """Each character as an HTML entity the cleaner's ftfy step decodes, also escaped twice (``&amp;#51;``)."""
+    forms = [rng.choice(("&#%d;", "&#x%x;", "&amp;#%d;")) % ord(ch) for ch in text]
+    # ftfy keeps a few entities raw ("&#59;"), so those characters stay as they are
+    return "".join(form if _unescape_html(form) == ch else ch for form, ch in zip(forms, text))
+
+
+def _unescape_html(text):
+    while (decoded := unescape_html(text)) != text:  # the cleaner's ftfy decode, to its fixpoint
+        text = decoded
+    return text
+
+
+def _unescape_backslash(text):
+    return text.encode("latin", "backslashreplace").decode("unicode-escape")
+
+
+def escaped_case(case, kind="escaped", encode=_escape, decode=_unescape_backslash):
+    """The case with a few characters of some values written as backslash escapes (``06 12\\u0033\\x34``) or, with
+    ``kind="entity"``, HTML entities (``06 12&amp;#32;34``); own RNG per value and kind, so the plain case and the
+    other kind stay the same. A value already encoded by an earlier pass is left as it is."""
     values = []
+    salt = "escape" if kind == "escaped" else kind
     for index, value in enumerate(case["values"]):
-        rng = random.Random(f"{case['seed']}-{index}-escape")  # noqa: S311
+        rng = random.Random(f"{case['seed']}-{index}-{salt}")  # noqa: S311
+        if "escaped" in value["kinds"]:
+            values.append(value)
+            continue
         value = dict(value, slots=list(value["slots"]), inserts=dict(value["inserts"]))
         positions = [i for i, slot in enumerate(value["slots"]) if slot is None or slot[1]]
         if rng.random() < 0.3:
             for i in rng.sample(positions, min(len(positions), rng.randint(1, 3))):
                 slot = value["slots"][i]
-                value["slots"][i] = ("escaped", _escape(rng, value["plain"][i] if slot is None else slot[1]))
-            for i, (kind, text) in list(value["inserts"].items()):
+                value["slots"][i] = (kind, encode(rng, value["plain"][i] if slot is None else slot[1]))
+            for i, (_, text) in list(value["inserts"].items()):
                 if rng.random() < 0.5:
-                    value["inserts"][i] = ("escaped", _escape(rng, text))
+                    value["inserts"][i] = (kind, encode(rng, text))
             value["kinds"] = sorted({slot[0] for slot in value["slots"] if slot}
                                     | {insert[0] for insert in value["inserts"].values()}) + (
                 ["glue"] if value["glue"] else [])
-            decoded = render(value).encode("latin", "backslashreplace").decode("unicode-escape")
+            decoded = decode(render(value))
             assert fold(decoded) == fold(value["plain"]), (case["seed"], value["plain"], render(value))
         values.append(value)
     return dict(case, values=values)
@@ -731,12 +756,12 @@ def check_case(seed: int, modes=MODES, folds=(True, False)) -> dict:
     failures, stream_errors = [], 0
     for preset in PRESETS:
         decodes = cleaner(preset, True, "placeholder").cfg.check_decode_unicode_escapes
-        case = escaped_case(plain_case) if decodes else plain_case
+        case = escaped_case(escaped_case(plain_case) if decodes else plain_case, "entity", _entity, _unescape_html)
         doc = build_doc(case)
         # a window keeps a spaced token whole only when it fits in the overlap; a month-name date or a value
         # written with escapes (6-10 characters per escaped one) may not (48/12)
         short = {f"{size}/{overlap}" for size, overlap in STREAM_PARAMS
-                 if any((value["month"] or "escaped" in value["kinds"]) and len(render(value)) > overlap
+                 if any((value["month"] or {"escaped", "entity"} & set(value["kinds"])) and len(render(value)) > overlap
                         for value in case["values"])}
         cores = active_cores(case, preset)
         for fold_styled in folds:
@@ -769,12 +794,13 @@ def check_case(seed: int, modes=MODES, folds=(True, False)) -> dict:
                             steps=steps(value), minimal_kinds=kinds,
                             signature=f"{check}|{value['type']}|{'+'.join(kinds) or 'plain'}|{mode}{suffix}"))
                         break  # one record per output is enough to cluster
-                    if is_restore and preset.startswith("training") and text_fold != fold(doc):
-                        # training keeps the prose, so restore gives the whole input back (up to the fold)
+                    if is_restore and preset.startswith("training") and text_fold != fold(_unescape_html(doc)):
+                        # training keeps the prose, so restore gives the whole input back (up to the fold and the
+                        # cleaner's HTML entity decoding)
                         def restore_differs(off):
                             changed = build_doc(case, off)
                             got = outputs(changed, preset, fold_styled, "reversible", seed)["restored"]
-                            return fold(got) != fold(changed)
+                            return fold(got) != fold(_unescape_html(changed))
                         kinds = _shrink_all(case, restore_differs)
                         failures.append(_record(
                             case, doc, "restore_exact", preset, fold_styled, mode, text, minimal_kinds=kinds,

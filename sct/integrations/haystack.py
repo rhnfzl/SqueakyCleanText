@@ -49,9 +49,9 @@ class SCTDocumentCleaner:
                 f.name: _plain(value)
                 for f in fields(config)
                 # supported_languages is recomputed by __post_init__; a derived PII label map is
-                # left out so the loaded config re-derives it (as pickle does).
+                # left out in PII mode so the loaded config re-derives it (as pickle does).
                 if f.name != "supported_languages"
-                and not any(getattr(config, f.name) is m for m in _PII_MAPS.values())
+                and not (config.ner_mode == "pii" and any(getattr(config, f.name) is m for m in _PII_MAPS.values()))
                 and (value := getattr(config, f.name)) != getattr(default, f.name)
             }
         return default_to_dict(self, columns=self.columns, output=self.output, config=config)
