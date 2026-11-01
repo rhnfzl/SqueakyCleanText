@@ -562,11 +562,10 @@ new_cfg = dataclasses.replace(cfg, check_ner_process=False)
 | Field | Default | Description |
 |-------|---------|-------------|
 | `check_detect_language` | `True` | Auto-detect language |
-| `check_fix_bad_unicode` | `True` | Fix encoding issues via ftfy |
+| `check_fix_bad_unicode` | `True` | Fix encoding issues via ftfy and decode HTML entities (`&amp;`, `&#64;`), each on its own, so `<p>john&#64;example.com</p>` is replaced. Escaped `&lt;` / `&gt;` decode only outside tags, after tag removal, so `&lt;b&gt;` stays the text `<b>`. `False` decodes nothing |
 | `check_decode_unicode_escapes` | `True` | Part of `check_fix_bad_unicode`: decode literal backslash escapes (`\u00e9` to `é`, `\n` to a line break). `False` keeps them as written (code, JSON) |
-| `keep_html_entities_with_markup` | `False` | Part of `check_fix_bad_unicode`. `False` decodes HTML entities (`&amp;`, `&#64;`) everywhere, each on its own, so `<p>john&#64;example.com</p>` is replaced and `WindowedStreamingRedactor` splits markup with entities as the whole text reads it. `True` = ftfy's `"auto"` (0.7): from the first line holding a `<` on, entities stay as written; the windowed stream then often finds no safe split in such text and raises `BufferError` (use `BufferedStreamingRedactor`) |
 | `check_to_ascii_unicode` | `False` | Transliterate to ASCII with unidecode. `False` keeps every script (`日本語`, `München`); the multilingual NER models read native script, and folded output hid names from them (0 of 8 Hindi/Bengali/Tamil names found). `True` = 0.7 (`日本語` -> `Ri Ben Yu`); `sct-clean --to-ascii`, `SCT_MCP_TO_ASCII=1` |
-| `check_replace_html` | `True` | Strip/replace HTML tags |
+| `check_replace_html` | `True` | Strip/replace HTML tags, found on the markup as written: escaped code (`&lt;b&gt;`) is text, not a tag |
 | `check_replace_urls` | `True` | Replace URLs with token |
 | `check_replace_emails` | `True` | Replace emails with token |
 | `check_replace_ips` | `True` | Replace IPv4/IPv6 addresses (runs before dates, phones, years) |

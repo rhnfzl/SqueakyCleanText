@@ -226,6 +226,8 @@ class TextCleaner:
             self._pipeline.append(self._remove_emoji)
         # Steps before this index only normalise; markers they surface are source text.
         self._normalise_steps = len(self._pipeline)
+        if cfg.check_fix_bad_unicode:  # escaped "<b>" stays text: decoded after the view, hidden from tags
+            self._pipeline.append(self._unescape_markup)
         if cfg.check_replace_html:
             self._pipeline.append(self._replace_html)
         if cfg.check_replace_urls:
@@ -405,7 +407,7 @@ class TextCleaner:
         # "&lt;LONDON&gt;"): NER gives them no protection and reversible mode never
         # allocates them.
         source_markers = frozenset(ner._PLACEHOLDER_TOKEN.findall(text)) | frozenset(
-            ner._PLACEHOLDER_TOKEN.findall(current_text)) | frozenset(
+            ner._PLACEHOLDER_TOKEN.findall(normtext.unescape_markup(current_text))) | frozenset(
             tag for tag in self._custom_markers if tag in text or tag in current_text)
         if anon_map is not None:
             anon_map.reserved.update(source_markers)
@@ -690,7 +692,8 @@ class TextCleaner:
         for m in _KEY.finditer(text):
             value = values.get(m.group(), m.group())
             size += m.start() - pos
-            emitted.append((size, size + len(value)))
+            if value not in ('<', '>'):  # a bracket unescape_markup hid is source text, not an emit
+                emitted.append((size, size + len(value)))
             parts += [text[pos:m.start()], value]
             size, pos = size + len(value), m.end()
         resolved = ''.join(parts) + text[pos:]
@@ -815,8 +818,10 @@ class TextCleaner:
         return self.NormaliseText.fix_bad_unicode(
             text, decode_escapes=self.cfg.check_decode_unicode_escapes,
             fix_character_width=self.cfg.fix_character_width,
-            fold_styled_characters=self.cfg.fold_styled_characters,
-            keep_html_entities_with_markup=self.cfg.keep_html_entities_with_markup)
+            fold_styled_characters=self.cfg.fold_styled_characters)
+
+    def _unescape_markup(self, text):
+        return normtext.unescape_markup(text, self._protect)
 
     def _to_ascii_unicode(self, text):
         return self.NormaliseText.to_ascii_unicode(text)

@@ -4,6 +4,8 @@ import unicodedata
 from encodings.idna import dots as _idna_dots
 from typing import Optional, Set
 from ftfy import fix_text
+from ftfy.chardata import HTML_ENTITY_RE
+from ftfy.fixes import unescape_html
 from unidecode import unidecode
 from emoji import demojize, replace_emoji
 from sct.utils import constants
@@ -211,6 +213,36 @@ def _fold_circled_run(m):
     return m.group()
 
 
+def _decode_entity(match):
+    decoded = unescape_html(match.group())
+    return match.group() if decoded in ('<', '>') else decoded
+
+
+def decode_html_entities(text):
+    """ftfy's entity decoding (to a fixpoint, "&amp;#64;" -> "@"), except escaped ``<`` and ``>``.
+
+    Each entity decodes on its own, so a text split at whitespace decodes as the whole. ``&lt;`` and ``&gt;``
+    stay, so escaped code is never read as a tag; ``unescape_markup`` decodes them after normalising.
+    """
+    while (decoded := HTML_ENTITY_RE.sub(_decode_entity, text)) != text:
+        text = decoded
+    return text
+
+
+# A tag as HTML_REGEX reads it from its last "<" (no "<" inside, so linear), or an entity.
+_MARKUP_OR_ENTITY = re.compile(r'<[^<>\n]*>|&#?[0-9A-Za-z]{1,24};')
+
+
+def unescape_markup(text, protect=lambda value: value):
+    """Decode the ``&lt;`` / ``&gt;`` that ``decode_html_entities`` kept, outside tags, through *protect*."""
+    def replace(match):
+        if match.group()[0] == '<':
+            return match.group()
+        decoded = unescape_html(match.group())
+        return protect(decoded) if decoded in ('<', '>') else match.group()
+    return _MARKUP_OR_ENTITY.sub(replace, text)
+
+
 def fold_styled(text):
     """Fold styled/compatibility letters, digits and in-run URL punctuation to ASCII."""
     text = _INVISIBLE_REGEX.sub(_drop_invisible, text.translate(_STYLED_ALNUM))
@@ -226,7 +258,7 @@ class NormaliseText:
         pass
 
     def fix_bad_unicode(self, text, normalization="NFC", decode_escapes=True, fix_character_width=False,
-                        fold_styled_characters=True, keep_html_entities_with_markup=False):
+                        fold_styled_characters=True):
         """
         Fix unicode text that's "broken" using `ftfy <http://ftfy.readthedocs.org/>`_;
         this includes mojibake, HTML entities and other code cruft,
@@ -238,9 +270,7 @@ class NormaliseText:
         full-width emails and phones are still found; ``True`` is ftfy's full width fix (0.7).
         ``fold_styled_characters=True`` also folds math-alphanumeric (𝐞), circled (ⓙ) and full-width
         URL punctuation (``：／？``) inside ASCII runs, so styled emails, URLs and phones are found.
-        ``keep_html_entities_with_markup=False`` decodes HTML entities everywhere (each entity on its own,
-        so a text split at whitespace decodes as the whole); ``True`` is ftfy's ``"auto"``: from the first
-        line holding a ``<`` on, entities stay (0.7).
+        HTML entities decode everywhere except ``&lt;`` / ``&gt;`` (see ``decode_html_entities``).
         """
         if decode_escapes:
             try:
@@ -248,8 +278,8 @@ class NormaliseText:
             except (UnicodeDecodeError, UnicodeEncodeError):
                 logger.debug("Unicode escape decoding failed, using original text", exc_info=True)
 
-        text = fix_text(text, normalization=normalization, fix_character_width=fix_character_width,
-                        unescape_html="auto" if keep_html_entities_with_markup else True)
+        text = fix_text(decode_html_entities(text), normalization=normalization,
+                        fix_character_width=fix_character_width, unescape_html=False)
         if fold_styled_characters:
             return fold_styled(text)
         if fix_character_width:

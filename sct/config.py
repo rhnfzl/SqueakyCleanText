@@ -357,10 +357,6 @@ class TextCleanerConfig:
     # synthetic: ISO date that date fakes (DATE, DATE_OF_BIRTH) end on, so a document gets the
     # same dates on any day; None = today, from the clock (earlier 0.8.0)
     synthetic_reference_date: Optional[str] = '2026-01-01'
-    # Part of check_fix_bad_unicode. False decodes HTML entities everywhere (each one on its own, so the
-    # stream's halves decode as the whole text); True = ftfy's "auto" (0.7): from the first line holding
-    # a "<" on, entities stay ("<p>john&#64;example.com" kept the email hidden)
-    keep_html_entities_with_markup: bool = False
 
     def __post_init__(self):
         if self.synthetic_reference_date is not None:
@@ -730,7 +726,6 @@ def _config_from_module_globals() -> TextCleanerConfig:
         synthetic_low_confidence_locale=getattr(m, 'SYNTHETIC_LOW_CONFIDENCE_LOCALE', 'en_US'),
         synthetic_collapse_period=getattr(m, 'SYNTHETIC_COLLAPSE_PERIOD', True),
         synthetic_reference_date=getattr(m, 'SYNTHETIC_REFERENCE_DATE', '2026-01-01'),
-        keep_html_entities_with_markup=getattr(m, 'KEEP_HTML_ENTITIES_WITH_MARKUP', False),
         check_replace_currency_symbols=m.CHECK_REPLACE_CURRENCY_SYMBOLS,
         check_ner_process=m.CHECK_NER_PROCESS,
         check_remove_isolated_letters=m.CHECK_REMOVE_ISOLATED_LETTERS,
@@ -839,7 +834,6 @@ NER_SEES_TAGS = True
 SYNTHETIC_LOW_CONFIDENCE_LOCALE = 'en_US'
 SYNTHETIC_COLLAPSE_PERIOD = True
 SYNTHETIC_REFERENCE_DATE = '2026-01-01'
-KEEP_HTML_ENTITIES_WITH_MARKUP = False
 GLINER_ONNX = False
 LANGUAGE = None
 

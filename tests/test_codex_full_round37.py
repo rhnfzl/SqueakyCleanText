@@ -39,12 +39,3 @@ def test_entity_encoded_email_in_markup_is_replaced():
     text = "<p>Mail john&#64;example.com now</p>"
     out = TextCleaner(cfg=TextCleanerConfig(check_ner_process=False)).process(text).lm_text
     assert "john" not in out and "<EMAIL>" in out
-    kept = TextCleaner(cfg=TextCleanerConfig(check_ner_process=False, keep_html_entities_with_markup=True))
-    assert "john" in kept.process(text).lm_text  # ftfy "auto" (0.7): entities stay after a "<"
-
-
-def test_option_is_wired_from_module_globals(monkeypatch):
-    from sct import config
-    assert TextCleanerConfig().keep_html_entities_with_markup is False
-    monkeypatch.setattr(config, "KEEP_HTML_ENTITIES_WITH_MARKUP", True)
-    assert config._config_from_module_globals().keep_html_entities_with_markup is True
