@@ -305,9 +305,15 @@ After a successful upload, replace the MULTILINGUAL fallback in `DEFAULT_NER_MOD
 The `stop-words` package supports 33 languages. If the new language is among them, stopwords are auto-loaded via `language_to_iso()`. Check coverage:
 
 ```python
-from stop_words import get_stop_words
-print(get_stop_words('fr'))  # French: works
-print(get_stop_words('th'))  # Thai: raises StopWordError (SCT falls back to no stopwords)
+from stop_words import StopWordError, get_stop_words
+
+print('le' in get_stop_words('fr'))
+# -> True
+try:
+    get_stop_words('th')
+except StopWordError:
+    print('Thai: not supported, SCT uses no stopwords')
+# -> Thai: not supported, SCT uses no stopwords
 ```
 
 If the package doesn't support the language, users can provide `custom_stopwords`, or you can add a built-in set.

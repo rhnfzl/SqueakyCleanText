@@ -18,8 +18,13 @@ Read from `result.signals` (the public view):
 | `sct_warnings` | `list[str]` | `warnings` |
 
 ```python
+from sct import TextCleaner
 from sct.score import score_record
-row = score_record(cleaner.process(text))
+
+cleaner = TextCleaner()
+row = score_record(cleaner.process("Mail john@example.com today."))
+print(row["sct_pii_types"])
+# -> ['EMAIL']
 ```
 
 ## Score B (built, off by default)
@@ -41,8 +46,17 @@ When any part of B is on, both `sct_quality` (`float | None`) and
 | `data_card` | `False` | set by `sct-report --card`; `score_records` ignores it |
 
 ```python
+from sct import TextCleaner
 from sct.score import ScoreConfig, score_records, build_data_card, render_data_card
-rows = score_records(results, texts, ScoreConfig(minhash=True), scorer=my_scorer)
+
+texts = ["Mail john@example.com today.", "Call +31 6 1234 5678 after five."]
+results = TextCleaner().process_batch(texts)
+
+def my_scorer(texts):  # any QualityScorer: list[str] -> list[float]
+    return [0.5 for _ in texts]
+
+config = ScoreConfig(quality=True, minhash=True)  # minhash needs the [score] extra
+rows = score_records(results, texts, config, scorer=my_scorer)
 card = build_data_card(rows)       # dict: counts, languages, PII types
 markdown = render_data_card(card)  # the same card as Markdown
 ```
