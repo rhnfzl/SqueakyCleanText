@@ -69,7 +69,6 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         quality=args.quality_model is not None,
         quality_model=args.quality_model,
         minhash=args.minhash,
-        data_card=args.card is not None,
     )
     overrides = {"check_ner_process": False} if args.no_ner else {}
     try:

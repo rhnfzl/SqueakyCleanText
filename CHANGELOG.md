@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.8.0 - 2026-10-31
+## 0.8.0 - 2026-11-01
 
 0.8.0 makes batch cleaning faster, detects all 75 Lingua languages, and adds a value-free
 signal view that feeds new framework adapters (Hugging Face `datasets`, DataTrove, LangChain,
@@ -27,7 +27,7 @@ Haystack), score columns and data cards (`sct-report`), a reworked MCP server an
 
 ### Added
 
-- Docs: a shorter README with a new pipeline diagram (`resources/sct_flow.excalidraw`, `.svg`, `.png`). The reference moved to `docs/`: `INSTALL.md`, `CONFIG.md`, `API.md`, `NER_BACKENDS.md`, `REPLACEMENT_MODES.md`, `PRIVACY.md`, `ADAPTERS.md`, `EVALUATION.md`, `LANGUAGES.md`; release notes of 0.4.5 to 0.6.0 moved here.
+- Docs: a shorter README with a new pipeline diagram (`resources/sct_flow.excalidraw`, `.svg`, `.png`). The reference moved to `docs/`: `INSTALL.md`, `CONFIG.md`, `API.md`, `NER_BACKENDS.md`, `REPLACEMENT_MODES.md`, `PRIVACY.md`, `ADAPTERS.md`, `EVALUATION.md`, `LANGUAGES.md`; release notes of 0.4.5 to 0.6.0 moved here. README links are full GitHub URLs, so they also work on the PyPI page.
 - `ProcessResult.signals`: a value-free public view (language, confidence, PII counts,
   share and types, regex and entity counts, warnings, model provenance). Never entity text.
   Details under "Behaviour changes".
@@ -148,12 +148,13 @@ Haystack), score columns and data cards (`sct-report`), a reworked MCP server an
 - `sct-clean --preset {sct,training}` (default `sct`) and `SCT_MCP_PRESET` / `create_mcp_server(preset=...)` (default `sct`) pick the config preset; `training` keeps numbers, case and whitespace as written. `sct-clean --to-ascii` / `SCT_MCP_TO_ASCII=1` turn on ASCII folding.
 - `onnx_intra_op_threads` and `onnx_inter_op_threads` (default `None`, the ONNX Runtime default, same as 0.7.1). Legacy module globals `ONNX_INTRA_OP_THREADS` / `ONNX_INTER_OP_THREADS`. Not applied to GLiNER's own ONNX session (`gliner_onnx=True`).
 - `SCT_MCP_ROOT` (default unset = off) and `SCT_MCP_MAX_BYTES` (default 1 MiB): let MCP `clean_text(path=...)` read regular UTF-8 files under the root. Relative paths only; `..`, hidden parts and symlinks are refused (opened folder by folder with `O_NOFOLLOW`); off on Windows.
-- `ScoreConfig` (`sct.score`, not `TextCleanerConfig`): `quality=False`, `quality_model=None`, `quality_revision=None`, `minhash=False`, `minhash_num_perm=128`, `minhash_seed=1`, `minhash_shingle=5`, `minhash_min_tokens=5`, `data_card=False`.
+- `ScoreConfig` (`sct.score`, not `TextCleanerConfig`): `quality=False`, `quality_model=None`, `quality_revision=None`, `minhash=False`, `minhash_num_perm=128`, `minhash_seed=1`, `minhash_shingle=5`, `minhash_min_tokens=5`. (`data_card` is gone: `score_records` never read it; use `build_data_card` / `sct-report --card`.)
 - Adapter options `columns`, `output` (`"overwrite"`), `config` (`None` = `"training"`); a single string for `columns` is one column.
 - `ner_chunk_overlap` (default `0`, legacy module global `NER_CHUNK_OVERLAP`): each NER window adds this many tokens of the neighbouring text on both sides of its chunk (GLiNER-only: 2 characters per token), and a span is kept from the window whose chunk holds its start; a neighbouring window's span is kept too when no span of the owning window that passes the confidence threshold (and, with a privacy policy, is replaced or redacted by it) covers it. A span seen by several windows is one vote per model, with its best score and that score's label, so repeated context (even with a different label) never counts as extra models in ensemble voting. A document that fits one window is never split, so overlap only affects documents that are chunked. This finds entities that a chunk boundary would split (sentence, whitespace or hard cut). The default `0` keeps the 0.7.1 chunks; overlap changes the context the model sees in long documents, so detections can change either way, and inference grows by about `2 * overlap / window`. An entity longer than the overlap that starts at the very end of a chunk can still be cut. Must satisfy `2 * overlap < window // 2`; this is checked again for each document, so a model loaded later with a smaller limit raises `ValueError` instead of running with a negative chunk budget.
 
 ### Fixes
 
+- `check_remove_stext_custom_stop_words` now works: `False` keeps the built-in stopword lists in `stat_text` and ignores `custom_stopwords`. Before, no step read it, so custom sets always replaced the built-in lists.
 - HTML entities decode everywhere, each on its own (0.7 used ftfy's `"auto"`, which stopped decoding from the first line holding a `<` on). `<p>john&#64;example.com</p>` left the address in the output, and `WindowedStreamingRedactor` never found a split in markup with entities: the right half (no `<`) decoded what the whole text kept, so each space was rejected after normalising the full prefix and suffix again (`"intro <b> " + "word &amp; " * 800`, 9062 characters, took 7.4 s and 3205 normalise calls, emitted `"intro "` and the next feed raised `BufferError`; now 0.03 s, 5 calls). Escaped `<` and `>` (`&lt;`, `&#60;`, `&#x3e;`) stay escaped while normalising and decode after it, only outside tags and hidden from the tag step only (contacts, URLs and the reversible map see the plain bracket: `john&lt;at&gt;example.com` gives `<EMAIL>`, and a URL holding `&lt;` restores with `<`), so escaped code stays visible text in every mode and the stream: `<p>Use &lt;b&gt; for bold</p>` gives `<HTML>Use <b> for bold<HTML>` (decoding every entity first had made it `<HTML>Use <HTML> for bold<HTML>`; 0.7 gave `<HTML>Use <HTML>b<HTML> for bold<HTML>`). No new option: `check_fix_bad_unicode=False` keeps every entity as written. `WindowedStreamingRedactor` also no longer splits inside an HTML tag that holds a space (`<a title="x y">`) when `check_replace_html` is on.
 - NER no longer tags text inside a regex placeholder: with the default models, `call +1-202-555-0147` became `call <<MISC>>` (the model tagged `PHONE` in `<PHONE>`; 0.7.1 did the same). Spans inside an upper-case `<TAG>` / `<TAG_n>` marker are dropped; custom `replace_with_*` text is not protected.
 - International phone numbers no longer swallow a closing parenthesis of the sentence: `(tel +31 6 1234 5678)` now gives `(tel <PHONE>)`, not `(tel <PHONE>`. Area-code parentheses must be balanced (`+44 (0)20 ...` unchanged).

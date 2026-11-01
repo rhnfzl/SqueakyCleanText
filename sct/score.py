@@ -53,7 +53,6 @@ class ScoreConfig:
     minhash_seed: int = 1
     minhash_shingle: int = 5
     minhash_min_tokens: int = 5
-    data_card: bool = False
 
     def __post_init__(self):
         if self.minhash_num_perm < 1:

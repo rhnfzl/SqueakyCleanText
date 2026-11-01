@@ -1354,6 +1354,17 @@ class TextCleanerTest(unittest.TestCase):
         )
         self.assertEqual(sw.get_stop_words('ENGLISH'), custom)
 
+    def test_custom_stopwords_toggle(self):
+        """check_remove_stext_custom_stop_words=False keeps the built-in lists."""
+        text = "the zebra sings"
+        for toggle, expected in ((True, "the sings"), (False, "zebra sings")):
+            cfg = TextCleanerConfig(
+                check_ner_process=False, language='ENGLISH',
+                custom_stopwords={'ENGLISH': frozenset({'zebra'})},
+                check_remove_stext_custom_stop_words=toggle,
+            )
+            self.assertEqual(TextCleaner(cfg=cfg).process(text).stat_text, expected)
+
     def test_auto_stopwords_via_iso(self):
         """Polish stopwords auto-load from stop-words package."""
         sw = ProcessStopwords(supported_languages=frozenset({'ENGLISH', 'POLISH'}))

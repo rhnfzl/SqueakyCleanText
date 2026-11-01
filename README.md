@@ -3,7 +3,7 @@
 [![PyPI](https://img.shields.io/pypi/v/squeakycleantext.svg)](https://pypi.org/project/squeakycleantext/)
 [![Python package](https://github.com/rhnfzl/SqueakyCleanText/actions/workflows/python-package.yml/badge.svg)](https://github.com/rhnfzl/SqueakyCleanText/actions/workflows/python-package.yml)
 [![Python Versions](https://img.shields.io/badge/Python-3.12%20|%203.13%20|%203.14-blue)](https://pypi.org/project/squeakycleantext/)
-[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/rhnfzl/SqueakyCleanText/blob/main/LICENSE)
 
 Real-world text is messy: broken encoding, HTML, URLs, and personal data such as names, emails and phone numbers. SqueakyCleanText cleans that text and replaces the personal data with tags, fake values or reversible placeholders, in one call and in 75 languages. It is for teams that feed text into LLMs, training sets, search indexes or classic ML models and need it clean and safe to share first.
 
@@ -45,7 +45,7 @@ Python 3.12 or newer. The base install runs NER with ONNX Runtime; it needs no P
 | `datasets`, `datatrove` | Clean Hugging Face datasets or DataTrove pipelines |
 | `mcp` | Run SCT as an MCP server for AI assistants |
 
-Install with `pip install "squeakycleantext[gpu,synthetic]"`. All extras: [docs/INSTALL.md](docs/INSTALL.md).
+Install with `pip install "squeakycleantext[gpu,synthetic]"`. All extras: [docs/INSTALL.md](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/INSTALL.md).
 
 ## Quickstart
 
@@ -85,7 +85,6 @@ For more PII types (IDs, bank numbers, health data and more), use the GLiNER PII
 6. **Output.** `lm_text`, `stat_text` and `language`, plus `metadata` and `signals`. `signals` holds counts, warnings and model ids, never raw values. `metadata` holds the same counts, and it can hold raw values: the reversible map (`anon_map`, unless you pass a `TokenStore`) and `findings` with entity text (with `include_entities=True` or a privacy policy).
 
 <picture>
-  <source srcset="resources/sct_flow.svg" type="image/svg+xml">
   <img src="https://raw.githubusercontent.com/rhnfzl/SqueakyCleanText/main/resources/sct_flow.png" alt="SqueakyCleanText pipeline: entry points, language detection, fixes, regex PII, NER, replacement, outputs and metadata" width="900">
 </picture>
 
@@ -98,7 +97,7 @@ For more PII types (IDs, bank numbers, health data and more), use the GLiNER PII
 
 </details>
 
-Every step is a `TextCleanerConfig` field with a safe default. The source of the diagram is [resources/sct_flow.excalidraw](resources/sct_flow.excalidraw).
+Every step is a `TextCleanerConfig` field with a safe default. The source of the diagram is [resources/sct_flow.excalidraw](https://github.com/rhnfzl/SqueakyCleanText/blob/main/resources/sct_flow.excalidraw).
 
 ## What you get back
 
@@ -116,7 +115,7 @@ print(result.signals["pii_count"], result.signals["pii_types"], result.signals["
 
 - `metadata` always holds `regex_counts`, `entity_counts`, `language_confidence`, `language_source`, `warnings` (such as `language_low_confidence` or `ner_fallback_models`) and `provenance` (the NER models and revisions that ran).
 - `signals` is the value-free view of the same data, with the same keys for every input. It is safe to log or store next to the cleaned text.
-- Entity text appears only when you ask for it (`include_entities=True` or a privacy policy adds `metadata["findings"]`) and in the reversible map. Keep those out of logs. Full field list: [docs/API.md](docs/API.md).
+- Entity text appears only when you ask for it (`include_entities=True` or a privacy policy adds `metadata["findings"]`) and in the reversible map. Keep those out of logs. Full field list: [docs/API.md](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/API.md).
 
 ## Common recipes
 
@@ -130,7 +129,7 @@ print(cleaner.process("Order 4711 from <b>Anna Berg</b> (anna@example.se) on 202
 # -> Order 4711 from <b><PERSON></b> (<EMAIL>) on 2024-05-01.
 ```
 
-**Reversible placeholders.** Keep the map in a `TokenStore` and restore the values later ([docs/REPLACEMENT_MODES.md](docs/REPLACEMENT_MODES.md), [docs/PRIVACY.md](docs/PRIVACY.md)). `replacement_mode="synthetic"` (`synthetic` extra) puts fake values in place instead. The same document always gets the same fakes.
+**Reversible placeholders.** Keep the map in a `TokenStore` and restore the values later ([docs/REPLACEMENT_MODES.md](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/REPLACEMENT_MODES.md), [docs/PRIVACY.md](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/PRIVACY.md)). `replacement_mode="synthetic"` (`synthetic` extra) puts fake values in place instead. The same document always gets the same fakes.
 
 ```python
 from sct import InMemoryTokenStore, TextCleaner, TextCleanerConfig
@@ -142,7 +141,7 @@ print(result.lm_text)  # -> <PERSON_0> lives in <LOCATION_0>.
 print(store.load(result.metadata["anon_map_reference"]).deanonymize(result.lm_text))  # -> Maria lives in Utrecht.
 ```
 
-**Privacy policy.** Decide per entity type what to keep or redact, and get a versioned audit trail ([docs/PRIVACY.md](docs/PRIVACY.md)):
+**Privacy policy.** Decide per entity type what to keep or redact, and get a versioned audit trail ([docs/PRIVACY.md](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/PRIVACY.md)):
 
 ```python
 from sct import EntityRule, PrivacyPolicy, TextCleaner
@@ -155,23 +154,23 @@ print(TextCleaner(privacy_policy=policy).process("Maria Chen from Acme Corp wrot
 # -> <REDACTED> from Acme Corp wrote to us.
 ```
 
-**GPU.** Install the `gpu` extra and set `TextCleanerConfig(ner_device="cuda", cuda_device_id=0)`. If CUDA cannot load, NER runs on CPU and each result gets the `cuda_fallback` warning ([docs/PERFORMANCE.md](docs/PERFORMANCE.md)).
+**GPU.** Install the `gpu` extra and set `TextCleanerConfig(ner_device="cuda", cuda_device_id=0)`. If CUDA cannot load, NER runs on CPU and each result gets the `cuda_fallback` warning ([docs/PERFORMANCE.md](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/PERFORMANCE.md)).
 
-**Your own entity labels.** With the `gliner` extra, set `ner_backend="gliner"`, `gliner_model="urchade/gliner_multi-v2.1"` and `gliner_labels=("person", "product", "event")`; unmapped labels become tags such as `<PRODUCT>` ([docs/NER_BACKENDS.md](docs/NER_BACKENDS.md)).
+**Your own entity labels.** With the `gliner` extra, set `ner_backend="gliner"`, `gliner_model="urchade/gliner_multi-v2.1"` and `gliner_labels=("person", "product", "event")`; unmapped labels become tags such as `<PRODUCT>` ([docs/NER_BACKENDS.md](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/NER_BACKENDS.md)).
 
 ## Use it in your stack
 
 | Integration | Usage | Extra | Docs |
 |---|---|---|---|
-| Hugging Face `datasets` | `clean_dataset(ds, columns=["text"], num_proc=4)` | `datasets` | [INTEGRATIONS](docs/INTEGRATIONS.md) |
-| DataTrove | `SCTCleaner()` as a pipeline step | `datatrove` | [INTEGRATIONS](docs/INTEGRATIONS.md) |
-| LangChain | `SCTDocumentTransformer().transform_documents(docs)` | `langchain` | [INTEGRATIONS](docs/INTEGRATIONS.md) |
-| Haystack | `pipe.add_component("sct", SCTDocumentCleaner())` | `haystack` | [INTEGRATIONS](docs/INTEGRATIONS.md) |
-| JSON, DataFrame, RAG chunks | `process_json(cleaner, value)` | none | [ADAPTERS](docs/ADAPTERS.md) |
-| Streams | `WindowedStreamingRedactor(cleaner)` | none | [ADAPTERS](docs/ADAPTERS.md) |
-| Ray, Spark, Polars, DuckDB, dlt, Daft | `clean_columns(handle, batch)` | none | [RECIPES](docs/RECIPES.md) |
-| Command line | `printf 'Email maria@example.com' \| sct-clean` | none | [ADAPTERS](docs/ADAPTERS.md) |
-| MCP server | `sct-mcp` | `mcp` | [MCP](docs/MCP.md) |
+| Hugging Face `datasets` | `clean_dataset(ds, columns=["text"], num_proc=4)` | `datasets` | [INTEGRATIONS](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/INTEGRATIONS.md) |
+| DataTrove | `SCTCleaner()` as a pipeline step | `datatrove` | [INTEGRATIONS](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/INTEGRATIONS.md) |
+| LangChain | `SCTDocumentTransformer().transform_documents(docs)` | `langchain` | [INTEGRATIONS](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/INTEGRATIONS.md) |
+| Haystack | `pipe.add_component("sct", SCTDocumentCleaner())` | `haystack` | [INTEGRATIONS](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/INTEGRATIONS.md) |
+| JSON, DataFrame, RAG chunks | `process_json(cleaner, value)` | none | [ADAPTERS](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/ADAPTERS.md) |
+| Streams | `WindowedStreamingRedactor(cleaner)` | none | [ADAPTERS](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/ADAPTERS.md) |
+| Ray, Spark, Polars, DuckDB, dlt, Daft | `clean_columns(handle, batch)` | none | [RECIPES](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/RECIPES.md) |
+| Command line | `printf 'Email maria@example.com' \| sct-clean` | none | [ADAPTERS](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/ADAPTERS.md) |
+| MCP server | `sct-mcp` | `mcp` | [MCP](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/MCP.md) |
 
 The framework adapters use the `training` preset unless you pass a config, build one cleaner per worker process, and reject reversible mode.
 
@@ -186,18 +185,18 @@ Default config (full multilingual NER ensemble), release benchmark documents, SC
 | `process_batch`, short documents, 16 workers | 64 CPU cores | 29.2 |
 | `process_batch`, short documents, English only (2 models) | RTX 4090 | 646 |
 
-Source and method: [docs/PERFORMANCE.md](docs/PERFORMANCE.md) and [evaluation/results/comparison-0.7.1-0.8.0.md](evaluation/results/comparison-0.7.1-0.8.0.md). Measure your own machine with `python -m scripts.benchmark_release --batch 256 --batch-size 8 --ner-batch-size 8`.
+Source and method: [docs/PERFORMANCE.md](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/PERFORMANCE.md) and [evaluation/results/comparison-0.7.1-0.8.0.md](https://github.com/rhnfzl/SqueakyCleanText/blob/main/evaluation/results/comparison-0.7.1-0.8.0.md). Measure your own machine with `python -m scripts.benchmark_release --batch 256 --batch-size 8 --ner-batch-size 8`.
 
 ## Quality and evaluation
 
 - Release benchmark (30 documents, 84 entities, 9 languages): exact-span F1 0.99 and 0 of 67 PII values leaked in 0.8.0. Run `python -m scripts.benchmark_release`.
-- Multilingual PII eval (220 synthetic records, 11 languages): the default ensemble scores 0.93 recall and 0.95 precision. Run `python -m scripts.run_multilingual_eval` ([docs/MULTILINGUAL_EVAL.md](docs/MULTILINGUAL_EVAL.md)).
-- Score columns and data cards: `sct-report data.jsonl --text-column text --out report.json` writes counts, shares and hashes, never text ([docs/SCORE.md](docs/SCORE.md)).
-- Test your own model or data with the PII evaluation harness ([docs/EVALUATION.md](docs/EVALUATION.md)).
+- Multilingual PII eval (220 synthetic records, 11 languages): the default ensemble scores 0.93 recall and 0.95 precision. Run `python -m scripts.run_multilingual_eval` ([docs/MULTILINGUAL_EVAL.md](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/MULTILINGUAL_EVAL.md)).
+- Score columns and data cards: `sct-report data.jsonl --text-column text --out report.json` writes counts, shares and hashes, never text ([docs/SCORE.md](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/SCORE.md)).
+- Test your own model or data with the PII evaluation harness ([docs/EVALUATION.md](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/EVALUATION.md)).
 
 ## Languages
 
-Language detection covers 75 languages. Full NER models cover 4 (English, Dutch, German, Spanish). The rest use the multilingual WikiNEural model with the English model, or a model you bring with `ner_models`. Full list: [docs/LANGUAGES.md](docs/LANGUAGES.md).
+Language detection covers 75 languages. Full NER models cover 4 (English, Dutch, German, Spanish). The rest use the multilingual WikiNEural model with the English model, or a model you bring with `ner_models`. Full list: [docs/LANGUAGES.md](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/LANGUAGES.md).
 
 ## Limits and design principles
 
@@ -229,21 +228,21 @@ Language detection covers 75 languages. Full NER models cover 4 (English, Dutch,
 
 | Topic | Where |
 |---|---|
-| Install and all extras, speed and hardware | [docs/INSTALL.md](docs/INSTALL.md), [docs/PERFORMANCE.md](docs/PERFORMANCE.md) |
-| Every config field, presets, language options | [docs/CONFIG.md](docs/CONFIG.md) |
-| `TextCleaner`, `ProcessResult`, `signals` | [docs/API.md](docs/API.md) |
-| NER backends, default models, GLiNER, PII mode | [docs/NER_BACKENDS.md](docs/NER_BACKENDS.md) |
-| Synthetic and reversible replacement, GLiClass | [docs/REPLACEMENT_MODES.md](docs/REPLACEMENT_MODES.md) |
-| Privacy policies, `TokenStore`, offsets, k-anonymity | [docs/PRIVACY.md](docs/PRIVACY.md) |
-| JSON, DataFrame, RAG, CLI, streaming, OCR, browser | [docs/ADAPTERS.md](docs/ADAPTERS.md) |
-| Framework adapters, other engines, MCP server | [docs/INTEGRATIONS.md](docs/INTEGRATIONS.md), [docs/RECIPES.md](docs/RECIPES.md), [docs/MCP.md](docs/MCP.md) |
-| Evaluation, score columns, `sct-report` | [docs/EVALUATION.md](docs/EVALUATION.md), [docs/SCORE.md](docs/SCORE.md), [docs/MULTILINGUAL_EVAL.md](docs/MULTILINGUAL_EVAL.md) |
-| Languages and adding a language | [docs/LANGUAGES.md](docs/LANGUAGES.md), [docs/ADDING_LANGUAGES.md](docs/ADDING_LANGUAGES.md) |
-| The whole API in one file, for AI coding assistants | [llms.txt](llms.txt) |
+| Install and all extras, speed and hardware | [docs/INSTALL.md](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/INSTALL.md), [docs/PERFORMANCE.md](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/PERFORMANCE.md) |
+| Every config field, presets, language options | [docs/CONFIG.md](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/CONFIG.md) |
+| `TextCleaner`, `ProcessResult`, `signals` | [docs/API.md](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/API.md) |
+| NER backends, default models, GLiNER, PII mode | [docs/NER_BACKENDS.md](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/NER_BACKENDS.md) |
+| Synthetic and reversible replacement, GLiClass | [docs/REPLACEMENT_MODES.md](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/REPLACEMENT_MODES.md) |
+| Privacy policies, `TokenStore`, offsets, k-anonymity | [docs/PRIVACY.md](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/PRIVACY.md) |
+| JSON, DataFrame, RAG, CLI, streaming, OCR, browser | [docs/ADAPTERS.md](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/ADAPTERS.md) |
+| Framework adapters, other engines, MCP server | [docs/INTEGRATIONS.md](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/INTEGRATIONS.md), [docs/RECIPES.md](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/RECIPES.md), [docs/MCP.md](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/MCP.md) |
+| Evaluation, score columns, `sct-report` | [docs/EVALUATION.md](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/EVALUATION.md), [docs/SCORE.md](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/SCORE.md), [docs/MULTILINGUAL_EVAL.md](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/MULTILINGUAL_EVAL.md) |
+| Languages and adding a language | [docs/LANGUAGES.md](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/LANGUAGES.md), [docs/ADDING_LANGUAGES.md](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/ADDING_LANGUAGES.md) |
+| The whole API in one file, for AI coding assistants | [llms.txt](https://github.com/rhnfzl/SqueakyCleanText/blob/main/llms.txt) |
 
 ## What's new in 0.8.0
 
-See [CHANGELOG.md](CHANGELOG.md) (many breaking changes). Highlights of 0.8.0:
+See [CHANGELOG.md](https://github.com/rhnfzl/SqueakyCleanText/blob/main/CHANGELOG.md) (many breaking changes). Highlights of 0.8.0:
 
 - `process_batch` is 4.2x faster on short documents on 16 CPU cores; GPU device options.
 - Detection of all 75 Lingua languages, with confidence and warnings.
@@ -260,7 +259,7 @@ See [CHANGELOG.md](CHANGELOG.md) (many breaking changes). Highlights of 0.8.0:
 
 ## Contributing
 
-Issues and pull requests are welcome. Read [AGENTS.md](AGENTS.md) first: model mistakes are fixed with model-driven rules, never with word lists, and every behaviour stays configurable.
+Issues and pull requests are welcome. Read [AGENTS.md](https://github.com/rhnfzl/SqueakyCleanText/blob/main/AGENTS.md) first: model mistakes are fixed with model-driven rules, never with word lists, and every behaviour stays configurable.
 
 ## Citation
 
@@ -276,4 +275,4 @@ Issues and pull requests are welcome. Read [AGENTS.md](AGENTS.md) first: model m
 
 ## License and acknowledgements
 
-MIT. See [LICENSE](LICENSE). The package took inspiration from [clean-text](https://github.com/jfilter/clean-text). It builds on [ftfy](https://github.com/rspeer/python-ftfy), [Lingua](https://github.com/pemistahl/lingua-py), [ONNX Runtime](https://onnxruntime.ai/) and the NER models listed in [docs/NER_BACKENDS.md](docs/NER_BACKENDS.md).
+MIT. See [LICENSE](https://github.com/rhnfzl/SqueakyCleanText/blob/main/LICENSE). The package took inspiration from [clean-text](https://github.com/jfilter/clean-text). It builds on [ftfy](https://github.com/rspeer/python-ftfy), [Lingua](https://github.com/pemistahl/lingua-py), [ONNX Runtime](https://onnxruntime.ai/) and the NER models listed in [docs/NER_BACKENDS.md](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/NER_BACKENDS.md).

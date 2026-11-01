@@ -80,7 +80,9 @@ class TextCleaner:
         # Instance-scoped stopwords (with custom override support)
         self.ProcessStopwords = stopwords.ProcessStopwords(
             supported_languages=self.cfg.supported_languages,
-            custom_stopwords=dict(self.cfg.custom_stopwords) if self.cfg.custom_stopwords else None,
+            custom_stopwords=(dict(self.cfg.custom_stopwords)
+                              if self.cfg.custom_stopwords and self.cfg.check_remove_stext_custom_stop_words
+                              else None),
         )
 
         # Instance-scoped datetime (with custom month names -> per-instance regex)

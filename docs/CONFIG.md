@@ -113,7 +113,7 @@ new_cfg = dataclasses.replace(cfg, check_ner_process=False)
 | `check_smart_casefold` | `False` | Lowercase but preserve NER tokens |
 | `check_remove_stopwords` | `True` | Remove stopwords from stat output |
 | `check_remove_punctuation` | `True` | Remove punctuation from stat output |
-| `check_remove_stext_custom_stop_words` | `True` | Not used: no step reads it. `custom_stopwords` sets are removed whenever `check_remove_stopwords` is on |
+| `check_remove_stext_custom_stop_words` | `True` | Use your `custom_stopwords` sets in `stat_text`. `False` keeps the built-in stopword lists |
 | `check_remove_emoji` | `False` | Remove emoji characters |
 
 **Replacement tokens** (all `str`):
