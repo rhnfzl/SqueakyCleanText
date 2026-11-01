@@ -81,3 +81,17 @@ def test_linear_scanners_keep_matches():
     assert cleaner.process("see https://a.jp,https：／／b.jp/?t=Secret now").lm_text == "see <URL>,<URL> now"
     assert cleaner.process("see https://u:p:q@x.com/?t=Secret now").lm_text == "see <URL> now"
     assert cleaner.process("mail jo-ann+tag@example.com now").lm_text == "mail <EMAIL> now"
+
+
+# --- 3: an IPv4 after a dot that ends a word (a CJK full stop folded to ".", or typed) ---
+
+@pytest.mark.parametrize("fold", [True, False])
+@pytest.mark.parametrize("text", ["x@ad.io銄黟。8.8.8.8夑", "see https://ad.io銄黟。8.8.8.8夑", "服务器.8.8.8.8",
+                                  "host x.10.0.0.1"])
+def test_ipv4_after_word_dot_masked(text, fold):
+    out = _cleaner(fold_styled_characters=fold).process(text).lm_text
+    assert "8.8.8.8" not in out and "10.0.0.1" not in out and "<IP>" in out, out
+
+
+def test_ipv4_inside_longer_dotted_number_stays():
+    assert _cleaner().process("v 1.2.3.4.5 x").lm_text == "v 1.2.3.4.5 x"
