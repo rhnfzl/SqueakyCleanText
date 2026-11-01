@@ -19,7 +19,7 @@ Haystack), score columns and data cards (`sct-report`), a reworked MCP server an
   TP/FP/FN 83/1/1 (P = R = F1 = 0.99; 0.7.1: 82/2/2) and 0 of 67 PII values leaked.
   `evaluation/results/benchmark-0.8.0.md`.
 - New multilingual PII eval (220 synthetic records, 11 languages): the default ONNX
-  ensemble scores 0.92 / 0.95 recall / precision overall. GLiNER multi v2.1 (0.45 / 0.68)
+  ensemble scores 0.93 / 0.95 recall / precision overall. GLiNER multi v2.1 (0.45 / 0.68)
   and GLiNER multi PII v1 (0.57 / 0.91) score lower, so the default model is not switched.
   `docs/MULTILINGUAL_EVAL.md`.
 - Linux worker processes (`fork`, `forkserver`) are tested in CI; a crash when a forked
@@ -215,6 +215,7 @@ Haystack), score columns and data cards (`sct-report`), a reworked MCP server an
 - A dash or dot look-alike inside a URL host or mail domain no longer hides the whole value: with `fold_styled_characters=True` every dash (Unicode category Pd: `‐ ‑ ‒ – —`) is a label hyphen and every character whose NFKC form is `.` (`․ ﹒`) a label dot there, also after `www` (`https://my‐site.example.com/?token=...` and `www․example․com` were left whole, query included). Whatever the fold, a `http://`, `https://` or `ftp://` run whose host fails the host grammar is still a URL up to a space or prose punctuation (`check_replace_urls`). No new option.
 - Long tokens no longer take quadratic time: the URL fold scanners match a scheme once per `[A-Za-z0-9+.-]` run, the address-fold scanners start once per run, the URL user info has one way to split, and a mail local part is at most 64 characters (RFC 5321). `"http://" + "a1" * 8000` took 1.0 s in `process()` (4x per doubling), a 16000-dash rule line 3 s; both are now linear. An IDNA dot right before a glued scheme with a leading digit (`。1https://`) now stays, as before other glued schemes. No new option.
 - An IPv4 after a dot that ends a word is found (`服务器.8.8.8.8`, and `x@ad.io銄黟。8.8.8.8` where `fold_styled_characters=True` reads the `。` as a host dot of the run that started at the address); a dot before it blocks a match only after a digit (`1.2.3.4.5` stays). No new option.
+- A mail domain or URL host ends at punctuation of any script (Unicode category P), as at `,`: the Arabic comma, the Devanagari danda and `»` after an address were taken into its TLD (`ahmed.ali@example.com، أو` lost the comma). Multilingual eval 608/34/52 to 612/29/48 (recall 0.927, precision 0.955). No new option.
 - A process forked while another thread generates a synthetic SSN/TAX_ID with `reference_date` restores the real clock in the child; the child kept that thread's held date for good (`zh_CN` TAX_ID with the wrong birth year). No option.
 - A URL scheme glued to CJK/Thai letters is matched (`เว็บhttps://...`); only an ASCII letter, digit, `_`, `/` or `.` before it blocks a match.
 - A URL path or query ends at CJK and full-width prose punctuation (`，。！（ ・`; full-width URL syntax `／？＃％＆＠：．－＿` excepted), so CJK prose glued after a URL is no longer swallowed with a phone after it (`...?q=zz（備考）！06 08 66 90 80` left `08 66 90 80`).
@@ -228,7 +229,8 @@ Haystack), score columns and data cards (`sct-report`), a reworked MCP server an
 - Only `process_batch` is faster. `process` of one document is not batched across documents.
 - GLiNER2 runs one chunk per call; torch models and GLiNER keep one lock per model, so they do not run in parallel across threads.
 - `ner_chunk_overlap` (off by default) can still cut an entity longer than the overlap that starts at the very end of a chunk.
-- The email regex takes an Arabic comma `،` after an address (`info@example.org،`). No PII leaks, but spans and nearby text are wrong. `06-12345678` becomes `06-<PHONE>`.
+- `06-12345678` becomes `06-<PHONE>`.
+- A katakana middle dot `・` (Unicode punctuation) ends a mail domain or URL host as CJK prose punctuation, so a host with one inside (`https://例・え.jp/?token=...`) is not found; such labels are rare (IDNA allows `・` only in context).
 - ORGANISATION is the weakest NER label in the multilingual eval (0.75 recall), mostly in non-Latin scripts; Bengali and Tamil name spans can be a few characters off. WordPiece widening makes the mBERT and XLM-RoBERTa spans agree more often, and the ensemble averages their scores, so a weak mBERT score can drop an agreed span below the threshold: some ar/bn/ta organisation names and 1 Thai name masked by the pre-review 0.8.0 code are not masked now (`docs/MULTILINGUAL_EVAL.md`).
 - A URL with a path swallows a trailing sentence period (`see https://x.org/a.` becomes `see <URL>`).
 - Adversarial strings such as `+000000000(000)0` can leave `(000)0` after phone replacement (Python `re` takes the first alternative that matches, not the longest).

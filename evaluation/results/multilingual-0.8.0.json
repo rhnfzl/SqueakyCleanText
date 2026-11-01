@@ -3,7 +3,7 @@
   "dataset_sha256": "d946043dc567a8246657f7cbb443aa773d038c5ca1c7fc6f44e68981bd2540c1",
   "documents": 220,
   "entities": 660,
-  "git_commit": "678a59b93e5bb43e9b30b60261050532e0d7c361",
+  "git_commit": "6ad8437f39172849630e27aa8a201a732ddf4ea2",
   "models": {
     "sct-default": {
       "config": "TextCleanerConfig(**{'replacement_mode': 'reversible', 'check_to_ascii_unicode': False})",
@@ -19,10 +19,10 @@
           {
             "end": 34,
             "label": "ORGANISATION",
-            "start": 29
+            "start": 22
           },
           {
-            "end": 64,
+            "end": 63,
             "label": "EMAIL",
             "start": 45
           },
@@ -34,7 +34,7 @@
         ],
         "ar-billing-010": [
           {
-            "end": 64,
+            "end": 63,
             "label": "EMAIL",
             "start": 45
           },
@@ -51,7 +51,7 @@
             "start": 27
           },
           {
-            "end": 63,
+            "end": 62,
             "label": "EMAIL",
             "start": 46
           },
@@ -63,12 +63,7 @@
         ],
         "ar-billing-020": [
           {
-            "end": 34,
-            "label": "ORGANISATION",
-            "start": 29
-          },
-          {
-            "end": 64,
+            "end": 63,
             "label": "EMAIL",
             "start": 45
           },
@@ -3669,12 +3664,12 @@
       "report": {
         "by_domain": {
           "billing": {
-            "f1": 0.9201520912547528,
-            "false_negatives": 11,
-            "false_positives": 10,
-            "precision": 0.9236641221374046,
-            "recall": 0.9166666666666666,
-            "true_positives": 121
+            "f1": 0.9541984732824428,
+            "false_negatives": 7,
+            "false_positives": 5,
+            "precision": 0.9615384615384616,
+            "recall": 0.946969696969697,
+            "true_positives": 125
           },
           "hr": {
             "f1": 0.9034749034749034,
@@ -3711,12 +3706,12 @@
         },
         "by_label": {
           "EMAIL": {
-            "f1": 0.9545454545454546,
-            "false_negatives": 4,
-            "false_positives": 4,
-            "precision": 0.9545454545454546,
-            "recall": 0.9545454545454546,
-            "true_positives": 84
+            "f1": 1.0,
+            "false_negatives": 0,
+            "false_positives": 0,
+            "precision": 1.0,
+            "recall": 1.0,
+            "true_positives": 88
           },
           "IP": {
             "f1": 1.0,
@@ -3735,10 +3730,10 @@
             "true_positives": 87
           },
           "ORGANISATION": {
-            "f1": 0.8081632653061224,
+            "f1": 0.8114754098360656,
             "false_negatives": 33,
-            "false_positives": 14,
-            "precision": 0.8761061946902655,
+            "false_positives": 13,
+            "precision": 0.8839285714285714,
             "recall": 0.75,
             "true_positives": 99
           },
@@ -3761,12 +3756,12 @@
         },
         "by_language": {
           "ar": {
-            "f1": 0.7692307692307692,
-            "false_negatives": 15,
-            "false_positives": 12,
-            "precision": 0.7894736842105263,
-            "recall": 0.75,
-            "true_positives": 45
+            "f1": 0.8448275862068966,
+            "false_negatives": 11,
+            "false_positives": 7,
+            "precision": 0.875,
+            "recall": 0.8166666666666667,
+            "true_positives": 49
           },
           "bn": {
             "f1": 0.8849557522123894,
@@ -3851,41 +3846,41 @@
         },
         "by_slice": {
           "code-switch": {
-            "f1": 0.9162011173184358,
-            "false_negatives": 8,
-            "false_positives": 7,
-            "precision": 0.9213483146067416,
-            "recall": 0.9111111111111111,
-            "true_positives": 82
+            "f1": 0.9273743016759777,
+            "false_negatives": 7,
+            "false_positives": 6,
+            "precision": 0.9325842696629213,
+            "recall": 0.9222222222222223,
+            "true_positives": 83
           },
           "multilingual": {
-            "f1": 0.9339477726574501,
-            "false_negatives": 52,
-            "false_positives": 34,
-            "precision": 0.9470404984423676,
-            "recall": 0.9212121212121213,
-            "true_positives": 608
+            "f1": 0.940814757878555,
+            "false_negatives": 48,
+            "false_positives": 29,
+            "precision": 0.9547581903276131,
+            "recall": 0.9272727272727272,
+            "true_positives": 612
           },
           "synthetic": {
-            "f1": 0.9339477726574501,
-            "false_negatives": 52,
-            "false_positives": 34,
-            "precision": 0.9470404984423676,
-            "recall": 0.9212121212121213,
-            "true_positives": 608
+            "f1": 0.940814757878555,
+            "false_negatives": 48,
+            "false_positives": 29,
+            "precision": 0.9547581903276131,
+            "recall": 0.9272727272727272,
+            "true_positives": 612
           }
         },
         "model": "sct-default",
         "overall": {
-          "f1": 0.9339477726574501,
-          "false_negatives": 52,
-          "false_positives": 34,
-          "precision": 0.9470404984423676,
-          "recall": 0.9212121212121213,
-          "true_positives": 608
+          "f1": 0.940814757878555,
+          "false_negatives": 48,
+          "false_positives": 29,
+          "precision": 0.9547581903276131,
+          "recall": 0.9272727272727272,
+          "true_positives": 612
         }
       },
-      "seconds": 18.4
+      "seconds": 21.6
     }
   },
   "platform": "macOS-27.2-arm64-arm-64bit-Mach-O",

@@ -84,16 +84,20 @@ Five runs on the same machine and settings; GLiNER rows were not re-run. Cells a
   584/50/76, 13 documents (ar, bn, ja, ta): +6 TP (4 ORGANISATION, 2 LOCATION), 5 FP fewer,
   4 FP more (ORGANISATION fragments, 2 of them the same Arabic company name cut short).
   `fold_styled_characters` and `synthetic_locale` do not change this eval.
-- `678a59b` (final, `evaluation/results/multilingual-0.8.0.json`): an email local part ends
+- `678a59b`: an email local part ends
   where glued CJK prose meets a Latin letter (fuzz round 3, `d6e047c`), so
   `请发送至wangfang@example.com` and `...お問い合わせはseikyu@example.com` no longer give one EMAIL
   over the prose: 584/50/76 to 608/34/52, 12 documents (ja, zh): EMAIL 72 to 84 TP, and NER
   now sees the organisation and person names the email span hid (ORGANISATION +8, PERSON +4 TP).
   No other language moved. Later fuzz and Codex rounds leave the predictions identical.
+- 0.8.0 security review leftovers (final, `evaluation/results/multilingual-0.8.0.json`): a mail
+  domain or URL host ends at punctuation of any script (Unicode category P), so the Arabic comma
+  after an address stays out of the EMAIL: 608/34/52 to 612/29/48, 4 documents (ar): EMAIL
+  84/4/4 to 88/0/0, and NER finds one Arabic organisation fragment fewer (ORGANISATION FP 14 to 13).
 
 | language | 371a873 | 28ed3a2 | 3a01635 | 4b7e9f9 | 0.8.0 final |
 |---|---|---|---|---|---|
-| ar | 0.77 / 0.78 | 0.75 / 0.82 | 0.75 / 0.80 | 0.75 / 0.79 | 0.75 / 0.79 |
+| ar | 0.77 / 0.78 | 0.75 / 0.82 | 0.75 / 0.80 | 0.75 / 0.79 | 0.82 / 0.88 |
 | bn | 0.82 / 0.96 | 0.72 / 0.90 | 0.78 / 0.94 | 0.83 / 0.94 | 0.83 / 0.94 |
 | de | 0.98 / 1.00 | 0.98 / 1.00 | 0.98 / 1.00 | 0.98 / 1.00 | 0.98 / 1.00 |
 | en | 1.00 / 1.00 | 1.00 / 1.00 | 1.00 / 1.00 | 1.00 / 1.00 | 1.00 / 1.00 |
@@ -104,20 +108,20 @@ Five runs on the same machine and settings; GLiNER rows were not re-run. Cells a
 | ta | 0.85 / 0.94 | 0.83 / 0.88 | 0.87 / 0.88 | 0.88 / 0.90 | 0.88 / 0.90 |
 | th | 0.90 / 0.93 | 0.65 / 0.76 | 0.85 / 0.89 | 0.87 / 0.91 | 0.87 / 0.91 |
 | zh | 0.80 / 0.86 | 0.67 / 0.77 | 0.80 / 0.87 | 0.80 / 0.87 | 0.93 / 0.95 |
-| overall | 0.87 / 0.92 | 0.82 / 0.89 | 0.87 / 0.91 | 0.88 / 0.92 | 0.92 / 0.95 |
+| overall | 0.87 / 0.92 | 0.82 / 0.89 | 0.87 / 0.91 | 0.88 / 0.92 | 0.93 / 0.95 |
 
 | label | 371a873 | 28ed3a2 | 3a01635 | 4b7e9f9 | 0.8.0 final |
 |---|---|---|---|---|---|
 | PERSON | 0.96 / 0.95 | 0.87 / 0.92 | 0.95 / 0.94 | 0.97 / 0.97 | 0.99 / 0.99 |
 | LOCATION | 0.95 / 0.92 | 0.89 / 0.86 | 0.97 / 0.90 | 0.99 / 0.93 | 0.99 / 0.93 |
 | ORGANISATION | 0.68 / 0.88 | 0.64 / 0.91 | 0.66 / 0.89 | 0.69 / 0.87 | 0.75 / 0.88 |
-| EMAIL | 0.82 / 0.82 | 0.77 / 0.77 | 0.82 / 0.82 | 0.82 / 0.82 | 0.95 / 0.95 |
+| EMAIL | 0.82 / 0.82 | 0.77 / 0.77 | 0.82 / 0.82 | 0.82 / 0.82 | 1.00 / 1.00 |
 | PHONE | 0.86 / 0.93 | 0.86 / 0.93 | 0.86 / 0.93 | 0.86 / 0.93 | 0.86 / 0.93 |
 | IP | 1.00 / 1.00 | 1.00 / 1.00 | 1.00 / 1.00 | 1.00 / 1.00 | 1.00 / 1.00 |
 
 Overall TP/FP/FN: 577/51/83 at `371a873`, 542/64/118 at `28ed3a2`, 573/56/87 at `3a01635`,
-584/50/76 at `4b7e9f9`, 608/34/52 final. Code-switch slice: 0.84 / 0.90, 0.76 / 0.83, 0.78 / 0.82,
-0.84 / 0.87, 0.91 / 0.92.
+584/50/76 at `4b7e9f9`, 608/34/52 at `678a59b`, 612/29/48 final (recall 0.927, precision 0.955).
+Code-switch slice: 0.84 / 0.90, 0.76 / 0.83, 0.78 / 0.82, 0.84 / 0.87, 0.92 / 0.93.
 
 What still differs from `371a873` (WordPiece widening, which hides a name's last subword and
 so is kept on by default):
@@ -132,9 +136,8 @@ so is kept on by default):
 
 ## What the misses are (sct-default)
 
-- **EMAIL in ar**: the email regex takes the Arabic comma `،` after the address (4 records).
-  A regex boundary bug, not a model gap; still open in 0.8.0. The zh / ja case (CJK text
-  glued before the address taken into it) is fixed in 0.8.0 (fuzz round 3).
+- **EMAIL**: none left. The Arabic comma `،` after an address (4 ar records) and CJK text glued
+  before it (zh / ja, fuzz round 3) are both fixed in 0.8.0.
 - **PHONE**: grouped national numbers (`010-6552 1234`, `699 123 456`,
   `06 12 34 56 78`) are matched whole since 0.8.0; `06-12345678` still loses its `06-`.
 - **ORGANISATION**: weakest label (0.75 recall); in ar, bn, ja, th, zh, ta the multilingual
@@ -144,13 +147,13 @@ so is kept on by default):
 
 ## Recommendation
 
-Keep today's default ensemble: it wins overall (0.84 / 0.89 at `39a5ca3`, 0.92 / 0.95 in
+Keep today's default ensemble: it wins overall (0.84 / 0.89 at `39a5ca3`, 0.93 / 0.95 in
 0.8.0) and in every language.
 GLiNER multi v2.1 is far behind outside Latin scripts. GLiNER multi PII v1 has the best
 EMAIL / PHONE precision and the best Arabic row, but recall in hi, bn, ta, ja, zh is
 0.07 to 0.35, so it is not a default candidate either. **The default NER model is NOT
 switched in 0.8.0.** The cheaper wins were the regex bugs above: grouped phone numbers
-are fixed in 0.8.0, the email boundary with glued CJK text is fixed too (fuzz round 3), the Arabic comma not yet. GlotLID / ICU / SaT extras: no gap traced to language ID or segmentation
+are fixed in 0.8.0, the email boundary with glued CJK text (fuzz round 3) and the Arabic comma are fixed too. GlotLID / ICU / SaT extras: no gap traced to language ID or segmentation
 here, so they stay out.
 
 ## Limits

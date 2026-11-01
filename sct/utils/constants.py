@@ -99,7 +99,10 @@ _GLUE = (rf"(?<=[0-9{_SPACED_LETTERS}])(?<!%[{_DECIMAL}A-Fa-f]{{2}})[{_SPACELESS
          rf"|(?<=[{_SPACELESS}])[0-9{_SPACED_LETTERS}]")
 # Before each character of a local part, TLD or URL path: it does not start a new word.
 _NO_GLUE = rf"(?!{_GLUE})"
-_IDN_LETTER = (r"a-z\u00a1-\u1fff\u2070-\u2fff\u3040-\ufeff\uff21-\uff3a\uff41-\uff5a\uff66-\uffff"
+# Label characters leave out punctuation of every script (category P), so a label ends at the Arabic
+# comma or the Devanagari danda after an address ("ahmed@example.com، أو"), as at ", ".
+_IDN_LETTER = ("a-z" + _class_ranges('CLMNSZ', (0xA1, 0x1FFF), (0x2070, 0x2FFF), (0x3040, 0xFEFF), (0xFF21, 0xFF3A),
+                                     (0xFF41, 0xFF5A), (0xFF66, 0xFFFF))
                + _CJK_SYMBOL_LETTERS + _SUPPLEMENTARY_ALNUM)
 # ZWNJ/ZWJ (U+200C/D) join letters inside IDNA labels (Persian, Devanagari conjuncts).
 _IDN_CHAR = _IDN_LETTER + r"0-9\uff10-\uff19\u200c\u200d"

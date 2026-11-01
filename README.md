@@ -827,7 +827,7 @@ python -m scripts.benchmark_models \
 ```
 
 The multilingual set `evaluation/multilingual_pii.jsonl` (220 synthetic records, en, nl, de,
-es, zh, ja, th, ar, hi, bn, ta) scores the default ensemble at 0.92 recall / 0.95 precision
+es, zh, ja, th, ar, hi, bn, ta) scores the default ensemble at 0.93 recall / 0.95 precision
 in 0.8.0, ahead of the GLiNER multilingual models; see
 [docs/MULTILINGUAL_EVAL.md](docs/MULTILINGUAL_EVAL.md). The release benchmark
 (`scripts/benchmark_release.py`, 30 documents in 9 languages) gives 0.99 exact-span F1 and
