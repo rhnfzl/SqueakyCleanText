@@ -5,14 +5,24 @@ eliminating the torch and transformers dependencies (~2 GB) while producing
 byte-identical entity span and label output.
 """
 
+import ctypes
+import hashlib
 import json
 import logging
+import os
+import re
+import shutil
+import sys
+import unicodedata
+import uuid
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
+from urllib.parse import quote
 
 import numpy as np
 import onnxruntime as ort
-from huggingface_hub import hf_hub_download
+from huggingface_hub import hf_hub_download, try_to_load_from_cache
 from tokenizers import Tokenizer
 
 logger = logging.getLogger(__name__)
@@ -51,11 +61,17 @@ class TokenizerWrapper:
 
     def __init__(self, tokenizer: Tokenizer, model_max_length: int = 512):
         self._tokenizer = tokenizer
+        # A saved truncation shorter than model_max_length still cuts inference input,
+        # so windows are planned within the smaller of the two.
+        truncation = tokenizer.truncation
+        if truncation and truncation.get("max_length"):
+            model_max_length = min(model_max_length, truncation["max_length"])
         self._model_max_length = model_max_length
         # Chunk planning must see every token: a truncating tokenizer.json would
         # hide the text past max_length and leave it out of model input.
         self._counter = Tokenizer.from_str(tokenizer.to_str())
         self._counter.no_truncation()
+        self._counter.no_padding()  # fixed padding would count every text as max_length tokens
 
     @property
     def max_len_single_sentence(self) -> int:
@@ -92,64 +108,100 @@ class ONNXNERPipeline:
         Mapping from model output indices to label strings (e.g. ``{0: "O", 1: "B-PER", …}``).
     """
 
+    provider: Optional[str] = None  # set by load_onnx_ner_model
+    revision: Optional[str] = None
+
     def __init__(self, session: ort.InferenceSession,
                  tokenizer_wrapper: TokenizerWrapper,
-                 id2label: Dict[int, str]):
+                 id2label: Dict[int, str],
+                 pad_id: int = 0):
         self._session = session
         self._tokenizer = tokenizer_wrapper
         self._id2label = id2label
+        self._pad_id = pad_id
+        # WordPiece marks a word's continuation pieces ("##e"); entities end on whole words.
+        model = getattr(getattr(tokenizer_wrapper, '_tokenizer', None), 'model', None)
+        self._subword_prefix = getattr(model, 'continuing_subword_prefix', None) or None
 
         # Detect which inputs the model expects (BERT needs token_type_ids,
         # XLM-RoBERTa does not).
-        self._input_names = [inp.name for inp in session.get_inputs()]
+        inputs = session.get_inputs()
+        self._input_names = [inp.name for inp in inputs]
         self._needs_token_type_ids = 'token_type_ids' in self._input_names
+        # Models exported with a fixed batch dimension of 1 take one row per run.
+        self._single_row = any(inp.shape and inp.shape[0] == 1 for inp in inputs)
 
     # ------------------------------------------------------------------
     # Public API
     # ------------------------------------------------------------------
 
-    def __call__(self, texts) -> List[List[dict]]:
+    def __call__(self, texts, batch_size: int = 1, max_workers: int = 1,
+                 subword_widen: Optional[float] = 1.0,
+                 subword_same_script: bool = True) -> List[List[dict]]:
         """Run NER on one or more texts.
 
         Parameters
         ----------
         texts : str | List[str]
             A single string or a list of strings.
+        batch_size : int
+            Texts per ``session.run``. Rows are right-padded to the longest text
+            in the batch; ``1`` runs each text alone with no padding.
+        max_workers : int
+            Threads running batches at once (``session.run`` is thread-safe).
+        subword_widen : float | None
+            WordPiece only: widen an entity to its whole word when the added text is at
+            most this many times the tagged span; ``None`` always, ``0`` never.
+        subword_same_script : bool
+            WordPiece only: never widen over a piece whose letters are in another Unicode
+            script than the entity's edge letter (``David Miller`` + ``##は``).
 
         Returns
         -------
         List[List[dict]]
-            One list of entity dicts per input text, each with keys:
+            One list of entity dicts per input text (input order), each with keys:
             ``entity_group``, ``score``, ``word``, ``start``, ``end``.
         """
         if isinstance(texts, str):
             texts = [texts]
 
-        all_results: List[List[dict]] = []
-        for text in texts:
-            encoding = self._tokenizer.encode_for_inference(text)
+        encodings = [self._tokenizer.encode_for_inference(text) for text in texts]
+        all_results: List[List[dict]] = [[] for _ in texts]
+        # Similar lengths share a batch, which keeps padding small.
+        order = sorted(range(len(texts)), key=lambda i: len(encodings[i].ids))
+        batch_size = 1 if self._single_row else max(1, batch_size)
 
-            # Build ONNX input feeds
-            input_ids = np.array([encoding.ids], dtype=np.int64)
-            attention_mask = np.array([encoding.attention_mask], dtype=np.int64)
+        def run_batch(rows):
+            width = max(len(encodings[i].ids) for i in rows)
 
-            feeds: Dict[str, np.ndarray] = {
-                'input_ids': input_ids,
-                'attention_mask': attention_mask,
-            }
-            if self._needs_token_type_ids:
-                feeds['token_type_ids'] = np.array(
-                    [encoding.type_ids], dtype=np.int64
+            def padded(field, pad):
+                return np.array(
+                    [getattr(encodings[i], field) + [pad] * (width - len(encodings[i].ids))
+                     for i in rows],
+                    dtype=np.int64,
                 )
 
-            # Run inference — returns list of output arrays
-            logits = self._session.run(None, feeds)[0]  # (1, seq_len, num_labels)
+            feeds: Dict[str, np.ndarray] = {
+                'input_ids': padded('ids', self._pad_id),
+                'attention_mask': padded('attention_mask', 0),
+            }
+            if self._needs_token_type_ids:
+                feeds['token_type_ids'] = padded('type_ids', 0)
 
-            scores = self._softmax(logits[0])  # (seq_len, num_labels)
-            entities = self._aggregate_simple(
-                text, encoding, scores
-            )
-            all_results.append(entities)
+            logits = self._session.run(None, feeds)[0]  # (rows, width, num_labels)
+
+            for row, i in enumerate(rows):
+                scores = self._softmax(logits[row, :len(encodings[i].ids)])
+                all_results[i] = self._aggregate_simple(
+                    texts[i], encodings[i], scores, subword_widen, subword_same_script)
+
+        batches = [order[i:i + batch_size] for i in range(0, len(order), batch_size)]
+        if max_workers > 1 and len(batches) > 1:
+            with ThreadPoolExecutor(max_workers=min(max_workers, len(batches))) as pool:
+                list(pool.map(run_batch, batches))
+        else:
+            for rows in batches:
+                run_batch(rows)
 
         return all_results
 
@@ -164,7 +216,9 @@ class ONNXNERPipeline:
         exp = np.exp(shifted)
         return exp / exp.sum(axis=-1, keepdims=True)
 
-    def _aggregate_simple(self, text: str, encoding, scores: np.ndarray) -> List[dict]:
+    def _aggregate_simple(self, text: str, encoding, scores: np.ndarray,
+                          subword_widen: Optional[float] = 1.0,
+                          subword_same_script: bool = True) -> List[dict]:
         """Reimplements HuggingFace ``aggregation_strategy="simple"``.
 
         For each non-special token:
@@ -198,6 +252,7 @@ class ONNXNERPipeline:
                 bio_prefix, entity_type = 'B', label
 
             pre_entities.append({
+                'idx': idx,
                 'bio': bio_prefix,
                 'entity_type': entity_type,
                 'score': token_score,
@@ -235,6 +290,27 @@ class ONNXNERPipeline:
             entity_type = group[0]['entity_type']
             start = group[0]['start']
             end = group[-1]['end']
+            tokens = getattr(encoding, 'tokens', None) if self._subword_prefix and subword_widen != 0 else None
+            if tokens:
+                # Widen to whole words so "John Do" + "##e" never leaves "e" behind.
+                first, last = group[0]['idx'], group[-1]['idx'] + 1
+                # Letters of an added piece must share the script of the entity's edge letter.
+                span = _letter_scripts(text[start:end]) if subword_same_script else None
+                left, right = ({span[0]}, {span[-1]}) if span else (None, None)
+
+                def same(idx, edge):
+                    return not edge or set(_letter_scripts(text[slice(*offsets[idx])])) <= edge
+
+                while first > 0 and tokens[first].startswith(self._subword_prefix) \
+                        and not special_tokens_mask[first - 1] and same(first - 1, left):
+                    first -= 1
+                while last < len(tokens) and not special_tokens_mask[last] \
+                        and tokens[last].startswith(self._subword_prefix) and same(last, right):
+                    last += 1
+                wide_start, wide_end = offsets[first][0], offsets[last - 1][1]
+                # Unspaced scripts (Thai, kana) make a whole clause one word: widen only a short tail.
+                if subword_widen is None or (wide_end - wide_start) - (end - start) <= subword_widen * (end - start):
+                    start, end = wide_start, wide_end
             avg_score = float(np.mean([t['score'] for t in group]))
             word = text[start:end]
 
@@ -249,9 +325,93 @@ class ONNXNERPipeline:
         return entities
 
 
+def _letter_scripts(text: str) -> List[str]:
+    """Script of each letter, from its Unicode name after NFKC ("LATIN", "HIRAGANA", "THAI").
+
+    Marks, digits, punctuation and modifier letters (ー, ๆ) belong to no script here.
+    """
+    return [unicodedata.name(c, ' ').split(' ', 1)[0]
+            for c in unicodedata.normalize('NFKC', text)
+            if unicodedata.category(c) in ('Lu', 'Ll', 'Lt', 'Lo')]
+
+
 # ---------------------------------------------------------------------------
 # Model loader
 # ---------------------------------------------------------------------------
+
+def _quantized_dir(model_name: str, revision: Optional[str]) -> str:
+    """Cache dir name for a quantized model; distinct ids and revisions never share one.
+
+    Keeps the 0.7.1 ``org__name`` form unless the id holds ``__`` itself.
+    """
+    name = (
+        quote(model_name, safe="").replace("_", "%5F") if "__" in model_name
+        else model_name.replace("/", "__")
+    )
+    # Lowercase digest: revisions differing only in case must not alias on case-insensitive disks.
+    return name + (f"@{hashlib.sha256(revision.encode()).hexdigest()[:16]}" if revision else "")
+
+
+def _link(src: Path, dst: Path) -> None:
+    """Hard-link *src* to *dst*; on macOS make an APFS clone (own inode, shared blocks) instead.
+
+    macOS may report an opened hard link under its other name (``F_GETPATH``), so ONNX Runtime
+    then sees ``model.onnx_data`` in the blob store, outside the model directory, and refuses it.
+    """
+    if sys.platform != 'darwin':
+        os.link(src, dst)
+    elif ctypes.CDLL(None, use_errno=True).clonefile(os.fsencode(src), os.fsencode(dst), 0):
+        err = ctypes.get_errno()
+        raise OSError(err, os.strerror(err), str(dst))
+
+
+def _colocate_external_data(model_path: str, data_path: str, link_dir: Path) -> str:
+    """Return a model path whose external data file resolves next to it.
+
+    ONNX Runtime only accepts ``model.onnx_data`` whose real path is in the real directory of
+    ``model.onnx``. A huggingface-hub cache that stores each blob in its own directory (the
+    sharded ``hub/blobs/<xx>/<sha256>`` store) breaks that, so both files are hard-linked
+    (cloned on macOS, copied if that fails) into ``link_dir``. Other layouts are returned unchanged.
+    """
+    real_model, real_data = Path(model_path).resolve(), Path(data_path).resolve()
+    if real_model.parent == real_data.parent:
+        return model_path
+    pairs = [(real_model, 'model.onnx'), (real_data, 'model.onnx_data')]
+
+    def same(src: Path, dst: Path) -> bool:
+        if os.path.samefile(src, dst):
+            return True
+        # A copy is published only when complete; a source blob newer than it means the snapshot moved.
+        s, d = src.stat(), dst.stat()
+        return s.st_size == d.st_size and d.st_mtime >= s.st_mtime
+
+    def ready() -> bool:
+        try:
+            return all(same(src, link_dir / name) for src, name in pairs)
+        except OSError:
+            return False
+
+    if not ready():
+        tmp = link_dir.parent / f'.{link_dir.name}.{uuid.uuid4().hex}'
+        tmp.mkdir(parents=True)
+        try:
+            for src, name in pairs:
+                try:
+                    _link(src, tmp / name)
+                except OSError:
+                    logger.warning("Cannot hard-link %s, copying it to %s", src, link_dir)
+                    shutil.copyfile(src, tmp / name)
+            if link_dir.exists() and not ready():
+                shutil.rmtree(link_dir, ignore_errors=True)  # stale; a concurrent loader may remove it first
+            try:
+                os.rename(tmp, link_dir)  # complete directory appears atomically
+            except OSError:
+                if not ready():  # lost a race only if the winner's directory is good
+                    raise
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+    return str(link_dir / 'model.onnx')
+
 
 def load_onnx_ner_model(
     model_name: str,
@@ -259,6 +419,10 @@ def load_onnx_ner_model(
     cache_dir: Optional[str] = None,
     quantize: bool = False,
     revision: Optional[str] = None,
+    intra_op_threads: Optional[int] = None,
+    inter_op_threads: Optional[int] = None,
+    cuda_device_id: int = 0,
+    cuda_provider_options: Optional[Dict[str, Any]] = None,
 ) -> Tuple[ONNXNERPipeline, TokenizerWrapper]:
     """Download and load an ONNX NER model from HuggingFace Hub.
 
@@ -275,11 +439,16 @@ def load_onnx_ner_model(
         loading.  The quantized model is cached next to the original
         (``model_quantized.onnx``) so quantization only runs once per model.
         Reduces model size ~4× with a small accuracy trade-off.  Default: ``False``.
+    intra_op_threads, inter_op_threads : int, optional
+        ONNX Runtime session thread counts. ``None`` keeps the ONNX Runtime default.
+    cuda_device_id, cuda_provider_options
+        GPU index and extra ``CUDAExecutionProvider`` options (passed to ORT unvalidated).
 
     Returns
     -------
     (ONNXNERPipeline, TokenizerWrapper)
-        Ready-to-use pipeline and tokenizer.
+        Ready-to-use pipeline and tokenizer. The pipeline carries ``provider`` (the
+        execution provider that runs it) and ``revision`` (resolved snapshot commit).
     """
     download_kwargs = {}
     if cache_dir:
@@ -289,23 +458,41 @@ def load_onnx_ner_model(
 
     # Download required files
     model_path = hf_hub_download(model_name, 'model.onnx', **download_kwargs)
+    # hub cache layout: .../snapshots/<commit>/model.onnx
+    commit = Path(model_path).parent.name
+    if re.fullmatch(r'[0-9a-f]{40}', commit):
+        # The rest comes from this snapshot: a commit hash is served from the cache with no
+        # HTTP, so a forked worker does not resolve DNS (which can hang after fork).
+        download_kwargs['revision'] = commit
+
+    def optional_download(filename):
+        # The Hub's cached "no such file" answer counts too, so the probe needs no HEAD request.
+        cached = try_to_load_from_cache(
+            model_name, filename, cache_dir=cache_dir, revision=download_kwargs.get('revision'))
+        if cached is not None and not isinstance(cached, str):
+            raise FileNotFoundError(filename)
+        return cached or hf_hub_download(model_name, filename, **download_kwargs)
     config_path = hf_hub_download(model_name, 'config.json', **download_kwargs)
     tokenizer_path = hf_hub_download(model_name, 'tokenizer.json', **download_kwargs)
 
     # Large models (XLM-RoBERTa-large ~2.1GB) store weights in an external
-    # data file. ONNX Runtime finds it automatically if it's in the same
-    # directory as model.onnx — hf_hub_download caches to the same dir.
+    # data file. ONNX Runtime needs it in the real directory of model.onnx.
     try:
-        hf_hub_download(model_name, 'model.onnx_data', **download_kwargs)
+        data_path = optional_download('model.onnx_data')
     except Exception:  # noqa: S110
         pass  # Smaller models don't have this file
+    else:
+        link_base = Path(cache_dir) if cache_dir else Path.home() / ".cache"
+        model_path = _colocate_external_data(
+            model_path, data_path,
+            # Keyed by snapshot commit: a moving branch must not reuse another commit's files.
+            link_base / "sct_linked" / _quantized_dir(model_name, commit),
+        )
 
     # Try to get tokenizer_config.json for model_max_length
     model_max_length = 512  # safe default
     try:
-        tok_config_path = hf_hub_download(
-            model_name, 'tokenizer_config.json', **download_kwargs
-        )
+        tok_config_path = optional_download('tokenizer_config.json')
         with open(tok_config_path) as f:
             tok_config = json.load(f)
         model_max_length = tok_config.get('model_max_length', 512)
@@ -328,7 +515,8 @@ def load_onnx_ner_model(
     if quantize:
         from onnxruntime.quantization import QuantType, quantize_dynamic  # noqa: PLC0415
         _qcache = Path(cache_dir) if cache_dir else Path.home() / ".cache" / "sct_quantized"
-        quantized_path = _qcache / model_name.replace("/", "__") / "model_quantized.onnx"
+        # Keyed by snapshot commit: a moved branch must not reuse another commit's weights.
+        quantized_path = _qcache / _quantized_dir(model_name, commit) / "model_quantized.onnx"
         quantized_path.parent.mkdir(parents=True, exist_ok=True)
         if not quantized_path.exists():
             logger.info("Quantizing model to INT8: %s", quantized_path)
@@ -336,13 +524,19 @@ def load_onnx_ner_model(
         model_path = str(quantized_path)
 
     # Create ONNX session with appropriate providers
-    providers = []
-    if device == 'cuda' and 'CUDAExecutionProvider' in ort.get_available_providers():
-        providers.append('CUDAExecutionProvider')
+    providers: List[Any] = []
+    cuda_requested = device == 'cuda' and 'CUDAExecutionProvider' in ort.get_available_providers()
+    if cuda_requested:
+        providers.append(('CUDAExecutionProvider',
+                          {'device_id': cuda_device_id, **(cuda_provider_options or {})}))
     providers.append('CPUExecutionProvider')
 
     session_options = ort.SessionOptions()
     session_options.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
+    if intra_op_threads is not None:
+        session_options.intra_op_num_threads = intra_op_threads
+    if inter_op_threads is not None:
+        session_options.inter_op_num_threads = inter_op_threads
 
     session = ort.InferenceSession(
         model_path,
@@ -350,8 +544,26 @@ def load_onnx_ner_model(
         providers=providers,
     )
 
-    pipeline = ONNXNERPipeline(session, wrapper, id2label)
+    # Pad id for batched inference: config, else the tokenizer's pad token, else 0.
+    pad_id = model_config.get('pad_token_id')
+    if pad_id is None:
+        pad_id = next(
+            (tok_id for tok_id in map(tokenizer.token_to_id, ('[PAD]', '<pad>'))
+             if tok_id is not None),
+            0,
+        )
+    pipeline = ONNXNERPipeline(session, wrapper, id2label, pad_id=pad_id)
+    pipeline.provider = session.get_providers()[0]
+    pipeline.revision = commit if re.fullmatch(r'[0-9a-f]{40}', commit) else revision
 
+    if cuda_requested and pipeline.provider != 'CUDAExecutionProvider':
+        # ORT drops CUDA silently when the CUDA/cuDNN libraries or the driver do not match.
+        logger.warning(
+            "ONNX NER model %s runs on CPU: CUDA was requested but could not be loaded. "
+            "Check that the onnxruntime-gpu CUDA version matches your driver and that CUDA/cuDNN "
+            "libraries are found (onnxruntime-gpu[cuda,cudnn] plus onnxruntime.preload_dlls()).",
+            model_name,
+        )
     logger.info(f"Loaded ONNX NER model: {model_name} (providers: {session.get_providers()})")
 
     return pipeline, wrapper

@@ -1,0 +1,86 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1240" height="700" viewBox="0 0 1240 700" font-family="Helvetica, Arial, sans-serif">
+<title>SqueakyCleanText pipeline</title>
+<defs><marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#1e1e1e"/></marker></defs>
+<rect width="1240" height="700" fill="#ffffff"/>
+<rect x="20" y="20" width="226" height="470" rx="8" fill="#f1f3f5" stroke="#495057" stroke-width="2"/>
+<text x="133.0" y="48" text-anchor="middle" font-size="18" font-weight="bold" fill="#495057">Entry points</text>
+<rect x="36" y="62" width="194" height="40" rx="8" fill="#f1f3f5" stroke="#495057" stroke-width="2"/>
+<text x="133.0" y="88.0" text-anchor="middle" font-size="16" font-weight="normal" fill="#1e1e1e">process()</text>
+<rect x="36" y="114" width="194" height="40" rx="8" fill="#f1f3f5" stroke="#495057" stroke-width="2"/>
+<text x="133.0" y="140.0" text-anchor="middle" font-size="16" font-weight="normal" fill="#1e1e1e">process_batch()</text>
+<rect x="36" y="166" width="194" height="40" rx="8" fill="#f1f3f5" stroke="#495057" stroke-width="2"/>
+<text x="133.0" y="192.0" text-anchor="middle" font-size="16" font-weight="normal" fill="#1e1e1e">sct-clean CLI</text>
+<rect x="36" y="218" width="194" height="40" rx="8" fill="#f1f3f5" stroke="#495057" stroke-width="2"/>
+<text x="133.0" y="244.0" text-anchor="middle" font-size="16" font-weight="normal" fill="#1e1e1e">sct-mcp server</text>
+<rect x="36" y="270" width="194" height="40" rx="8" fill="#f1f3f5" stroke="#495057" stroke-width="2"/>
+<text x="133.0" y="296.0" text-anchor="middle" font-size="16" font-weight="normal" fill="#1e1e1e">datasets, DataTrove</text>
+<rect x="36" y="322" width="194" height="40" rx="8" fill="#f1f3f5" stroke="#495057" stroke-width="2"/>
+<text x="133.0" y="348.0" text-anchor="middle" font-size="16" font-weight="normal" fill="#1e1e1e">LangChain, Haystack</text>
+<rect x="36" y="374" width="194" height="40" rx="8" fill="#f1f3f5" stroke="#495057" stroke-width="2"/>
+<text x="133.0" y="400.0" text-anchor="middle" font-size="16" font-weight="normal" fill="#1e1e1e">JSON, DataFrame, RAG</text>
+<rect x="36" y="426" width="194" height="40" rx="8" fill="#f1f3f5" stroke="#495057" stroke-width="2"/>
+<text x="133.0" y="452.0" text-anchor="middle" font-size="16" font-weight="normal" fill="#1e1e1e">stream redactors</text>
+<rect x="300" y="40" width="260" height="170" rx="8" fill="#e3fafc" stroke="#0b7285" stroke-width="2"/>
+<text x="316" y="72" font-size="20" font-weight="bold" fill="#0b7285">1  Detect language</text>
+<text x="316" y="106" font-size="16" fill="#1e1e1e" xml:space="preserve">Lingua, 75 languages</text>
+<text x="316" y="130" font-size="16" fill="#1e1e1e" xml:space="preserve">reads the raw input</text>
+<text x="316" y="154" font-size="16" fill="#1e1e1e" xml:space="preserve">pin or limit: language=</text>
+<rect x="620" y="40" width="260" height="170" rx="8" fill="#e7f5ff" stroke="#1864ab" stroke-width="2"/>
+<text x="636" y="72" font-size="20" font-weight="bold" fill="#1864ab">2  Fix the text</text>
+<text x="636" y="106" font-size="16" fill="#1e1e1e" xml:space="preserve">ftfy unicode, HTML entities</text>
+<text x="636" y="130" font-size="16" fill="#1e1e1e" xml:space="preserve">styled characters</text>
+<text x="636" y="154" font-size="16" fill="#1e1e1e" xml:space="preserve">HTML tags</text>
+<text x="636" y="178" font-size="16" fill="#1e1e1e" xml:space="preserve">emoji, ASCII (both off)</text>
+<rect x="940" y="40" width="280" height="170" rx="8" fill="#fff4e6" stroke="#c26a00" stroke-width="2"/>
+<text x="956" y="72" font-size="20" font-weight="bold" fill="#c26a00">3  Regex PII</text>
+<text x="956" y="106" font-size="16" fill="#1e1e1e" xml:space="preserve">URLs, emails, IPs</text>
+<text x="956" y="130" font-size="16" fill="#1e1e1e" xml:space="preserve">dates, phones, years</text>
+<text x="956" y="154" font-size="16" fill="#1e1e1e" xml:space="preserve">numbers, currency</text>
+<text x="956" y="178" font-size="16" fill="#1e1e1e" xml:space="preserve">cleanup: whitespace, symbols</text>
+<rect x="300" y="290" width="300" height="200" rx="8" fill="#f3f0ff" stroke="#6741d9" stroke-width="2"/>
+<text x="316" y="322" font-size="20" font-weight="bold" fill="#6741d9">4  NER</text>
+<text x="316" y="356" font-size="16" fill="#1e1e1e" xml:space="preserve">default: ONNX ensemble</text>
+<text x="316" y="380" font-size="16" fill="#1e1e1e" xml:space="preserve">(language model + multilingual)</text>
+<text x="316" y="404" font-size="16" fill="#1e1e1e" xml:space="preserve">or torch, GLiNER, ner_mode=&quot;pii&quot;</text>
+<text x="316" y="428" font-size="16" fill="#1e1e1e" xml:space="preserve">confidence threshold, policy</text>
+<rect x="330" y="445" width="100" height="26" rx="8" fill="#f3f0ff" stroke="#6741d9" stroke-width="2" stroke-dasharray="6 4"/>
+<rect x="405" y="445" width="100" height="26" rx="8" fill="#f3f0ff" stroke="#6741d9" stroke-width="2" stroke-dasharray="6 4"/>
+<rect x="480" y="445" width="100" height="26" rx="8" fill="#f3f0ff" stroke="#6741d9" stroke-width="2" stroke-dasharray="6 4"/>
+<rect x="660" y="290" width="260" height="200" rx="8" fill="#ebfbee" stroke="#2b8a3e" stroke-width="2"/>
+<text x="790.0" y="318" text-anchor="middle" font-size="18" font-weight="bold" fill="#2b8a3e">5  Replace</text>
+<rect x="676" y="336" width="228" height="40" rx="8" fill="#ebfbee" stroke="#2b8a3e" stroke-width="2"/>
+<text x="790.0" y="362.0" text-anchor="middle" font-size="16" font-weight="normal" fill="#1e1e1e">&lt;TAG&gt; (default)</text>
+<rect x="676" y="384" width="228" height="40" rx="8" fill="#ebfbee" stroke="#2b8a3e" stroke-width="2"/>
+<text x="790.0" y="410.0" text-anchor="middle" font-size="16" font-weight="normal" fill="#1e1e1e">synthetic fakes (Faker)</text>
+<rect x="676" y="432" width="228" height="40" rx="8" fill="#ebfbee" stroke="#2b8a3e" stroke-width="2"/>
+<text x="790.0" y="458.0" text-anchor="middle" font-size="16" font-weight="normal" fill="#1e1e1e">reversible &lt;PERSON_0&gt;</text>
+<rect x="676" y="540" width="228" height="44" rx="8" fill="#ebfbee" stroke="#2b8a3e" stroke-width="2" stroke-dasharray="6 4"/>
+<text x="790.0" y="568.0" text-anchor="middle" font-size="16" font-weight="normal" fill="#1e1e1e">map / TokenStore</text>
+<rect x="980" y="290" width="240" height="200" rx="8" fill="#ffffff" stroke="#343a40" stroke-width="2"/>
+<text x="996" y="322" font-size="20" font-weight="bold" fill="#343a40">6  Output</text>
+<text x="996" y="356" font-size="16" fill="#1e1e1e" xml:space="preserve">lm_text</text>
+<text x="996" y="380" font-size="16" fill="#1e1e1e" xml:space="preserve">stat_text (casefold,</text>
+<text x="996" y="404" font-size="16" fill="#1e1e1e" xml:space="preserve">  stopwords, punctuation)</text>
+<text x="996" y="428" font-size="16" fill="#1e1e1e" xml:space="preserve">language</text>
+<rect x="980" y="540" width="240" height="140" rx="8" fill="#f8f9fa" stroke="#343a40" stroke-width="2"/>
+<text x="996" y="572" font-size="20" font-weight="bold" fill="#343a40">metadata, signals</text>
+<text x="996" y="600" font-size="16" fill="#1e1e1e" xml:space="preserve">counts, regex_counts</text>
+<text x="996" y="622" font-size="16" fill="#1e1e1e" xml:space="preserve">warnings, provenance</text>
+<text x="996" y="644" font-size="16" fill="#1e1e1e" xml:space="preserve">signals: no raw values</text>
+<text x="996" y="666" font-size="16" fill="#1e1e1e" xml:space="preserve">anon_map, findings: raw</text>
+<rect x="20" y="620" width="920" height="60" rx="8" fill="#f8f9fa" stroke="#868e96" stroke-width="2"/>
+<polyline points="246,125 300,125" fill="none" stroke="#1e1e1e" stroke-width="2" marker-end="url(#ah)"/>
+<polyline points="560,125 620,125" fill="none" stroke="#1e1e1e" stroke-width="2" marker-end="url(#ah)"/>
+<polyline points="880,125 940,125" fill="none" stroke="#1e1e1e" stroke-width="2" marker-end="url(#ah)"/>
+<polyline points="1080,250 1080,262 450,262 450,290" fill="none" stroke="#1e1e1e" stroke-width="2" marker-end="url(#ah)"/>
+<polyline points="600,390 660,390" fill="none" stroke="#1e1e1e" stroke-width="2" marker-end="url(#ah)"/>
+<polyline points="790,472 790,540" fill="none" stroke="#1e1e1e" stroke-width="2" stroke-dasharray="6 4" marker-end="url(#ah)"/>
+<polyline points="920,390 980,390" fill="none" stroke="#1e1e1e" stroke-width="2" marker-end="url(#ah)"/>
+<polyline points="1100,490 1100,540" fill="none" stroke="#1e1e1e" stroke-width="2" marker-end="url(#ah)"/>
+<text x="1080" y="232" font-size="15" text-anchor="middle" font-weight="normal" fill="#c26a00" xml:space="preserve">counted in regex_counts</text>
+<text x="273" y="112" font-size="15" text-anchor="middle" font-weight="normal" fill="#495057" xml:space="preserve">text</text>
+<text x="450" y="505" font-size="14" text-anchor="middle" font-weight="normal" fill="#6741d9" xml:space="preserve">long text: chunk windows (overlap: ner_chunk_overlap)</text>
+<text x="790" y="604" font-size="14" text-anchor="middle" font-weight="normal" fill="#2b8a3e" xml:space="preserve">map holds personal data</text>
+<text x="40" y="646" font-size="16" text-anchor="start" font-weight="normal" fill="#343a40" xml:space="preserve">process_batch: threads per document, NER batched across documents (ner_batch_size)</text>
+<text x="40" y="668" font-size="16" text-anchor="start" font-weight="normal" fill="#343a40" xml:space="preserve">device: CPU or CUDA (ner_device)    preset &quot;training&quot;: PII only, keeps numbers, HTML, case</text>
+</svg>

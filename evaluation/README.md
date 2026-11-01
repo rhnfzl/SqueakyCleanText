@@ -113,3 +113,14 @@ leaks), cleaned outputs for parity diffs, and default-config speed (docs/s, one 
 pass, single process). Correctness uses `replacement_mode="reversible"` so each placeholder
 maps back to its exact source span, and `check_to_ascii_unicode=False` so leaks stay visible.
 A speed gain counts only if recall per label and language does not drop.
+
+Batch throughput (`process_batch`) is a separate mode:
+
+```sh
+python -m scripts.benchmark_release --batch 256 --batch-size 8 --ner-batch-size 8 --intra-op-threads 2 [--long]
+```
+
+It times `--repeats` (default 3) `process_batch` calls after one warmup over N documents (the
+dataset cycled; `--long` joins every 8 documents into one) and writes
+`benchmark-<version>-batch[-long]-N<n>-B<b>-K<k>-T<t>.json` with docs/s, peak RSS and a hash of
+the outputs, so a speed row can be tied to its outputs.

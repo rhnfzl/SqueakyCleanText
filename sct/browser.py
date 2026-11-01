@@ -119,26 +119,26 @@ def build_browser_manifest(config: TextCleanerConfig) -> dict[str, Any]:
                 config.replace_with_email,
                 config.check_replace_emails,
             ),
-            "ip": _rule(
+            "ip": {**_rule(
                 constants.IP_REGEX,
                 config.replace_with_ips,
                 config.check_replace_ips,
-            ),
-            "date": _rule(
+            ), "fold_decimal_digits": True},
+            "date": {**_rule(
                 constants.DATE_REGEX,
                 config.replace_with_dates,
                 config.check_replace_dates,
-            ),
+            ), "fold_decimal_digits": True},
             "year": _rule(
                 constants.YEAR_REGEX,
                 config.replace_with_years,
                 config.check_replace_years,
             ),
-            "phone": _rule(
+            "phone": {**_rule(
                 constants.PHONE_REGEX,
                 config.replace_with_phone_numbers,
                 config.check_replace_phone_numbers,
-            ),
+            ), "fold_decimal_digits": True},
             "number": _rule(
                 numbers_regex(config.replace_numbers_in_words),
                 config.replace_with_numbers,
@@ -155,6 +155,9 @@ def build_browser_manifest(config: TextCleanerConfig) -> dict[str, Any]:
             "Regular expressions require JavaScript compatibility tests.",
             "Model files remain external and must keep their recorded revisions.",
             "Reversible and synthetic replacement are server-side features.",
+            "Rules with fold_decimal_digits match on a copy of the text where every Unicode "
+            "decimal digit (Nd, such as ٠٦ or ०६) is its ASCII digit, one code point for one, "
+            "and replace the same offsets in the original text (JavaScript \\d is ASCII only).",
         ],
     }
 

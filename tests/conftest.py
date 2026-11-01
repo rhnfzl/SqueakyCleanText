@@ -1,6 +1,7 @@
 """Shared test constants and fixtures."""
 
-from sct.config import LANG_KEYS
+from sct.config import DEFAULT_TORCH_NER_MODELS, LANG_KEYS
 
 # Lightweight ONNX test model shared by all NER tests (never production 7GB models)
 TEST_NER_MODELS = {k: "protectai/bert-base-NER-onnx" for k in LANG_KEYS}
+TEST_TORCH_NER_MODELS = {k: "dslim/bert-base-NER" for k in DEFAULT_TORCH_NER_MODELS}  # small torch twin

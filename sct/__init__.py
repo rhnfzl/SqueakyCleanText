@@ -11,6 +11,7 @@ from sct.privacy import (
     TokenStore,
 )
 from sct.sct import TextCleaner
+from sct.presets import PRESETS, preset_config
 from sct.adapters import (
     DataFrameResult,
     PathFinding,
@@ -49,9 +50,9 @@ from sct.streaming import (
 from sct.utils.anonymization_map import AnonymizationMap, MapEntry
 from sct.utils.process_result import ProcessResult
 
-__version__ = "0.7.1"
+__version__ = "0.8.0"
 __all__ = [
-    "TextCleaner", "TextCleanerConfig",
+    "TextCleaner", "TextCleanerConfig", "PRESETS", "preset_config",
     "PII_LABELS", "PII_LABEL_MAP",
     "AnonymizationMap", "MapEntry", "ProcessResult",
     "DetectedEntity", "EntityFinding", "EntityRule",

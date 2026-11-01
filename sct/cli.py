@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Optional, Sequence, TextIO
 
 from sct.adapters import process_json
-from sct.config import TextCleanerConfig
+from sct.presets import PRESETS, preset_config
 from sct.sct import TextCleaner
 
 
@@ -23,6 +23,17 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--no-ner", action="store_true")
     parser.add_argument("--pii", action="store_true")
     parser.add_argument("--json-input", action="store_true")
+    parser.add_argument(
+        "--preset",
+        choices=sorted(PRESETS),
+        default="sct",
+        help="Config preset: sct (library default) or training (PII only, text kept as written)",
+    )
+    parser.add_argument(
+        "--to-ascii",
+        action="store_true",
+        help="Transliterate to ASCII (0.7 default: 日本語 -> Ri Ben Yu); off keeps every script",
+    )
     parser.add_argument(
         "--replacement-mode",
         choices=("placeholder", "reversible", "synthetic"),
@@ -54,15 +65,20 @@ def main(
         source = Path(args.input).read_text(encoding="utf-8")
 
     try:
-        cleaner = TextCleaner(cfg=TextCleanerConfig(
+        cleaner = TextCleaner(cfg=preset_config(
+            args.preset,
             check_ner_process=not args.no_ner,
             ner_mode="pii" if args.pii else "standard",
             replacement_mode=args.replacement_mode,
+            **({"check_to_ascii_unicode": True} if args.to_ascii else {}),
         ))
     except ImportError as exc:
         parser.error(str(exc))
     if args.json_input:
-        cleaned = process_json(cleaner, json.loads(source)).value
+        try:
+            cleaned = process_json(cleaner, json.loads(source)).value
+        except ValueError as exc:  # bad JSON or two keys cleaned to the same text
+            parser.error(str(exc))
         stdout.write(json.dumps(cleaned, ensure_ascii=False) + "\n")
     else:
         result = cleaner.process(source)

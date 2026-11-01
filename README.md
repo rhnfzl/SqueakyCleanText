@@ -1,800 +1,278 @@
-<div align="center">
-
 # SqueakyCleanText
 
 [![PyPI](https://img.shields.io/pypi/v/squeakycleantext.svg)](https://pypi.org/project/squeakycleantext/)
-[![PyPI - Downloads](https://img.shields.io/pypi/dm/squeakycleantext)](https://pypistats.org/packages/squeakycleantext)
 [![Python package](https://github.com/rhnfzl/SqueakyCleanText/actions/workflows/python-package.yml/badge.svg)](https://github.com/rhnfzl/SqueakyCleanText/actions/workflows/python-package.yml)
-[![Python Versions](https://img.shields.io/badge/Python-3.11%20|%203.12%20|%203.13%20|%203.14-blue)](https://pypi.org/project/squeakycleantext/)
-[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Python Versions](https://img.shields.io/badge/Python-3.12%20|%203.13%20|%203.14-blue)](https://pypi.org/project/squeakycleantext/)
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/rhnfzl/SqueakyCleanText/blob/main/LICENSE)
 
-A comprehensive text cleaning and preprocessing pipeline for machine learning and NLP tasks.
-</div>
+Real-world text is messy: broken encoding, HTML, URLs, and personal data such as names, emails and phone numbers. SqueakyCleanText cleans that text and replaces the personal data with tags, fake values or reversible placeholders, in one call and in 75 languages. It is for teams that feed text into LLMs, training sets, search indexes or classic ML models and need it clean and safe to share first.
 
-> **Using an AI coding assistant?** This repo includes an [`llms.txt`](https://github.com/rhnfzl/SqueakyCleanText/blob/main/llms.txt) with the full API surface, config reference, and Q&A - optimised for Claude, Cursor, Copilot, and ChatGPT.
+It finds most personal data, not all of it. Check its output before you publish sensitive data.
 
-In the world of machine learning and natural language processing, clean and well-structured text data is crucial for building effective downstream models and managing token limits in language models.
+## Before and after
 
-SqueakyCleanText simplifies the process by automatically addressing common text issues - removing PII, anonymizing named entities (persons, organisations, locations), and ensuring your data is clean and well-structured for language models and classical ML pipelines with minimal effort on your part.
+```python
+from sct import TextCleaner
 
-### Key Features
+text = "<p>Hi, Iâ€™m John Smith. Mail me at john.smith@example.com or call +31 6 1234 5678.</p>"
+print(TextCleaner().process(text).lm_text)
+# -> <HTML>Hi, I'm <PERSON>. Mail me at <EMAIL> or call <PHONE>.<HTML>
+```
 
-- **Named Entity Recognition (NER)**:
-  - Multi-backend: ONNX (default, torch-free), PyTorch, GLiNER, and ensemble modes
-  - Zero-shot custom entities via GLiNER (e.g., PRODUCT, EVENT, SKILL)
-  - Multi-language support (English, Dutch, German, Spanish, French, Portuguese, Italian)
-  - Ensemble voting across backends for improved accuracy
-  - Configurable confidence thresholds
-  - Lazy model loading (models load on demand per language)
-  - Shared ONNX sessions across same-model languages (~600 MB RAM saved)
-  - Automatic text chunking for long documents (CJK/Arabic safe)
-  - GPU acceleration support (CUDA for ONNX and PyTorch)
-  - Model warm-up API to pre-load on startup
-- **Text Normalization**:
-  - Corrects text encoding problems and handles bad Unicode characters
-  - Removes or replaces HTML tags and URLs with configurable tokens
-  - Handles emails, phone numbers, and other contact details
-  - Multilingual date detection and replacement (ISO 8601, month names, common formats)
-  - Fuzzy date matching for misspelled months (requires `[fuzzy]` extra)
-  - Year and number standardization
-  - Configurable emoji removal
-  - Configurable bracket/brace content removal
-  - Removes isolated letters and symbols
-  - Normalizes whitespace and handles currency symbols
-  - Smart case folding (preserves NER tokens like `<PERSON>`)
-- **Language Support**:
-  - Automatic language detection (English, Dutch, German, Spanish)
-  - Language-specific NER models; French, Portuguese, Italian via multilingual model
-  - Language-aware stopword removal
-  - Extensible: add custom languages with stopwords, month names, and NER models
-- **Dual Output Formats**:
-  - Language Model format (preserves structure with tokens)
-  - Statistical Model format (optimized for classical ML)
-- **Performance**:
-  - ONNX Runtime inference (torch-free base install, ~3-5x faster than PyTorch)
-  - Thread-parallel batch processing via `ThreadPoolExecutor`
-  - Async batch processing (`aprocess_batch`) for FastAPI / aiohttp
-  - Lazy model loading (only loads models as needed)
-  - Shared ONNX sessions for same-model languages (saves ~600 MB for FR/PT/IT)
-  - Memory-efficient processing of large texts
-  - GPU acceleration (CUDA) for both ONNX and PyTorch backends
+The broken `â€™` is repaired to an apostrophe, the HTML tags become `<HTML>` (set `replace_with_html=""` to drop them), and the name, email and phone become tags.
 
-![Default Flow of cleaning Text](resources/sct_flow.png)
+## Use SCT when
 
-### Benefits
+- You send user text (tickets, chats, emails, scraped pages) to an LLM, a RAG index or a training set and must take the personal data out first.
+- Your text comes in many languages and scripts, and you want one tool for all of them.
+- You need the original values back later: reversible placeholders keep a map you store apart.
+- You want to log or report what was found without logging the values (value-free `signals`).
+- Do not use it alone for tables with known PII columns: drop or hash those columns, or use a tool built for structured data such as Presidio structured.
 
-#### For Language Models
-- Maintains text structure while anonymizing sensitive information
-- Configurable token replacements
-- Preserves context while removing noise
-- Handles long documents through intelligent chunking
-
-#### For Statistical Models
-- Removes stopwords and punctuation
-- Case normalization
-- Special symbol removal
-- Optimized for classification tasks
-
-#### Advanced NER Processing
-- Ensemble approach reduces missed entities
-- Language-specific models improve accuracy
-- Confidence thresholds for precision control
-- Efficient batch processing for large datasets
-- Automatic handling of long documents
-
-## Installation
+## Install
 
 ```sh
-pip install SqueakyCleanText
+pip install squeakycleantext
 ```
 
-The base install uses **ONNX Runtime** for NER inference - no PyTorch or Transformers required.
-
-### Optional Extras
-
-| Extra | Command | What it adds |
-|-------|---------|--------------|
-| GPU | `pip install SqueakyCleanText[gpu]` | CUDA-accelerated ONNX inference |
-| Fuzzy dates | `pip install SqueakyCleanText[fuzzy]` | Fuzzy month name matching ([rapidfuzz](https://github.com/rapidfuzz/RapidFuzz)) |
-| PyTorch NER | `pip install SqueakyCleanText[torch]` | PyTorch/Transformers NER backend |
-| GLiNER | `pip install SqueakyCleanText[gliner]` | [GLiNER](https://github.com/urchade/GLiNER) zero-shot NER |
-| GLiNER2 | `pip install SqueakyCleanText[gliner2]` | [GLiNER2](https://github.com/Knowledgator/GLiNER) (knowledgator) backend |
-| Synthetic | `pip install SqueakyCleanText[synthetic]` | Faker-based synthetic replacement (realistic fake values instead of `<TAG>` tokens) |
-| Presidio | `pip install SqueakyCleanText[presidio]` | Presidio-analyzer for `presidio_gliner` backend |
-| Classify | `pip install SqueakyCleanText[classify]` | GLiClass document-level pre-classification |
-| MCP | `pip install SqueakyCleanText[mcp]` | FastMCP server with text and JSON cleaning tools |
-| OCR | `pip install SqueakyCleanText[ocr]` | Pillow image redaction and Tesseract OCR adapter |
-| All NER | `pip install SqueakyCleanText[all-ner]` | All NER backends combined |
-| Development | `pip install SqueakyCleanText[dev]` | Testing and linting tools |
-
-You can combine extras: `pip install SqueakyCleanText[gpu,fuzzy,gliner]`
-
-## Usage
-
-### Basic Usage
-
-```python
-from sct import TextCleaner
-
-# Initialize the TextCleaner
-cleaner = TextCleaner()
-
-# Input text
-text = "Contact John Doe at john.doe@company.com. Meeting on 2023-10-01."
-
-# Process the text
-lm_text, stat_text, lang = cleaner.process(text)
-
-print(f"Language Model format:    {lm_text}")
-# Output: "Contact <PERSON> at <EMAIL>. Meeting on <YEAR>."
-
-print(f"Statistical Model format: {stat_text}")
-# Output: "contact meeting"
-
-print(f"Detected Language: {lang}")
-# Output: "ENGLISH"
-```
-
-### Using TextCleanerConfig
-
-```python
-from sct import TextCleaner, TextCleanerConfig
-
-# Create an immutable configuration
-cfg = TextCleanerConfig(
-    check_ner_process=True,
-    ner_confidence_threshold=0.85,
-    positional_tags=('PER', 'LOC', 'ORG', 'MISC'),
-    replace_with_url="<URL>",
-    replace_with_email="<EMAIL>",
-    replace_with_phone_numbers="<PHONE>",
-    language="en",  # Pin to English (also accepts 'ENGLISH', 'eng')
-)
-
-# Initialize with config
-cleaner = TextCleaner(cfg=cfg)
-```
-
-#### Language Specification
-
-All language parameters accept Lingua names (`'ENGLISH'`), ISO 639-1 (`'en'`), or ISO 639-3 (`'eng'`) codes:
-
-```python
-# Pin to one language (skip auto-detection)
-cfg = TextCleanerConfig(language='de', check_ner_process=False)
-
-# Restrict detection to specific languages (auto-detect among them)
-cfg = TextCleanerConfig(language=('en', 'nl', 'de'), check_ner_process=False)
-
-# Add extra languages for detection
-cfg = TextCleanerConfig(extra_languages=('fr', 'pt'), check_ner_process=False)
-```
-
-### GLiNER: Zero-Shot Custom NER
-
-Use [GLiNER](https://github.com/urchade/GLiNER) to recognize any entity type without retraining:
-
-```python
-from sct import TextCleaner, TextCleanerConfig
-
-cfg = TextCleanerConfig(
-    ner_backend='gliner',
-    gliner_model='urchade/gliner_large-v2.1',
-    gliner_labels=('person', 'organization', 'location', 'product', 'event'),
-    gliner_label_map={
-        'person': 'PER', 'organization': 'ORG', 'location': 'LOC',
-        # 'product' and 'event' are unmapped - they become <PRODUCT>, <EVENT> tokens
-    },
-    gliner_threshold=0.4,
-)
-
-cleaner = TextCleaner(cfg=cfg)
-lm_text, stat_text, lang = cleaner.process(
-    "John bought an iPhone at the Apple Store in Berlin during CES 2025."
-)
-# lm_text: "<PERSON> bought an <PRODUCT> at the <ORGANISATION> in <LOCATION> during <EVENT>."
-```
-
-### Ensemble NER
-
-Combine ONNX/Torch models with GLiNER for improved recall via ensemble voting:
-
-```python
-from sct import TextCleaner, TextCleanerConfig
-
-cfg = TextCleanerConfig(
-    ner_backend='ensemble_onnx',  # or 'ensemble_torch'
-    gliner_model='urchade/gliner_large-v2.1',
-    gliner_labels=('person', 'organization', 'location'),
-    gliner_label_map={'person': 'PER', 'organization': 'ORG', 'location': 'LOC'},
-)
-
-cleaner = TextCleaner(cfg=cfg)
-lm_text, stat_text, lang = cleaner.process("Angela Merkel visited the Bundestag in Berlin.")
-```
-
-### PII Detection Mode
-
-Automatically configure GLiNER for comprehensive PII detection with 60+ entity types (personal, financial, healthcare, identity, digital):
-
-```python
-from sct import TextCleaner, TextCleanerConfig
-
-cfg = TextCleanerConfig(ner_mode='pii')
-
-cleaner = TextCleaner(cfg=cfg)
-lm_text, stat_text, lang = cleaner.process(
-    "John Smith's SSN is 123-45-6789, email john@example.com, DOB 1990-01-15"
-)
-# Entities are anonymized: names, SSNs, emails, dates of birth, and 50+ more PII types
-```
-
-PII mode auto-configures: `ner_backend='gliner'`, uses [`knowledgator/gliner-pii-base-v1.0`](https://huggingface.co/knowledgator/gliner-pii-base-v1.0), sets `gliner_threshold` and the final `ner_confidence_threshold` to 0.3 (recall-focused), and expands positional tags. User-provided values always take priority.
-
-**Alternative PII models** (pass as `gliner_model`):
-
-| Model | Type | Size | Labels | F1 |
-|-------|------|------|--------|-----|
-| [`knowledgator/gliner-pii-base-v1.0`](https://huggingface.co/knowledgator/gliner-pii-base-v1.0) | Uni-encoder | 330MB (ONNX FP16) | 60+ | 80.99% |
-| [`nvidia/gliner-PII`](https://huggingface.co/nvidia/gliner-PII) | Bi-encoder | 570MB | 55+ | — |
-| [`gretelai/gretel-gliner-bi-base-v1.0`](https://huggingface.co/gretelai/gretel-gliner-bi-base-v1.0) | Bi-encoder | ~800MB | 40+ | 95% |
-| [`urchade/gliner_multi_pii-v1`](https://huggingface.co/urchade/gliner_multi_pii-v1) | Multilingual | — | — | — |
-
-### Synthetic Replacement
-
-Replace detected entities with realistic fake values (via [Faker](https://faker.readthedocs.io/)) instead of `<TAG>` placeholder tokens:
-
-```python
-from sct import TextCleaner, TextCleanerConfig
-
-cfg = TextCleanerConfig(
-    ner_mode='pii',
-    replacement_mode='synthetic',  # pip install squeakycleantext[synthetic]
-)
-
-cleaner = TextCleaner(cfg=cfg)
-lm_text, stat_text, lang = cleaner.process(
-    "Contact John Smith at john.smith@company.com or +1-555-0123"
-)
-# Output: "Contact Jennifer Williams at lisa45@example.net or +1-555-0198"
-# Same entity always maps to same fake value within a document
-```
-
-> **Note**: Synthetic replacement preserves data utility for downstream ML tasks but is NOT GDPR-compliant anonymization. Same-document consistency is maintained (same entity text always maps to the same fake value).
-
-### Reversible Anonymization
-
-Replace entities with indexed placeholders (`<PERSON_0>`, `<LOCATION_1>`) and get a mapping for round-trip deanonymization:
-
-```python
-from sct import TextCleaner, TextCleanerConfig
-
-cfg = TextCleanerConfig(
-    ner_mode='pii',
-    replacement_mode='reversible',
-)
-
-cleaner = TextCleaner(cfg=cfg)
-result = cleaner.process("John Smith works at Google in London.")
-
-print(result.lm_text)
-# "<PERSON_0> works at <ORGANISATION_0> in <LOCATION_0>."
-
-# Access the anonymization map via metadata
-anon_map = result.metadata['anon_map']
-restored = anon_map.deanonymize(result.lm_text)
-# "John Smith works at Google in London."
-
-# Serialize the map for storage
-import json
-json.dumps(anon_map.to_dict())
-```
-
-> **Note**: `ProcessResult` from `process()` unpacks as a 3-tuple (`lm_text, stat_text, language`) for backward compatibility, but also exposes `.metadata` for reversible maps and document classification.
-
-### Document Classification (GLiClass)
-
-Classify documents before processing using zero-shot classification with [GLiClass](https://github.com/Knowledgator/GLiClass):
-
-```python
-from sct import TextCleaner, TextCleanerConfig
-
-cfg = TextCleanerConfig(
-    check_classify_document=True,
-    gliclass_labels=('email', 'code', 'legal', 'medical'),
-    # gliclass_model defaults to 'knowledgator/gliclass-edge-v3.0' (32.7M params)
-)
-
-cleaner = TextCleaner(cfg=cfg)  # pip install squeakycleantext[classify]
-result = cleaner.process("Dear Sir, please find attached the contract...")
-
-# Classification results in metadata
-print(result.metadata['classes'])
-# [{"label": "email", "score": 0.92}, {"label": "legal", "score": 0.78}]
-```
-
-### Bi-Encoder GLiNER Models
-
-Bi-encoder models (ModernBERT, etc.) are auto-detected and leverage pre-computed label embeddings for faster inference with larger context windows:
-
-```python
-from sct import TextCleaner, TextCleanerConfig
-
-cfg = TextCleanerConfig(
-    ner_backend='gliner',
-    gliner_model='knowledgator/gliner-bi-base-v2.0',
-    gliner_labels=('person', 'organization', 'location'),
-)
-
-cleaner = TextCleaner(cfg=cfg)
-# Auto-detects bi-encoder → caches label embeddings → uses 2048+ token context window
-```
-
-### Entity Description Labels (ZERONER-Style)
-
-Provide natural-language descriptions for labels to improve zero-shot recognition accuracy:
-
-```python
-from sct import TextCleaner, TextCleanerConfig
-
-cfg = TextCleanerConfig(
-    ner_backend='gliner',
-    gliner_model='knowledgator/gliner-bi-base-v2.0',
-    gliner_label_descriptions={
-        'person': "a person's full legal name",
-        'location': "a geographical place or address",
-        'organization': "a company, institution, or government body",
-    },
-)
-
-cleaner = TextCleaner(cfg=cfg)
-# Descriptions are used for inference, results are mapped back to original label names
-```
-
-### Batch Processing
-
-```python
-from sct import TextCleaner, TextCleanerConfig
-
-cfg = TextCleanerConfig(
-    check_remove_stopwords=True,
-    check_remove_punctuation=True,
-    check_ner_process=True,
-    positional_tags=('PER', 'ORG', 'LOC'),
-    ner_confidence_threshold=0.90,
-)
-
-cleaner = TextCleaner(cfg=cfg)
-
-# Sample texts
-texts = [
-    "Email maria.garcia@example.es for more info.",  # Spanish
-    "Besuchen Sie uns im Büro in Berlin.",           # German
-    "Voor vragen, bel +31 20 123 4567.",             # Dutch
-]
-
-# Process texts in batch (uses ThreadPoolExecutor for parallel processing)
-results = cleaner.process_batch(texts, batch_size=2)
-
-for lm_text, stat_text, lang in results:
-    print(f"Language: {lang}")
-    print(f"LM Format:    {lm_text}")
-    print(f"Stat Format:  {stat_text}")
-    print("-" * 40)
-```
-
-<details>
-<summary>Legacy Configuration (backward compatible)</summary>
-
-```python
-from sct import sct, config
-
-# Customize settings via module-level variables
-config.CHECK_NER_PROCESS = True
-config.NER_CONFIDENCE_THRESHOLD = 0.85
-config.POSITIONAL_TAGS = ['PER', 'LOC', 'ORG']
-config.REPLACE_WITH_URL = "<URL>"
-config.REPLACE_WITH_EMAIL = "<EMAIL>"
-config.LANGUAGE = "ENGLISH"
-
-# Initialize (reads from module-level config)
-cleaner = sct.TextCleaner()
-```
-
-> **Note**: The legacy module-level configuration is not thread-safe. For concurrent processing, use `TextCleanerConfig` instead.
-
-</details>
-
-## NER Backends
-
-SqueakyCleanText supports six NER backends, selectable via the `ner_backend` config field:
-
-| Backend | Description | Dependencies | Best for |
-|---------|-------------|-------------|----------|
-| `onnx` (default) | ONNX Runtime inference with quantized XLM-RoBERTa models | Base install | Production: fast, torch-free |
-| `torch` | PyTorch/Transformers pipeline with full XLM-RoBERTa models | `[torch]` extra | Compatibility with existing PyTorch workflows |
-| `gliner` | GLiNER zero-shot NER with custom entity labels | `[gliner]` or `[gliner2]` extra | Custom entity types, PII detection, bi-encoder models |
-| `ensemble_onnx` | ONNX + GLiNER ensemble voting | `[gliner]` extra | Maximum recall with custom entities |
-| `ensemble_torch` | Torch + GLiNER ensemble voting | `[torch,gliner]` extra | Maximum recall with PyTorch |
-| `presidio_gliner` | Presidio + GLiNER recognizer (beta) | `presidio-analyzer`, `[gliner]` | Context-aware NER via Presidio's pipeline |
-
-### Default NER Models (ONNX)
-
-| Language | Model |
-|----------|-------|
-| English | [`rhnfzl/xlm-roberta-large-conll03-english-onnx`](https://huggingface.co/rhnfzl/xlm-roberta-large-conll03-english-onnx) |
-| Dutch | [`rhnfzl/xlm-roberta-large-conll02-dutch-onnx`](https://huggingface.co/rhnfzl/xlm-roberta-large-conll02-dutch-onnx) |
-| German | [`rhnfzl/xlm-roberta-large-conll03-german-onnx`](https://huggingface.co/rhnfzl/xlm-roberta-large-conll03-german-onnx) |
-| Spanish | [`rhnfzl/xlm-roberta-large-conll02-spanish-onnx`](https://huggingface.co/rhnfzl/xlm-roberta-large-conll02-spanish-onnx) |
-| French / Portuguese / Italian | [`rhnfzl/wikineural-multilingual-ner-onnx`](https://huggingface.co/rhnfzl/wikineural-multilingual-ner-onnx) (shared session) |
-| Multilingual (fallback) | [`rhnfzl/wikineural-multilingual-ner-onnx`](https://huggingface.co/rhnfzl/wikineural-multilingual-ner-onnx) |
-
-### GLiNER Model Recommendations
-
-| Model | Architecture | Context | Languages | Best for |
-|-------|-------------|---------|-----------|----------|
-| `knowledgator/gliner-bi-base-v2.0` | Bi-encoder (ModernBERT) | 2048 | Multi | General NER, long documents |
-| `knowledgator/gliner-pii-base-v1.0` | Bi-encoder | 2048 | Multi | PII detection (60+ entity types) |
-| `urchade/gliner_large-v2.1` | Uni-encoder (DeBERTa) | 512 | Multi | Legacy, high accuracy on short texts |
-| `MatteoFasulo/ModernBERT-base-NER` | ModernBERT | 8192 | English | English-only, very long context |
-
-> **GLiNER2 note**: `pip install squeakycleantext[gliner2]` installs [Knowledgator's gliner2 package](https://github.com/Knowledgator/GLiNER), not Fastino AI's GLiNER2 from EMNLP 2025 (different API).
-
-### GLiNER Label Mapping
-
-GLiNER uses lowercase free-text labels (e.g., `'person'`, `'product'`). To map them to standard NER tags used by the anonymizer, use `gliner_label_map`:
-
-```python
-gliner_label_map={
-    'person': 'PER',          # → <PERSON>
-    'organization': 'ORG',    # → <ORGANISATION>
-    'location': 'LOC',        # → <LOCATION>
-}
-# Unmapped labels are uppercased automatically:
-# 'product' → <PRODUCT>, 'event' → <EVENT>, 'skill' → <SKILL>
-```
-
-## API
-
-### `TextCleaner`
-
-#### `process(text: str) -> Tuple[str, Optional[str], Optional[str]]`
-
-Processes the input text and returns a tuple containing:
-  - Cleaned text formatted for language models.
-  - Cleaned text formatted for statistical models (`None` if `check_statistical_model_processing` is `False`).
-  - Detected language of the text (`None` if language detection is disabled).
-
-#### `process_batch(texts: List[str], batch_size: int = None) -> List[Tuple[str, Optional[str], Optional[str]]]`
-
-Processes multiple texts using thread-parallel execution. Each result follows the same format as `process()`.
-
-#### `aprocess_batch(texts: List[str], batch_size: int = None) -> List[Tuple[str, Optional[str], Optional[str]]]`
-
-Async version of `process_batch` for use with asyncio-based frameworks (FastAPI, aiohttp). Runs the batch in a thread-pool executor so it does not block the event loop:
+Python 3.12 or newer. The base install runs NER with ONNX Runtime; it needs no PyTorch. The extras you are most likely to need:
+
+| Extra | Why you need it |
+|---|---|
+| `gpu` | Run NER on an NVIDIA GPU (CUDA ONNX Runtime) |
+| `synthetic` | Replace PII with fake values (Faker) |
+| `gliner` | Zero-shot NER with your own labels, and `ner_mode="pii"` (58 PII labels) |
+| `datasets`, `datatrove` | Clean Hugging Face datasets or DataTrove pipelines |
+| `mcp` | Run SCT as an MCP server for AI assistants |
+
+Install with `pip install "squeakycleantext[gpu,synthetic]"`. All extras: [docs/INSTALL.md](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/INSTALL.md).
+
+## Quickstart
 
 ```python
 from sct import TextCleaner
 
 cleaner = TextCleaner()
-
-# In an async context (FastAPI route, aiohttp handler, etc.)
-results = await cleaner.aprocess_batch(texts)
+result = cleaner.process("Contact John Doe at john.doe@company.com. Meeting on 2023-10-01.")
+print(result.lm_text)    # -> Contact <PERSON> at <EMAIL>. Meeting on <DATE>.
+print(result.stat_text)  # -> contact person email meeting date
+print(result.language)   # -> ENGLISH
 ```
 
-#### `warmup(languages: Optional[List[str]] = None) -> None`
+`lm_text` keeps the sentence for LLMs. `stat_text` is lower-cased, without stopwords and punctuation, for classic ML models. The result also unpacks as `lm_text, stat_text, language`.
 
-Pre-loads NER models to avoid first-request latency. Call once during application startup:
+Clean many texts at once with `process_batch`. It runs documents in threads and batches the NER calls across them:
 
 ```python
+from sct import TextCleaner
+
 cleaner = TextCleaner()
-cleaner.warmup(['ENGLISH', 'DUTCH'])  # or warmup() for all supported languages
+for r in cleaner.process_batch(["Mail jan@example.nl", "Bel +31 20 123 4567 voor Jan de Vries."]):
+    print(r.language, r.lm_text)
+# -> ENGLISH Mail <EMAIL>
+# -> DUTCH Bel <PHONE> voor <PERSON>.
 ```
 
-### `TextCleanerConfig`
+For more PII types (IDs, bank numbers, health data and more), use the GLiNER PII model with `TextCleaner(cfg=TextCleanerConfig(ner_mode="pii"))`. It needs the `gliner` extra.
 
-Immutable (frozen) dataclass. Create modified copies with `dataclasses.replace()`:
+## How it works
 
-```python
-import dataclasses
-new_cfg = dataclasses.replace(cfg, check_ner_process=False)
-```
+1. **Detect language.** Lingua reads the raw input and picks one of 75 languages. Pin it with `language="de"` or limit it with `language=("en", "nl")`.
+2. **Fix the text.** ftfy repairs broken unicode and HTML entities, styled characters such as `𝐣𝐨𝐡𝐧` are folded, and HTML tags are replaced. Emoji removal and ASCII folding are off by default.
+3. **Regex PII.** URLs, emails, IPs, dates, phones, years and numbers become tags. Currency symbols become ISO codes by default (`€100` becomes `EUR<NUMBER>`); set `replace_with_currency_symbols="<CURRENCY>"` to get a tag. Then isolated letters and symbols, bracket content and extra whitespace are cleaned up. Each type is counted.
+4. **NER.** By default an ensemble of ONNX models per language finds persons, locations, organisations and misc entities. Long texts are cut into chunk windows (no overlap unless you set `ner_chunk_overlap`). You can switch to PyTorch, GLiNER or the GLiNER PII mode, and apply a privacy policy.
+5. **Replace.** Found values become `<TAG>`s (default), fake values (`synthetic`) or indexed placeholders such as `<PERSON_0>` with a map to restore them (`reversible`).
+6. **Output.** `lm_text`, `stat_text` and `language`, plus `metadata` and `signals`. `signals` holds counts, warnings and model ids, never raw values. `metadata` holds the same counts, and it can hold raw values: the reversible map (`anon_map`, unless you pass a `TokenStore`) and `findings` with entity text (with `include_entities=True` or a privacy policy).
+
+<picture>
+  <img src="https://raw.githubusercontent.com/rhnfzl/SqueakyCleanText/main/resources/sct_flow.png" alt="SqueakyCleanText pipeline: entry points, language detection, fixes, regex PII, NER, replacement, outputs and metadata" width="900">
+</picture>
 
 <details>
-<summary>Full configuration reference</summary>
+<summary>The diagram as text</summary>
 
-**Pipeline toggles** (all `bool`, default shown):
-
-| Field | Default | Description |
-|-------|---------|-------------|
-| `check_detect_language` | `True` | Auto-detect language |
-| `check_fix_bad_unicode` | `True` | Fix encoding issues via ftfy |
-| `check_to_ascii_unicode` | `True` | Transliterate to ASCII |
-| `check_replace_html` | `True` | Strip/replace HTML tags |
-| `check_replace_urls` | `True` | Replace URLs with token |
-| `check_replace_emails` | `True` | Replace emails with token |
-| `check_replace_ips` | `True` | Replace IPv4/IPv6 addresses (runs before dates, phones, years) |
-| `replace_ips_public_only` | `False` | Keep private, loopback and reserved IPs; replace only public ones |
-| `check_replace_years` | `True` | Replace years (1900-2099) |
-| `check_replace_dates` | `False` | Replace full dates (ISO 8601, month names) |
-| `check_fuzzy_replace_dates` | `False` | Fuzzy match misspelled months (requires `[fuzzy]`) |
-| `check_replace_phone_numbers` | `True` | Replace phone numbers |
-| `check_replace_numbers` | `True` | Replace standalone numbers |
-| `replace_numbers_in_words` | `False` | Also replace digits inside Latin/Greek/Cyrillic words (`GPT4` to `GPT<NUMBER>`) |
-| `check_replace_currency_symbols` | `True` | Replace currency symbols |
-| `check_ner_process` | `True` | Run NER entity recognition |
-| `check_remove_isolated_letters` | `True` | Remove single letters |
-| `check_remove_isolated_special_symbols` | `True` | Remove isolated symbols |
-| `check_remove_bracket_content` | `True` | Remove `[...]` content |
-| `check_remove_brace_content` | `True` | Remove `{...}` content |
-| `check_normalize_whitespace` | `True` | Normalize whitespace |
-| `check_statistical_model_processing` | `True` | Generate stat model output |
-| `check_casefold` | `True` | Lowercase stat output |
-| `check_smart_casefold` | `False` | Lowercase but preserve NER tokens |
-| `check_remove_stopwords` | `True` | Remove stopwords from stat output |
-| `check_remove_punctuation` | `True` | Remove punctuation from stat output |
-| `check_remove_stext_custom_stop_words` | `True` | Remove custom stop words from stat output |
-| `check_remove_emoji` | `False` | Remove emoji characters |
-
-**Replacement tokens** (all `str`):
-
-| Field | Default |
-|-------|---------|
-| `replace_with_url` | `"<URL>"` |
-| `replace_with_html` | `"<HTML>"` |
-| `replace_with_email` | `"<EMAIL>"` |
-| `replace_with_ips` | `"<IP>"` |
-| `replace_with_years` | `"<YEAR>"` |
-| `replace_with_dates` | `"<DATE>"` |
-| `replace_with_phone_numbers` | `"<PHONE>"` |
-| `replace_with_numbers` | `"<NUMBER>"` |
-| `replace_with_currency_symbols` | `None` |
-
-**NER settings**:
-
-| Field | Default | Description |
-|-------|---------|-------------|
-| `ner_backend` | `'onnx'` | Backend: `onnx`, `torch`, `gliner`, `ensemble_onnx`, `ensemble_torch`, `presidio_gliner` |
-| `ner_mode` | `'standard'` | `'standard'` or `'pii'` (auto-configures GLiNER for PII detection) |
-| `replacement_mode` | `'placeholder'` | `'placeholder'`, `'synthetic'` (Faker), or `'reversible'` (indexed placeholders + deanonymize map) |
-| `positional_tags` | `('PER', 'LOC', 'ORG', 'MISC')` | Entity types to recognize |
-| `ner_confidence_threshold` | `0.85` | Minimum confidence score |
-| `ner_batch_size` | `8` | Inference batch size (must be >= 1) |
-| `ner_models` | `None` | Language-keyed dict of ONNX model repo IDs |
-| `torch_ner_models` | `None` | Language-keyed dict of PyTorch model repo IDs |
-| `gliner_model` | `None` | GLiNER model ID (required for gliner/ensemble backends) |
-| `gliner_variant` | `'gliner'` | `'gliner'` or `'gliner2'` |
-| `gliner_labels` | `('person', 'organization', 'location')` | GLiNER entity labels |
-| `gliner_label_map` | `None` | Maps GLiNER labels to NER tags |
-| `gliner_threshold` | `0.4` | GLiNER confidence threshold |
-| `gliner_label_descriptions` | `None` | ZERONER-style: `{label: "description"}` for improved zero-shot accuracy |
-| `fuzzy_date_score_cutoff` | `85` | Fuzzy matching threshold (0-100) for misspelled months |
-| `custom_pipeline_steps` | `()` | Tuple of `(text: str) -> str` callables appended after all built-in steps |
-
-**Language settings**:
-
-| Field | Default | Description |
-|-------|---------|-------------|
-| `language` | `None` | Pin language (`'en'`), restrict detection to a set (`('en','nl')`), or `None` for auto-detect. Accepts Lingua names, ISO 639-1, ISO 639-3 codes. |
-| `extra_languages` | `()` | Additional language names/codes for detection |
-| `custom_stopwords` | `None` | `{LANG: frozenset({...})}` custom stopword sets |
-| `custom_month_names` | `None` | `{LANG: ('Jan', 'Feb', ...)}` for date detection |
+- Entry points: `process()`, `process_batch()`, the `sct-clean` CLI, the `sct-mcp` server, the Hugging Face `datasets`, DataTrove, LangChain and Haystack adapters, the JSON, DataFrame and RAG adapters, and the streaming redactors. All of them pass text to the same pipeline.
+- 1 Detect language (Lingua, 75 languages, on the raw input) -> 2 Fix the text -> 3 Regex PII (counted in `regex_counts`) -> 4 NER (chunk windows for long text, overlap only with `ner_chunk_overlap`) -> 5 Replace (`<TAG>`, synthetic fakes, or reversible `<PERSON_0>` with a map in `metadata` or a `TokenStore`) -> 6 Output (`lm_text`, `stat_text`, `language`) and `metadata` / `signals` (`signals` has no raw values; `metadata` can hold the reversible map and `findings`).
+- Across all stages: `process_batch` runs documents in threads and batches NER across them (`ner_batch_size`); NER runs on CPU or CUDA (`ner_device`); the `training` preset turns stages on and off.
 
 </details>
 
-## Privacy Engine
+Every step is a `TextCleanerConfig` field with a safe default. The source of the diagram is [resources/sct_flow.excalidraw](https://github.com/rhnfzl/SqueakyCleanText/blob/main/resources/sct_flow.excalidraw).
 
-Applications can apply versioned policy rules and inspect each decision.
-This makes privacy behavior testable across services, datasets, and model upgrades.
+## What you get back
+
+`process` returns a `ProcessResult` with `lm_text`, `stat_text`, `language` and `metadata`:
 
 ```python
-from sct import EntityRule, PrivacyPolicy, TextCleaner, TextCleanerConfig
+from sct import TextCleaner
 
-policy = PrivacyPolicy(
-    name="support-export",
-    version="1",
-    rules={
-        "PERSON": EntityRule(action="redact", min_score=0.8),
-        "ORGANISATION": EntityRule(action="keep"),
-    },
-    allowlist=frozenset({"Jane Public"}),
-)
-
-cleaner = TextCleaner(
-    cfg=TextCleanerConfig(ner_mode="pii"),
-    privacy_policy=policy,
-    include_entities=True,
-)
-result = cleaner.process("Contact Maria Chen for help.")
-
-print(result.metadata["findings"])
-print(result.metadata["detector"])
+result = TextCleaner().process("Mail jan@example.nl or call +31 20 123 4567.")
+print(result.metadata["regex_counts"])
+# -> {'EMAIL': {'count': 1, 'chars': 14}, 'PHONE': {'count': 1, 'chars': 15}}
+print(result.signals["pii_count"], result.signals["pii_types"], result.signals["sensitive"])
+# -> 2 {'EMAIL': 1, 'PHONE': 1} True
 ```
 
-Finding offsets (`start`, `end`) and NER entries in the reversible map are
-document-relative positions in the post-regex text: the text after the regex
-stages replaced URLs, emails, phones and the like. They are not offsets into the
-raw input.
+- `metadata` always holds `regex_counts`, `entity_counts`, `language_confidence`, `language_source`, `warnings` (such as `language_low_confidence` or `ner_fallback_models`) and `provenance` (the NER models and revisions that ran).
+- `signals` is the value-free view of the same data, with the same keys for every input. It is safe to log or store next to the cleaned text.
+- Entity text appears only when you ask for it (`include_entities=True` or a privacy policy adds `metadata["findings"]`) and in the reversible map. Keep those out of logs. Full field list: [docs/API.md](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/API.md).
 
-Reversible output is pseudonymized personal data. Anyone with the token map can
-restore the source values. Keep token maps outside logs and cleaned datasets.
+## Common recipes
 
-Use a `TokenStore` implementation to keep maps behind opaque references:
+**Training or RAG data.** The `training` preset only takes out PII and repairs unicode. Numbers, dates, HTML, case, line breaks and code stay as written:
+
+```python
+from sct import TextCleaner, preset_config
+
+cleaner = TextCleaner(cfg=preset_config("training"))
+print(cleaner.process("Order 4711 from <b>Anna Berg</b> (anna@example.se) on 2024-05-01.").lm_text)
+# -> Order 4711 from <b><PERSON></b> (<EMAIL>) on 2024-05-01.
+```
+
+**Reversible placeholders.** Keep the map in a `TokenStore` and restore the values later ([docs/REPLACEMENT_MODES.md](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/REPLACEMENT_MODES.md), [docs/PRIVACY.md](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/PRIVACY.md)). `replacement_mode="synthetic"` (`synthetic` extra) puts fake values in place instead. The same document always gets the same fakes.
 
 ```python
 from sct import InMemoryTokenStore, TextCleaner, TextCleanerConfig
 
 store = InMemoryTokenStore()
-cleaner = TextCleaner(
-    cfg=TextCleanerConfig(replacement_mode="reversible"),
-    token_store=store,
-)
+cleaner = TextCleaner(cfg=TextCleanerConfig(replacement_mode="reversible"), token_store=store)
 result = cleaner.process("Maria lives in Utrecht.")
-reference = result.metadata["anon_map_reference"]
+print(result.lm_text)  # -> <PERSON_0> lives in <LOCATION_0>.
+print(store.load(result.metadata["anon_map_reference"]).deanonymize(result.lm_text))  # -> Maria lives in Utrecht.
 ```
 
-`InMemoryTokenStore` supports tests and short sessions. Production systems
-should implement `TokenStore` with encryption, access control, expiry, and audit logs.
-
-### Boundary adapters
-
-The base package includes JSON, DataFrame, retrieval, command-line, and streaming adapters:
+**Privacy policy.** Decide per entity type what to keep or redact, and get a versioned audit trail ([docs/PRIVACY.md](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/PRIVACY.md)):
 
 ```python
-from sct import RAGChunk, process_json, process_rag_chunks
+from sct import EntityRule, PrivacyPolicy, TextCleaner
 
-cleaned_json = process_json(cleaner, {"message": "Email a@example.com"})
-cleaned_chunks = process_rag_chunks(
-    cleaner,
-    [RAGChunk(id="1", text="Call +1-202-555-0147", metadata={})],
-)
+policy = PrivacyPolicy(name="support-export", version="1", rules={
+    "PERSON": EntityRule(action="redact", min_score=0.8),
+    "ORGANISATION": EntityRule(action="keep"),
+})
+print(TextCleaner(privacy_policy=policy).process("Maria Chen from Acme Corp wrote to us.").lm_text)
+# -> <REDACTED> from Acme Corp wrote to us.
 ```
 
-```sh
-printf 'Email maria@example.com' | sct-clean --no-ner
-printf 'Email maria@example.com' | sct-clean --no-ner \
-  --replacement-mode reversible --token-map tokens.json
-pip install 'SqueakyCleanText[mcp]'
-sct-mcp
-```
+**GPU.** Install the `gpu` extra and set `TextCleanerConfig(ner_device="cuda", cuda_device_id=0)`. If CUDA cannot load, NER runs on CPU and each result gets the `cuda_fallback` warning ([docs/PERFORMANCE.md](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/PERFORMANCE.md)).
 
-`BufferedStreamingRedactor` holds a full document for cross-chunk NER safety.
-`WindowedStreamingRedactor` provides bounded latency for contact tokens.
+**Your own entity labels.** With the `gliner` extra, set `ner_backend="gliner"`, `gliner_model="urchade/gliner_multi-v2.1"` and `gliner_labels=("person", "product", "event")`; unmapped labels become tags such as `<PRODUCT>` ([docs/NER_BACKENDS.md](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/NER_BACKENDS.md)).
 
-The OCR adapter accepts any `OCRProvider`. The included Tesseract provider also
-needs a local Tesseract executable. Browser export writes an ONNX Runtime Web
-manifest, but it does not copy model files or Python language detection.
+## Use it in your stack
 
-Corpus owners can call `assess_reidentification_risk` to measure k-anonymity
-for selected quasi-identifiers. Reports contain counts only, not source values.
+| Integration | Usage | Extra | Docs |
+|---|---|---|---|
+| Hugging Face `datasets` | `clean_dataset(ds, columns=["text"], num_proc=4)` | `datasets` | [INTEGRATIONS](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/INTEGRATIONS.md) |
+| DataTrove | `SCTCleaner()` as a pipeline step | `datatrove` | [INTEGRATIONS](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/INTEGRATIONS.md) |
+| LangChain | `SCTDocumentTransformer().transform_documents(docs)` | `langchain` | [INTEGRATIONS](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/INTEGRATIONS.md) |
+| Haystack | `pipe.add_component("sct", SCTDocumentCleaner())` | `haystack` | [INTEGRATIONS](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/INTEGRATIONS.md) |
+| JSON, DataFrame, RAG chunks | `process_json(cleaner, value)` | none | [ADAPTERS](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/ADAPTERS.md) |
+| Streams | `WindowedStreamingRedactor(cleaner)` | none | [ADAPTERS](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/ADAPTERS.md) |
+| Ray, Spark, Polars, DuckDB, dlt, Daft | `clean_columns(handle, batch)` | none | [RECIPES](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/RECIPES.md) |
+| Command line | `printf 'Email maria@example.com' \| sct-clean` | none | [ADAPTERS](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/ADAPTERS.md) |
+| MCP server | `sct-mcp` | `mcp` | [MCP](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/MCP.md) |
 
-## PII Evaluation
+The framework adapters use the `training` preset unless you pass a config, build one cleaner per worker process, and reject reversible mode.
 
-Model changes need ground-truth privacy evaluation, not only backend agreement.
-The evaluation harness reports exact entity metrics by label, language, domain,
-and named slice.
+## Performance
 
-```sh
-python -m scripts.evaluate_pii \
-  --dataset evaluation/pii_starter.jsonl \
-  --predictions path/to/model-predictions.jsonl \
-  --model model-name-and-revision \
-  --output evaluation/results/model-name.json
-```
+Default config (full multilingual NER ensemble), release benchmark documents, SCT 0.8.0, AMD Ryzen Threadripper PRO 7985WX and RTX 4090, median of 3 runs:
 
-The included starter corpus is synthetic and only checks the evaluation path.
-See [`evaluation/README.md`](evaluation/README.md) for schemas and release rules.
+| Workload | Hardware | Docs/s |
+|---|---|---|
+| `process`, one document at a time | 16 CPU cores | 5.0 |
+| `process_batch`, short documents, 16 workers | 16 CPU cores | 15.5 (0.7.1: 3.7) |
+| `process_batch`, short documents, 16 workers | 64 CPU cores | 29.2 |
+| `process_batch`, short documents, English only (2 models) | RTX 4090 | 646 |
 
-Pinned candidates live in `sct.model_candidates`. Run one candidate with:
+Source and method: [docs/PERFORMANCE.md](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/PERFORMANCE.md) and [evaluation/results/comparison-0.7.1-0.8.0.md](https://github.com/rhnfzl/SqueakyCleanText/blob/main/evaluation/results/comparison-0.7.1-0.8.0.md). Measure your own machine with `python -m scripts.benchmark_release --batch 256 --batch-size 8 --ner-batch-size 8`.
 
-```sh
-python -m scripts.benchmark_models \
-  --dataset evaluation/pii_starter.jsonl \
-  --candidate gliner2-pii \
-  --output evaluation/results/gliner2-pii.json
-```
+## Quality and evaluation
 
-Published third-party results are reference data only. `assess_candidate`
-requires local recall, exact-span F1, latency, and ONNX parity before adoption.
+- Release benchmark (30 documents, 84 entities, 9 languages): exact-span F1 0.99 and 0 of 67 PII values leaked in 0.8.0. Run `python -m scripts.benchmark_release`.
+- Multilingual PII eval (220 synthetic records, 11 languages): the default ensemble scores 0.93 recall and 0.95 precision. Run `python -m scripts.run_multilingual_eval` ([docs/MULTILINGUAL_EVAL.md](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/MULTILINGUAL_EVAL.md)).
+- Score columns and data cards: `sct-report data.jsonl --text-column text --out report.json` writes counts, shares and hashes, never text ([docs/SCORE.md](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/SCORE.md)).
+- Test your own model or data with the PII evaluation harness ([docs/EVALUATION.md](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/EVALUATION.md)).
 
-## Architecture
+## Languages
 
-SqueakyCleanText processes text through a configurable pipeline of sequential steps:
+Language detection covers 75 languages. Full NER models cover 4 (English, Dutch, German, Spanish). The rest use the multilingual WikiNEural model with the English model, or a model you bring with `ner_models`. Full list: [docs/LANGUAGES.md](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/LANGUAGES.md).
 
-```
-Input Text
-  │
-  ├─ Fix Unicode (ftfy)
-  ├─ ASCII transliteration (unidecode)
-  ├─ Emoji removal
-  ├─ HTML replacement
-  ├─ URL / Email / Phone replacement
-  ├─ Date & Year replacement
-  ├─ Number & Currency replacement
-  ├─ Isolated letter/symbol removal
-  ├─ Whitespace normalization
-  │
-  ├─ NER Processing (ONNX / Torch / GLiNER / Ensemble)
-  │   ├─ Language detection (Lingua)
-  │   ├─ Text chunking (token-bounded)
-  │   ├─ Entity recognition (per-chunk)
-  │   ├─ Ensemble voting (cross-model)
-  │   └─ Entity anonymization (Presidio)
-  │
-  └─ Statistical Model Output
-      ├─ Case folding
-      ├─ Stopword removal
-      └─ Punctuation removal
+## Limits and design principles
 
-  ▼
-(lm_text, stat_text, language)
-```
+- **Safe defaults, every choice configurable.** Each behaviour is a config field; nothing is forced.
+- **No guarantee that all PII is found.** Models miss entities, mostly organisations and non-Latin scripts. Review output before you publish it.
+- **Reversible maps are personal data.** Anyone with the map can restore the values. Store maps apart from the cleaned data, with access control.
+- **Offsets are post-regex.** Finding offsets point into the text after the regex step, not into the raw input.
+- **Synthetic data is not anonymisation.** Fake values keep the data useful; they do not make it anonymous in a legal sense.
 
-Each step is toggled by a `TextCleanerConfig` field. The pipeline is built once at initialization; disabled steps are skipped entirely (zero overhead).
+<details>
+<summary>Known limits of 0.8.0 (details in <a href="CHANGELOG.md">CHANGELOG.md</a>)</summary>
 
-## What's New
+- Dates: only full dates become one `<DATE>`. `1990年1月`, `1月15日`, Japanese era years and `1990.1.15.` do not; the year and number steps still change them (`1990年1月` becomes `<YEAR>年<NUMBER>月`, `生日1990.1.15谢谢` becomes `<YEAR><NUMBER>.15`). A circled number glued to a unit character (`1月⑮日`) stays a list marker. Thai month names need `custom_month_names`.
+- In ensembles with GLiNER, windows are sized for the token-classification models, not for GLiNER's own word limit. GLiNER2 runs one chunk per call; torch models and GLiNER keep one lock per model, so they do not run in parallel across threads.
+- Only `process_batch` is faster; `process` of one document is not batched across documents.
+- `ner_chunk_overlap` (off by default) can still cut an entity longer than the overlap that starts at the very end of a chunk.
+- `06-12345678` becomes `06-<PHONE>`. Adversarial strings such as `+000000000(000)0` can leave `(000)0` after phone replacement.
+- Two addresses glued with no separator in a script written without spaces can be read as one address or split at the wrong place.
+- ORGANISATION is the weakest NER label (0.75 recall in the multilingual eval); Bengali and Tamil name spans can be a few characters off.
+- A URL with a path swallows a trailing sentence period (`see https://x.org/a.` becomes `see <URL>`). A URL path that switches from Latin letters or digits straight into a script written without spaces is replaced only up to the switch (`https://x.org/a東京secret` becomes `<URL>東京secret`). Rare styled URL hosts and mail addresses (`https://ab｡⑧․cd.ex.com/...`, `INFO@COL·LEGI。CAT`) are not fully replaced.
+- Score B's quality head was tested with a small ONNX graph only; GLiNER PII mode was not run end to end for this release. CI does not install the `mcp` extra; FastMCP-only tests skip there.
+- An unpinned NER model makes one Hub request per worker when the parent never loaded it before forking; pin `ner_model_revisions` or set `HF_HUB_OFFLINE=1`.
+- With an empty regex marker (`replace_with_email=""`), NER in synthetic or reversible mode can find other entities than in placeholder mode.
+- `WindowedStreamingRedactor` can cut an HTML tag that holds a space when the tag reaches past `overlap_chars`. It raises `BufferError` when the buffer passes `max_buffer_chars` (default 4096) with no safe whitespace split; raise the limit or use `BufferedStreamingRedactor`.
 
-**v0.7.0**
-- **Privacy policies**: Apply versioned entity rules, allowlists, thresholds, and redaction actions.
-- **Structured audit findings**: Inspect entity decisions, detector backends, and pinned model revisions.
-- **Safer reversible processing**: Restore contact values and keep token maps behind an optional `TokenStore`.
-- **Boundary adapters**: Clean JSON, DataFrame-like objects, RAG chunks, standard input, and MCP tool requests.
-- **Privacy evaluation**: Score exact PII spans by label, language, domain, and custom slice.
-- **Model adoption gates**: Compare pinned candidates using recall, F1, latency, and ONNX parity.
-- **Extended media support**: Redact OCR regions, process bounded streams, and export browser deployment manifests.
-- **Corpus risk indicators**: Measure k-anonymity for user-selected quasi-identifiers.
-- **Supply-chain improvements**: Pin model revisions, publish through PyPI Trusted Publishing, and ship standard lockfiles.
-- **Python 3.14**: Added CI coverage alongside Python 3.11 through 3.13.
+</details>
 
-Migration notes:
-- `gliclass_onnx=True` now raises an error because the upstream package has no native ONNX loader.
-- HTML processing now honors `replace_with_html` instead of silently stripping tags.
-- Structured adapters reject reversible mode unless each token map can be retained safely.
+## Documentation
 
-**v0.6.0**
-- **PII detection mode** (`ner_mode='pii'`): auto-configures GLiNER with 60+ PII entity labels (personal, financial, healthcare, identity, digital)
-- **Synthetic replacement** (`replacement_mode='synthetic'`): Faker-generated realistic values instead of `<TAG>` placeholders, with per-document consistency
-- **Reversible anonymization** (`replacement_mode='reversible'`): indexed placeholders (`<PERSON_0>`) with `AnonymizationMap` for round-trip deanonymization
-- **Document classification** (`check_classify_document=True`): zero-shot GLiClass pre-classification before text processing
-- **ProcessResult**: `process()` returns `ProcessResult` (backward-compatible 3-tuple) with `.metadata` for anonymization maps and classification results
-- **GLiNER ONNX mode** (`gliner_onnx=True`): load GLiNER with pre-built ONNX weights from HuggingFace Hub (auto-set for PII + ONNX backend)
-- **Bi-encoder support**: auto-detects ModernBERT and other bi-encoder GLiNER models, caches label embeddings, dynamic context windows (2048-8192 tokens)
-- **Entity description labels**: ZERONER-style natural-language descriptions for improved zero-shot accuracy
-- **Presidio GLiNER backend** (beta): opt-in `ner_backend='presidio_gliner'` for Presidio's context-aware recognition pipeline
-- **ModernBERT ONNX export**: updated export script with ModernBERT support (English, 8192 token context)
-- **Dynamic chunk sizing**: GLiNER chunk size adapts to model's actual context window instead of hardcoded 384
+| Topic | Where |
+|---|---|
+| Install and all extras, speed and hardware | [docs/INSTALL.md](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/INSTALL.md), [docs/PERFORMANCE.md](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/PERFORMANCE.md) |
+| Every config field, presets, language options | [docs/CONFIG.md](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/CONFIG.md) |
+| `TextCleaner`, `ProcessResult`, `signals` | [docs/API.md](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/API.md) |
+| NER backends, default models, GLiNER, PII mode | [docs/NER_BACKENDS.md](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/NER_BACKENDS.md) |
+| Synthetic and reversible replacement, GLiClass | [docs/REPLACEMENT_MODES.md](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/REPLACEMENT_MODES.md) |
+| Privacy policies, `TokenStore`, offsets, k-anonymity | [docs/PRIVACY.md](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/PRIVACY.md) |
+| JSON, DataFrame, RAG, CLI, streaming, OCR, browser | [docs/ADAPTERS.md](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/ADAPTERS.md) |
+| Framework adapters, other engines, MCP server | [docs/INTEGRATIONS.md](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/INTEGRATIONS.md), [docs/RECIPES.md](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/RECIPES.md), [docs/MCP.md](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/MCP.md) |
+| Evaluation, score columns, `sct-report` | [docs/EVALUATION.md](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/EVALUATION.md), [docs/SCORE.md](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/SCORE.md), [docs/MULTILINGUAL_EVAL.md](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/MULTILINGUAL_EVAL.md) |
+| Languages and adding a language | [docs/LANGUAGES.md](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/LANGUAGES.md), [docs/ADDING_LANGUAGES.md](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/ADDING_LANGUAGES.md) |
+| The whole API in one file, for AI coding assistants | [llms.txt](https://github.com/rhnfzl/SqueakyCleanText/blob/main/llms.txt) |
 
-**v0.5.x**
-- `aprocess_batch()`: async batch processing for FastAPI / aiohttp integrations
-- `warmup(languages)`: pre-load NER models at startup to eliminate first-request latency
-- `custom_pipeline_steps`: attach arbitrary `(text: str) -> str` callables after the built-in pipeline
-- French, Portuguese, and Italian NER support via a shared multilingual ONNX session
-- Improved NER sentence boundary detection with abbreviation guard
+## What's new in 0.8.0
 
-**v0.4.5**
-- Frozen `TextCleanerConfig` dataclass: immutable, thread-safe, per-instance configuration
-- ONNX-first NER inference: torch-free base install (~400 MB models vs ~7 GB)
-- Thread-parallel batch processing via `ThreadPoolExecutor`
-- Five NER backends: `onnx`, `torch`, `gliner`, `ensemble_onnx`, `ensemble_torch`
-- GLiNER zero-shot NER for custom entity types (PRODUCT, EVENT, SKILL, etc.)
-- Ensemble voting across backends for improved recall
-- Lazy per-language model loading
-- Multilingual date detection and fuzzy date matching
-- Configurable emoji removal, bracket/brace content removal, and smart case folding
-- `stop-words` replaces NLTK (50 KB bundled vs 30 MB download)
-- PyTorch and Transformers moved to optional extras
-- Migrated to `pyproject.toml` (PEP 517), Python 3.11-3.13, ruff linter
+See [CHANGELOG.md](https://github.com/rhnfzl/SqueakyCleanText/blob/main/CHANGELOG.md) (many breaking changes). Highlights of 0.8.0:
+
+- `process_batch` is 4.2x faster on short documents on 16 CPU cores; GPU device options.
+- Detection of all 75 Lingua languages, with confidence and warnings.
+- `result.signals`, a value-free view for logs, score columns and data cards (`sct-report`).
+- Adapters for Hugging Face `datasets`, DataTrove, LangChain and Haystack, and a `training` preset.
+- A reworked MCP server and a multilingual PII eval in 11 languages. Python 3.12 or newer.
+
+## Related work
+
+- [clean-text](https://github.com/jfilter/clean-text) normalises text and replaces URLs, emails and phones with rules. SCT adds NER for names and places and works in many languages.
+- [ftfy](https://github.com/rspeer/python-ftfy) repairs broken unicode. SCT uses it as its first fix step.
+- [Presidio](https://github.com/microsoft/presidio) is a PII detection and anonymisation framework you assemble from recognisers. SCT is one call with multilingual defaults and also cleans the text.
+- [scrubadub](https://github.com/LeapBeyond/scrubadub) removes PII from free text with detectors. SCT adds text cleaning, reversible maps and value-free metadata.
 
 ## Contributing
 
-Contributions are welcome! Please feel free to submit a Pull Request or open an issue.
+Issues and pull requests are welcome. Read [AGENTS.md](https://github.com/rhnfzl/SqueakyCleanText/blob/main/AGENTS.md) first: model mistakes are fixed with model-driven rules, never with word lists, and every behaviour stays configurable.
 
-## License
+## Citation
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+```bibtex
+@software{fazal_squeakycleantext,
+  author = {Fazal, Rehan},
+  title = {SqueakyCleanText},
+  url = {https://github.com/rhnfzl/SqueakyCleanText},
+  version = {0.8.0},
+  year = {2026}
+}
+```
 
-## Acknowledgements
+## License and acknowledgements
 
-The package took inspirations from the following repo:
-
-- [clean-text](https://github.com/jfilter/clean-text)
+MIT. See [LICENSE](https://github.com/rhnfzl/SqueakyCleanText/blob/main/LICENSE). The package took inspiration from [clean-text](https://github.com/jfilter/clean-text). It builds on [ftfy](https://github.com/rspeer/python-ftfy), [Lingua](https://github.com/pemistahl/lingua-py), [ONNX Runtime](https://onnxruntime.ai/) and the NER models listed in [docs/NER_BACKENDS.md](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/NER_BACKENDS.md).

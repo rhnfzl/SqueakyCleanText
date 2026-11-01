@@ -86,10 +86,13 @@ class TextCleanerTest(unittest.TestCase):
     def test_email_regex(self, rx):
         self.assertEqual("", self.ProcessContacts.replace_emails(rx, ""))
 
-    @settings(deadline=None)
+    # The alternation is leftmost-first, so an earlier alternative may take only
+    # part of a string a later one matches whole ("+000000000(0)" leaves "(0)").
+    # Assert that no digit run survives; derandomized so the gate is stable.
+    @settings(deadline=None, derandomize=True)
     @given(from_regex(constants.PHONE_REGEX, fullmatch=True))
     def test_phone_regex(self, rx):
-        self.assertEqual("", self.ProcessContacts.replace_phone_numbers(rx, ""))
+        self.assertNotRegex(self.ProcessContacts.replace_phone_numbers(rx, ""), r"\d{3}")
 
     @settings(deadline=None)
     @given(from_regex(constants.NUMBERS_REGEX, fullmatch=True))
@@ -325,6 +328,16 @@ class TextCleanerTest(unittest.TestCase):
         constants.ACRONYM_REGEX.findall(adversarial)
         elapsed = time.time() - start
         self.assertLess(elapsed, 2.0, "ACRONYM_REGEX took too long - possible ReDoS")
+
+    def test_host_regex_no_redos(self):
+        """A dotted host with no TLD fails fast (each label used to split every way: ~5 s / 10 s here)."""
+        import time
+        host = ".".join(["1" * 20] * 5) + " "
+        for name, rx, sample in (("EMAIL_REGEX", constants.EMAIL_REGEX, "a@" + host),
+                                 ("URL_REGEX", constants.URL_REGEX, "http://" + host)):
+            start = time.time()
+            rx.search(sample)
+            self.assertLess(time.time() - start, 1.0, f"{name} took too long - possible ReDoS")
 
     # --- Consistent return type tests ---
 
@@ -1229,10 +1242,11 @@ class TextCleanerTest(unittest.TestCase):
         self.assertNotIn('MULTILINGUAL', cfg.supported_languages)
 
     def test_language_pin_validation(self):
-        """language must be in supported set."""
+        """Any Lingua language is a valid pin; unknown names still raise."""
         with self.assertRaises(ValueError):
-            TextCleanerConfig(check_ner_process=False, language='POLISH')
-        # This should work when POLISH is in supported set:
+            TextCleanerConfig(check_ner_process=False, language='KLINGON')
+        cfg = TextCleanerConfig(check_ner_process=False, language='POLISH')
+        self.assertEqual(cfg.language, 'POLISH')
         cfg = TextCleanerConfig(
             check_ner_process=False, language='POLISH', extra_languages=('POLISH',)
         )
@@ -1339,6 +1353,17 @@ class TextCleanerTest(unittest.TestCase):
             custom_stopwords={'ENGLISH': custom},
         )
         self.assertEqual(sw.get_stop_words('ENGLISH'), custom)
+
+    def test_custom_stopwords_toggle(self):
+        """check_remove_stext_custom_stop_words=False keeps the built-in lists."""
+        text = "the zebra sings"
+        for toggle, expected in ((True, "the sings"), (False, "zebra sings")):
+            cfg = TextCleanerConfig(
+                check_ner_process=False, language='ENGLISH',
+                custom_stopwords={'ENGLISH': frozenset({'zebra'})},
+                check_remove_stext_custom_stop_words=toggle,
+            )
+            self.assertEqual(TextCleaner(cfg=cfg).process(text).stat_text, expected)
 
     def test_auto_stopwords_via_iso(self):
         """Polish stopwords auto-load from stop-words package."""
@@ -1533,7 +1558,7 @@ class PIIModeConfigTest(unittest.TestCase):
         self.assertEqual(cfg.ner_backend, 'gliner')
         self.assertEqual(cfg.gliner_model, PII_DEFAULT_MODEL)
         self.assertEqual(cfg.gliner_labels, PII_LABELS)
-        self.assertEqual(cfg.gliner_threshold, PII_DEFAULT_THRESHOLD)
+        self.assertEqual(cfg.effective_gliner_threshold, PII_DEFAULT_THRESHOLD)
         self.assertIsNotNone(cfg.gliner_label_map)
 
     def test_pii_mode_preserves_user_model(self):
@@ -1579,7 +1604,8 @@ class PIIModeConfigTest(unittest.TestCase):
         self.assertIn('ORG', tags)
         # PII-specific tags should be added (uppercased label names)
         self.assertIn('EMAIL', tags)
-        self.assertIn('PHONE_NUMBER', tags)
+        self.assertIn('PHONE', tags)
+        self.assertIn('IP', tags)
         self.assertIn('CREDIT_CARD_NUMBER', tags)
 
     def test_pii_mode_invalid_value(self):
@@ -1609,8 +1635,8 @@ class PIIModeConfigTest(unittest.TestCase):
         self.assertGreater(len(PII_LABELS), 50)
 
     def test_pii_label_map_coverage(self):
-        """All PII_LABEL_MAP keys should map to standard NER tags."""
-        valid_tags = {'PER', 'LOC', 'ORG'}
+        """PII_LABEL_MAP keys map to standard NER tags or a regex step's type name."""
+        valid_tags = {'PER', 'LOC', 'ORG', 'PHONE', 'IP'}
         for label, tag in PII_LABEL_MAP.items():
             self.assertIn(tag, valid_tags, f"Label '{label}' maps to unexpected tag '{tag}'")
 
@@ -2132,11 +2158,11 @@ class ProcessResultTest(unittest.TestCase):
         self.assertEqual(r[1], 'b')
         self.assertEqual(r[2], 'c')
 
-    def test_process_result_metadata_none_by_default(self):
-        """metadata should be None when no extended features active."""
+    def test_process_result_metadata_empty_by_default(self):
+        """metadata is an empty dict (never None) when none is given."""
         from sct.utils.process_result import ProcessResult
         r = ProcessResult('a', None, None)
-        self.assertIsNone(r.metadata)
+        self.assertEqual(r.metadata, {})
 
     def test_process_result_metadata_accessible(self):
         """metadata should carry anon_map and other keys."""

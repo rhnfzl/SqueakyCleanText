@@ -66,8 +66,6 @@ class GLiNERAdapter:
                     self._onnx = False
             else:
                 self.model = GLiNER.from_pretrained(model_id, **load_kwargs)
-            if device == 'cuda' and not onnx:
-                self.model = self.model.to('cuda')
 
         elif variant == 'gliner2':
             try:
@@ -78,8 +76,12 @@ class GLiNERAdapter:
                     "Install with: pip install squeakycleantext[gliner2]"
                 )
             self.model = GLiNER2.from_pretrained(model_id, **load_kwargs)
+            self._onnx = False  # GLiNER2 has no ONNX loader; it always runs in torch
         else:
             raise ValueError(f"Unknown GLiNER variant: {variant!r}. Use 'gliner' or 'gliner2'.")
+        # The effective backend decides: an ONNX load that fell back to torch still moves.
+        if device.startswith('cuda') and not self._onnx:
+            self.model = self.model.to(device)
 
         # Bi-encoder detection: ModernBERT and similar architectures expose encode_labels()
         self._is_bi_encoder = hasattr(self.model, 'encode_labels')
@@ -122,8 +124,12 @@ class GLiNERAdapter:
         """Map a GLiNER label to entity_group tag."""
         return self.label_map.get(label, label.upper())
 
-    def __call__(self, texts) -> List[List[dict]]:
-        """Run NER. Returns List[List[dict]] matching ONNXNERPipeline format."""
+    def __call__(self, texts, batch_size: int = 1) -> List[List[dict]]:
+        """Run NER. Returns List[List[dict]] matching ONNXNERPipeline format.
+
+        GLiNER runs ``batch_size`` texts per forward pass; ``1`` keeps the
+        one-text-per-call pattern. GLiNER2 always runs one text per call.
+        """
         if isinstance(texts, str):
             texts = [texts]
 
@@ -136,22 +142,40 @@ class GLiNERAdapter:
                 desc = self.label_descriptions.get(label, label)
                 desc_to_label[desc] = label
 
-        for text in texts:
-            if self.variant == 'gliner':
-                inference_labels = self._get_inference_labels()
-
-                if self._is_bi_encoder:
-                    self._ensure_label_embeddings()
+        raw_batch = None
+        if self.variant == 'gliner':
+            inference_labels = self._get_inference_labels()
+            if self._is_bi_encoder:
+                self._ensure_label_embeddings()
+                if batch_size > 1:
                     raw_batch = self.model.batch_predict_with_embeds(
-                        [text], self._label_embeddings, self.labels,
-                        threshold=self.threshold,
+                        texts, self._label_embeddings, self.labels,
+                        threshold=self.threshold, batch_size=batch_size,
                     )
-                    raw = raw_batch[0] if raw_batch else []
                 else:
-                    raw = self.model.predict_entities(
+                    raw_batch = [
+                        (self.model.batch_predict_with_embeds(
+                            [text], self._label_embeddings, self.labels,
+                            threshold=self.threshold,
+                        ) or [[]])[0]
+                        for text in texts
+                    ]
+            elif batch_size > 1 and hasattr(self.model, 'inference'):
+                raw_batch = self.model.inference(
+                    texts, inference_labels, threshold=self.threshold,
+                    batch_size=batch_size,
+                )
+            else:
+                raw_batch = [
+                    self.model.predict_entities(
                         text, inference_labels, threshold=self.threshold,
                     )
+                    for text in texts
+                ]
 
+        for index, text in enumerate(texts):
+            if self.variant == 'gliner':
+                raw = raw_batch[index] if index < len(raw_batch) else []
                 entities = [
                     {
                         'entity_group': self._map_label(

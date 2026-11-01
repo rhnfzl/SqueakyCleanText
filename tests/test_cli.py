@@ -77,3 +77,15 @@ def test_cli_rejects_reversible_json_input(tmp_path):
             "--token-map",
             str(tmp_path / "tokens.json"),
         ])
+
+
+def test_cli_preset_training_keeps_non_latin_text_and_short_keys():
+    output = StringIO()
+
+    main(
+        ["--no-ner", "--preset", "training", "--json-input"],
+        stdin=StringIO('{"k": "日本語 maria@example.com München"}'),
+        stdout=output,
+    )
+
+    assert json.loads(output.getvalue()) == {"k": "日本語 <EMAIL> München"}

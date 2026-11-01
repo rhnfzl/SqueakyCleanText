@@ -14,8 +14,9 @@ Legacy API (backward compatible):
 
 import sys
 from dataclasses import dataclass
+from datetime import date
 from types import MappingProxyType
-from typing import Mapping, Optional, Tuple, Union
+from typing import Any, Mapping, Optional, Tuple, Union
 
 
 LANG_KEYS = ('ENGLISH', 'DUTCH', 'GERMAN', 'SPANISH', 'MULTILINGUAL')
@@ -123,7 +124,14 @@ PII_LABEL_MAP: dict[str, str] = {
     'spouse_name': 'PER', 'child_name': 'PER', 'emergency_contact': 'PER',
     'company_name': 'ORG', 'court_name': 'ORG', 'school_name': 'ORG',
     'city': 'LOC', 'state': 'LOC', 'country': 'LOC',
+    # One name per type on every surface: the regex steps emit <PHONE> / <IP> too.
+    'phone_number': 'PHONE', 'ip_address': 'IP',
 }
+
+# legacy_type_names -> the label map PII mode derives (identity marks it as derived).
+_PII_MAPS = {legacy: MappingProxyType({k: v for k, v in PII_LABEL_MAP.items()
+                                       if not (legacy and v in ('PHONE', 'IP'))})
+             for legacy in (False, True)}
 
 PII_DEFAULT_MODEL = 'knowledgator/gliner-pii-base-v1.0'
 PII_DEFAULT_REVISION = '61726e0ad791dcab3e29339bbec3ad42ded65641'
@@ -131,6 +139,7 @@ PII_DEFAULT_THRESHOLD = 0.3  # Recall > precision for PII
 
 VALID_NER_MODES = frozenset({'standard', 'pii'})
 VALID_REPLACEMENT_MODES = frozenset({'placeholder', 'synthetic', 'reversible'})
+VALID_JSON_KEY_CLEANING = frozenset({'pii', 'pii_ner', 'full', 'off'})
 
 # Optional ModernBERT NER models (available when exported via export_onnx_models.py)
 MODERNBERT_NER_MODELS: dict[str, str] = {
@@ -162,12 +171,12 @@ class TextCleanerConfig:
     # Pipeline step toggles
     check_detect_language: bool = True
     check_fix_bad_unicode: bool = True
-    check_to_ascii_unicode: bool = True
+    check_to_ascii_unicode: bool = False  # True = unidecode transliteration (0.7: 日本語 -> Ri Ben Yu)
     check_replace_html: bool = True
     check_replace_urls: bool = True
     check_replace_emails: bool = True
     check_replace_years: bool = True
-    check_replace_dates: bool = False
+    check_replace_dates: bool = True
     check_fuzzy_replace_dates: bool = False
     check_replace_phone_numbers: bool = True
     check_replace_numbers: bool = True
@@ -206,7 +215,7 @@ class TextCleanerConfig:
 
     # NER settings
     positional_tags: Tuple[str, ...] = ('PER', 'LOC', 'ORG', 'MISC')
-    ner_confidence_threshold: float = 0.85
+    ner_confidence_threshold: Optional[float] = None  # None = effective_ner_confidence_threshold
     ner_batch_size: int = 8
     language: Optional[Union[str, Tuple[str, ...]]] = None
 
@@ -255,7 +264,7 @@ class TextCleanerConfig:
     gliner_variant: str = 'gliner'  # 'gliner' or 'gliner2'
     gliner_labels: Tuple[str, ...] = ('person', 'organization', 'location')
     gliner_label_map: Optional[Mapping[str, str]] = None
-    gliner_threshold: float = 0.4
+    gliner_threshold: Optional[float] = None  # None = effective_gliner_threshold
 
     # Entity description labels (ZERONER-style): maps labels to natural-language descriptions.
     # When provided, descriptions are sent to GLiNER for inference, results mapped back to labels.
@@ -276,7 +285,7 @@ class TextCleanerConfig:
     gliclass_onnx: bool = False
 
     # Plugin: user-provided pipeline steps, each callable (text: str) -> str.
-    # Appended after all built-in steps in _init_pipeline().
+    # Appended to the pre-NER pipeline in _init_pipeline(), so they run before NER.
     custom_pipeline_steps: Tuple = ()
 
     # Language extensibility — extend Lingua detection, stopwords, dates, NER
@@ -293,7 +302,65 @@ class TextCleanerConfig:
     replace_with_ips: str = "<IP>"
     replace_numbers_in_words: bool = False  # True also replaces digits glued to Latin/Greek/Cyrillic letters (GPT4)
 
+    # Added in 0.8.0; kept last so existing positional arguments keep their meaning.
+    onnx_intra_op_threads: Optional[int] = None  # None = ONNX Runtime default (all cores)
+    onnx_inter_op_threads: Optional[int] = None  # None = ONNX Runtime default
+    ner_chunk_overlap: int = 0  # tokens of neighbouring text each NER window adds per side; 0 = 0.7.1 chunks
+    detect_all_languages: bool = True  # False = 0.7 detector over supported_languages only
+    language_confidence_warning: float = 0.0  # below this confidence, warn language_low_confidence; 0.5 = early 0.8.0
+    check_decode_unicode_escapes: bool = True  # False keeps literal \n, \u00e9 escapes (code, JSON)
+    ner_device: Optional[str] = None  # None = auto (CUDA when available), 'cpu', 'cuda'
+    cuda_device_id: int = 0  # GPU index for ONNX, torch and GLiNER when on CUDA
+    onnx_cuda_provider_options: Optional[Mapping[str, Any]] = None  # extra CUDAExecutionProvider options
+    # process_json keys: 'pii' = regex PII steps only (NER tags lone words like 'message' out of context),
+    # 'pii_ner' = PII steps plus NER, 'full' = whole config (0.7), 'off' = raw
+    json_key_cleaning: str = 'pii'
+    synthetic_seed: int = 42  # base seed for replacement_mode='synthetic'
+    # True: fakes seeded per document from synthetic_seed + its text (differ across documents,
+    # same document -> same fakes); False = 0.7 single Faker stream per thread
+    synthetic_per_document: bool = True
+    # Warn language_low_confidence when the top language leads the runner-up by less than this
+    # (ambiguous detection); 0 turns it off. Absolute confidence is low for many correct texts.
+    language_margin_warning: float = 0.15
+    # Part of check_fix_bad_unicode. False keeps full-width CJK punctuation (，！：) and half-width
+    # katakana, converting only full-width ASCII letters/digits; True = ftfy's full width fix (0.7)
+    fix_character_width: bool = False
+    # True: phone and IP types use their pre-0.8.0 names PHONE_NUMBER / IP_ADDRESS in reversible
+    # placeholders, metadata, signals and PII-mode NER tags; False = PHONE / IP everywhere
+    legacy_type_names: bool = False
+    # WordPiece NER: widen an entity to its whole word when the added text is at most this many
+    # times the tagged span ("John Do" + "##e"); None = always (whole unspaced Thai/kana clauses
+    # too), 0 = never (0.7)
+    ner_subword_widen: Optional[float] = 1.0
+    # Part of check_fix_bad_unicode. True folds math-alphanumeric (𝐞𝐱), circled (ⓙ) and full-width
+    # URL punctuation (：／？) inside ASCII runs and drops invisible Cf characters (ZWSP, soft hyphen)
+    # inside them, so styled emails/URLs/phones are replaced without
+    # check_to_ascii_unicode; False = earlier 0.8.0 (full-width letters/digits and ＠．－＿＋ only)
+    fold_styled_characters: bool = True
+    # WordPiece NER widening stops where the Unicode script of the letters changes, so a Latin
+    # name glued to kana or Thai ("David Millerは") keeps its own span; False = widen across scripts
+    ner_subword_widen_same_script: bool = True
+    # Faker locale for replacement_mode='synthetic': None = follow the detected document language
+    # (Dutch text gets Dutch names, en_US when Faker has no locale for it); a string forces that
+    # locale ('en_US' = 0.7)
+    synthetic_locale: Optional[str] = None
+    # synthetic/reversible: NER reads the same text as placeholder mode (<EMAIL>, <PHONE>...) and
+    # the fakes / indexed placeholders go in after NER, so every mode finds the same entities;
+    # False = 0.7 order (NER reads the fakes / <EMAIL_0>)
+    ner_sees_tags: bool = True
+    # synthetic_locale=None: Faker locale for documents whose detection gets the
+    # language_low_confidence warning; None = follow the detected language anyway (earlier 0.8.0)
+    synthetic_low_confidence_locale: Optional[str] = 'en_US'
+    # synthetic: drop a fake's final '.' when a '.' follows the entity ('B.Eng..' -> 'B.Eng.');
+    # False = keep both (earlier 0.8.0)
+    synthetic_collapse_period: bool = True
+    # synthetic: ISO date that date fakes (DATE, DATE_OF_BIRTH) end on, so a document gets the
+    # same dates on any day; None = today, from the clock (earlier 0.8.0)
+    synthetic_reference_date: Optional[str] = '2026-01-01'
+
     def __post_init__(self):
+        if self.synthetic_reference_date is not None:
+            date.fromisoformat(self.synthetic_reference_date)  # ValueError on a bad date
         if self.gliclass_onnx:
             raise ValueError(
                 "GLiClass ONNX is not supported by the gliclass package. "
@@ -332,6 +399,11 @@ class TextCleanerConfig:
                 f"replacement_mode must be one of {sorted(VALID_REPLACEMENT_MODES)}, "
                 f"got: {self.replacement_mode!r}"
             )
+        if self.json_key_cleaning not in VALID_JSON_KEY_CLEANING:
+            raise ValueError(
+                f"json_key_cleaning must be one of {sorted(VALID_JSON_KEY_CLEANING)}, "
+                f"got: {self.json_key_cleaning!r}"
+            )
         if (
             self.replacement_mode == 'reversible'
             and self.check_fuzzy_replace_dates
@@ -361,19 +433,17 @@ class TextCleanerConfig:
                 )
             if self.gliner_labels == ('person', 'organization', 'location'):
                 object.__setattr__(self, 'gliner_labels', PII_LABELS)
-            if self.gliner_threshold == 0.4:
-                object.__setattr__(self, 'gliner_threshold', PII_DEFAULT_THRESHOLD)
-            # The final ensemble filter must not drop what GLiNER kept.
-            if self.ner_confidence_threshold == 0.85:
-                object.__setattr__(
-                    self, 'ner_confidence_threshold', self.gliner_threshold,
-                )
-            if self.gliner_label_map is None:
-                object.__setattr__(self, 'gliner_label_map', PII_LABEL_MAP)
-            # Expand positional_tags to include all PII label tags
             pii_tags = set(self.positional_tags)
+            # Derived maps are shared objects, so a dataclasses.replace() clone re-derives them
+            # (and drops the other naming's phone/IP tags) when legacy_type_names changes.
+            if self.gliner_label_map is _PII_MAPS[True] or self.gliner_label_map is _PII_MAPS[False]:
+                pii_tags -= {'PHONE', 'IP', 'PHONE_NUMBER', 'IP_ADDRESS'}
+                object.__setattr__(self, 'gliner_label_map', None)
+            if self.gliner_label_map is None:
+                object.__setattr__(self, 'gliner_label_map', _PII_MAPS[self.legacy_type_names])
+            # Expand positional_tags to include all PII label tags
             for label in self.gliner_labels:
-                pii_tags.add(PII_LABEL_MAP.get(label, label.upper()))
+                pii_tags.add(self.gliner_label_map.get(label, label.upper()))
             object.__setattr__(self, 'positional_tags', tuple(sorted(pii_tags)))
 
         # --- NER backend validation ---
@@ -387,6 +457,34 @@ class TextCleanerConfig:
         if self.ner_batch_size <= 0:
             raise ValueError(
                 f"ner_batch_size must be >= 1, got {self.ner_batch_size}"
+            )
+        for name in ('onnx_intra_op_threads', 'onnx_inter_op_threads'):
+            value = getattr(self, name)
+            if value is not None and value < 1:
+                raise ValueError(f"{name} must be None or >= 1, got {value}")
+        if self.ner_chunk_overlap < 0:
+            raise ValueError(f"ner_chunk_overlap must be >= 0, got {self.ner_chunk_overlap}")
+        if self.ner_device not in (None, 'cpu', 'cuda'):
+            raise ValueError(f"ner_device must be None, 'cpu' or 'cuda', got {self.ner_device!r}")
+        if self.cuda_device_id < 0:
+            raise ValueError(f"cuda_device_id must be >= 0, got {self.cuda_device_id}")
+        if self.onnx_cuda_provider_options is not None:
+            object.__setattr__(self, 'onnx_cuda_provider_options',
+                               MappingProxyType(dict(self.onnx_cuda_provider_options)))
+        for name in ('ner_confidence_threshold', 'gliner_threshold'):
+            value = getattr(self, name)
+            if value is not None and not 0.0 <= value <= 1.0:
+                raise ValueError(f"{name} must be None or in [0, 1], got {value}")
+        if self.ner_subword_widen is not None and self.ner_subword_widen < 0:
+            raise ValueError(f"ner_subword_widen must be None or >= 0, got {self.ner_subword_widen}")
+        if not 0.0 <= self.language_confidence_warning <= 1.0:
+            raise ValueError(
+                "language_confidence_warning must be in [0, 1], "
+                f"got {self.language_confidence_warning}"
+            )
+        if not 0.0 <= self.language_margin_warning <= 1.0:
+            raise ValueError(
+                f"language_margin_warning must be in [0, 1], got {self.language_margin_warning}"
             )
 
         # GLiNER fields required for gliner/ensemble backends
@@ -404,7 +502,7 @@ class TextCleanerConfig:
                 )
 
         # Freeze gliner_label_map
-        if self.gliner_label_map is not None:
+        if self.gliner_label_map is not None and not any(self.gliner_label_map is m for m in _PII_MAPS.values()):
             object.__setattr__(self, 'gliner_label_map',
                                MappingProxyType(dict(self.gliner_label_map)))
 
@@ -512,7 +610,7 @@ class TextCleanerConfig:
 
         # Validate and freeze custom_stopwords (keys must be valid language names)
         if self.custom_stopwords:
-            resolved_sw = {resolve_language(k): v for k, v in self.custom_stopwords.items()}
+            resolved_sw = {resolve_language(k): frozenset(v) for k, v in self.custom_stopwords.items()}
             object.__setattr__(self, 'custom_stopwords',
                                MappingProxyType(resolved_sw))
 
@@ -535,23 +633,30 @@ class TextCleanerConfig:
         # Add languages from tuple-of-languages config
         if isinstance(self.language, tuple):
             langs.update(self.language)
+        # Any Lingua language is a valid pin (resolve_language raised above otherwise);
+        # supported_languages only means "has stopwords/dates/NER key".
         object.__setattr__(self, 'supported_languages', frozenset(langs))
 
-        # Validate language pin/restriction against supported set
-        if self.language is not None:
-            if isinstance(self.language, str):
-                if self.language not in self.supported_languages:
-                    raise ValueError(
-                        f"language='{self.language}' not in supported languages: "
-                        f"{sorted(self.supported_languages)}"
-                    )
-            elif isinstance(self.language, tuple):
-                for lang in self.language:
-                    if lang not in self.supported_languages:
-                        raise ValueError(
-                            f"language='{lang}' (from tuple) not in supported languages: "
-                            f"{sorted(self.supported_languages)}"
-                        )
+    @property
+    def effective_gliner_threshold(self) -> float:
+        """GLiNER score cut: explicit value, else 0.3 in PII mode, else 0.4."""
+        if self.gliner_threshold is not None:
+            return self.gliner_threshold
+        return PII_DEFAULT_THRESHOLD if self.ner_mode == 'pii' else 0.4
+
+    @property
+    def effective_ner_confidence_threshold(self) -> float:
+        """Final NER filter: explicit value, else the GLiNER cut in PII mode, else 0.85."""
+        if self.ner_confidence_threshold is not None:
+            return self.ner_confidence_threshold
+        # PII mode: the final ensemble filter must not drop what GLiNER kept.
+        return self.effective_gliner_threshold if self.ner_mode == 'pii' else 0.85
+
+    @classmethod
+    def from_preset(cls, name: str = "training", **overrides) -> "TextCleanerConfig":
+        """Build a config from a named preset (see ``sct.presets.PRESETS``)."""
+        from sct.presets import preset_config
+        return preset_config(name, **overrides)
 
     def __getstate__(self):
         # Restore the exact normalized state; never re-run __post_init__.
@@ -559,6 +664,10 @@ class TextCleanerConfig:
         frozen = [k for k, v in state.items() if isinstance(v, MappingProxyType)]
         for key in frozen:
             state[key] = dict(state[key])
+        # derived only in PII mode (re-shared on load); a map kept after a replace() to another mode is data
+        if self.ner_mode == 'pii' and any(self.gliner_label_map is m for m in _PII_MAPS.values()):
+            state['gliner_label_map'] = None
+            frozen.remove('gliner_label_map')
         return state, frozen
 
     def __setstate__(self, packed):
@@ -567,6 +676,8 @@ class TextCleanerConfig:
             if key in frozen:
                 value = MappingProxyType(value)
             object.__setattr__(self, key, value)
+        if self.ner_mode == 'pii' and self.gliner_label_map is None:
+            object.__setattr__(self, 'gliner_label_map', _PII_MAPS[self.legacy_type_names])
 
 
 def _config_from_module_globals() -> TextCleanerConfig:
@@ -585,12 +696,36 @@ def _config_from_module_globals() -> TextCleanerConfig:
         check_replace_ips=getattr(m, 'CHECK_REPLACE_IPS', True),
         replace_ips_public_only=getattr(m, 'REPLACE_IPS_PUBLIC_ONLY', False),
         check_replace_years=m.CHECK_REPLACE_YEARS,
-        check_replace_dates=getattr(m, 'CHECK_REPLACE_DATES', False),
+        check_replace_dates=getattr(m, 'CHECK_REPLACE_DATES', True),
         check_fuzzy_replace_dates=getattr(m, 'CHECK_FUZZY_REPLACE_DATES', False),
         fuzzy_date_score_cutoff=getattr(m, 'FUZZY_DATE_SCORE_CUTOFF', 85),
         check_replace_phone_numbers=m.CHECK_REPLACE_PHONE_NUMBERS,
         check_replace_numbers=m.CHECK_REPLACE_NUMBERS,
         replace_numbers_in_words=getattr(m, 'REPLACE_NUMBERS_IN_WORDS', False),
+        onnx_intra_op_threads=getattr(m, 'ONNX_INTRA_OP_THREADS', None),
+        onnx_inter_op_threads=getattr(m, 'ONNX_INTER_OP_THREADS', None),
+        ner_batch_size=getattr(m, 'NER_BATCH_SIZE', 8),
+        ner_chunk_overlap=getattr(m, 'NER_CHUNK_OVERLAP', 0),
+        detect_all_languages=getattr(m, 'DETECT_ALL_LANGUAGES', True),
+        language_confidence_warning=getattr(m, 'LANGUAGE_CONFIDENCE_WARNING', 0.0),
+        check_decode_unicode_escapes=getattr(m, 'CHECK_DECODE_UNICODE_ESCAPES', True),
+        ner_device=getattr(m, 'NER_DEVICE', None),
+        cuda_device_id=getattr(m, 'CUDA_DEVICE_ID', 0),
+        onnx_cuda_provider_options=getattr(m, 'ONNX_CUDA_PROVIDER_OPTIONS', None),
+        json_key_cleaning=getattr(m, 'JSON_KEY_CLEANING', 'pii'),
+        synthetic_seed=getattr(m, 'SYNTHETIC_SEED', 42),
+        synthetic_per_document=getattr(m, 'SYNTHETIC_PER_DOCUMENT', True),
+        language_margin_warning=getattr(m, 'LANGUAGE_MARGIN_WARNING', 0.15),
+        fix_character_width=getattr(m, 'FIX_CHARACTER_WIDTH', False),
+        legacy_type_names=getattr(m, 'LEGACY_TYPE_NAMES', False),
+        ner_subword_widen=getattr(m, 'NER_SUBWORD_WIDEN', 1.0),
+        fold_styled_characters=getattr(m, 'FOLD_STYLED_CHARACTERS', True),
+        ner_subword_widen_same_script=getattr(m, 'NER_SUBWORD_WIDEN_SAME_SCRIPT', True),
+        synthetic_locale=getattr(m, 'SYNTHETIC_LOCALE', None),
+        ner_sees_tags=getattr(m, 'NER_SEES_TAGS', True),
+        synthetic_low_confidence_locale=getattr(m, 'SYNTHETIC_LOW_CONFIDENCE_LOCALE', 'en_US'),
+        synthetic_collapse_period=getattr(m, 'SYNTHETIC_COLLAPSE_PERIOD', True),
+        synthetic_reference_date=getattr(m, 'SYNTHETIC_REFERENCE_DATE', '2026-01-01'),
         check_replace_currency_symbols=m.CHECK_REPLACE_CURRENCY_SYMBOLS,
         check_ner_process=m.CHECK_NER_PROCESS,
         check_remove_isolated_letters=m.CHECK_REMOVE_ISOLATED_LETTERS,
@@ -615,7 +750,7 @@ def _config_from_module_globals() -> TextCleanerConfig:
         replace_with_numbers=m.REPLACE_WITH_NUMBERS,
         replace_with_currency_symbols=m.REPLACE_WITH_CURRENCY_SYMBOLS,
         positional_tags=tuple(m.POSITIONAL_TAGS),
-        ner_confidence_threshold=m.NER_CONFIDENCE_THRESHOLD,
+        ner_confidence_threshold=getattr(m, 'NER_CONFIDENCE_THRESHOLD', None),
         ner_mode=getattr(m, 'NER_MODE', 'standard'),
         replacement_mode=getattr(m, 'REPLACEMENT_MODE', 'placeholder'),
         gliner_onnx=getattr(m, 'GLINER_ONNX', False),
@@ -633,19 +768,30 @@ def _config_from_module_globals() -> TextCleanerConfig:
 # ---------------------------------------------------------------------------
 CHECK_DETECT_LANGUAGE = True
 CHECK_FIX_BAD_UNICODE = True
-CHECK_TO_ASCII_UNICODE = True
+CHECK_TO_ASCII_UNICODE = False
 CHECK_REPLACE_HTML = True
 CHECK_REPLACE_URLS = True
 CHECK_REPLACE_EMAILS = True
 CHECK_REPLACE_IPS = True
 REPLACE_IPS_PUBLIC_ONLY = False
 CHECK_REPLACE_YEARS = True
-CHECK_REPLACE_DATES = False
+CHECK_REPLACE_DATES = True
 CHECK_FUZZY_REPLACE_DATES = False
 FUZZY_DATE_SCORE_CUTOFF = 85
 CHECK_REPLACE_PHONE_NUMBERS = True
 CHECK_REPLACE_NUMBERS = True
 REPLACE_NUMBERS_IN_WORDS = False
+ONNX_INTRA_OP_THREADS = None
+ONNX_INTER_OP_THREADS = None
+NER_BATCH_SIZE = 8
+NER_CHUNK_OVERLAP = 0
+DETECT_ALL_LANGUAGES = True
+LANGUAGE_CONFIDENCE_WARNING = 0.0
+CHECK_DECODE_UNICODE_ESCAPES = True
+NER_DEVICE = None
+CUDA_DEVICE_ID = 0
+ONNX_CUDA_PROVIDER_OPTIONS = None
+JSON_KEY_CLEANING = 'pii'
 CHECK_REPLACE_CURRENCY_SYMBOLS = True
 CHECK_NER_PROCESS = True
 CHECK_REMOVE_ISOLATED_LETTERS = True
@@ -672,9 +818,22 @@ REPLACE_WITH_NUMBERS = "<NUMBER>"
 REPLACE_WITH_CURRENCY_SYMBOLS = None
 
 POSITIONAL_TAGS = ['PER', 'LOC', 'ORG', 'MISC']
-NER_CONFIDENCE_THRESHOLD = 0.85
+NER_CONFIDENCE_THRESHOLD = None  # None = 0.85, or the GLiNER threshold in PII mode
 NER_MODE = 'standard'
 REPLACEMENT_MODE = 'placeholder'
+SYNTHETIC_SEED = 42
+SYNTHETIC_PER_DOCUMENT = True
+LANGUAGE_MARGIN_WARNING = 0.15
+FIX_CHARACTER_WIDTH = False
+LEGACY_TYPE_NAMES = False
+NER_SUBWORD_WIDEN = 1.0
+FOLD_STYLED_CHARACTERS = True
+NER_SUBWORD_WIDEN_SAME_SCRIPT = True
+SYNTHETIC_LOCALE = None
+NER_SEES_TAGS = True
+SYNTHETIC_LOW_CONFIDENCE_LOCALE = 'en_US'
+SYNTHETIC_COLLAPSE_PERIOD = True
+SYNTHETIC_REFERENCE_DATE = '2026-01-01'
 GLINER_ONNX = False
 LANGUAGE = None
 

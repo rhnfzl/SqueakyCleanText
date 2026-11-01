@@ -1,4 +1,14 @@
+import unicodedata
+
 from sct.utils import constants
+
+
+def _drop_if_isolated(match):
+    text, i = match.string, match.start()
+    touches_word = any(
+        0 <= j < len(text) and unicodedata.category(text[j])[0] in 'LNM' for j in (i - 1, i + 1)
+    )
+    return match.group() if touches_word else ''
 
 
 class ProcessSpecialSymbols:
@@ -17,11 +27,12 @@ class ProcessSpecialSymbols:
                 (e.g. "*CURRENCY*")
         """
         if replace_with is None:
-            for k, v in constants.CURRENCIES.items():
-                text = text.replace(k, v)
-            return text
-        else:
-            return constants.CURRENCY_REGEX.sub(replace_with, text)
+            return self.replace_currency_symbols_with_fn(text, constants.CURRENCIES.__getitem__)
+        return constants.CURRENCY_REGEX.sub(replace_with, text)
+
+    def replace_currency_symbols_with_fn(self, text, replace_fn):
+        """Replace each single currency symbol: replace_fn(symbol) -> replacement."""
+        return constants.CURRENCY_SYMBOL_REGEX.sub(lambda m: replace_fn(m.group()), text)
 
 
     def remove_isolated_letters(self, text):
@@ -47,7 +58,7 @@ class ProcessSpecialSymbols:
         if remove_braces:
             cleaned_text = constants.BRACE_CONTENT_REGEX.sub('', cleaned_text)
         cleaned_text = constants.ISOLATED_SPECIAL_SYMBOLS_REGEX.sub('', cleaned_text)
-        cleaned_text = constants.ISOLATED_QUOTES_REGEX.sub('', cleaned_text)
+        cleaned_text = constants.ISOLATED_QUOTES_REGEX.sub(_drop_if_isolated, cleaned_text)
 
         return cleaned_text
 

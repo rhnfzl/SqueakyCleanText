@@ -1,0 +1,3889 @@
+{
+  "dataset": "multilingual_pii.jsonl",
+  "dataset_sha256": "d946043dc567a8246657f7cbb443aa773d038c5ca1c7fc6f44e68981bd2540c1",
+  "documents": 220,
+  "entities": 660,
+  "git_commit": "6ad8437f39172849630e27aa8a201a732ddf4ea2",
+  "models": {
+    "sct-default": {
+      "config": "TextCleanerConfig(**{'replacement_mode': 'reversible', 'check_to_ascii_unicode': False})",
+      "ner_models": {
+        "DUTCH": "rhnfzl/xlm-roberta-large-conll02-dutch-onnx",
+        "ENGLISH": "rhnfzl/xlm-roberta-large-conll03-english-onnx",
+        "GERMAN": "rhnfzl/xlm-roberta-large-conll03-german-onnx",
+        "MULTILINGUAL": "rhnfzl/wikineural-multilingual-ner-onnx",
+        "SPANISH": "rhnfzl/xlm-roberta-large-conll02-spanish-onnx"
+      },
+      "predictions": {
+        "ar-billing-005": [
+          {
+            "end": 34,
+            "label": "ORGANISATION",
+            "start": 22
+          },
+          {
+            "end": 63,
+            "label": "EMAIL",
+            "start": 45
+          },
+          {
+            "end": 81,
+            "label": "PERSON",
+            "start": 72
+          }
+        ],
+        "ar-billing-010": [
+          {
+            "end": 63,
+            "label": "EMAIL",
+            "start": 45
+          },
+          {
+            "end": 80,
+            "label": "PERSON",
+            "start": 72
+          }
+        ],
+        "ar-billing-015": [
+          {
+            "end": 41,
+            "label": "ORGANISATION",
+            "start": 27
+          },
+          {
+            "end": 62,
+            "label": "EMAIL",
+            "start": 46
+          },
+          {
+            "end": 84,
+            "label": "PERSON",
+            "start": 71
+          }
+        ],
+        "ar-billing-020": [
+          {
+            "end": 63,
+            "label": "EMAIL",
+            "start": 45
+          },
+          {
+            "end": 82,
+            "label": "PERSON",
+            "start": 72
+          }
+        ],
+        "ar-hr-002": [
+          {
+            "end": 16,
+            "label": "PERSON",
+            "start": 6
+          },
+          {
+            "end": 24,
+            "label": "LOCATION",
+            "start": 21
+          },
+          {
+            "end": 59,
+            "label": "LOCATION",
+            "start": 54
+          }
+        ],
+        "ar-hr-007": [
+          {
+            "end": 14,
+            "label": "PERSON",
+            "start": 6
+          },
+          {
+            "end": 26,
+            "label": "LOCATION",
+            "start": 19
+          },
+          {
+            "end": 61,
+            "label": "LOCATION",
+            "start": 49
+          }
+        ],
+        "ar-hr-012": [
+          {
+            "end": 19,
+            "label": "PERSON",
+            "start": 6
+          },
+          {
+            "end": 37,
+            "label": "LOCATION",
+            "start": 24
+          },
+          {
+            "end": 70,
+            "label": "ORGANISATION",
+            "start": 64
+          }
+        ],
+        "ar-hr-017": [
+          {
+            "end": 15,
+            "label": "PERSON",
+            "start": 6
+          },
+          {
+            "end": 25,
+            "label": "LOCATION",
+            "start": 20
+          }
+        ],
+        "ar-office-004": [
+          {
+            "end": 15,
+            "label": "PERSON",
+            "start": 5
+          },
+          {
+            "end": 31,
+            "label": "LOCATION",
+            "start": 26
+          },
+          {
+            "end": 80,
+            "label": "PHONE",
+            "start": 64
+          }
+        ],
+        "ar-office-009": [
+          {
+            "end": 14,
+            "label": "PERSON",
+            "start": 5
+          },
+          {
+            "end": 32,
+            "label": "LOCATION",
+            "start": 25
+          },
+          {
+            "end": 81,
+            "label": "PHONE",
+            "start": 65
+          }
+        ],
+        "ar-office-014": [
+          {
+            "end": 15,
+            "label": "PERSON",
+            "start": 5
+          },
+          {
+            "end": 29,
+            "label": "LOCATION",
+            "start": 26
+          },
+          {
+            "end": 78,
+            "label": "PHONE",
+            "start": 62
+          }
+        ],
+        "ar-office-019": [
+          {
+            "end": 18,
+            "label": "PERSON",
+            "start": 5
+          },
+          {
+            "end": 34,
+            "label": "LOCATION",
+            "start": 29
+          },
+          {
+            "end": 79,
+            "label": "PHONE",
+            "start": 67
+          }
+        ],
+        "ar-security-003": [
+          {
+            "end": 17,
+            "label": "LOCATION",
+            "start": 12
+          },
+          {
+            "end": 62,
+            "label": "IP",
+            "start": 34
+          },
+          {
+            "end": 87,
+            "label": "PERSON",
+            "start": 75
+          }
+        ],
+        "ar-security-008": [
+          {
+            "end": 24,
+            "label": "ORGANISATION",
+            "start": 5
+          },
+          {
+            "end": 69,
+            "label": "IP",
+            "start": 41
+          },
+          {
+            "end": 92,
+            "label": "PERSON",
+            "start": 82
+          }
+        ],
+        "ar-security-013": [
+          {
+            "end": 43,
+            "label": "IP",
+            "start": 32
+          },
+          {
+            "end": 66,
+            "label": "PERSON",
+            "start": 56
+          }
+        ],
+        "ar-security-018": [
+          {
+            "end": 17,
+            "label": "LOCATION",
+            "start": 12
+          },
+          {
+            "end": 62,
+            "label": "IP",
+            "start": 34
+          },
+          {
+            "end": 84,
+            "label": "PERSON",
+            "start": 75
+          }
+        ],
+        "ar-support-001": [
+          {
+            "end": 26,
+            "label": "PERSON",
+            "start": 16
+          },
+          {
+            "end": 56,
+            "label": "EMAIL",
+            "start": 38
+          },
+          {
+            "end": 88,
+            "label": "PHONE",
+            "start": 72
+          }
+        ],
+        "ar-support-006": [
+          {
+            "end": 29,
+            "label": "PERSON",
+            "start": 16
+          },
+          {
+            "end": 57,
+            "label": "EMAIL",
+            "start": 41
+          },
+          {
+            "end": 89,
+            "label": "PHONE",
+            "start": 73
+          }
+        ],
+        "ar-support-011": [
+          {
+            "end": 28,
+            "label": "PERSON",
+            "start": 16
+          },
+          {
+            "end": 58,
+            "label": "EMAIL",
+            "start": 40
+          },
+          {
+            "end": 90,
+            "label": "PHONE",
+            "start": 74
+          }
+        ],
+        "ar-support-016": [
+          {
+            "end": 28,
+            "label": "PERSON",
+            "start": 16
+          },
+          {
+            "end": 58,
+            "label": "EMAIL",
+            "start": 40
+          },
+          {
+            "end": 90,
+            "label": "PHONE",
+            "start": 74
+          }
+        ],
+        "bn-billing-005": [
+          {
+            "end": 17,
+            "label": "ORGANISATION",
+            "start": 0
+          },
+          {
+            "end": 58,
+            "label": "EMAIL",
+            "start": 42
+          },
+          {
+            "end": 95,
+            "label": "PERSON",
+            "start": 83
+          }
+        ],
+        "bn-billing-010": [
+          {
+            "end": 23,
+            "label": "ORGANISATION",
+            "start": 0
+          },
+          {
+            "end": 64,
+            "label": "EMAIL",
+            "start": 48
+          },
+          {
+            "end": 100,
+            "label": "PERSON",
+            "start": 89
+          }
+        ],
+        "bn-billing-015": [
+          {
+            "end": 23,
+            "label": "ORGANISATION",
+            "start": 0
+          },
+          {
+            "end": 74,
+            "label": "EMAIL",
+            "start": 48
+          },
+          {
+            "end": 107,
+            "label": "PERSON",
+            "start": 99
+          }
+        ],
+        "bn-billing-020": [
+          {
+            "end": 12,
+            "label": "ORGANISATION",
+            "start": 0
+          },
+          {
+            "end": 56,
+            "label": "EMAIL",
+            "start": 37
+          },
+          {
+            "end": 92,
+            "label": "PERSON",
+            "start": 81
+          }
+        ],
+        "bn-hr-002": [
+          {
+            "end": 15,
+            "label": "PERSON",
+            "start": 0
+          },
+          {
+            "end": 32,
+            "label": "LOCATION",
+            "start": 23
+          },
+          {
+            "end": 68,
+            "label": "ORGANISATION",
+            "start": 51
+          }
+        ],
+        "bn-hr-007": [
+          {
+            "end": 9,
+            "label": "PERSON",
+            "start": 0
+          },
+          {
+            "end": 26,
+            "label": "LOCATION",
+            "start": 17
+          }
+        ],
+        "bn-hr-012": [
+          {
+            "end": 13,
+            "label": "PERSON",
+            "start": 0
+          },
+          {
+            "end": 27,
+            "label": "LOCATION",
+            "start": 21
+          }
+        ],
+        "bn-hr-017": [
+          {
+            "end": 15,
+            "label": "PERSON",
+            "start": 0
+          },
+          {
+            "end": 32,
+            "label": "LOCATION",
+            "start": 23
+          },
+          {
+            "end": 62,
+            "label": "ORGANISATION",
+            "start": 51
+          },
+          {
+            "end": 68,
+            "label": "ORGANISATION",
+            "start": 65
+          }
+        ],
+        "bn-office-004": [
+          {
+            "end": 4,
+            "label": "LOCATION",
+            "start": 0
+          },
+          {
+            "end": 42,
+            "label": "PERSON",
+            "start": 27
+          }
+        ],
+        "bn-office-009": [
+          {
+            "end": 9,
+            "label": "LOCATION",
+            "start": 0
+          },
+          {
+            "end": 44,
+            "label": "PERSON",
+            "start": 32
+          },
+          {
+            "end": 77,
+            "label": "PHONE",
+            "start": 63
+          }
+        ],
+        "bn-office-014": [
+          {
+            "end": 9,
+            "label": "LOCATION",
+            "start": 0
+          },
+          {
+            "end": 43,
+            "label": "PERSON",
+            "start": 32
+          },
+          {
+            "end": 76,
+            "label": "PHONE",
+            "start": 62
+          }
+        ],
+        "bn-office-019": [
+          {
+            "end": 6,
+            "label": "LOCATION",
+            "start": 0
+          },
+          {
+            "end": 37,
+            "label": "PERSON",
+            "start": 29
+          }
+        ],
+        "bn-security-003": [
+          {
+            "end": 13,
+            "label": "PERSON",
+            "start": 0
+          },
+          {
+            "end": 52,
+            "label": "IP",
+            "start": 42
+          }
+        ],
+        "bn-security-008": [
+          {
+            "end": 13,
+            "label": "PERSON",
+            "start": 0
+          },
+          {
+            "end": 46,
+            "label": "ORGANISATION",
+            "start": 29
+          },
+          {
+            "end": 58,
+            "label": "IP",
+            "start": 47
+          }
+        ],
+        "bn-security-013": [
+          {
+            "end": 9,
+            "label": "PERSON",
+            "start": 0
+          },
+          {
+            "end": 28,
+            "label": "ORGANISATION",
+            "start": 25
+          },
+          {
+            "end": 49,
+            "label": "IP",
+            "start": 38
+          }
+        ],
+        "bn-security-018": [
+          {
+            "end": 12,
+            "label": "PERSON",
+            "start": 0
+          },
+          {
+            "end": 45,
+            "label": "ORGANISATION",
+            "start": 28
+          },
+          {
+            "end": 57,
+            "label": "IP",
+            "start": 46
+          }
+        ],
+        "bn-support-001": [
+          {
+            "end": 20,
+            "label": "PERSON",
+            "start": 12
+          },
+          {
+            "end": 48,
+            "label": "EMAIL",
+            "start": 29
+          },
+          {
+            "end": 88,
+            "label": "PHONE",
+            "start": 74
+          }
+        ],
+        "bn-support-006": [
+          {
+            "end": 20,
+            "label": "PERSON",
+            "start": 12
+          },
+          {
+            "end": 48,
+            "label": "EMAIL",
+            "start": 29
+          }
+        ],
+        "bn-support-011": [
+          {
+            "end": 25,
+            "label": "PERSON",
+            "start": 12
+          },
+          {
+            "end": 53,
+            "label": "EMAIL",
+            "start": 34
+          }
+        ],
+        "bn-support-016": [
+          {
+            "end": 24,
+            "label": "PERSON",
+            "start": 12
+          },
+          {
+            "end": 59,
+            "label": "EMAIL",
+            "start": 33
+          }
+        ],
+        "de-billing-005": [
+          {
+            "end": 38,
+            "label": "ORGANISATION",
+            "start": 19
+          },
+          {
+            "end": 68,
+            "label": "EMAIL",
+            "start": 48
+          },
+          {
+            "end": 88,
+            "label": "PERSON",
+            "start": 77
+          }
+        ],
+        "de-billing-010": [
+          {
+            "end": 38,
+            "label": "ORGANISATION",
+            "start": 19
+          },
+          {
+            "end": 73,
+            "label": "EMAIL",
+            "start": 48
+          },
+          {
+            "end": 94,
+            "label": "PERSON",
+            "start": 82
+          }
+        ],
+        "de-billing-015": [
+          {
+            "end": 38,
+            "label": "ORGANISATION",
+            "start": 19
+          },
+          {
+            "end": 68,
+            "label": "EMAIL",
+            "start": 48
+          },
+          {
+            "end": 90,
+            "label": "PERSON",
+            "start": 77
+          }
+        ],
+        "de-billing-020": [
+          {
+            "end": 32,
+            "label": "ORGANISATION",
+            "start": 19
+          },
+          {
+            "end": 67,
+            "label": "EMAIL",
+            "start": 42
+          },
+          {
+            "end": 88,
+            "label": "PERSON",
+            "start": 76
+          }
+        ],
+        "de-hr-002": [
+          {
+            "end": 14,
+            "label": "PERSON",
+            "start": 0
+          },
+          {
+            "end": 44,
+            "label": "LOCATION",
+            "start": 37
+          },
+          {
+            "end": 80,
+            "label": "ORGANISATION",
+            "start": 61
+          }
+        ],
+        "de-hr-007": [
+          {
+            "end": 11,
+            "label": "PERSON",
+            "start": 0
+          },
+          {
+            "end": 41,
+            "label": "LOCATION",
+            "start": 34
+          },
+          {
+            "end": 77,
+            "label": "ORGANISATION",
+            "start": 58
+          }
+        ],
+        "de-hr-012": [
+          {
+            "end": 14,
+            "label": "PERSON",
+            "start": 0
+          },
+          {
+            "end": 44,
+            "label": "LOCATION",
+            "start": 37
+          },
+          {
+            "end": 86,
+            "label": "ORGANISATION",
+            "start": 61
+          }
+        ],
+        "de-hr-017": [
+          {
+            "end": 14,
+            "label": "PERSON",
+            "start": 0
+          },
+          {
+            "end": 44,
+            "label": "LOCATION",
+            "start": 37
+          },
+          {
+            "end": 80,
+            "label": "ORGANISATION",
+            "start": 61
+          }
+        ],
+        "de-office-004": [
+          {
+            "end": 21,
+            "label": "LOCATION",
+            "start": 14
+          },
+          {
+            "end": 40,
+            "label": "PERSON",
+            "start": 29
+          },
+          {
+            "end": 90,
+            "label": "PHONE",
+            "start": 75
+          }
+        ],
+        "de-office-009": [
+          {
+            "end": 21,
+            "label": "LOCATION",
+            "start": 14
+          },
+          {
+            "end": 40,
+            "label": "PERSON",
+            "start": 29
+          },
+          {
+            "end": 90,
+            "label": "PHONE",
+            "start": 75
+          }
+        ],
+        "de-office-014": [
+          {
+            "end": 18,
+            "label": "LOCATION",
+            "start": 14
+          },
+          {
+            "end": 40,
+            "label": "PERSON",
+            "start": 26
+          },
+          {
+            "end": 91,
+            "label": "PHONE",
+            "start": 75
+          }
+        ],
+        "de-office-019": [
+          {
+            "end": 18,
+            "label": "LOCATION",
+            "start": 14
+          },
+          {
+            "end": 37,
+            "label": "PERSON",
+            "start": 26
+          },
+          {
+            "end": 84,
+            "label": "PHONE",
+            "start": 72
+          }
+        ],
+        "de-security-003": [
+          {
+            "end": 46,
+            "label": "IP",
+            "start": 18
+          },
+          {
+            "end": 82,
+            "label": "ORGANISATION",
+            "start": 57
+          },
+          {
+            "end": 119,
+            "label": "PERSON",
+            "start": 106
+          }
+        ],
+        "de-security-008": [
+          {
+            "end": 28,
+            "label": "IP",
+            "start": 18
+          },
+          {
+            "end": 58,
+            "label": "ORGANISATION",
+            "start": 39
+          },
+          {
+            "end": 96,
+            "label": "PERSON",
+            "start": 82
+          }
+        ],
+        "de-security-013": [
+          {
+            "end": 46,
+            "label": "IP",
+            "start": 18
+          },
+          {
+            "end": 70,
+            "label": "ORGANISATION",
+            "start": 57
+          },
+          {
+            "end": 108,
+            "label": "PERSON",
+            "start": 94
+          }
+        ],
+        "de-security-018": [
+          {
+            "end": 46,
+            "label": "IP",
+            "start": 18
+          },
+          {
+            "end": 76,
+            "label": "ORGANISATION",
+            "start": 57
+          },
+          {
+            "end": 111,
+            "label": "PERSON",
+            "start": 100
+          }
+        ],
+        "de-support-001": [
+          {
+            "end": 37,
+            "label": "PERSON",
+            "start": 25
+          },
+          {
+            "end": 69,
+            "label": "EMAIL",
+            "start": 44
+          }
+        ],
+        "de-support-006": [
+          {
+            "end": 36,
+            "label": "PERSON",
+            "start": 25
+          },
+          {
+            "end": 63,
+            "label": "EMAIL",
+            "start": 43
+          },
+          {
+            "end": 94,
+            "label": "PHONE",
+            "start": 79
+          }
+        ],
+        "de-support-011": [
+          {
+            "end": 39,
+            "label": "PERSON",
+            "start": 25
+          },
+          {
+            "end": 66,
+            "label": "EMAIL",
+            "start": 46
+          },
+          {
+            "end": 97,
+            "label": "PHONE",
+            "start": 82
+          }
+        ],
+        "de-support-016": [
+          {
+            "end": 39,
+            "label": "PERSON",
+            "start": 25
+          },
+          {
+            "end": 66,
+            "label": "EMAIL",
+            "start": 46
+          },
+          {
+            "end": 94,
+            "label": "PHONE",
+            "start": 82
+          }
+        ],
+        "en-billing-005": [
+          {
+            "end": 36,
+            "label": "ORGANISATION",
+            "start": 22
+          },
+          {
+            "end": 62,
+            "label": "EMAIL",
+            "start": 43
+          },
+          {
+            "end": 85,
+            "label": "PERSON",
+            "start": 74
+          }
+        ],
+        "en-billing-010": [
+          {
+            "end": 36,
+            "label": "ORGANISATION",
+            "start": 22
+          },
+          {
+            "end": 64,
+            "label": "EMAIL",
+            "start": 43
+          },
+          {
+            "end": 87,
+            "label": "PERSON",
+            "start": 76
+          }
+        ],
+        "en-billing-015": [
+          {
+            "end": 39,
+            "label": "ORGANISATION",
+            "start": 22
+          },
+          {
+            "end": 67,
+            "label": "EMAIL",
+            "start": 46
+          },
+          {
+            "end": 89,
+            "label": "PERSON",
+            "start": 79
+          }
+        ],
+        "en-billing-020": [
+          {
+            "end": 38,
+            "label": "ORGANISATION",
+            "start": 22
+          },
+          {
+            "end": 66,
+            "label": "EMAIL",
+            "start": 45
+          },
+          {
+            "end": 90,
+            "label": "PERSON",
+            "start": 78
+          }
+        ],
+        "en-hr-002": [
+          {
+            "end": 10,
+            "label": "PERSON",
+            "start": 0
+          },
+          {
+            "end": 27,
+            "label": "LOCATION",
+            "start": 20
+          },
+          {
+            "end": 66,
+            "label": "ORGANISATION",
+            "start": 52
+          }
+        ],
+        "en-hr-007": [
+          {
+            "end": 10,
+            "label": "PERSON",
+            "start": 0
+          },
+          {
+            "end": 29,
+            "label": "LOCATION",
+            "start": 20
+          },
+          {
+            "end": 68,
+            "label": "ORGANISATION",
+            "start": 54
+          }
+        ],
+        "en-hr-012": [
+          {
+            "end": 11,
+            "label": "PERSON",
+            "start": 0
+          },
+          {
+            "end": 27,
+            "label": "LOCATION",
+            "start": 21
+          },
+          {
+            "end": 68,
+            "label": "ORGANISATION",
+            "start": 52
+          }
+        ],
+        "en-hr-017": [
+          {
+            "end": 10,
+            "label": "PERSON",
+            "start": 0
+          },
+          {
+            "end": 26,
+            "label": "LOCATION",
+            "start": 20
+          },
+          {
+            "end": 65,
+            "label": "ORGANISATION",
+            "start": 51
+          }
+        ],
+        "en-office-004": [
+          {
+            "end": 22,
+            "label": "LOCATION",
+            "start": 14
+          },
+          {
+            "end": 43,
+            "label": "PERSON",
+            "start": 33
+          },
+          {
+            "end": 81,
+            "label": "PHONE",
+            "start": 66
+          }
+        ],
+        "en-office-009": [
+          {
+            "end": 21,
+            "label": "LOCATION",
+            "start": 14
+          },
+          {
+            "end": 42,
+            "label": "PERSON",
+            "start": 32
+          },
+          {
+            "end": 79,
+            "label": "PHONE",
+            "start": 65
+          }
+        ],
+        "en-office-014": [
+          {
+            "end": 22,
+            "label": "LOCATION",
+            "start": 14
+          },
+          {
+            "end": 43,
+            "label": "PERSON",
+            "start": 33
+          },
+          {
+            "end": 80,
+            "label": "PHONE",
+            "start": 66
+          }
+        ],
+        "en-office-019": [
+          {
+            "end": 23,
+            "label": "LOCATION",
+            "start": 14
+          },
+          {
+            "end": 44,
+            "label": "PERSON",
+            "start": 34
+          },
+          {
+            "end": 83,
+            "label": "PHONE",
+            "start": 67
+          }
+        ],
+        "en-security-003": [
+          {
+            "end": 43,
+            "label": "IP",
+            "start": 15
+          },
+          {
+            "end": 73,
+            "label": "ORGANISATION",
+            "start": 59
+          },
+          {
+            "end": 107,
+            "label": "PERSON",
+            "start": 94
+          }
+        ],
+        "en-security-008": [
+          {
+            "end": 26,
+            "label": "IP",
+            "start": 15
+          },
+          {
+            "end": 56,
+            "label": "ORGANISATION",
+            "start": 42
+          },
+          {
+            "end": 87,
+            "label": "PERSON",
+            "start": 77
+          }
+        ],
+        "en-security-013": [
+          {
+            "end": 26,
+            "label": "IP",
+            "start": 15
+          },
+          {
+            "end": 58,
+            "label": "ORGANISATION",
+            "start": 42
+          },
+          {
+            "end": 89,
+            "label": "PERSON",
+            "start": 79
+          }
+        ],
+        "en-security-018": [
+          {
+            "end": 43,
+            "label": "IP",
+            "start": 15
+          },
+          {
+            "end": 73,
+            "label": "ORGANISATION",
+            "start": 59
+          },
+          {
+            "end": 106,
+            "label": "PERSON",
+            "start": 94
+          }
+        ],
+        "en-support-001": [
+          {
+            "end": 25,
+            "label": "PERSON",
+            "start": 15
+          },
+          {
+            "end": 50,
+            "label": "EMAIL",
+            "start": 29
+          },
+          {
+            "end": 74,
+            "label": "PHONE",
+            "start": 59
+          }
+        ],
+        "en-support-006": [
+          {
+            "end": 26,
+            "label": "PERSON",
+            "start": 15
+          },
+          {
+            "end": 49,
+            "label": "EMAIL",
+            "start": 30
+          },
+          {
+            "end": 73,
+            "label": "PHONE",
+            "start": 58
+          }
+        ],
+        "en-support-011": [
+          {
+            "end": 26,
+            "label": "PERSON",
+            "start": 15
+          },
+          {
+            "end": 51,
+            "label": "EMAIL",
+            "start": 30
+          },
+          {
+            "end": 74,
+            "label": "PHONE",
+            "start": 60
+          }
+        ],
+        "en-support-016": [
+          {
+            "end": 25,
+            "label": "PERSON",
+            "start": 15
+          },
+          {
+            "end": 47,
+            "label": "EMAIL",
+            "start": 29
+          },
+          {
+            "end": 71,
+            "label": "PHONE",
+            "start": 56
+          }
+        ],
+        "es-billing-005": [
+          {
+            "end": 46,
+            "label": "ORGANISATION",
+            "start": 28
+          },
+          {
+            "end": 79,
+            "label": "EMAIL",
+            "start": 59
+          },
+          {
+            "end": 113,
+            "label": "PERSON",
+            "start": 98
+          }
+        ],
+        "es-billing-010": [
+          {
+            "end": 46,
+            "label": "ORGANISATION",
+            "start": 28
+          },
+          {
+            "end": 79,
+            "label": "EMAIL",
+            "start": 59
+          },
+          {
+            "end": 109,
+            "label": "PERSON",
+            "start": 98
+          }
+        ],
+        "es-billing-015": [
+          {
+            "end": 41,
+            "label": "ORGANISATION",
+            "start": 28
+          },
+          {
+            "end": 71,
+            "label": "EMAIL",
+            "start": 54
+          },
+          {
+            "end": 102,
+            "label": "PERSON",
+            "start": 90
+          }
+        ],
+        "es-billing-020": [
+          {
+            "end": 41,
+            "label": "ORGANISATION",
+            "start": 28
+          },
+          {
+            "end": 71,
+            "label": "EMAIL",
+            "start": 54
+          },
+          {
+            "end": 105,
+            "label": "PERSON",
+            "start": 90
+          }
+        ],
+        "es-hr-002": [
+          {
+            "end": 12,
+            "label": "PERSON",
+            "start": 0
+          },
+          {
+            "end": 29,
+            "label": "LOCATION",
+            "start": 23
+          },
+          {
+            "end": 74,
+            "label": "ORGANISATION",
+            "start": 61
+          }
+        ],
+        "es-hr-007": [
+          {
+            "end": 15,
+            "label": "PERSON",
+            "start": 0
+          },
+          {
+            "end": 32,
+            "label": "LOCATION",
+            "start": 26
+          },
+          {
+            "end": 85,
+            "label": "ORGANISATION",
+            "start": 64
+          }
+        ],
+        "es-hr-012": [
+          {
+            "end": 11,
+            "label": "PERSON",
+            "start": 0
+          },
+          {
+            "end": 28,
+            "label": "LOCATION",
+            "start": 22
+          },
+          {
+            "end": 73,
+            "label": "ORGANISATION",
+            "start": 60
+          }
+        ],
+        "es-hr-017": [
+          {
+            "end": 15,
+            "label": "PERSON",
+            "start": 0
+          },
+          {
+            "end": 34,
+            "label": "LOCATION",
+            "start": 26
+          },
+          {
+            "end": 79,
+            "label": "ORGANISATION",
+            "start": 66
+          }
+        ],
+        "es-office-004": [
+          {
+            "end": 27,
+            "label": "LOCATION",
+            "start": 19
+          },
+          {
+            "end": 50,
+            "label": "PERSON",
+            "start": 38
+          },
+          {
+            "end": 94,
+            "label": "PHONE",
+            "start": 79
+          }
+        ],
+        "es-office-009": [
+          {
+            "end": 27,
+            "label": "LOCATION",
+            "start": 19
+          },
+          {
+            "end": 53,
+            "label": "PERSON",
+            "start": 38
+          },
+          {
+            "end": 93,
+            "label": "PHONE",
+            "start": 82
+          }
+        ],
+        "es-office-014": [
+          {
+            "end": 25,
+            "label": "LOCATION",
+            "start": 19
+          },
+          {
+            "end": 49,
+            "label": "PERSON",
+            "start": 36
+          },
+          {
+            "end": 89,
+            "label": "PHONE",
+            "start": 78
+          }
+        ],
+        "es-office-019": [
+          {
+            "end": 26,
+            "label": "LOCATION",
+            "start": 19
+          },
+          {
+            "end": 50,
+            "label": "PERSON",
+            "start": 37
+          },
+          {
+            "end": 95,
+            "label": "PHONE",
+            "start": 79
+          }
+        ],
+        "es-security-003": [
+          {
+            "end": 27,
+            "label": "IP",
+            "start": 16
+          },
+          {
+            "end": 67,
+            "label": "ORGANISATION",
+            "start": 46
+          },
+          {
+            "end": 96,
+            "label": "PERSON",
+            "start": 85
+          }
+        ],
+        "es-security-008": [
+          {
+            "end": 27,
+            "label": "IP",
+            "start": 16
+          },
+          {
+            "end": 64,
+            "label": "ORGANISATION",
+            "start": 46
+          },
+          {
+            "end": 93,
+            "label": "PERSON",
+            "start": 82
+          }
+        ],
+        "es-security-013": [
+          {
+            "end": 26,
+            "label": "IP",
+            "start": 16
+          },
+          {
+            "end": 66,
+            "label": "ORGANISATION",
+            "start": 45
+          },
+          {
+            "end": 95,
+            "label": "PERSON",
+            "start": 84
+          }
+        ],
+        "es-security-018": [
+          {
+            "end": 29,
+            "label": "IP",
+            "start": 16
+          },
+          {
+            "end": 61,
+            "label": "ORGANISATION",
+            "start": 48
+          },
+          {
+            "end": 91,
+            "label": "PERSON",
+            "start": 79
+          }
+        ],
+        "es-support-001": [
+          {
+            "end": 39,
+            "label": "PERSON",
+            "start": 24
+          },
+          {
+            "end": 66,
+            "label": "EMAIL",
+            "start": 43
+          },
+          {
+            "end": 94,
+            "label": "PHONE",
+            "start": 78
+          }
+        ],
+        "es-support-006": [
+          {
+            "end": 37,
+            "label": "PERSON",
+            "start": 24
+          },
+          {
+            "end": 61,
+            "label": "EMAIL",
+            "start": 41
+          },
+          {
+            "end": 88,
+            "label": "PHONE",
+            "start": 73
+          }
+        ],
+        "es-support-011": [
+          {
+            "end": 39,
+            "label": "PERSON",
+            "start": 24
+          },
+          {
+            "end": 63,
+            "label": "EMAIL",
+            "start": 43
+          },
+          {
+            "end": 86,
+            "label": "PHONE",
+            "start": 75
+          }
+        ],
+        "es-support-016": [
+          {
+            "end": 35,
+            "label": "PERSON",
+            "start": 24
+          },
+          {
+            "end": 62,
+            "label": "EMAIL",
+            "start": 39
+          },
+          {
+            "end": 85,
+            "label": "PHONE",
+            "start": 74
+          }
+        ],
+        "hi-billing-005": [
+          {
+            "end": 35,
+            "label": "ORGANISATION",
+            "start": 0
+          },
+          {
+            "end": 75,
+            "label": "EMAIL",
+            "start": 57
+          },
+          {
+            "end": 108,
+            "label": "PERSON",
+            "start": 97
+          }
+        ],
+        "hi-billing-010": [
+          {
+            "end": 16,
+            "label": "ORGANISATION",
+            "start": 0
+          },
+          {
+            "end": 59,
+            "label": "EMAIL",
+            "start": 38
+          },
+          {
+            "end": 93,
+            "label": "PERSON",
+            "start": 81
+          }
+        ],
+        "hi-billing-015": [
+          {
+            "end": 35,
+            "label": "ORGANISATION",
+            "start": 0
+          },
+          {
+            "end": 75,
+            "label": "EMAIL",
+            "start": 57
+          },
+          {
+            "end": 108,
+            "label": "PERSON",
+            "start": 97
+          }
+        ],
+        "hi-billing-020": [
+          {
+            "end": 35,
+            "label": "ORGANISATION",
+            "start": 0
+          },
+          {
+            "end": 78,
+            "label": "EMAIL",
+            "start": 57
+          },
+          {
+            "end": 112,
+            "label": "PERSON",
+            "start": 100
+          }
+        ],
+        "hi-hr-002": [
+          {
+            "end": 12,
+            "label": "PERSON",
+            "start": 0
+          },
+          {
+            "end": 28,
+            "label": "LOCATION",
+            "start": 23
+          },
+          {
+            "end": 60,
+            "label": "ORGANISATION",
+            "start": 42
+          }
+        ],
+        "hi-hr-007": [
+          {
+            "end": 11,
+            "label": "PERSON",
+            "start": 0
+          },
+          {
+            "end": 26,
+            "label": "LOCATION",
+            "start": 22
+          },
+          {
+            "end": 75,
+            "label": "ORGANISATION",
+            "start": 40
+          }
+        ],
+        "hi-hr-012": [
+          {
+            "end": 12,
+            "label": "PERSON",
+            "start": 0
+          },
+          {
+            "end": 28,
+            "label": "LOCATION",
+            "start": 23
+          },
+          {
+            "end": 60,
+            "label": "ORGANISATION",
+            "start": 42
+          }
+        ],
+        "hi-hr-017": [
+          {
+            "end": 11,
+            "label": "PERSON",
+            "start": 0
+          },
+          {
+            "end": 29,
+            "label": "LOCATION",
+            "start": 22
+          }
+        ],
+        "hi-office-004": [
+          {
+            "end": 4,
+            "label": "LOCATION",
+            "start": 0
+          },
+          {
+            "end": 36,
+            "label": "PERSON",
+            "start": 24
+          },
+          {
+            "end": 75,
+            "label": "PHONE",
+            "start": 59
+          }
+        ],
+        "hi-office-009": [
+          {
+            "end": 4,
+            "label": "LOCATION",
+            "start": 0
+          },
+          {
+            "end": 35,
+            "label": "PERSON",
+            "start": 24
+          },
+          {
+            "end": 73,
+            "label": "PHONE",
+            "start": 58
+          }
+        ],
+        "hi-office-014": [
+          {
+            "end": 4,
+            "label": "LOCATION",
+            "start": 0
+          },
+          {
+            "end": 36,
+            "label": "PERSON",
+            "start": 24
+          },
+          {
+            "end": 70,
+            "label": "PHONE",
+            "start": 59
+          }
+        ],
+        "hi-office-019": [
+          {
+            "end": 5,
+            "label": "LOCATION",
+            "start": 0
+          },
+          {
+            "end": 36,
+            "label": "PERSON",
+            "start": 25
+          },
+          {
+            "end": 72,
+            "label": "PHONE",
+            "start": 59
+          }
+        ],
+        "hi-security-003": [
+          {
+            "end": 28,
+            "label": "IP",
+            "start": 0
+          },
+          {
+            "end": 56,
+            "label": "PERSON",
+            "start": 45
+          },
+          {
+            "end": 109,
+            "label": "ORGANISATION",
+            "start": 74
+          }
+        ],
+        "hi-security-008": [
+          {
+            "end": 10,
+            "label": "IP",
+            "start": 0
+          },
+          {
+            "end": 39,
+            "label": "PERSON",
+            "start": 27
+          }
+        ],
+        "hi-security-013": [
+          {
+            "end": 10,
+            "label": "IP",
+            "start": 0
+          },
+          {
+            "end": 38,
+            "label": "PERSON",
+            "start": 27
+          }
+        ],
+        "hi-security-018": [
+          {
+            "end": 10,
+            "label": "IP",
+            "start": 0
+          },
+          {
+            "end": 39,
+            "label": "PERSON",
+            "start": 27
+          },
+          {
+            "end": 75,
+            "label": "ORGANISATION",
+            "start": 57
+          }
+        ],
+        "hi-support-001": [
+          {
+            "end": 17,
+            "label": "PERSON",
+            "start": 6
+          },
+          {
+            "end": 39,
+            "label": "EMAIL",
+            "start": 21
+          },
+          {
+            "end": 71,
+            "label": "PHONE",
+            "start": 58
+          }
+        ],
+        "hi-support-006": [
+          {
+            "end": 16,
+            "label": "PERSON",
+            "start": 6
+          },
+          {
+            "end": 37,
+            "label": "EMAIL",
+            "start": 20
+          },
+          {
+            "end": 69,
+            "label": "PHONE",
+            "start": 56
+          }
+        ],
+        "hi-support-011": [
+          {
+            "end": 18,
+            "label": "PERSON",
+            "start": 6
+          },
+          {
+            "end": 39,
+            "label": "EMAIL",
+            "start": 22
+          },
+          {
+            "end": 74,
+            "label": "PHONE",
+            "start": 58
+          }
+        ],
+        "hi-support-016": [
+          {
+            "end": 17,
+            "label": "PERSON",
+            "start": 6
+          },
+          {
+            "end": 38,
+            "label": "EMAIL",
+            "start": 21
+          },
+          {
+            "end": 73,
+            "label": "PHONE",
+            "start": 57
+          }
+        ],
+        "ja-billing-005": [
+          {
+            "end": 8,
+            "label": "ORGANISATION",
+            "start": 0
+          },
+          {
+            "end": 41,
+            "label": "EMAIL",
+            "start": 23
+          },
+          {
+            "end": 49,
+            "label": "PERSON",
+            "start": 45
+          }
+        ],
+        "ja-billing-010": [
+          {
+            "end": 8,
+            "label": "ORGANISATION",
+            "start": 0
+          },
+          {
+            "end": 40,
+            "label": "EMAIL",
+            "start": 23
+          },
+          {
+            "end": 48,
+            "label": "PERSON",
+            "start": 44
+          }
+        ],
+        "ja-billing-015": [
+          {
+            "end": 8,
+            "label": "ORGANISATION",
+            "start": 0
+          },
+          {
+            "end": 40,
+            "label": "EMAIL",
+            "start": 23
+          },
+          {
+            "end": 55,
+            "label": "PERSON",
+            "start": 44
+          }
+        ],
+        "ja-billing-020": [
+          {
+            "end": 4,
+            "label": "ORGANISATION",
+            "start": 0
+          },
+          {
+            "end": 39,
+            "label": "EMAIL",
+            "start": 19
+          },
+          {
+            "end": 47,
+            "label": "PERSON",
+            "start": 43
+          }
+        ],
+        "ja-hr-002": [
+          {
+            "end": 4,
+            "label": "PERSON",
+            "start": 0
+          },
+          {
+            "end": 9,
+            "label": "LOCATION",
+            "start": 7
+          },
+          {
+            "end": 19,
+            "label": "ORGANISATION",
+            "start": 15
+          }
+        ],
+        "ja-hr-007": [
+          {
+            "end": 3,
+            "label": "PERSON",
+            "start": 0
+          },
+          {
+            "end": 9,
+            "label": "LOCATION",
+            "start": 6
+          },
+          {
+            "end": 23,
+            "label": "ORGANISATION",
+            "start": 15
+          }
+        ],
+        "ja-hr-012": [
+          {
+            "end": 12,
+            "label": "PERSON",
+            "start": 0
+          },
+          {
+            "end": 18,
+            "label": "LOCATION",
+            "start": 15
+          },
+          {
+            "end": 32,
+            "label": "ORGANISATION",
+            "start": 24
+          }
+        ],
+        "ja-hr-017": [
+          {
+            "end": 11,
+            "label": "PERSON",
+            "start": 0
+          },
+          {
+            "end": 16,
+            "label": "LOCATION",
+            "start": 14
+          },
+          {
+            "end": 30,
+            "label": "ORGANISATION",
+            "start": 22
+          }
+        ],
+        "ja-office-004": [
+          {
+            "end": 2,
+            "label": "LOCATION",
+            "start": 0
+          },
+          {
+            "end": 22,
+            "label": "PERSON",
+            "start": 10
+          },
+          {
+            "end": 44,
+            "label": "PHONE",
+            "start": 32
+          }
+        ],
+        "ja-office-009": [
+          {
+            "end": 2,
+            "label": "LOCATION",
+            "start": 0
+          },
+          {
+            "end": 14,
+            "label": "PERSON",
+            "start": 10
+          },
+          {
+            "end": 36,
+            "label": "PHONE",
+            "start": 24
+          }
+        ],
+        "ja-office-014": [
+          {
+            "end": 2,
+            "label": "LOCATION",
+            "start": 0
+          },
+          {
+            "end": 21,
+            "label": "PERSON",
+            "start": 10
+          },
+          {
+            "end": 43,
+            "label": "PHONE",
+            "start": 31
+          }
+        ],
+        "ja-office-019": [
+          {
+            "end": 3,
+            "label": "LOCATION",
+            "start": 0
+          },
+          {
+            "end": 14,
+            "label": "PERSON",
+            "start": 11
+          },
+          {
+            "end": 40,
+            "label": "PHONE",
+            "start": 24
+          }
+        ],
+        "ja-security-003": [
+          {
+            "end": 11,
+            "label": "IP",
+            "start": 0
+          },
+          {
+            "end": 23,
+            "label": "PERSON",
+            "start": 19
+          },
+          {
+            "end": 37,
+            "label": "ORGANISATION",
+            "start": 30
+          }
+        ],
+        "ja-security-008": [
+          {
+            "end": 10,
+            "label": "IP",
+            "start": 0
+          },
+          {
+            "end": 22,
+            "label": "PERSON",
+            "start": 18
+          },
+          {
+            "end": 36,
+            "label": "ORGANISATION",
+            "start": 29
+          },
+          {
+            "end": 46,
+            "label": "PERSON",
+            "start": 45
+          }
+        ],
+        "ja-security-013": [
+          {
+            "end": 28,
+            "label": "IP",
+            "start": 0
+          },
+          {
+            "end": 40,
+            "label": "PERSON",
+            "start": 36
+          },
+          {
+            "end": 51,
+            "label": "ORGANISATION",
+            "start": 47
+          }
+        ],
+        "ja-security-018": [
+          {
+            "end": 13,
+            "label": "IP",
+            "start": 0
+          },
+          {
+            "end": 24,
+            "label": "PERSON",
+            "start": 21
+          },
+          {
+            "end": 35,
+            "label": "ORGANISATION",
+            "start": 31
+          }
+        ],
+        "ja-support-001": [
+          {
+            "end": 4,
+            "label": "PERSON",
+            "start": 0
+          },
+          {
+            "end": 32,
+            "label": "EMAIL",
+            "start": 15
+          },
+          {
+            "end": 47,
+            "label": "PHONE",
+            "start": 35
+          }
+        ],
+        "ja-support-006": [
+          {
+            "end": 3,
+            "label": "PERSON",
+            "start": 0
+          },
+          {
+            "end": 32,
+            "label": "EMAIL",
+            "start": 14
+          },
+          {
+            "end": 47,
+            "label": "PHONE",
+            "start": 35
+          }
+        ],
+        "ja-support-011": [
+          {
+            "end": 4,
+            "label": "PERSON",
+            "start": 0
+          },
+          {
+            "end": 33,
+            "label": "EMAIL",
+            "start": 15
+          },
+          {
+            "end": 52,
+            "label": "PHONE",
+            "start": 36
+          }
+        ],
+        "ja-support-016": [
+          {
+            "end": 11,
+            "label": "PERSON",
+            "start": 0
+          },
+          {
+            "end": 40,
+            "label": "EMAIL",
+            "start": 22
+          },
+          {
+            "end": 55,
+            "label": "PHONE",
+            "start": 43
+          }
+        ],
+        "nl-billing-005": [
+          {
+            "end": 46,
+            "label": "ORGANISATION",
+            "start": 25
+          },
+          {
+            "end": 85,
+            "label": "EMAIL",
+            "start": 66
+          },
+          {
+            "end": 110,
+            "label": "PERSON",
+            "start": 94
+          }
+        ],
+        "nl-billing-010": [
+          {
+            "end": 46,
+            "label": "ORGANISATION",
+            "start": 25
+          },
+          {
+            "end": 86,
+            "label": "EMAIL",
+            "start": 66
+          },
+          {
+            "end": 107,
+            "label": "PERSON",
+            "start": 95
+          }
+        ],
+        "nl-billing-015": [
+          {
+            "end": 43,
+            "label": "ORGANISATION",
+            "start": 25
+          },
+          {
+            "end": 82,
+            "label": "EMAIL",
+            "start": 63
+          },
+          {
+            "end": 104,
+            "label": "PERSON",
+            "start": 91
+          }
+        ],
+        "nl-billing-020": [
+          {
+            "end": 42,
+            "label": "ORGANISATION",
+            "start": 25
+          },
+          {
+            "end": 82,
+            "label": "EMAIL",
+            "start": 62
+          },
+          {
+            "end": 103,
+            "label": "PERSON",
+            "start": 91
+          }
+        ],
+        "nl-hr-002": [
+          {
+            "end": 16,
+            "label": "PERSON",
+            "start": 0
+          },
+          {
+            "end": 49,
+            "label": "LOCATION",
+            "start": 43
+          },
+          {
+            "end": 78,
+            "label": "ORGANISATION",
+            "start": 57
+          }
+        ],
+        "nl-hr-007": [
+          {
+            "end": 16,
+            "label": "PERSON",
+            "start": 0
+          },
+          {
+            "end": 52,
+            "label": "LOCATION",
+            "start": 43
+          },
+          {
+            "end": 70,
+            "label": "ORGANISATION",
+            "start": 60
+          }
+        ],
+        "nl-hr-012": [
+          {
+            "end": 16,
+            "label": "PERSON",
+            "start": 0
+          },
+          {
+            "end": 49,
+            "label": "LOCATION",
+            "start": 43
+          },
+          {
+            "end": 74,
+            "label": "ORGANISATION",
+            "start": 57
+          }
+        ],
+        "nl-hr-017": [
+          {
+            "end": 16,
+            "label": "PERSON",
+            "start": 0
+          },
+          {
+            "end": 52,
+            "label": "LOCATION",
+            "start": 43
+          },
+          {
+            "end": 70,
+            "label": "ORGANISATION",
+            "start": 60
+          }
+        ],
+        "nl-office-004": [
+          {
+            "end": 21,
+            "label": "LOCATION",
+            "start": 15
+          },
+          {
+            "end": 52,
+            "label": "PERSON",
+            "start": 40
+          },
+          {
+            "end": 95,
+            "label": "PHONE",
+            "start": 80
+          }
+        ],
+        "nl-office-009": [
+          {
+            "end": 25,
+            "label": "LOCATION",
+            "start": 15
+          },
+          {
+            "end": 56,
+            "label": "PERSON",
+            "start": 44
+          },
+          {
+            "end": 95,
+            "label": "PHONE",
+            "start": 87
+          }
+        ],
+        "nl-office-014": [
+          {
+            "end": 24,
+            "label": "LOCATION",
+            "start": 15
+          },
+          {
+            "end": 56,
+            "label": "PERSON",
+            "start": 43
+          },
+          {
+            "end": 95,
+            "label": "PHONE",
+            "start": 87
+          }
+        ],
+        "nl-office-019": [
+          {
+            "end": 24,
+            "label": "LOCATION",
+            "start": 15
+          },
+          {
+            "end": 56,
+            "label": "PERSON",
+            "start": 43
+          },
+          {
+            "end": 95,
+            "label": "PHONE",
+            "start": 87
+          }
+        ],
+        "nl-security-003": [
+          {
+            "end": 43,
+            "label": "IP",
+            "start": 15
+          },
+          {
+            "end": 62,
+            "label": "ORGANISATION",
+            "start": 52
+          },
+          {
+            "end": 107,
+            "label": "PERSON",
+            "start": 94
+          }
+        ],
+        "nl-security-008": [
+          {
+            "end": 28,
+            "label": "IP",
+            "start": 15
+          },
+          {
+            "end": 47,
+            "label": "ORGANISATION",
+            "start": 37
+          },
+          {
+            "end": 95,
+            "label": "PERSON",
+            "start": 79
+          }
+        ],
+        "nl-security-013": [
+          {
+            "end": 26,
+            "label": "IP",
+            "start": 15
+          },
+          {
+            "end": 53,
+            "label": "ORGANISATION",
+            "start": 35
+          },
+          {
+            "end": 98,
+            "label": "PERSON",
+            "start": 85
+          }
+        ],
+        "nl-security-018": [
+          {
+            "end": 28,
+            "label": "IP",
+            "start": 15
+          },
+          {
+            "end": 55,
+            "label": "ORGANISATION",
+            "start": 37
+          },
+          {
+            "end": 100,
+            "label": "PERSON",
+            "start": 87
+          }
+        ],
+        "nl-support-001": [
+          {
+            "end": 32,
+            "label": "PERSON",
+            "start": 20
+          },
+          {
+            "end": 59,
+            "label": "EMAIL",
+            "start": 37
+          },
+          {
+            "end": 78,
+            "label": "PHONE",
+            "start": 70
+          }
+        ],
+        "nl-support-006": [
+          {
+            "end": 36,
+            "label": "PERSON",
+            "start": 20
+          },
+          {
+            "end": 63,
+            "label": "EMAIL",
+            "start": 41
+          },
+          {
+            "end": 85,
+            "label": "PHONE",
+            "start": 71
+          }
+        ],
+        "nl-support-011": [
+          {
+            "end": 32,
+            "label": "PERSON",
+            "start": 20
+          },
+          {
+            "end": 56,
+            "label": "EMAIL",
+            "start": 37
+          },
+          {
+            "end": 79,
+            "label": "PHONE",
+            "start": 64
+          }
+        ],
+        "nl-support-016": [
+          {
+            "end": 32,
+            "label": "PERSON",
+            "start": 20
+          },
+          {
+            "end": 57,
+            "label": "EMAIL",
+            "start": 37
+          },
+          {
+            "end": 76,
+            "label": "PHONE",
+            "start": 65
+          }
+        ],
+        "ta-billing-005": [
+          {
+            "end": 21,
+            "label": "ORGANISATION",
+            "start": 0
+          },
+          {
+            "end": 70,
+            "label": "EMAIL",
+            "start": 49
+          },
+          {
+            "end": 122,
+            "label": "PERSON",
+            "start": 107
+          }
+        ],
+        "ta-billing-010": [
+          {
+            "end": 28,
+            "label": "ORGANISATION",
+            "start": 0
+          },
+          {
+            "end": 75,
+            "label": "EMAIL",
+            "start": 56
+          },
+          {
+            "end": 123,
+            "label": "PERSON",
+            "start": 112
+          }
+        ],
+        "ta-billing-015": [
+          {
+            "end": 28,
+            "label": "ORGANISATION",
+            "start": 0
+          },
+          {
+            "end": 74,
+            "label": "EMAIL",
+            "start": 56
+          },
+          {
+            "end": 124,
+            "label": "PERSON",
+            "start": 111
+          }
+        ],
+        "ta-billing-020": [
+          {
+            "end": 16,
+            "label": "ORGANISATION",
+            "start": 0
+          },
+          {
+            "end": 65,
+            "label": "EMAIL",
+            "start": 44
+          },
+          {
+            "end": 117,
+            "label": "PERSON",
+            "start": 102
+          }
+        ],
+        "ta-hr-002": [
+          {
+            "end": 13,
+            "label": "PERSON",
+            "start": 0
+          },
+          {
+            "end": 50,
+            "label": "LOCATION",
+            "start": 26
+          },
+          {
+            "end": 85,
+            "label": "ORGANISATION",
+            "start": 66
+          }
+        ],
+        "ta-hr-007": [
+          {
+            "end": 12,
+            "label": "PERSON",
+            "start": 0
+          },
+          {
+            "end": 30,
+            "label": "LOCATION",
+            "start": 25
+          },
+          {
+            "end": 78,
+            "label": "ORGANISATION",
+            "start": 57
+          }
+        ],
+        "ta-hr-012": [
+          {
+            "end": 12,
+            "label": "PERSON",
+            "start": 0
+          },
+          {
+            "end": 31,
+            "label": "LOCATION",
+            "start": 25
+          },
+          {
+            "end": 93,
+            "label": "PERSON",
+            "start": 92
+          }
+        ],
+        "ta-hr-017": [
+          {
+            "end": 24,
+            "label": "PERSON",
+            "start": 0
+          },
+          {
+            "end": 42,
+            "label": "LOCATION",
+            "start": 37
+          },
+          {
+            "end": 90,
+            "label": "ORGANISATION",
+            "start": 69
+          }
+        ],
+        "ta-office-004": [
+          {
+            "end": 13,
+            "label": "LOCATION",
+            "start": 0
+          },
+          {
+            "end": 51,
+            "label": "PERSON",
+            "start": 39
+          },
+          {
+            "end": 79,
+            "label": "PHONE",
+            "start": 66
+          }
+        ],
+        "ta-office-009": [
+          {
+            "end": 13,
+            "label": "LOCATION",
+            "start": 0
+          },
+          {
+            "end": 63,
+            "label": "PERSON",
+            "start": 39
+          },
+          {
+            "end": 89,
+            "label": "PHONE",
+            "start": 78
+          }
+        ],
+        "ta-office-014": [
+          {
+            "end": 5,
+            "label": "LOCATION",
+            "start": 0
+          },
+          {
+            "end": 55,
+            "label": "PERSON",
+            "start": 31
+          },
+          {
+            "end": 86,
+            "label": "PHONE",
+            "start": 70
+          }
+        ],
+        "ta-office-019": [
+          {
+            "end": 5,
+            "label": "LOCATION",
+            "start": 0
+          },
+          {
+            "end": 55,
+            "label": "PERSON",
+            "start": 31
+          },
+          {
+            "end": 83,
+            "label": "PHONE",
+            "start": 70
+          }
+        ],
+        "ta-security-003": [
+          {
+            "end": 13,
+            "label": "PERSON",
+            "start": 0
+          },
+          {
+            "end": 51,
+            "label": "IP",
+            "start": 40
+          },
+          {
+            "end": 96,
+            "label": "ORGANISATION",
+            "start": 77
+          },
+          {
+            "end": 115,
+            "label": "ORGANISATION",
+            "start": 114
+          }
+        ],
+        "ta-security-008": [
+          {
+            "end": 24,
+            "label": "PERSON",
+            "start": 0
+          },
+          {
+            "end": 79,
+            "label": "IP",
+            "start": 51
+          }
+        ],
+        "ta-security-013": [
+          {
+            "end": 13,
+            "label": "PERSON",
+            "start": 0
+          },
+          {
+            "end": 50,
+            "label": "IP",
+            "start": 40
+          }
+        ],
+        "ta-security-018": [
+          {
+            "end": 12,
+            "label": "PERSON",
+            "start": 0
+          },
+          {
+            "end": 50,
+            "label": "IP",
+            "start": 39
+          },
+          {
+            "end": 95,
+            "label": "ORGANISATION",
+            "start": 76
+          }
+        ],
+        "ta-support-001": [
+          {
+            "end": 26,
+            "label": "PERSON",
+            "start": 11
+          },
+          {
+            "end": 54,
+            "label": "EMAIL",
+            "start": 35
+          },
+          {
+            "end": 99,
+            "label": "PHONE",
+            "start": 86
+          }
+        ],
+        "ta-support-006": [
+          {
+            "end": 22,
+            "label": "PERSON",
+            "start": 11
+          },
+          {
+            "end": 49,
+            "label": "EMAIL",
+            "start": 31
+          },
+          {
+            "end": 94,
+            "label": "PHONE",
+            "start": 81
+          }
+        ],
+        "ta-support-011": [
+          {
+            "end": 24,
+            "label": "PERSON",
+            "start": 11
+          },
+          {
+            "end": 52,
+            "label": "EMAIL",
+            "start": 33
+          },
+          {
+            "end": 100,
+            "label": "PHONE",
+            "start": 84
+          }
+        ],
+        "ta-support-016": [
+          {
+            "end": 26,
+            "label": "PERSON",
+            "start": 11
+          },
+          {
+            "end": 54,
+            "label": "EMAIL",
+            "start": 35
+          },
+          {
+            "end": 101,
+            "label": "PHONE",
+            "start": 86
+          }
+        ],
+        "th-billing-005": [
+          {
+            "end": 40,
+            "label": "ORGANISATION",
+            "start": 25
+          },
+          {
+            "end": 76,
+            "label": "EMAIL",
+            "start": 55
+          },
+          {
+            "end": 100,
+            "label": "PERSON",
+            "start": 77
+          }
+        ],
+        "th-billing-010": [
+          {
+            "end": 52,
+            "label": "ORGANISATION",
+            "start": 32
+          },
+          {
+            "end": 83,
+            "label": "EMAIL",
+            "start": 67
+          },
+          {
+            "end": 101,
+            "label": "PERSON",
+            "start": 90
+          }
+        ],
+        "th-billing-015": [
+          {
+            "end": 38,
+            "label": "ORGANISATION",
+            "start": 31
+          },
+          {
+            "end": 74,
+            "label": "EMAIL",
+            "start": 53
+          },
+          {
+            "end": 90,
+            "label": "PERSON",
+            "start": 81
+          }
+        ],
+        "th-billing-020": [
+          {
+            "end": 40,
+            "label": "ORGANISATION",
+            "start": 25
+          },
+          {
+            "end": 76,
+            "label": "EMAIL",
+            "start": 55
+          },
+          {
+            "end": 93,
+            "label": "PERSON",
+            "start": 83
+          }
+        ],
+        "th-hr-002": [
+          {
+            "end": 9,
+            "label": "PERSON",
+            "start": 0
+          },
+          {
+            "end": 22,
+            "label": "LOCATION",
+            "start": 16
+          }
+        ],
+        "th-hr-007": [
+          {
+            "end": 11,
+            "label": "PERSON",
+            "start": 0
+          },
+          {
+            "end": 28,
+            "label": "LOCATION",
+            "start": 18
+          },
+          {
+            "end": 70,
+            "label": "ORGANISATION",
+            "start": 55
+          }
+        ],
+        "th-hr-012": [
+          {
+            "end": 28,
+            "label": "LOCATION",
+            "start": 18
+          },
+          {
+            "end": 68,
+            "label": "ORGANISATION",
+            "start": 55
+          }
+        ],
+        "th-hr-017": [
+          {
+            "end": 11,
+            "label": "PERSON",
+            "start": 0
+          },
+          {
+            "end": 24,
+            "label": "LOCATION",
+            "start": 18
+          },
+          {
+            "end": 65,
+            "label": "LOCATION",
+            "start": 60
+          }
+        ],
+        "th-office-004": [
+          {
+            "end": 20,
+            "label": "LOCATION",
+            "start": 11
+          },
+          {
+            "end": 33,
+            "label": "PERSON",
+            "start": 22
+          },
+          {
+            "end": 80,
+            "label": "PHONE",
+            "start": 69
+          }
+        ],
+        "th-office-009": [
+          {
+            "end": 20,
+            "label": "LOCATION",
+            "start": 11
+          },
+          {
+            "end": 33,
+            "label": "PERSON",
+            "start": 22
+          },
+          {
+            "end": 81,
+            "label": "PHONE",
+            "start": 69
+          }
+        ],
+        "th-office-014": [
+          {
+            "end": 17,
+            "label": "LOCATION",
+            "start": 11
+          },
+          {
+            "end": 30,
+            "label": "PERSON",
+            "start": 19
+          },
+          {
+            "end": 78,
+            "label": "PHONE",
+            "start": 66
+          }
+        ],
+        "th-office-019": [
+          {
+            "end": 17,
+            "label": "LOCATION",
+            "start": 11
+          },
+          {
+            "end": 30,
+            "label": "PERSON",
+            "start": 19
+          },
+          {
+            "end": 81,
+            "label": "PHONE",
+            "start": 66
+          }
+        ],
+        "th-security-003": [
+          {
+            "end": 31,
+            "label": "IP",
+            "start": 18
+          },
+          {
+            "end": 48,
+            "label": "ORGANISATION",
+            "start": 35
+          },
+          {
+            "end": 84,
+            "label": "PERSON",
+            "start": 73
+          }
+        ],
+        "th-security-008": [
+          {
+            "end": 46,
+            "label": "IP",
+            "start": 18
+          },
+          {
+            "end": 100,
+            "label": "PERSON",
+            "start": 89
+          }
+        ],
+        "th-security-013": [
+          {
+            "end": 46,
+            "label": "IP",
+            "start": 18
+          },
+          {
+            "end": 77,
+            "label": "ORGANISATION",
+            "start": 57
+          },
+          {
+            "end": 119,
+            "label": "PERSON",
+            "start": 102
+          }
+        ],
+        "th-security-018": [
+          {
+            "end": 46,
+            "label": "IP",
+            "start": 18
+          },
+          {
+            "end": 63,
+            "label": "ORGANISATION",
+            "start": 50
+          },
+          {
+            "end": 98,
+            "label": "PERSON",
+            "start": 88
+          }
+        ],
+        "th-support-001": [
+          {
+            "end": 25,
+            "label": "PERSON",
+            "start": 14
+          },
+          {
+            "end": 56,
+            "label": "EMAIL",
+            "start": 35
+          },
+          {
+            "end": 80,
+            "label": "PHONE",
+            "start": 65
+          }
+        ],
+        "th-support-006": [
+          {
+            "end": 25,
+            "label": "PERSON",
+            "start": 14
+          },
+          {
+            "end": 51,
+            "label": "EMAIL",
+            "start": 35
+          },
+          {
+            "end": 75,
+            "label": "PHONE",
+            "start": 60
+          }
+        ],
+        "th-support-011": [
+          {
+            "end": 29,
+            "label": "PERSON",
+            "start": 14
+          },
+          {
+            "end": 60,
+            "label": "EMAIL",
+            "start": 39
+          },
+          {
+            "end": 80,
+            "label": "PHONE",
+            "start": 69
+          }
+        ],
+        "th-support-016": [
+          {
+            "end": 25,
+            "label": "PERSON",
+            "start": 14
+          },
+          {
+            "end": 56,
+            "label": "EMAIL",
+            "start": 35
+          },
+          {
+            "end": 77,
+            "label": "PHONE",
+            "start": 65
+          }
+        ],
+        "zh-billing-005": [
+          {
+            "end": 6,
+            "label": "ORGANISATION",
+            "start": 2
+          },
+          {
+            "end": 35,
+            "label": "EMAIL",
+            "start": 15
+          },
+          {
+            "end": 42,
+            "label": "PERSON",
+            "start": 40
+          }
+        ],
+        "zh-billing-010": [
+          {
+            "end": 10,
+            "label": "ORGANISATION",
+            "start": 2
+          },
+          {
+            "end": 39,
+            "label": "EMAIL",
+            "start": 19
+          },
+          {
+            "end": 56,
+            "label": "PERSON",
+            "start": 44
+          }
+        ],
+        "zh-billing-015": [
+          {
+            "end": 6,
+            "label": "ORGANISATION",
+            "start": 2
+          },
+          {
+            "end": 33,
+            "label": "EMAIL",
+            "start": 15
+          },
+          {
+            "end": 40,
+            "label": "PERSON",
+            "start": 38
+          }
+        ],
+        "zh-billing-020": [
+          {
+            "end": 6,
+            "label": "ORGANISATION",
+            "start": 2
+          },
+          {
+            "end": 35,
+            "label": "EMAIL",
+            "start": 15
+          },
+          {
+            "end": 42,
+            "label": "PERSON",
+            "start": 40
+          }
+        ],
+        "zh-hr-002": [
+          {
+            "end": 2,
+            "label": "PERSON",
+            "start": 0
+          },
+          {
+            "end": 8,
+            "label": "LOCATION",
+            "start": 6
+          },
+          {
+            "end": 16,
+            "label": "ORGANISATION",
+            "start": 12
+          }
+        ],
+        "zh-hr-007": [
+          {
+            "end": 2,
+            "label": "PERSON",
+            "start": 0
+          },
+          {
+            "end": 8,
+            "label": "LOCATION",
+            "start": 6
+          },
+          {
+            "end": 20,
+            "label": "ORGANISATION",
+            "start": 12
+          }
+        ],
+        "zh-hr-012": [
+          {
+            "end": 2,
+            "label": "PERSON",
+            "start": 0
+          },
+          {
+            "end": 8,
+            "label": "LOCATION",
+            "start": 6
+          },
+          {
+            "end": 16,
+            "label": "LOCATION",
+            "start": 12
+          }
+        ],
+        "zh-hr-017": [
+          {
+            "end": 13,
+            "label": "PERSON",
+            "start": 0
+          },
+          {
+            "end": 19,
+            "label": "LOCATION",
+            "start": 17
+          },
+          {
+            "end": 31,
+            "label": "ORGANISATION",
+            "start": 23
+          }
+        ],
+        "zh-office-004": [
+          {
+            "end": 5,
+            "label": "LOCATION",
+            "start": 3
+          },
+          {
+            "end": 12,
+            "label": "PERSON",
+            "start": 10
+          },
+          {
+            "end": 33,
+            "label": "PHONE",
+            "start": 20
+          }
+        ],
+        "zh-office-009": [
+          {
+            "end": 5,
+            "label": "LOCATION",
+            "start": 3
+          },
+          {
+            "end": 22,
+            "label": "PERSON",
+            "start": 10
+          },
+          {
+            "end": 43,
+            "label": "PHONE",
+            "start": 30
+          }
+        ],
+        "zh-office-014": [
+          {
+            "end": 5,
+            "label": "LOCATION",
+            "start": 3
+          },
+          {
+            "end": 23,
+            "label": "PERSON",
+            "start": 10
+          },
+          {
+            "end": 47,
+            "label": "PHONE",
+            "start": 31
+          }
+        ],
+        "zh-office-019": [
+          {
+            "end": 5,
+            "label": "LOCATION",
+            "start": 3
+          },
+          {
+            "end": 12,
+            "label": "PERSON",
+            "start": 10
+          },
+          {
+            "end": 32,
+            "label": "PHONE",
+            "start": 20
+          }
+        ],
+        "zh-security-003": [
+          {
+            "end": 15,
+            "label": "IP",
+            "start": 2
+          },
+          {
+            "end": 26,
+            "label": "ORGANISATION",
+            "start": 20
+          },
+          {
+            "end": 35,
+            "label": "PERSON",
+            "start": 33
+          }
+        ],
+        "zh-security-008": [
+          {
+            "end": 30,
+            "label": "IP",
+            "start": 2
+          },
+          {
+            "end": 41,
+            "label": "ORGANISATION",
+            "start": 35
+          },
+          {
+            "end": 50,
+            "label": "PERSON",
+            "start": 48
+          }
+        ],
+        "zh-security-013": [
+          {
+            "end": 30,
+            "label": "IP",
+            "start": 2
+          },
+          {
+            "end": 48,
+            "label": "PERSON",
+            "start": 46
+          }
+        ],
+        "zh-security-018": [
+          {
+            "end": 13,
+            "label": "IP",
+            "start": 2
+          },
+          {
+            "end": 24,
+            "label": "ORGANISATION",
+            "start": 18
+          },
+          {
+            "end": 33,
+            "label": "PERSON",
+            "start": 31
+          }
+        ],
+        "zh-support-001": [
+          {
+            "end": 5,
+            "label": "PERSON",
+            "start": 3
+          },
+          {
+            "end": 29,
+            "label": "EMAIL",
+            "start": 9
+          },
+          {
+            "end": 46,
+            "label": "PHONE",
+            "start": 33
+          }
+        ],
+        "zh-support-006": [
+          {
+            "end": 5,
+            "label": "PERSON",
+            "start": 3
+          },
+          {
+            "end": 25,
+            "label": "EMAIL",
+            "start": 9
+          },
+          {
+            "end": 41,
+            "label": "PHONE",
+            "start": 29
+          }
+        ],
+        "zh-support-011": [
+          {
+            "end": 5,
+            "label": "PERSON",
+            "start": 3
+          },
+          {
+            "end": 29,
+            "label": "EMAIL",
+            "start": 9
+          },
+          {
+            "end": 49,
+            "label": "PHONE",
+            "start": 33
+          }
+        ],
+        "zh-support-016": [
+          {
+            "end": 5,
+            "label": "PERSON",
+            "start": 3
+          },
+          {
+            "end": 25,
+            "label": "EMAIL",
+            "start": 9
+          },
+          {
+            "end": 45,
+            "label": "PHONE",
+            "start": 29
+          }
+        ]
+      },
+      "report": {
+        "by_domain": {
+          "billing": {
+            "f1": 0.9541984732824428,
+            "false_negatives": 7,
+            "false_positives": 5,
+            "precision": 0.9615384615384616,
+            "recall": 0.946969696969697,
+            "true_positives": 125
+          },
+          "hr": {
+            "f1": 0.9034749034749034,
+            "false_negatives": 15,
+            "false_positives": 10,
+            "precision": 0.9212598425196851,
+            "recall": 0.8863636363636364,
+            "true_positives": 117
+          },
+          "office": {
+            "f1": 0.9618320610687022,
+            "false_negatives": 6,
+            "false_positives": 4,
+            "precision": 0.9692307692307692,
+            "recall": 0.9545454545454546,
+            "true_positives": 126
+          },
+          "security": {
+            "f1": 0.9147286821705426,
+            "false_negatives": 14,
+            "false_positives": 8,
+            "precision": 0.9365079365079365,
+            "recall": 0.8939393939393939,
+            "true_positives": 118
+          },
+          "support": {
+            "f1": 0.9692307692307692,
+            "false_negatives": 6,
+            "false_positives": 2,
+            "precision": 0.984375,
+            "recall": 0.9545454545454546,
+            "true_positives": 126
+          }
+        },
+        "by_label": {
+          "EMAIL": {
+            "f1": 1.0,
+            "false_negatives": 0,
+            "false_positives": 0,
+            "precision": 1.0,
+            "recall": 1.0,
+            "true_positives": 88
+          },
+          "IP": {
+            "f1": 1.0,
+            "false_negatives": 0,
+            "false_positives": 0,
+            "precision": 1.0,
+            "recall": 1.0,
+            "true_positives": 44
+          },
+          "LOCATION": {
+            "f1": 0.9560439560439561,
+            "false_negatives": 1,
+            "false_positives": 7,
+            "precision": 0.925531914893617,
+            "recall": 0.9886363636363636,
+            "true_positives": 87
+          },
+          "ORGANISATION": {
+            "f1": 0.8114754098360656,
+            "false_negatives": 33,
+            "false_positives": 13,
+            "precision": 0.8839285714285714,
+            "recall": 0.75,
+            "true_positives": 99
+          },
+          "PERSON": {
+            "f1": 0.9886621315192745,
+            "false_negatives": 2,
+            "false_positives": 3,
+            "precision": 0.9864253393665159,
+            "recall": 0.990909090909091,
+            "true_positives": 218
+          },
+          "PHONE": {
+            "f1": 0.8941176470588236,
+            "false_negatives": 12,
+            "false_positives": 6,
+            "precision": 0.926829268292683,
+            "recall": 0.8636363636363636,
+            "true_positives": 76
+          }
+        },
+        "by_language": {
+          "ar": {
+            "f1": 0.8448275862068966,
+            "false_negatives": 11,
+            "false_positives": 7,
+            "precision": 0.875,
+            "recall": 0.8166666666666667,
+            "true_positives": 49
+          },
+          "bn": {
+            "f1": 0.8849557522123894,
+            "false_negatives": 10,
+            "false_positives": 3,
+            "precision": 0.9433962264150944,
+            "recall": 0.8333333333333334,
+            "true_positives": 50
+          },
+          "de": {
+            "f1": 0.9915966386554621,
+            "false_negatives": 1,
+            "false_positives": 0,
+            "precision": 1.0,
+            "recall": 0.9833333333333333,
+            "true_positives": 59
+          },
+          "en": {
+            "f1": 1.0,
+            "false_negatives": 0,
+            "false_positives": 0,
+            "precision": 1.0,
+            "recall": 1.0,
+            "true_positives": 60
+          },
+          "es": {
+            "f1": 1.0,
+            "false_negatives": 0,
+            "false_positives": 0,
+            "precision": 1.0,
+            "recall": 1.0,
+            "true_positives": 60
+          },
+          "hi": {
+            "f1": 0.9743589743589743,
+            "false_negatives": 3,
+            "false_positives": 0,
+            "precision": 1.0,
+            "recall": 0.95,
+            "true_positives": 57
+          },
+          "ja": {
+            "f1": 0.9917355371900827,
+            "false_negatives": 0,
+            "false_positives": 1,
+            "precision": 0.9836065573770492,
+            "recall": 1.0,
+            "true_positives": 60
+          },
+          "nl": {
+            "f1": 0.9333333333333333,
+            "false_negatives": 4,
+            "false_positives": 4,
+            "precision": 0.9333333333333333,
+            "recall": 0.9333333333333333,
+            "true_positives": 56
+          },
+          "ta": {
+            "f1": 0.8907563025210085,
+            "false_negatives": 7,
+            "false_positives": 6,
+            "precision": 0.8983050847457628,
+            "recall": 0.8833333333333333,
+            "true_positives": 53
+          },
+          "th": {
+            "f1": 0.8888888888888888,
+            "false_negatives": 8,
+            "false_positives": 5,
+            "precision": 0.9122807017543859,
+            "recall": 0.8666666666666667,
+            "true_positives": 52
+          },
+          "zh": {
+            "f1": 0.9411764705882353,
+            "false_negatives": 4,
+            "false_positives": 3,
+            "precision": 0.9491525423728814,
+            "recall": 0.9333333333333333,
+            "true_positives": 56
+          }
+        },
+        "by_slice": {
+          "code-switch": {
+            "f1": 0.9273743016759777,
+            "false_negatives": 7,
+            "false_positives": 6,
+            "precision": 0.9325842696629213,
+            "recall": 0.9222222222222223,
+            "true_positives": 83
+          },
+          "multilingual": {
+            "f1": 0.940814757878555,
+            "false_negatives": 48,
+            "false_positives": 29,
+            "precision": 0.9547581903276131,
+            "recall": 0.9272727272727272,
+            "true_positives": 612
+          },
+          "synthetic": {
+            "f1": 0.940814757878555,
+            "false_negatives": 48,
+            "false_positives": 29,
+            "precision": 0.9547581903276131,
+            "recall": 0.9272727272727272,
+            "true_positives": 612
+          }
+        },
+        "model": "sct-default",
+        "overall": {
+          "f1": 0.940814757878555,
+          "false_negatives": 48,
+          "false_positives": 29,
+          "precision": 0.9547581903276131,
+          "recall": 0.9272727272727272,
+          "true_positives": 612
+        }
+      },
+      "seconds": 21.6
+    }
+  },
+  "platform": "macOS-27.2-arm64-arm-64bit-Mach-O",
+  "python": "3.13.12",
+  "sct_version": "0.8.0"
+}

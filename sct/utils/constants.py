@@ -4,6 +4,7 @@ Constant symbols and compiled RegExs used for cleaning.
 
 import re
 import string
+import unicodedata
 import regex
 
 CURRENCIES = {
@@ -26,6 +27,7 @@ CURRENCIES = {
 CURRENCY_REGEX = re.compile(
     "({})+".format("|".join(re.escape(c) for c in CURRENCIES.keys()))
 )
+CURRENCY_SYMBOL_REGEX = re.compile("|".join(re.escape(c) for c in CURRENCIES))
 
 # Fixed: bounded quantifiers to prevent ReDoS (was nested + quantifiers)
 ACRONYM_REGEX = re.compile(
@@ -33,23 +35,147 @@ ACRONYM_REGEX = re.compile(
     flags=re.UNICODE,
 )
 
+# Canonical PII type name -> its pre-0.8.0 name in reversible placeholders and metadata
+# (legacy_type_names=True). Every other type already had one name on every surface.
+LEGACY_TYPE_NAMES = {'PHONE': 'PHONE_NUMBER', 'IP': 'IP_ADDRESS'}
+
 # Fixed: Unicode ranges use actual Unicode escapes (not literal \\u in raw strings)
+# Local part takes RFC 5322 punctuation (o'connor, jo&co, alice!) after a word start, at most 64 characters
+# (RFC 5321) so a long run with no "@" costs a bounded scan from each start (linear time),
+# so no prefix of the address stays visible; it never ends in a dot. ZWNJ/ZWJ join letters
+# in it as in a domain label (Devanagari half forms, Persian).
+# Domain labels take any script but not general, CJK or full-width punctuation, so
+# "a@b.com（担当：鈴木）" or "a@b.com、" ends at ".com". The letters and numbers of the
+# CJK punctuation block (々 〆 〇, by Unicode category) stay, so "info@佐々木.jp" is whole.
+_CJK_SYMBOL_LETTERS = ''.join(chr(c) for c in range(0x3000, 0x3040) if unicodedata.category(chr(c))[0] in 'LN')
+
+
+def _class_ranges(categories, *spans):
+    """Character-class body (literal ranges) of the code points in *spans* whose category starts with one of *categories*."""
+    out, start = [], None
+    for lo, hi in spans:
+        for cp in range(lo, hi + 1):
+            hit = unicodedata.category(chr(cp))[0] in categories
+            if hit and start is None:
+                start = cp
+            elif not hit and start is not None:
+                out.append(chr(start) if start == cp - 1 else f"{chr(start)}-{chr(cp - 1)}")
+                start = None
+        if start is not None:
+            out.append(chr(start) if start == hi else f"{chr(start)}-{chr(hi)}")
+            start = None
+    return ''.join(out)
+
+
+def _cp_spans(cps):
+    """(first, last) spans of consecutive code points in the ascending iterable *cps*."""
+    spans = []
+    for cp in cps:
+        if spans and spans[-1][1] == cp - 1:
+            spans[-1][1] = cp
+        else:
+            spans.append([cp, cp])
+    return spans
+
+
+# Combining marks of every script (Mn/Mc/Me: the vowel signs of প্রিয়া, संपर्क), which \w leaves out.
+MARKS = _class_ranges('M', (0x300, 0x3FFFF), (0xE0000, 0xE0FFF))
+# Letters, marks and digits beyond the BMP (𠮷野.jp): the BMP ranges below stop at U+FFFF.
+_SUPPLEMENTARY_ALNUM = _class_ranges('LMN', (0x10000, 0x3FFFF))
+# Latin, Greek and Cyrillic letters, which sit between spaces in prose.
+_SPACED_LETTERS = "A-Za-z\u00C0-\u024F\u0370-\u03FF\u0400-\u04FF"
+# Letters of the Latin script (Script=Latin, any block: é, ŀ, ḁ), which styled letters fold to.
+LATIN_LETTERS = ''.join(
+    f"{chr(lo)}-{chr(hi)}" if hi > lo else chr(lo) for lo, hi in _cp_spans(
+        cp for cp in range(0x110000)
+        if unicodedata.category(chr(cp))[0] == 'L' and regex.match(r'\p{Script=Latin}', chr(cp))))
+# Letters and marks of scripts written without spaces between words (Thai, Lao, Khmer, Myanmar, CJK, kana:
+# Unicode line-break class SA, ID or CJ; not full-width Latin). Where one touches a Latin/Greek/Cyrillic letter or a digit, a
+# word ends, so prose glued to an address ("ดูa@b.jpกขค", "https://x.com/aปถว06 10") stays outside it.
+_SPACELESS_CHAR = regex.compile(r'(?V1)[[\p{Line_Break=SA}\p{Line_Break=ID}\p{Line_Break=CJ}]--\p{Script=Latin}]')
+_SPACELESS = ''.join(
+    f"{chr(lo)}-{chr(hi)}" if hi > lo else chr(lo) for lo, hi in _cp_spans(
+        cp for cp in range(0x110000)
+        if unicodedata.category(chr(cp))[0] in 'LM' and _SPACELESS_CHAR.match(chr(cp))))
+# A percent escape is one character (?email=a%40ตัวอย่าง.ไทย, its digits in any script), so it glues to nothing.
+_DECIMAL = ''.join(f"{chr(lo)}-{chr(hi)}" if hi > lo else chr(lo) for lo, hi in _cp_spans(
+    cp for cp in range(0x110000) if unicodedata.category(chr(cp)) == 'Nd'))
+_GLUE = (rf"(?<=[0-9{_SPACED_LETTERS}])(?<!%[{_DECIMAL}A-Fa-f]{{2}})[{_SPACELESS}]"
+         rf"|(?<=[{_SPACELESS}])[0-9{_SPACED_LETTERS}]")
+# Before each character of a local part, TLD or URL path: it does not start a new word.
+_NO_GLUE = rf"(?!{_GLUE})"
+# Label characters leave out punctuation of every script (category P), so a label ends at the Arabic
+# comma or the Devanagari danda after an address ("ahmed@example.com، أو"), as at ", ".
+_IDN_LETTER = ("a-z" + _class_ranges('CLMNSZ', (0xA1, 0x1FFF), (0x2070, 0x2FFF), (0x3040, 0xFEFF), (0xFF21, 0xFF3A),
+                                     (0xFF41, 0xFF5A), (0xFF66, 0xFFFF))
+               + _CJK_SYMBOL_LETTERS + _SUPPLEMENTARY_ALNUM)
+# ZWNJ/ZWJ (U+200C/D) join letters inside IDNA labels (Persian, Devanagari conjuncts).
+_IDN_CHAR = _IDN_LETTER + r"0-9\uff10-\uff19\u200c\u200d"
+# The one punctuation IDNA2008 allows in a label in a Latin context (RFC 5892 A.3): the middle dot between
+# two l's (col·legi.cat, Catalan); elsewhere it stays punctuation that ends a label.
+_MIDDLE_DOT = "(?<=l)\u00b7(?=l)"
+
+
+def _script_class(*scripts):
+    """Character-class body of the code points of *scripts* (Unicode Script property)."""
+    script = regex.compile('[%s]' % ''.join(rf'\p{{Script={name}}}' for name in scripts))
+    return ''.join(f"{chr(lo)}-{chr(hi)}" if hi > lo else chr(lo)
+                   for lo, hi in _cp_spans(cp for cp in range(0x110000) if script.match(chr(cp))))
+
+
+# The other CONTEXTO punctuation of RFC 5892 (A.4, A.5, A.7): Hebrew geresh and gershayim after a Hebrew character
+# (צ׳.co.il) and the katakana middle dot in a label with Hiragana, Katakana or Han (例・え.jp).
+# shortcut: the middle dot needs such a character right beside it, not anywhere in the label; widen if one shows up.
+_KANA_HAN = _script_class('Hiragana', 'Katakana', 'Han')
+# The two branches never match the same dot (the second needs a non-kana/Han left neighbour), so a run of
+# dots between Han has one parse and a host with no TLD fails in linear time.
+_KATAKANA_MIDDLE_DOT = f"(?:(?<=[{_KANA_HAN}])\u30fb|(?<![{_KANA_HAN}])\u30fb(?=[{_KANA_HAN}]))"
+_GERESH = f"(?<=[{_script_class('Hebrew')}])[\u05f3\u05f4]"
+# One run of label characters (X+ with those marks inside, a geresh also at its end), so a label stays X+(-+X+)*.
+_IDN_RUN = rf"[{_IDN_CHAR}]+(?:(?:{_MIDDLE_DOT}|{_KATAKANA_MIDDLE_DOT})[{_IDN_CHAR}]+|{_GERESH}[{_IDN_CHAR}]*)*"
+# A punycode TLD (xn--p1ai) is tried first, so ".xn" alone never ends the match; ZWNJ/ZWJ join
+# letters inside it as in any other label.
+_TLD = (rf"(?:xn--[a-z0-9-]*[a-z0-9]"
+        rf"|{_NO_GLUE}[{_IDN_LETTER}](?:[\u200c\u200d]*{_NO_GLUE}[{_IDN_LETTER}])+)")
+_LOCAL_CHAR = rf"{_NO_GLUE}[\w!#$%&'*+{MARKS}\u200c\u200d-]|\.(?!\.)|{_MIDDLE_DOT}"
 EMAIL_REGEX = re.compile(
-    r"(?:^|(?<=[^\w@.)]))([\w+-](\.(?!\.))?)*?[\w+-](@|[(<{\[]at[)>}\]])(?:(?:[a-z\u00a1-\uffff0-9]-?)*[a-z\u00a1-\uffff0-9]+)(?:\.(?:[a-z\u00a1-\uffff0-9]-?)*[a-z\u00a1-\uffff0-9]+)*(?:\.(?:[a-z\u00a1-\uffff]{2,}))",
+    rf"(?:(?:^|(?<=[^\w@.){MARKS}])|(?={_GLUE}))[\w+-](?:{_LOCAL_CHAR}){{0,63}}?"
+    # A longer local part is taken whole from the start of its run (or a script change), so it is masked, not
+    # left as text; one scan per run, so this stays linear too.
+    rf"|(?:(?<![\w!#$%&'*+.@)\u00b7{MARKS}\u200c\u200d-])|(?={_GLUE}))[\w!#$%&'*+-](?:{_LOCAL_CHAR}){{64,}})"
+    rf"(?<!\.)(@|[(<{{\[]at[)>}}\]])"
+    # Host labels as X+(-+X+)*: one way to split a label, so a host with no TLD fails in linear time.
+    rf"{_IDN_RUN}(?:-+{_IDN_RUN})*(?:\.{_IDN_RUN}(?:-+{_IDN_RUN})*)*(?:\.{_TLD})",
     flags=re.IGNORECASE | re.UNICODE,
 )
+
+# Area-code parentheses in compatibility form (full-width （ ）, small ﹙ ﹚): the phone view reads them as
+# "(" ")" (+49（30）123456) and the styled fold treats them as phone punctuation.
+PHONE_PARENS = {ch: unicodedata.normalize('NFKC', ch) for ch in map(chr, range(0x80, 0x20000))
+                if unicodedata.decomposition(ch).split(' ', 1)[0] in ('<wide>', '<small>')
+                and unicodedata.normalize('NFKC', ch) in '()'}
 
 # Digit boundaries are "not next to a digit", so numbers glued to letters of
 # any script (``电话9876543210``, ``फोन9876543210पर``) are still found.
 PHONE_REGEX = re.compile(
+    # National trunk-0 numbers in groups, 9+ digits: 020 7946 0958, 010-6552 1234, 06 12 34 56 78.
+    # First, so the general pattern below cannot take only their leading groups.
+    # 00 is the international prefix, left to the general pattern.
+    r"(?<![\d_)])0[1-9](?=(?:[ .-]?\d){7})\d{0,3}(?:[ .-]\d{2,4}){2,4}"
+    r"(?:\s?(?:ext\.?|[#x])\s?\d{2,6})?(?![\d_])"
+    r"|"
     # A leading year group ("1999 2000", "2019 555-1234") stays for the year step.
     r"((?<![\d_)])(?!(?:19|20)\d\d[ .-])((\+?\d+|0{1,2}\d*?)[ .-]?)?(\(?\d{3,4}\)?/?[ .-]?)?"
     r"(\d{3}[ .-]?\d{4})(\s?(?:ext\.?|[#x-])\s?\d{2,6})?(?![\d_]))|\+?\d{4,5}[ .-/]\d{6,9}"
     # Indian mobile: 98765 43210, 098765-43210
     r"|(?<![\d_)])0?[6-9]\d{4}[ -]?\d{5}(?![\d_])"
+    # 3-3-3 national numbers (699 123 456, 912 345 678); a space-grouped 9-digit amount reads as one too
+    r"|(?<![\d_)])(?<!\d[ .,])\d{3}[ .-]\d{3}[ .-]\d{3}(?![\d_]|[ .,]\d)"
     # International: "+" then at least 8 digits in groups (+34 612 345 678, +91 98765 43210)
-    r"|(?<![\d+])\+(?=(?:[ .()-]{0,2}\d){8})\d{1,3}(?:[ .-]?\(?\d{1,5}\)?){1,5}"
-    r"(?:\s?(?:ext\.?|[#x])\s?\d{2,6})?(?![\d_(])"
+    # Area-code parentheses must be balanced, so a closing ")" of the sentence stays;
+    # a bracket glued after the number ends it unless digits follow (+49 30 1234567（電話）).
+    r"|(?<![\d+])\+(?=(?:[ .()-]{0,2}\d){8})\d{1,3}(?:[ .-]?(?:\(\d{1,5}\)|\d{1,5})){1,5}"
+    r"(?:\s?(?:ext\.?|[#x])\s?\d{2,6})?(?![\d_]|\(\d)"
 )
 
 # IPv4 and IPv6 (incl. "::" forms and IPv4-mapped tails). Runs before the
@@ -81,7 +207,12 @@ _IPV6_START = (
 )
 IP_REGEX = re.compile(
     rf"{_IPV6_START}(?:{_IPV6})(?![A-Za-z0-9_:]|\.[0-9])"
-    rf"|(?<![0-9.])(?:{_IPV4})(?![0-9]|\.[0-9])"
+    # A dot before it blocks only after a digit (1.2.3.4.5); after a letter it ends a word or sentence
+    # (服务器.8.8.8.8, where a CJK full stop may fold to ".").
+    rf"|(?<![0-9])(?<![0-9]\.)(?:{_IPV4})(?![0-9]|\.[0-9])"
+    # IPv4 in other digit scripts (١٩٢.١٦٨.١.١): needs one non-ASCII digit ([^\x00-\x7f\D]),
+    # so ASCII matching (and the browser export, where \d is ASCII) is unchanged.
+    r"|(?<!\d)(?<!\d\.)(?=[\d.]*[^\x00-\x7f\D])\d{1,3}(?:\.\d{1,3}){3}(?!\d|\.\d)"
 )
 
 _NUMBER_BODY = (
@@ -91,7 +222,6 @@ _NUMBER_BODY = (
 # Latin, Greek and Cyrillic put spaces between words, so a digit glued to their
 # letters is part of a word (GPT4, Qwen3-8B, H2O) and is kept by default.
 # Scripts without spaces (``金额5000元``) still get the number replaced.
-_SPACED_LETTERS = "A-Za-z\u00C0-\u024F\u0370-\u03FF\u0400-\u04FF"
 # shortcut: common ISO 4217 codes only (EUR4500 is an amount, GPT4 is a name); add codes as needed.
 _CURRENCY_CODES = (
     "EUR|USD|GBP|JPY|CNY|INR|CHF|CAD|AUD|NZD|SEK|NOK|DKK|PLN|CZK|HUF|RUB|UAH|TRY|"
@@ -114,32 +244,56 @@ HTML_REGEX = re.compile(
     flags=re.UNICODE | re.IGNORECASE,
 )
 
+# Punctuation (category P) of the CJK symbol, katakana middle dot and full-width blocks, except the
+# full-width forms of URL syntax (／ ？ ＃ ％ ＆ ＠ ： ． － ＿), which the styled fold turns into ASCII.
+_WIDE_PUNCT = re.escape(''.join(
+    chr(cp) for cp in [*range(0x3000, 0x3040), 0x30FB, *range(0xFF00, 0xFF66)]
+    if unicodedata.category(chr(cp))[0] == 'P' and unicodedata.normalize('NFKC', chr(cp)) not in '/?#%&@:.-_'))
+
 # Fixed: Unicode ranges use actual Unicode escapes (not literal \\u in raw strings)
 URL_REGEX = re.compile(
-    r"(?:^|(?<![\w\/\.]))"
+    # Only an ASCII letter or digit glues to the scheme, so a URL right after CJK/Thai text
+    # (請見https://..., ดูhttps://...) is still found.
+    r"(?:^|(?<![A-Za-z0-9_\/\.]))(?:"
     # protocol identifier
     r"(?:(?:https?:\/\/|ftp:\/\/|www\d{0,3}\.))"
-    # user:pass authentication
-    r"(?:\S+(?::\S*)?@)?" r"(?:"
-    # IP address exclusion - private & local networks
-    r"(?!(?:10|127)(?:\.\d{1,3}){3})"
-    r"(?!(?:169\.254|192\.168)(?:\.\d{1,3}){2})"
-    r"(?!172\.(?:1[6-9]|2\d|3[0-1])(?:\.\d{1,3}){2})"
-    # IP address dotted notation octets
-    r"(?:[1-9]\d?|1\d\d|2[01]\d|22[0-3])"
-    r"(?:\.(?:1?\d{1,2}|2[0-4]\d|25[0-5])){2}"
-    r"(?:\.(?:[1-9]\d?|1\d\d|2[0-4]\d|25[0-4]))"
+    # user:pass authentication; never across / ? # " < > so a later "@" in the
+    # query or the markup is not taken as user info
+    # (user up to the first ":", one way to split it, so a long run with no "@" fails in linear time)
+    r"(?:(?=[^\s/?#\"<>@])[^\s/?#\"<>@:]*(?::[^\s/?#\"<>@]*)?@)?" r"(?:"
+    # bracketed IPv6 host; private and loopback IPv4 hosts match too, so the whole
+    # URL (query values included) is replaced, not just the address
+    r"\[[0-9a-f:.]*:[0-9a-f:.]*\]" r"|"
+    # IPv4 host, whole: a longer octet (any decimal digit, "1௨3") or another label after it (any
+    # label start the host grammar below takes, "école" too) is a host name
+    rf"{_IPV4}(?![0-9{_DECIMAL}]|\.[{_IDN_CHAR}])"
     r"|"
-    # host name (with proper Unicode support)
-    r"(?:(?:[a-z\u00a1-\uffff0-9]-?)*[a-z\u00a1-\uffff0-9]+)"
+    # host name (with proper Unicode support, beyond the BMP too); the label characters of an email
+    # domain, so CJK and full-width prose punctuation (，、「) glued after a host ends it
+    # (labels as X+(-+X+)*, as in EMAIL_REGEX, so a host with no TLD fails in linear time)
+    rf"{_IDN_RUN}(?:-+{_IDN_RUN})*"
     # domain name
-    r"(?:\.(?:[a-z\u00a1-\uffff0-9]-?)*[a-z\u00a1-\uffff0-9]+)*"
-    # TLD identifier
-    r"(?:\.(?:[a-z\u00a1-\uffff]{2,}))" r"|" r"(?:(localhost))" r")"
+    rf"(?:\.{_IDN_RUN}(?:-+{_IDN_RUN})*)*"
+    # TLD identifier (punycode first, so ".xn" alone never ends the host)
+    rf"(?:\.(?:xn--[a-z0-9-]*[a-z0-9]|(?:{_NO_GLUE}[{_IDN_LETTER}]){{2,}}))"
+    r"|" r"(?:(localhost))" r")"
+    # fully qualified host's final dot ("example.com./?q="), only when a path, port or query follows,
+    # so a sentence-ending period stays outside the URL
+    r"(?:\.(?=/|:\d|[?#][^\s\"<>]))?"
     # port number
     r"(?::\d{2,5}\b)?"
-    # resource path
-    r"(?:\/[^\)\]\}\s]*)?",
+    # resource path, or a query/fragment right after the host ("?id=", "#token=");
+    # " < > are never raw in a URL, so markup around it survives. A bare trailing "?"
+    # stays punctuation. CJK and full-width punctuation (，。！（ ・) ends it, as in an email
+    # domain, so CJK prose glued after a URL stays. ) ] } belong to the URL only when more URL text follows
+    # ("?f=(a)&email=...", "report(1).pdf", "a(b);jsessionid=", a run as in "/(S(id))/a.aspx"); RFC 3986
+    # sub-delimiters (but a possessive ') between bracket and text count as URL text, so a closing bracket
+    # around a URL stays outside it.
+    rf"(?:\/(?:{_NO_GLUE}[^\)\]\}}\s\"<>{_WIDE_PUNCT}]|[\)\]\}}]+(?=[.,;:!$*@]*[\w&=/?#%+~-]))*"
+    rf"|[?#](?:{_NO_GLUE}[^\)\]\}}\s\"<>{_WIDE_PUNCT}]|[\)\]\}}]+(?=[.,;:!$*@]*[\w&=/?#%+~-]))+)?"
+    # Safety net: a scheme-led run whose host fails the grammar above (a look-alike character in it) is
+    # still a URL up to a space or prose punctuation, so its query values never stay visible.
+    rf"|(?:https?|ftp):\/\/(?:{_NO_GLUE}[^\s\"<>{_WIDE_PUNCT}])+(?<=[^\W_]|[{MARKS}]))",
     flags=re.UNICODE | re.IGNORECASE,
 )
 
@@ -286,29 +440,76 @@ def build_month_names_dict(extra_month_names=None):
     return result
 
 
-def build_date_regex(month_names_dict=None):
+_DAY = r'(?:0?[1-9]|[12]\d|3[01])'
+_MONTH = r'(?:0?[1-9]|1[0-2])'
+# Numeric dates with a 4-digit year and one separator (-, / or .), optional time:
+# 2024-01-15, 2024/1/15, 2024.01.15, 15.01.2024, 01/15/2024, 2024-01-15T10:30:00Z, 15-01-2024 10:30.
+# Year-last takes day-month or month-day, so one part must be a month (no 31/31/2024).
+# Year-first with dots needs 2-digit month/day so CalVer "2024.1.5" stays; a digit
+# joined by . or , on either side means a version, IP or decimal ("10.1.12.2024").
+# CJK and Korean write the year, month and day with unit characters (1990年1月15日, 1990년 1월 15일), and Korean
+# also as dots each followed by a space (1990. 1. 15.); the unit characters are separators like "/".
+_NUMERIC_DATE = (
+    r'(?<!\d[.,])(?:'
+    r'\d{4}(?:([-/])' + _MONTH + r'\1' + _DAY + r'|\.(?:0[1-9]|1[0-2])\.(?:0[1-9]|[12]\d|3[01])'
+    r'|\s?年\s?' + _MONTH + r'\s?月\s?' + _DAY + r'\s?日|년\s?' + _MONTH + r'월\s?' + _DAY + r'일'
+    r'|\.\s' + _MONTH + r'\.\s' + _DAY + r'\.)'
+    r'|' + _DAY + r'([-/.])' + _MONTH + r'\2\d{4}|' + _MONTH + r'([-/.])' + _DAY + r'\3\d{4}'
+    r')'
+    r'(?:[T ]\d{1,2}:\d{2}(?::\d{2})?(?:[.,]\d+)?(?:\s?Z|\s?[+-]\d{2}:?\d{2})?)?'
+    r'(?![.,]\d)'
+)
+
+
+# A date is a word of its own where no digit, "_" or letter of a spaced script (Latin, Greek, Cyrillic) touches it;
+# letters of an unspaced script (Thai, CJK) end a word, as they do for numbers (生日是15 January 1990谢谢).
+_DATE_START = r'(?<![\d_' + _SPACED_LETTERS + r'])'
+_DATE_END = r'(?![\d_' + _SPACED_LETTERS + r'])'
+
+
+def _han_numerals(*values):
+    """Han-script numerals (〇 一 十 廿, financial forms) whose Unicode numeric value is in *values*."""
+    return ''.join(chr(cp) for cp in range(0x3000, 0x2FA20) if unicodedata.numeric(chr(cp), None) in values
+                   and regex.match(r'\p{Script=Han}', chr(cp)))
+
+
+_HAN_DIGIT, _HAN_1_9 = f'[{_han_numerals(*range(10))}]', f'[{_han_numerals(*range(1, 10))}]'
+_HAN_TEN = f'[{_han_numerals(10)}]'
+# A date in Han numerals (一九九〇年一月十五日): four digits of value 0-9, a month 1-12 and a day 1-31 by numeric value.
+_HAN_DATE = (
+    rf'{_HAN_DIGIT}{{4}}年(?:{_HAN_TEN}[{_han_numerals(1, 2)}]?|{_HAN_1_9})月'
+    rf'(?:[{_han_numerals(2)}]{_HAN_TEN}{_HAN_1_9}?|[{_han_numerals(3)}]{_HAN_TEN}[{_han_numerals(1)}]?'
+    rf'|[{_han_numerals(20, 30)}]{_HAN_1_9}?|{_HAN_TEN}{_HAN_1_9}?|{_HAN_1_9})日'
+)
+# fold_styled_characters: a circled day number (⑮ January 1990), which the fold keeps where no digit sits beside it.
+_CIRCLED_DAYS = ''.join(chr(cp) for cp in range(0x2460, 0x3300)
+                        if unicodedata.decomposition(chr(cp)).startswith('<circle>')
+                        and unicodedata.normalize('NFKC', chr(cp)).isdigit()
+                        and 1 <= int(unicodedata.normalize('NFKC', chr(cp))) <= 31)
+
+
+def build_date_regex(month_names_dict=None, styled=False):
     """Build DATE_REGEX from a month-names dict.
 
     Args:
         month_names_dict: output of build_month_names_dict().
                          Uses module-level MONTH_NAMES_MULTILINGUAL if None.
+        styled: a month-name date's day may be a circled number (fold_styled_characters).
     Returns:
         Compiled regex pattern
     """
     names = month_names_dict or MONTH_NAMES_MULTILINGUAL
     alt = '|'.join(sorted(names.keys(), key=len, reverse=True))
+    day = rf'(?:\d{{1,2}}|[{_CIRCLED_DAYS}])' if styled else r'\d{1,2}'
+    # A numeric date glued to letters of an unspaced script (Thai, CJK) is a date, as numbers are.
     return re.compile(
-        r'\b(?:'
-        r'\d{4}-\d{2}-\d{2}(?:T\d{2}:\d{2}(?::\d{2})?(?:\.\d+)?(?:Z|[+-]\d{2}:?\d{2})?)?'
-        r'|'
-        r'\d{1,2}[/.-]\d{1,2}[/.-]\d{4}'
-        r'|'
+        _DATE_START + _NUMERIC_DATE + _DATE_END + '|' + _HAN_DATE + '|' + _DATE_START + r'(?:'
         r'(?:' + alt + r')'
-        r'\.?\s+\d{1,2}(?:st|nd|rd|th)?,?\s+\d{4}'
+        r'\.?\s+' + day + r'(?:st|nd|rd|th)?,?\s+\d{4}'
         r'|'
-        r'\d{1,2}\.?\s+(?:de\s+)?(?:' + alt + r')'
+        + day + r'\.?\s+(?:de\s+)?(?:' + alt + r')'
         r'(?:\s+de)?\s+\d{4}'
-        r')\b',
+        r')' + _DATE_END,
         flags=re.IGNORECASE,
     )
 
@@ -332,36 +533,19 @@ def build_fuzzy_vocabulary(month_names_dict=None, lang_to_vocab=None):
         )
     return all_vocab, by_lang
 
-# Date patterns: ISO 8601, common formats, multilingual month names
-DATE_REGEX = re.compile(
-    r'\b(?:'
-    # ISO 8601: 2024-01-15 or 2024-01-15T10:30:00Z
-    r'\d{4}-\d{2}-\d{2}(?:T\d{2}:\d{2}(?::\d{2})?(?:\.\d+)?(?:Z|[+-]\d{2}:?\d{2})?)?'
-    r'|'
-    # Common formats: 01/15/2024, 15.01.2024, 15-01-2024
-    r'\d{1,2}[/.-]\d{1,2}[/.-]\d{4}'
-    r'|'
-    # Month name first: January 15, 2024 or Jan 15 2024 (all 4 langs)
-    r'(?:' + _MONTH_ALTERNATION + r')'
-    r'\.?\s+\d{1,2}(?:st|nd|rd|th)?,?\s+\d{4}'
-    r'|'
-    # Day first: 15 January 2024, 15. Januar 2024, 15 de enero de 2024
-    r'\d{1,2}\.?\s+(?:de\s+)?(?:' + _MONTH_ALTERNATION + r')'
-    r'(?:\s+de)?\s+\d{4}'
-    r')\b',
-    flags=re.IGNORECASE,
-)
+# Date patterns: numeric dates and date-times, multilingual month names
+DATE_REGEX = build_date_regex()
 
 # Candidate pattern for fuzzy date matching: a word near a number that could be a date.
 # Matches patterns like "Janury 15, 2024" or "15 Feburary 2024" where the month is misspelled.
 FUZZY_DATE_CANDIDATE_REGEX = re.compile(
-    r'\b(?:'
+    _DATE_START + r'(?:'
     # Word then day then year: "Janury 15, 2024"
     r'([A-Za-z\u00e0-\u00fc]{3,12})\.?\s+\d{1,2}(?:st|nd|rd|th)?,?\s+\d{4}'
     r'|'
     # Day then word then year: "15 Feburary 2024" or "15. Janur 2024" or "15 de enro de 2024"
     r'\d{1,2}\.?\s+(?:de\s+)?([A-Za-z\u00e0-\u00fc]{3,12})(?:\s+de)?\s+\d{4}'
-    r')\b',
+    r')' + _DATE_END,
     flags=re.IGNORECASE,
 )
 
@@ -371,18 +555,18 @@ ISOLATED_LETTERS_REGEX = re.compile(
     flags=re.UNICODE | re.IGNORECASE,
 )
 
+# Isolated = whitespace (or text edge) on both sides, so "(born <YEAR>)." keeps its ")." in any script.
 ISOLATED_SPECIAL_SYMBOLS_REGEX = re.compile(
-    r"(?<![a-zA-Z0-9])[:_.|><;·}@~!?+#)({,/\\\\^]+(?![a-zA-Z0-9])",
+    r"(?<!\S)[:_.|><;·}@~!?+#)({,/\\\\^]+(?!\S)",
     flags=re.UNICODE | re.IGNORECASE,
 )
 
 # Pre-compiled bracket/brace removal patterns (moved from special.py runtime)
 BRACKET_CONTENT_REGEX = re.compile(r'\[[^\]]+\]')
 BRACE_CONTENT_REGEX = re.compile(r'\{[^}]+\}')
-ISOLATED_QUOTES_REGEX = re.compile(
-    r"(?<![a-zA-Z0-9])['\"\-*%](?![a-zA-Z0-9])",
-    flags=re.UNICODE | re.IGNORECASE,
-)
+# A quote, dash, * or % is isolated unless a letter, digit or mark of any script touches it
+# (special.py checks the neighbours), so "ইসলাম-এর" and "東京-大阪" keep their hyphen.
+ISOLATED_QUOTES_REGEX = re.compile(r"['\"\-*%]")
 
 # Pre-compiled punctuation pattern (was re-compiled on every call in special.py)
 PUNCTUATION_REGEX = re.compile('[' + re.escape(string.punctuation) + ']')

@@ -1,6 +1,6 @@
 # SqueakyCleanText
 
-> Production-ready text preprocessing and PII anonymization pipeline for Python 3.11+.
+> Production-ready text preprocessing and PII anonymization pipeline for Python 3.12+.
 > Removes noise (URLs, emails, phone numbers, stopwords), detects language automatically,
 > and runs ensemble NER (ONNX/PyTorch/GLiNER) for entity anonymization.
 > Published on PyPI as `squeakycleantext`.
@@ -29,7 +29,10 @@ lm_text, stat_text, lang = result  # backward-compatible 3-tuple unpacking
 - `cleaner.process_batch(texts) -> List[ProcessResult]` — thread-parallel batch
 - `cleaner.aprocess_batch(texts) -> List[ProcessResult]` — async (FastAPI/aiohttp)
 - `cleaner.warmup(languages=None)` — pre-load NER models at startup
-- `ProcessResult.metadata` — dict with `anon_map` (reversible mode) and `classes` (GLiClass)
+- `ProcessResult.metadata` — always a dict: `regex_counts` and `entity_counts` (`{TYPE: {"count", "chars"}}`, value-free), `language_confidence` (float, 1.0 pinned, None unknown), `language_source` (`pinned`/`detected`/`fallback`/`none`), `warnings` (sorted codes: `language_unknown`, `language_fallback`, `language_low_confidence`, `ner_fallback_models`, `cuda_fallback`), `provenance` (`{"backend", "models": [{"key", "id", "revision", "provider"}]}` of the NER models run), plus `anon_map` (reversible mode), `classes` (GLiClass), `findings` (opt-in)
+- `ProcessResult.signals` — value-free view, same keys for every input: `language`, `language_confidence`, `language_source`, `chars`, `pii_count`, `pii_chars`, `pii_share`, `pii_types`, `regex_counts`, `entity_counts`, `sensitive`, `warnings` (adds `ner_off`, `empty_input`), `models`. Never entity text (`sct.signals.public_view`, `merge_views`, `PUBLIC_VIEW_KEYS`)
+- `preset_config(name, **overrides)` / `TextCleanerConfig.from_preset(name, ...)` / `PRESETS` — `"training"` (PII only) or `"sct"` (library defaults)
+- `sct.adapters.is_sensitive_result(result)` — True when any regex replacement or NER finding was counted
 - `AnonymizationMap.deanonymize(text)` — restore original text from reversible placeholders
 - `AnonymizationMap.to_dict()` / `.from_dict(data)` — serialization for storage
 - `sct.evaluation.evaluate_pii(examples, predictions, model=...)` — exact-span PII evaluation
@@ -41,6 +44,10 @@ lm_text, stat_text, lang = result  # backward-compatible 3-tuple unpacking
 - `redact_image` / `TesseractOCRProvider` — optional OCR image redaction
 - `assess_reidentification_risk` — corpus k-anonymity summary
 - `MODEL_CANDIDATES` / `run_model_benchmark` — pinned model evaluation
+- `sct.integrations.hf.clean_dataset(ds, columns=, output=, config=, score=, **map_kwargs)` — Hugging Face datasets (`[datasets]` extra)
+- `sct.integrations.datatrove.SCTCleaner` / `sct.integrations.langchain.SCTDocumentTransformer` / `sct.integrations.haystack.SCTDocumentCleaner` — framework adapters (`[datatrove]`, `[langchain]`, `[haystack]`); shared options `columns`, `output='overwrite'|'new_column'`, `config` (default `"training"` preset); write `metadata["sct"]`
+- `sct.integrations._runtime.CleanerHandle` / `clean_columns` — one cleaner per process for Ray, Spark, Polars, DuckDB, dlt, Daft (docs/RECIPES.md)
+- `sct.score.score_record(result)` / `score_records(results, texts, ScoreConfig(...))` — flat `sct_*` columns; Score B (quality, MinHash, `[score]` extra) off by default; `build_data_card` / `render_data_card`
 
 ## PII Evaluation
 
@@ -69,8 +76,8 @@ python -m scripts.benchmark_models \
 ## Privacy Policies and Audit Metadata
 
 Pass `privacy_policy=PrivacyPolicy(...)` and `include_entities=True` to
-`TextCleaner`. `ProcessResult.metadata` then includes policy findings and
-detector model revisions.
+`TextCleaner`. `ProcessResult.metadata` then includes policy findings; model
+revisions are always in `metadata['provenance']`.
 
 Pass `token_store=...` in reversible mode to return an opaque
 `anon_map_reference` instead of the map. Reversible output remains
@@ -79,23 +86,34 @@ pseudonymized personal data.
 ## Boundary Commands
 
 ```
-printf 'Email maria@example.com' | sct-clean --no-ner
+printf 'Email maria@example.com' | sct-clean --no-ner --preset training
+sct-report data.jsonl --text-column text --preset training --minhash \
+    --quasi-identifiers city,age_band --k 5 --out report.json --card card.md
 pip install 'squeakycleantext[mcp]'
-sct-mcp
+SCT_MCP_PRESET=training SCT_MCP_ROOT=~/notes sct-mcp
 ```
 
-FastMCP loads only when the MCP server starts. OCR requires the `ocr` extra and
+FastMCP loads only when the MCP server starts. MCP tools `clean_text` (`text` or `path`)
+and `clean_json` return `{warnings, summary, text|value, signals}`, plus value-free
+`findings` with `detail="full"`. `path` input is off unless `SCT_MCP_ROOT` is set
+(`SCT_MCP_MAX_BYTES`, default 1 MiB). `SCT_MCP_PRESET` defaults to `sct`. OCR requires the `ocr` extra and
 a local Tesseract executable when using `TesseractOCRProvider`.
 
 ## TextCleanerConfig — Key Fields
 
+Presets: `preset_config("training", **overrides)` / `TextCleanerConfig.from_preset()` = PII-only cleaning
+for training/RAG text (URLs, emails, phones, IPs, NER entities replaced; numbers, dates, HTML,
+brackets, case, punctuation, whitespace, code escapes kept; no stat_text). `"sct"` = library defaults.
+Adapters default to `"training"`.
+
 ```
 check_ner_process=True              # NER entity anonymization
 check_replace_urls=True             # Replace URLs with <URL>
+check_decode_unicode_escapes=True   # With check_fix_bad_unicode: decode literal \u00e9 / \n escapes; False keeps them (code)
 check_replace_emails=True           # Replace emails with <EMAIL>
 check_replace_ips=True              # Replace IPv4/IPv6 with <IP> (replace_ips_public_only=False)
 check_replace_phone_numbers=True    # Replace phones with <PHONE>
-check_replace_dates=False           # Replace dates with <DATE>
+check_replace_dates=True            # Replace dates with <DATE>
 check_fuzzy_replace_dates=False     # Fuzzy misspelled month matching (requires [fuzzy])
 check_remove_stopwords=True         # Language-aware stopword removal
 check_remove_punctuation=True       # Punctuation removal (stat output)
@@ -106,8 +124,19 @@ check_classify_document=False       # GLiClass zero-shot pre-classification
 ner_backend='onnx'                  # 'onnx'|'torch'|'gliner'|'ensemble_onnx'|'ensemble_torch'|'presidio_gliner'
 ner_mode='standard'                 # 'standard'|'pii' (auto-configures GLiNER for 60+ PII entity types)
 replacement_mode='placeholder'      # 'placeholder' | 'synthetic' | 'reversible' (indexed placeholders + deanonymize map)
-ner_confidence_threshold=0.85       # Min confidence for entity tagging
-ner_batch_size=8                    # Inference batch size (must be >= 1)
+ner_confidence_threshold=None       # Min confidence (0..1); None = 0.85, or the GLiNER threshold in PII mode
+gliner_threshold=None               # GLiNER cut (0..1); None = 0.4, or 0.3 in PII mode
+ner_batch_size=8                    # NER chunks per forward pass, batched across process_batch docs; 1 = 0.7.1 pattern
+onnx_intra_op_threads=None          # ONNX Runtime threads per inference (None = ORT default, all cores); set to cap CPU use
+onnx_inter_op_threads=None          # ONNX Runtime inter-op threads (None = ORT default; rarely needed)
+ner_device=None                     # None = auto (CUDA when available) | 'cpu' | 'cuda'
+cuda_device_id=0                    # GPU index for ONNX/torch/GLiNER (and GLiClass with ner_device='cuda')
+onnx_cuda_provider_options=None     # extra CUDAExecutionProvider options, e.g. {'gpu_mem_limit': 8 << 30}
+ner_chunk_overlap=0                 # NER window overlap in tokens per side for long docs (0 = 0.7.1 chunks)
+detect_all_languages=True           # Auto-detect over all 75 Lingua languages; False = 0.7 detector (EN/NL/DE/ES + extras)
+json_key_cleaning='pii'             # process_json keys: 'pii' = regex PII steps only (no NER) | 'pii_ner' = plus NER | 'full' = whole config (0.7) | 'off' = raw
+language_confidence_warning=0.0     # metadata warning 'language_low_confidence' below this confidence (0..1, never changes routing)
+language_margin_warning=0.15        # same warning when the top language leads the runner-up by less than this
 positional_tags=('PER','LOC','ORG','MISC')
 
 gliner_model=None                   # GLiNER model ID (auto-set by ner_mode='pii')
@@ -115,7 +144,7 @@ gliner_onnx=False                   # Load GLiNER with ONNX weights (auto-set fo
 gliner_label_descriptions=None      # ZERONER-style: {'person': "a person's full name"} for zero-shot
 gliclass_model=None                 # GLiClass model ID (default: gliclass-edge-v3.0)
 gliclass_labels=()                  # Classification labels: ('email', 'code', 'legal')
-language=None                       # Pin ('en'), restrict (('en','nl')), or None for auto-detect. Accepts Lingua names, ISO 639-1/639-3.
+language=None                       # Pin ('en', 'hi': any Lingua language), restrict (('en','nl')), or None for auto-detect. Accepts Lingua names, ISO 639-1/639-3.
 extra_languages=()                  # Add languages: 'FRENCH', 'fr', 'PORTUGUESE', 'pt', etc.
 custom_stopwords=None               # {LANG: frozenset({...})}
 custom_pipeline_steps=()            # Tuple of (text: str) -> str callables
@@ -182,6 +211,15 @@ A: Pass `extra_languages=('FRENCH',)` in `TextCleanerConfig`. NER and detection 
 **Q: Can I add custom text transformation steps?**
 A: Yes — `custom_pipeline_steps=(my_fn,)` where `my_fn` accepts and returns `str`. Steps run after all built-in steps.
 
+**Q: How do I clean a Hugging Face dataset or a LangChain/Haystack/DataTrove pipeline?**
+A: Use the adapters in `sct.integrations` (see docs/INTEGRATIONS.md). They default to the `training` preset (PII only).
+
+**Q: How do I get per-row PII stats or a data card without exposing values?**
+A: `sct.score.score_record(result)` or the `sct-report` command (docs/SCORE.md).
+
+**Q: How fast is it, and should I use a GPU?**
+A: See docs/PERFORMANCE.md: `process_batch` with about 16 workers on CPU; a GPU for bulk work.
+
 **Q: What's the difference between lm_text and stat_text?**
 A: `lm_text` preserves sentence structure with replacement tokens (for LLM fine-tuning/inference). `stat_text` is lowercased, stopword-free, no punctuation (for TF-IDF, embeddings, classical ML).
 
@@ -197,11 +235,21 @@ sct/utils/anonymization_map.py   — AnonymizationMap: reversible anonymization 
 sct/utils/process_result.py      — ProcessResult: backward-compatible result with metadata
 sct/utils/synthetic.py           — SyntheticReplacer: Faker-based entity replacement
 sct/utils/onnx_pipeline.py       — ONNXNERPipeline: ONNX inference, BIO aggregation
+sct/signals.py                   — public value-free view (ProcessResult.signals)
+sct/presets.py                   — training / sct presets
+sct/integrations/                — HF datasets, DataTrove, LangChain, Haystack adapters
+sct/score.py / sct/report_cli.py — score columns, data card, sct-report
+sct/mcp_server.py                — FastMCP server (sct-mcp)
 sct/utils/constants.py           — Pre-compiled regexes (URL, email, phone, date, currency, etc.)
 sct/utils/stopwords.py           — Language-aware stopword removal (O(1) set lookup)
 sct/utils/resources.py           — Lingua language detector (lazy singleton)
 tests/test_sct.py                — Full test suite (hypothesis, faker, pytest-timeout)
 ```
+
+## Docs
+
+- docs/PERFORMANCE.md (CPU/GPU throughput, CUDA setup), docs/INTEGRATIONS.md, docs/RECIPES.md,
+  docs/SCORE.md, docs/MCP.md, docs/MULTILINGUAL_EVAL.md, docs/ADDING_LANGUAGES.md, CHANGELOG.md
 
 ## Resources
 

@@ -18,7 +18,7 @@ import pytest
 from sct import TextCleaner, TextCleanerConfig, ProcessResult, AnonymizationMap
 from sct.config import DEFAULT_NER_MODELS, PII_DEFAULT_MODEL
 from sct.utils.ner import ENTITY_TYPE_MAP
-from tests.conftest import TEST_NER_MODELS
+from tests.conftest import TEST_NER_MODELS, TEST_TORCH_NER_MODELS
 
 # Derive entity tags from the authoritative map — stays in sync automatically
 ENTITY_TAGS = tuple(f"<{v}>" for v in ENTITY_TYPE_MAP.values())
@@ -75,10 +75,18 @@ def _make_ner_cfg(**overrides) -> TextCleanerConfig:
         check_statistical_model_processing=True,
         ner_models=NER_MODELS,
     )
+    if overrides.get("ner_backend") in ("torch", "ensemble_torch") and not USE_PROD:
+        defaults["torch_ner_models"] = TEST_TORCH_NER_MODELS
     defaults.update(overrides)
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", DeprecationWarning)
         return TextCleanerConfig(**defaults)
+
+
+def test_torch_tests_use_the_small_model():
+    """Torch-backend tests must not fall back to the multi-GB XLM-R defaults."""
+    cfg = _make_ner_cfg(ner_backend="torch")
+    assert set(cfg.torch_ner_models.values()) == {"dslim/bert-base-NER"} or USE_PROD
 
 
 # =========================================================================
@@ -99,8 +107,8 @@ class TestCorePipeline:
         assert "â€" not in lm
 
     def test_a02_ascii_transliteration(self):
-        """unidecode converts non-ASCII to ASCII equivalents."""
-        cfg = _make_cfg()
+        """unidecode converts non-ASCII to ASCII equivalents (opt-in since 0.8.0)."""
+        cfg = _make_cfg(check_to_ascii_unicode=True)
         tc = TextCleaner(cfg=cfg)
         lm, _, _ = tc.process("Ångström café résumé naïve")
         assert "Angstrom" in lm
@@ -121,8 +129,6 @@ class TestCorePipeline:
         cfg = _make_cfg(check_remove_emoji=False)
         tc = TextCleaner(cfg=cfg)
         lm, _, _ = tc.process("Hello 🌍 World")
-        # Emoji gets transliterated by unidecode (to_ascii_unicode), not removed
-        # This is expected behavior — emoji characters become ASCII approximations
         assert "Hello" in lm
 
     def test_a05_html_stripping(self):
@@ -446,13 +452,16 @@ class TestNERBackends:
         assert lang is not None
 
     def test_d32_process_result_metadata(self):
-        """ProcessResult.metadata available (None when no extended features)."""
+        """ProcessResult.metadata always carries the value-free counts."""
         cfg = _make_ner_cfg()
         tc = TextCleaner(cfg=cfg)
         result = tc.process("Test text for metadata check.")
         assert isinstance(result, ProcessResult)
-        # In placeholder mode, metadata is None (no anon_map, no classes)
-        assert result.metadata is None
+        # Placeholder mode: only the value-free counts (no anon_map, no classes)
+        assert set(result.metadata) == {
+            "source_chars", "regex_counts", "entity_counts", "language_confidence", "language_source", "warnings",
+            "provenance",
+        }
 
     def test_d33_batch_processing(self):
         """process_batch handles multiple texts."""
@@ -832,6 +841,10 @@ class TestPIIMode:
 class TestPresidioGLiNER:
     """L. Presidio + GLiNER integration backend."""
 
+    @pytest.mark.skipif(
+        not (HAS_PRESIDIO and _has_package("en_core_web_lg")),
+        reason="presidio downloads the 400 MB spaCy en_core_web_lg at test time",
+    )
     def test_l53_presidio_gliner_backend(self):
         """Presidio + GLiNER backend with real models."""
         cfg = _make_ner_cfg(

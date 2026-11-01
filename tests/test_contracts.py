@@ -72,6 +72,13 @@ def test_presidio_backend_uses_detected_language():
 
     assert calls == [("Piet woont hier.", "nl")]
 
+    # A detected language the analyzer has no NLP engine for falls back to English.
+    FakeAnalyzer.supported_languages = ["en", "nl"]
+    ner.ner_process_detailed(
+        "Namaste.", positional_tags=("PER",), language="HINDI", privacy_policy=policy,
+    )
+    assert calls[-1] == ("Namaste.", "en")
+
 
 def test_gliclass_onnx_rejects_unsupported_configuration():
     with pytest.raises(ValueError, match="GLiClass ONNX is not supported"):
@@ -95,7 +102,7 @@ def test_general_ner_passes_pinned_revision_to_model_loader(monkeypatch):
     class FakeTokenizer:
         max_len_single_sentence = 510
 
-    def fake_loader(model_name, *, device, cache_dir, revision):
+    def fake_loader(model_name, *, device, cache_dir, revision, **thread_kwargs):
         calls.append((model_name, revision))
         return object(), FakeTokenizer()
 

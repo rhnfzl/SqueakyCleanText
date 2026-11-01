@@ -21,7 +21,7 @@ def test_evaluate_pii_counts_exact_span_matches():
     predictions = {
         "email-1": (
             EntitySpan("PERSON", 6, 9),
-            EntitySpan("PHONE_NUMBER", 13, 28),
+            EntitySpan("PHONE", 13, 28),
         ),
     }
 

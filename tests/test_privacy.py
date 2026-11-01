@@ -96,8 +96,16 @@ def test_privacy_policy_redacts_union_of_overlapping_entities():
 
 def test_text_cleaner_returns_policy_findings(monkeypatch):
     class FakeNER:
+        device = "cpu"
+
         def __init__(self, **kwargs):
             pass
+
+        def uses_fallback_models(self, language):
+            return False
+
+        def models_for(self, language):
+            return [{"key": "ENGLISH", "id": "m", "revision": "r", "provider": "CPUExecutionProvider"}]
 
         def ner_process_detailed(self, text, *, privacy_policy, **kwargs):
             entity = DetectedEntity("PERSON", 0.95, "Maria", 0, 5)
@@ -106,6 +114,9 @@ def test_text_cleaner_returns_policy_findings(monkeypatch):
                 text=privacy_policy.transform(text, findings),
                 findings=findings,
             )
+
+        def ner_process_batch_detailed(self, texts, languages, *, privacy_policy, **kwargs):
+            return [self.ner_process_detailed(t, privacy_policy=privacy_policy) for t in texts]
 
     monkeypatch.setattr("sct.sct.ner.GeneralNER", FakeNER)
     policy = PrivacyPolicy(
@@ -140,11 +151,10 @@ def test_text_cleaner_returns_policy_findings(monkeypatch):
 
     assert result.lm_text == "<REDACTED> arrived."
     assert result.metadata["policy"] == {"name": "strict", "version": "2026-09"}
-    assert result.metadata["detector"]["backend"] == "onnx"
-    assert (
-        result.metadata["detector"]["models"]["ENGLISH"]["revision"]
-        == "2c10955af9538d6ff8a68316c5dbfcd0b968761e"
-    )
+    assert result.metadata["provenance"] == {
+        "backend": "onnx",
+        "models": [{"key": "ENGLISH", "id": "m", "revision": "r", "provider": "CPUExecutionProvider"}],
+    }
     assert result.metadata["findings"] == (
         EntityFinding(
             DetectedEntity("PERSON", 0.95, "Maria", 0, 5),
@@ -160,7 +170,7 @@ def test_general_ner_detailed_processing_returns_real_offsets():
         labels = ["person"]
         label_map = {"person": "PER"}
 
-        def __call__(self, texts):
+        def __call__(self, texts, batch_size=1):
             return [[{
                 "entity_group": "PER",
                 "score": 0.95,
@@ -203,7 +213,7 @@ def test_detailed_processing_maps_normalized_chunk_offsets_to_source():
         labels = ["person"]
         label_map = {"person": "PER"}
 
-        def __call__(self, texts):
+        def __call__(self, texts, batch_size=1):
             assert texts == ["Intro. Maria"]
             return [[{
                 "entity_group": "PER",
@@ -242,12 +252,26 @@ def test_detailed_processing_maps_normalized_chunk_offsets_to_source():
 
 def test_text_cleaner_stores_reversible_map_externally(monkeypatch):
     class FakeNER:
+        device = "cpu"
+
         def __init__(self, **kwargs):
             pass
+
+        def uses_fallback_models(self, language):
+            return False
+
+        def models_for(self, language):
+            return [{"key": "ENGLISH", "id": "m", "revision": "r", "provider": "CPUExecutionProvider"}]
 
         def ner_process(self, text, *, anon_map, **kwargs):
             anon_map.add("<PERSON_0>", "Maria", "PERSON", 0, 5)
             return "<PERSON_0> arrived."
+
+        def ner_process_batch_detailed(self, texts, languages, *, anon_maps, **kwargs):
+            return [
+                NERProcessingResult(text=self.ner_process(t, anon_map=m), findings=())
+                for t, m in zip(texts, anon_maps)
+            ]
 
     monkeypatch.setattr("sct.sct.ner.GeneralNER", FakeNER)
     store = InMemoryTokenStore()
@@ -292,7 +316,7 @@ def test_reversible_mode_restores_contact_values():
     anon_map = result.metadata["anon_map"]
 
     assert "<EMAIL_0>" in result.lm_text
-    assert "<PHONE_NUMBER_0>" in result.lm_text
+    assert "<PHONE_0>" in result.lm_text
     assert anon_map.deanonymize(result.lm_text) == source
 
 
@@ -347,7 +371,7 @@ def _gliner_ner_with_score(score):
         labels = ["person"]
         label_map = {"person": "PER"}
 
-        def __call__(self, texts):
+        def __call__(self, texts, batch_size=1):
             return [[{
                 "entity_group": "PER",
                 "score": score,
@@ -369,19 +393,19 @@ def _gliner_ner_with_score(score):
 
 def test_pii_mode_final_threshold_keeps_what_gliner_keeps():
     cfg = TextCleanerConfig(ner_mode="pii")
-    assert cfg.ner_confidence_threshold == cfg.gliner_threshold == 0.3
+    assert cfg.effective_ner_confidence_threshold == cfg.effective_gliner_threshold == 0.3
     assert TextCleanerConfig(
         ner_mode="pii", gliner_threshold=0.5,
-    ).ner_confidence_threshold == 0.5
+    ).effective_ner_confidence_threshold == 0.5
     assert TextCleanerConfig(
         ner_mode="pii", ner_confidence_threshold=0.9,
-    ).ner_confidence_threshold == 0.9
-    assert TextCleanerConfig().ner_confidence_threshold == 0.85
+    ).effective_ner_confidence_threshold == 0.9
+    assert TextCleanerConfig().effective_ner_confidence_threshold == 0.85
 
     result = _gliner_ner_with_score(0.5).ner_process_detailed(
         "Maria arrived.",
         positional_tags=cfg.positional_tags,
-        ner_confidence_threshold=cfg.ner_confidence_threshold,
+        ner_confidence_threshold=cfg.effective_ner_confidence_threshold,
         language="ENGLISH",
         privacy_policy=_REDACT_PERSON,
     )

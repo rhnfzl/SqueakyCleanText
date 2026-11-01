@@ -1,6 +1,15 @@
 """Streaming interfaces with explicit privacy guarantees."""
 
+import re
+from bisect import bisect_right
+
 from sct.sct import TextCleaner
+from sct.utils import constants, contact
+
+# A digit run at the end of the buffer may be a phone the next feed completes ("06 12 34").
+_PHONE_TAIL = re.compile(r"[+(]?\d[\d ()+./-]*\Z")
+# Longer than any phone the regex accepts; a longer digit tail (a number table) may still split.
+_PHONE_TAIL_MAX = 32
 
 
 class BufferedStreamingRedactor:
@@ -29,8 +38,8 @@ class BufferedStreamingRedactor:
 class WindowedStreamingRedactor:
     """Emit bounded chunks while retaining a configurable token overlap.
 
-    This mode is suitable for bounded contact tokens such as emails and phone
-    numbers. Use ``BufferedStreamingRedactor`` when multiword NER entities must
+    This mode is suitable for bounded contact tokens such as emails, phone
+    numbers and dates. Use ``BufferedStreamingRedactor`` when multiword NER entities must
     have document-wide guarantees.
     """
 
@@ -59,23 +68,78 @@ class WindowedStreamingRedactor:
         if len(self._buffer) <= self._max_buffer_chars:
             return ""
 
-        cutoff = len(self._buffer) - self._overlap_chars
-        split_at = max(
-            (
-                index
-                for index, character in enumerate(self._buffer[:cutoff + 1])
-                if character.isspace()
-            ),
-            default=-1,
-        )
+        # Never split inside a contact token that holds spaces ("06 12 34 56 78"). The guard reads the
+        # cleaner's own normalised text (cleaner.normalise, the steps process runs before its regexes)
+        # and the regexes on the views the cleaner's steps use, so the two cannot differ.
+        cleaner, cfg = self._cleaner, self._cleaner.cfg
+        normalise = cleaner.normalise
+        # The unfinished last token is left out when it changes the view before it: a cut escape ("\\U000000")
+        # stops the cleaner's escape decoding for the whole buffer (the whole text decodes it once complete).
+        buffer, view = self._buffer, normalise(self._buffer)
+        head = buffer[:max((i for i, c in enumerate(buffer) if c.isspace()), default=-1) + 1]
+        if head != buffer and not view.startswith(head_view := normalise(head)):
+            buffer, view = head, head_view
+        # The overlap is kept on the text the guard reads: a split needs overlap_chars of it to its right, so a
+        # rule that reads past a space (a phone's next group: "㉚ ⓪⑦" folds to "30 07") sees what the whole
+        # document gives it.
+        cutoff = len(buffer) - self._overlap_chars
+        phone_view = contact.PHONE_VIEW if cfg.fold_styled_characters else contact.PHONE_DIGIT_VIEW
+        views = [constants.URL_REGEX, constants.EMAIL_REGEX, contact.IP_VIEW, phone_view]
+        if cfg.check_replace_html:  # a tag holding a space ('<a title="x y">')
+            views.append(constants.HTML_REGEX)
+        if cfg.check_replace_dates:
+            views.append(cleaner._date_view)
+        if cfg.check_fuzzy_replace_dates:  # every candidate the fuzzy step may mask ("15 Janury 1990")
+            views.append(constants.FUZZY_DATE_CANDIDATE_REGEX)
+        if cfg.check_replace_numbers:  # a grouped number ("5 379") is one token too
+            views.append(contact.numbers_regex(cfg.replace_numbers_in_words))
+        # (start, end) of view text a split must not cut: start < split < end
+        protected = [
+            match.span()
+            for regex in views
+            for match in (regex.pattern.finditer(view.translate(regex.table))
+                          if isinstance(regex, contact.DigitView) else regex.finditer(view))
+        ]
+        phone_digits = view.translate(phone_view.table)
+        tail = _PHONE_TAIL.search(phone_digits, max(0, len(phone_digits) - _PHONE_TAIL_MAX))
+        if tail:
+            protected.append((tail.start(), len(view) + 1))
+
+        # A whitespace split is safe where the view is the two halves' own views with at most one whitespace
+        # character between them ("\r\n" is one "\n"), so no step reads across it, and no protected match
+        # covers the cut. Candidates are tried from the cutoff back; a protected one jumps to the last candidate
+        # whose own view ends at or before the match start (a bisect on view offsets, since NFKC can make the
+        # view longer, "⑫" -> "12", or escapes shorter), so a feed normalises a few times, not once per space.
+        candidates = [index for index, character in enumerate(buffer[:cutoff + 1]) if character.isspace()]
+        split_at, index = -1, len(candidates) - 1
+        while index >= 0:
+            position = candidates[index]
+            left = normalise(buffer[:position])
+            offset = len(left)
+            if not view.startswith(left):
+                index -= 1
+                continue
+            cover = next((start for start, end in protected if start < offset < end), None)
+            if cover is not None:
+                index = bisect_right(candidates, cover, hi=index, key=lambda p: len(normalise(buffer[:p]))) - 1
+                continue
+            right = normalise(buffer[position + 1:])
+            separator = view[offset:len(view) - len(right)]
+            if len(view) - offset - len(right) not in (0, 1) or not view.endswith(right) \
+                    or not (separator == "" or separator.isspace()):
+                index -= 1
+                continue
+            split_at = position
+            break
         if split_at < 0:
             raise BufferError(
-                "Streaming buffer exceeded max_buffer_chars without whitespace. "
+                "Streaming buffer exceeded max_buffer_chars without a safe whitespace split. "
                 "Increase the limit or use BufferedStreamingRedactor."
             )
 
         prefix = self._buffer[:split_at]
-        separator = self._buffer[split_at]
+        # the cleaner's whitespace step turns any space (\u00a0, \u202f) into " "; the separator follows it
+        separator = " " if cfg.check_normalize_whitespace else separator
         self._buffer = self._buffer[split_at + 1:]
         return self._cleaner.process(prefix).lm_text + separator
 

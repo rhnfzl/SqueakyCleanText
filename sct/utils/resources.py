@@ -1,3 +1,4 @@
+import os
 import warnings
 import threading
 
@@ -52,6 +53,9 @@ LANGUAGE_NAME = [(language.name).lower() for language in LANGUAGES]
 # Lazy language detector: built on first use, not at import time
 _detector = None
 _detector_lock = threading.Lock()
+if hasattr(os, "register_at_fork"):
+    # A child forked while another thread built a detector must not inherit the lock held.
+    os.register_at_fork(after_in_child=lambda: globals().update(_detector_lock=threading.Lock()))
 
 
 def _get_detector():
@@ -93,6 +97,19 @@ def build_detector(supported_languages: frozenset):
     if not lingua_langs:
         lingua_langs = [getattr(Language, n) for n in DEFAULT_LANGUAGES]
     return LanguageDetectorBuilder.from_languages(*lingua_langs).build()
+
+
+_all_detector = None
+
+
+def build_all_detector():
+    """Lingua detector over all 75 languages (high accuracy), built once per process."""
+    global _all_detector
+    if _all_detector is None:
+        with _detector_lock:
+            if _all_detector is None:
+                _all_detector = LanguageDetectorBuilder.from_all_languages().build()
+    return _all_detector
 
 
 def language_to_iso(name: str) -> str:

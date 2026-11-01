@@ -1,12 +1,13 @@
 """Boundary adapters for structured data and retrieval pipelines."""
 
-import re
-from dataclasses import dataclass
+import copy
+from dataclasses import dataclass, field, replace
 from typing import Any, Iterable, Mapping, Optional
 
+from sct.presets import PRESETS
 from sct.privacy import EntityFinding
 from sct.sct import TextCleaner
-from sct.utils import constants
+from sct.signals import merge_views
 
 
 @dataclass(frozen=True)
@@ -24,6 +25,8 @@ class StructuredResult:
     value: Any
     findings: tuple[PathFinding, ...]
     sensitive: bool
+    # merge_views over every string leaf, keys included.
+    signals: dict = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -62,66 +65,49 @@ def _require_adapter_mode(cleaner: TextCleaner) -> None:
         )
 
 
-def is_sensitive_result(
-    cleaner: TextCleaner,
-    source: str,
-    result: Any,
-) -> bool:
-    """Return whether processing found or replaced sensitive content."""
+def is_sensitive_result(result: Any) -> bool:
+    """Return whether processing found an entity or made a regex replacement."""
     metadata = result.metadata or {}
-    if metadata.get("findings"):
-        return True
-    if (
-        cleaner.cfg.replacement_mode == "synthetic"
-        and result.lm_text != source
-    ):
-        return True
-    # The HTML step rewrites marker-like tags already in the source, so they
-    # cannot offset markers emitted later (``<EMAIL> Alice`` -> ``<PERSON>``).
-    baseline = source
-    if cleaner.cfg.check_replace_html:
-        baseline = constants.HTML_REGEX.sub("", source)
-    configured_markers = (
-        cleaner.cfg.replace_with_url,
-        cleaner.cfg.replace_with_html,
-        cleaner.cfg.replace_with_email,
-        cleaner.cfg.replace_with_ips,
-        cleaner.cfg.replace_with_years,
-        cleaner.cfg.replace_with_dates,
-        cleaner.cfg.replace_with_phone_numbers,
-        cleaner.cfg.replace_with_numbers,
-        cleaner.cfg.replace_with_currency_symbols,
+    return bool(
+        metadata.get("regex_counts")
+        or metadata.get("entity_counts")
+        or metadata.get("findings")
     )
-    if any(
-        isinstance(marker, str)
-        and marker
-        and result.lm_text.count(marker) > baseline.count(marker)
-        for marker in configured_markers
-    ):
-        return True
-    # Compare counts, not presence: a source that already holds a marker
-    # still gains one per replacement.
-    marker_pattern = r"<[A-Z][A-Z0-9_]*>"
-    return len(re.findall(marker_pattern, result.lm_text)) > len(
-        re.findall(marker_pattern, baseline)
-    )
+
+
+def _pii_only_cleaner(cleaner: TextCleaner, ner: bool = True) -> TextCleaner:
+    """Return a view of *cleaner* that runs only its PII steps, sharing its NER models."""
+    key_cleaner = copy.copy(cleaner)
+    # Everything the training preset turns off (folding, letter/number removal, casefold...).
+    off = {name: value for name, value in PRESETS['training'].items() if value is False}
+    if not ner:
+        off['check_ner_process'] = False
+    key_cleaner.cfg = replace(cleaner.cfg, **off)
+    key_cleaner._pipeline, key_cleaner._post_fuzzy_pipeline = [], []
+    key_cleaner._init_pipeline()
+    return key_cleaner
 
 
 def process_json(cleaner: TextCleaner, value: Any) -> StructuredResult:
-    """Process every string in a JSON-compatible value."""
+    """Process every string in a JSON-compatible value.
+
+    Keys follow ``cfg.json_key_cleaning``: ``'pii'`` (default) replaces regex
+    PII only (emails, phones, URLs...), so short keys such as ``"k"`` and
+    common words such as ``"message"`` survive (NER tags lone words out of
+    context); ``'pii_ner'`` also runs NER on keys; ``'full'`` uses the whole
+    config; ``'off'`` keeps keys as written.
+    """
     _require_adapter_mode(cleaner)
     findings = []
-    sensitive = False
+    views = []
+    key_mode = cleaner.cfg.json_key_cleaning
+    key_cleaner = None
 
-    def visit(item: Any, path: tuple[str | int, ...]) -> Any:
-        nonlocal sensitive
+    def visit(item: Any, path: tuple[str | int, ...], text_cleaner: TextCleaner = cleaner) -> Any:
+        nonlocal key_cleaner
         if isinstance(item, str):
-            result = cleaner.process(item)
-            sensitive = sensitive or is_sensitive_result(
-                cleaner,
-                item,
-                result,
-            )
+            result = text_cleaner.process(item)
+            views.append(result.signals)
             if result.metadata:
                 findings.extend(
                     PathFinding(path, finding)
@@ -132,10 +118,16 @@ def process_json(cleaner: TextCleaner, value: Any) -> StructuredResult:
             processed = {}
             for index, (key, child) in enumerate(item.items()):
                 # The raw key may itself be PII, so its path uses the index.
-                processed_key = (
-                    visit(key, path + ("@key", index))
-                    if isinstance(key, str) else key
-                )
+                if isinstance(key, str) and key_mode != 'off':
+                    if key_mode in ('pii', 'pii_ner') and key_cleaner is None:
+                        key_cleaner = _pii_only_cleaner(cleaner, ner=key_mode == 'pii_ner')
+                    processed_key = visit(
+                        key,
+                        path + ("@key", index),
+                        cleaner if key_mode == 'full' else key_cleaner,
+                    )
+                else:
+                    processed_key = key
                 if processed_key in processed:
                     raise ValueError(
                         "Cleaning JSON keys produced a duplicate key"
@@ -152,10 +144,13 @@ def process_json(cleaner: TextCleaner, value: Any) -> StructuredResult:
             ]
         return item
 
+    cleaned = visit(value, ())
+    signals = merge_views(views)
     return StructuredResult(
-        value=visit(value, ()),
+        value=cleaned,
         findings=tuple(findings),
-        sensitive=sensitive,
+        sensitive=signals["sensitive"],
+        signals=signals,
     )
 
 
@@ -178,13 +173,10 @@ def process_rag_chunks(
         )
         metadata = processed_metadata.value
         metadata["sensitive"] = (
-            is_sensitive_result(
-                cleaner,
-                chunk.text,
-                result,
-            )
+            is_sensitive_result(result)
             or processed_metadata.sensitive
         )
+        metadata["sct"] = result.signals
         processed.append(ProcessedRAGChunk(
             id=chunk.id,
             text=result.lm_text,
@@ -209,16 +201,18 @@ def process_dataframe(
 
     output = frame.copy(deep=True)
     findings = []
-    for row in output.index:
-        for column in columns:
-            value = output.at[row, column]
+    # Positional access: a duplicate row or column label makes .at return a Series.
+    selected = [j for j, name in enumerate(output.columns) if name in columns]
+    for i, row in enumerate(output.index):
+        for j in selected:
+            value = output.iat[i, j]
             if not isinstance(value, str):
                 continue
             result = cleaner.process(value)
-            output.at[row, column] = result.lm_text
+            output.iat[i, j] = result.lm_text
             if result.metadata:
                 findings.extend(
-                    PathFinding((row, column), finding)
+                    PathFinding((row, output.columns[j]), finding)
                     for finding in result.metadata.get("findings", ())
                 )
     return DataFrameResult(output, tuple(findings))

@@ -1,6 +1,70 @@
 import ipaddress
+import unicodedata
 
 from sct.utils import constants
+
+# Phones and IPs are matched on a view of the text where every decimal digit is ASCII and
+# full-width . - and the ideographic space are ASCII (٠٦ ١٢ ٣٤, ١٩٢．١٦٨．١．١): one code point
+# for one, so a match in the view has the same offsets in the source.
+_DIGIT_VIEW = {cp: str(unicodedata.decimal(chr(cp))) for cp in range(0x80, 0x20000)
+               if unicodedata.category(chr(cp)) == 'Nd'}
+_DIGIT_VIEW.update({0xFF0E: '.', 0xFF0D: '-', 0x3000: ' '})
+# fold_styled_characters: phones also see every other space (Zs: no-break, thin, narrow no-break) as
+# " " and every dash (Pd: hyphen, non-breaking hyphen, en dash) as "-", as word processors and PDFs
+# set digit groups (06\u00a012\u00a034, 06\u201112345678), and full-width or small area-code
+# parentheses as "(" ")" (+49（30）123456); the source text keeps them.
+SEPARATOR_VIEW = {**_DIGIT_VIEW, **{cp: ' ' if unicodedata.category(chr(cp)) == 'Zs' else '-'
+                                    for cp in range(0x80, 0x20000) if unicodedata.category(chr(cp)) in ('Zs', 'Pd')},
+                  **str.maketrans(constants.PHONE_PARENS)}
+
+# Dates (fold_styled_characters) also read every character whose NFKC form is "." as "." (1990﹒ 1﹒ 15﹒).
+DATE_SEPARATOR_VIEW = {**SEPARATOR_VIEW, **{cp: '.' for cp in range(0x80, 0x20000)
+                                             if unicodedata.normalize('NFKC', chr(cp)) == '.'}}
+
+
+class _SourceMatch:
+    """A match found in the view, read from the source text."""
+
+    def __init__(self, match, source):
+        self._match, self._source = match, source
+
+    def group(self, *groups):
+        if groups not in ((), (0,)):
+            raise IndexError("only the whole match is read from the source")
+        return self._source[self._match.start():self._match.end()]
+
+    def start(self, *groups):
+        return self._match.start(*groups)
+
+    def end(self, *groups):
+        return self._match.end(*groups)
+
+    def span(self, *groups):
+        return self._match.span(*groups)
+
+
+class DigitView:
+    """*pattern* matched on the digit view of a text; replacements land in the source text."""
+
+    def __init__(self, pattern, table=_DIGIT_VIEW):
+        self.pattern, self.table = pattern, table
+
+    def sub(self, repl, text):
+        view = text if text.isascii() else text.translate(self.table)
+        if view == text:
+            return self.pattern.sub(repl, text)
+        out, last = [], 0
+        for match in self.pattern.finditer(view):
+            out.append(text[last:match.start()])
+            out.append(repl(_SourceMatch(match, text)) if callable(repl) else match.expand(repl))
+            last = match.end()
+        out.append(text[last:])
+        return ''.join(out)
+
+
+PHONE_VIEW = DigitView(constants.PHONE_REGEX, SEPARATOR_VIEW)
+PHONE_DIGIT_VIEW = DigitView(constants.PHONE_REGEX)  # fold_styled_characters=False
+IP_VIEW = DigitView(constants.IP_REGEX)
 
 
 def numbers_regex(in_words=False):
@@ -11,7 +75,8 @@ def numbers_regex(in_words=False):
 def is_replaceable_ip(candidate, public_only=False):
     """True if ``candidate`` is a valid IP (and public, when ``public_only``)."""
     try:
-        ip = ipaddress.ip_address(candidate)
+        # Digits of any script count (١٩٢.١٦٨.١.١ is 192.168.1.1).
+        ip = ipaddress.ip_address(candidate.translate(_DIGIT_VIEW))
     except ValueError:
         return False
     return ip.is_global or not public_only
@@ -40,7 +105,7 @@ class ProcessContacts:
 
     def replace_phone_numbers(self, text, replace_with="<PHONE>"):
         """Replace all phone numbers in ``text`` str with ``replace_with`` str."""
-        return constants.PHONE_REGEX.sub(replace_with, text)
+        return PHONE_VIEW.sub(replace_with, text)
 
     def replace_numbers(self, text, replace_with="<NUMBER>", in_words=False):
         """Replace all numbers in ``text`` str with ``replace_with`` str.
@@ -61,14 +126,14 @@ class ProcessContacts:
 
     def replace_ips_with_fn(self, text, replace_fn, public_only=False):
         """Replace IPs using a callable: replace_fn(matched_text) -> replacement."""
-        return constants.IP_REGEX.sub(
+        return IP_VIEW.sub(
             lambda m: replace_fn(m.group()) if is_replaceable_ip(m.group(), public_only) else m.group(),
             text,
         )
 
-    def replace_phone_numbers_with_fn(self, text, replace_fn):
+    def replace_phone_numbers_with_fn(self, text, replace_fn, view=PHONE_VIEW):
         """Replace phone numbers using a callable: replace_fn(matched_text) -> replacement."""
-        return constants.PHONE_REGEX.sub(lambda m: replace_fn(m.group()), text)
+        return view.sub(lambda m: replace_fn(m.group()), text)
 
     def replace_numbers_with_fn(self, text, replace_fn, in_words=False):
         """Replace numbers using a callable: replace_fn(matched_text) -> replacement."""
