@@ -742,6 +742,8 @@ sct-mcp
 
 `BufferedStreamingRedactor` holds a full document for cross-chunk NER safety.
 `WindowedStreamingRedactor` provides bounded latency for contact tokens.
+It never splits a window inside an email, phone, URL, IP (or a date or number when those steps are on): it reads the
+cleaner's own `TextCleaner.normalise` view of the buffer, so its split points follow every pre-regex step.
 
 The OCR adapter accepts any `OCRProvider`. The included Tesseract provider also
 needs a local Tesseract executable. Browser export writes an ONNX Runtime Web

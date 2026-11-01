@@ -341,6 +341,15 @@ class TextCleaner:
             findings = detailed.findings
         return self._after_ner(state, current_text, findings)
 
+    def normalise(self, text: str) -> str:
+        """The steps before the first regex step (unicode fix, ASCII, emoji), as ``process`` runs them.
+
+        The streaming split guard reads this same view, so the two cannot differ.
+        """
+        for step in self._pipeline[:self._normalise_steps]:
+            text = step(text)
+        return text
+
     def _before_ner_isolated(self, text: str) -> tuple:
         """``_before_ner`` that clears the per-thread document context afterwards."""
         try:
@@ -389,8 +398,7 @@ class TextCleaner:
         current_text = text
 
         # Pre-fuzzy pipeline steps (unicode fix → html → urls → emails → ips → dates)
-        for step in self._pipeline[:self._normalise_steps]:
-            current_text = step(current_text)
+        current_text = self.normalise(current_text)
         # Placeholder spellings the source holds, raw or once normalised ("＜LONDON＞",
         # "&lt;LONDON&gt;"): NER gives them no protection and reversible mode never
         # allocates them.

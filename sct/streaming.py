@@ -1,50 +1,15 @@
 """Streaming interfaces with explicit privacy guarantees."""
 
 import re
-import unicodedata
-from itertools import groupby
-
-from ftfy import fix_encoding
-from ftfy.chardata import CONTROL_CHARS
-from ftfy.fixes import ANSI_RE, unescape_html
+from bisect import bisect_right
 
 from sct.sct import TextCleaner
-from sct.utils import constants
-from sct.utils.contact import _DIGIT_VIEW, SEPARATOR_VIEW
-from sct.utils.normtext import _STYLED_SEP
+from sct.utils import constants, contact
 
-_CONTACT_REGEXES = (
-    constants.EMAIL_REGEX, constants.PHONE_REGEX, constants.URL_REGEX, constants.IP_REGEX,
-)
 # A digit run at the end of the buffer may be a phone the next feed completes ("06 12 34").
 _PHONE_TAIL = re.compile(r"[+(]?\d[\d ()+./-]*\Z")
 # Longer than any phone the regex accepts; a longer digit tail (a number table) may still split.
 _PHONE_TAIL_MAX = 32
-# One HTML entity, escaped again any number of times ("&amp;#32;", decoded later by the cleaner's ftfy step to
-# a fixpoint), one backslash escape (decoded by the
-# cleaner's check_decode_unicode_escapes step, "12\\u0033"), one terminal escape (removed by ftfy, "\x1b[32m")
-# or one character.
-_VIEW_UNIT = re.compile(
-    ANSI_RE.pattern + r"|&(?:amp;)*(?:#[0-9]+|#[xX][0-9a-fA-F]+|[A-Za-z][A-Za-z0-9]*);"
-    r"|\\(?:u[0-9a-fA-F]{4}|U[0-9a-fA-F]{8}|x[0-9a-fA-F]{2}|N\{[^}]*\}|[0-7]{1,3}|[\\'\"abfnrtv])|.",
-    re.DOTALL,
-)
-
-
-def _decode_unit(unit: str, decode_escapes: bool) -> str:
-    """Decode one view unit the way the cleaner's fix_bad_unicode step does."""
-    if unit[0] == "\x1b" and len(unit) > 1:  # a terminal colour code, which ftfy removes
-        return ""
-    if unit[0] != "\\":
-        while (decoded := unescape_html(unit)) != unit:  # ftfy's own decode ("&#59;" stays), to its fixpoint
-            unit = decoded
-        return unit
-    if not decode_escapes:
-        return unit
-    try:  # the cleaner's own codec, so the view decodes exactly what it decodes
-        return unit.encode("latin", "backslashreplace").decode("unicode-escape")
-    except UnicodeDecodeError:  # "\\N{unknown}" stays as its raw characters
-        return unit
 
 
 class BufferedStreamingRedactor:
@@ -104,74 +69,61 @@ class WindowedStreamingRedactor:
             return ""
 
         cutoff = len(self._buffer) - self._overlap_chars
-        # Never split inside a contact token that holds spaces ("06 12 34 56 78"). Match on a
-        # view close to what the cleaner sees: HTML entities decoded ("12&#32;34"), mojibake repaired, and each letter,
-        # digit, space and contact punctuation NFKC-folded ("０６ １２") with any decimal digit as
-        # ASCII ("٠٦ ١٢", as the cleaner's digit view); starts/ends map view offsets back to the buffer.
-        view, starts, ends = [], [], []
-        table = SEPARATOR_VIEW if self._cleaner.cfg.fold_styled_characters else _DIGIT_VIEW  # as the phone step
-        decode_escapes = self._cleaner.cfg.check_decode_unicode_escapes
-        units = []  # (decoded character, source start, source end)
-        for unit in _VIEW_UNIT.finditer(self._buffer):
-            decoded = _decode_unit(unit.group(), decode_escapes)
-            if decoded == unit.group():  # an unknown entity or escape stays as its raw characters
-                units += [(c, i, i + 1) for i, c in enumerate(decoded, unit.start())]
-            else:  # "&ThickSpace;" decodes to two characters, both on the entity's span
-                units += [(c, unit.start(), unit.end()) for c in decoded]
-        # mojibake ("fÃ©vrier") is repaired word by word as the cleaner's ftfy step repairs it; the word keeps its span
-        repaired_units = []
-        for is_space, group in groupby(units, key=lambda u: u[0].isspace()):
-            group = list(group)
-            word = "".join(u[0] for u in group)
-            repaired = word if is_space or word.isascii() else fix_encoding(word)
-            repaired_units += group if repaired == word else [(c, group[0][1], group[-1][2]) for c in repaired]
-        for character, start, end in repaired_units:
-                if unicodedata.category(character) == "Cf":
-                    continue  # invisible ("06\u00ad12"): the cleaner's fold drops it inside a contact run
-                if ord(character) in CONTROL_CHARS:
-                    continue  # a control ("15\x00", U+FFFC) that ftfy's remove_control_chars drops
-                # a combining mark composes with the letter before it, as the cleaner's NFC step ("fe\u0301vrier")
-                composed = unicodedata.normalize("NFC", view[-1] + character) if view else ""
-                if unicodedata.category(character).startswith("M") and len(composed) == 1:
-                    view[-1], ends[-1] = composed, end
-                    continue
-                folded = unicodedata.normalize("NFKC", character).translate(table)
-                # punctuation folds only where the cleaner does (contact punctuation, the phone view's
-                # dashes), so a "（" glued after a phone stays wide and does not end the match early
-                if not (folded.isalnum() or folded.isspace()) and character not in _STYLED_SEP \
-                        and ord(character) not in table:
-                    folded = character
-                # styled multi-character folds ("⑫" -> "12") keep every character, all on one source span
-                if len(folded) != 1 and not (folded.isascii() and folded.isalnum()):
-                    folded = character
-                for view_character in folded:
-                    view.append(view_character)
-                    starts.append(start)
-                    ends.append(end)
-        view = "".join(view)
-        # a configured date ("15 January 1990") is one token too; the cleaner's own (custom) date regex,
-        # and with fuzzy dates on every candidate its fuzzy step may mask ("15 Janury 1990")
-        cfg = self._cleaner.cfg
-        regexes = _CONTACT_REGEXES + (
-            (self._cleaner.ProcessDateTime._date_regex.pattern,) if cfg.check_replace_dates else ()) + (
-            (constants.FUZZY_DATE_CANDIDATE_REGEX,) if cfg.check_fuzzy_replace_dates else ())
-        inside = {
-            index
-            for regex in regexes
-            for match in regex.finditer(view)
-            for index in range(starts[match.start()] + 1, ends[match.end() - 1])
-        }
-        tail = _PHONE_TAIL.search(view, max(0, len(view) - _PHONE_TAIL_MAX))
+        # Never split inside a contact token that holds spaces ("06 12 34 56 78"). The guard reads the
+        # cleaner's own normalised text (cleaner.normalise, the steps process runs before its regexes)
+        # and the regexes on the views the cleaner's steps use, so the two cannot differ.
+        cleaner, cfg = self._cleaner, self._cleaner.cfg
+        normalise = cleaner.normalise
+        # The unfinished last token is left out: it may end in a cut escape ("\\U000000"), which would stop the
+        # cleaner's escape decoding for the whole buffer (the whole text decodes it once complete).
+        buffer = self._buffer[:max((i for i, c in enumerate(self._buffer) if c.isspace()), default=-1) + 1]
+        view = normalise(buffer)
+        phone_view = contact.PHONE_VIEW if cfg.fold_styled_characters else contact.PHONE_DIGIT_VIEW
+        views = [constants.URL_REGEX, constants.EMAIL_REGEX, contact.IP_VIEW, phone_view]
+        if cfg.check_replace_dates:
+            views.append(cleaner._date_view)
+        if cfg.check_fuzzy_replace_dates:  # every candidate the fuzzy step may mask ("15 Janury 1990")
+            views.append(constants.FUZZY_DATE_CANDIDATE_REGEX)
+        if cfg.check_replace_numbers:  # a grouped number ("5 379") is one token too
+            views.append(contact.numbers_regex(cfg.replace_numbers_in_words))
+        # (start, end) of view text a split must not cut: start < split < end
+        protected = [
+            match.span()
+            for regex in views
+            for match in (regex.pattern.finditer(view.translate(regex.table))
+                          if isinstance(regex, contact.DigitView) else regex.finditer(view))
+        ]
+        phone_digits = view.translate(phone_view.table)
+        tail = _PHONE_TAIL.search(phone_digits, max(0, len(phone_digits) - _PHONE_TAIL_MAX))
         if tail:
-            inside.update(range(starts[tail.start()] + 1, len(self._buffer)))
-        split_at = max(
-            (
-                index
-                for index, character in enumerate(self._buffer[:cutoff + 1])
-                if character.isspace() and index not in inside
-            ),
-            default=-1,
-        )
+            protected.append((tail.start(), len(view) + 1))
+
+        # A whitespace split is safe where the view is the two halves' own views with at most one whitespace
+        # character between them ("\r\n" is one "\n"), so no step reads across it, and no protected match
+        # covers the cut. Candidates are tried from the cutoff back; a protected one jumps back by its distance
+        # to the match start (exact where the view keeps the length, short where escapes make the text
+        # longer, so the next try jumps again by the rest), so a feed normalises a few times, not once per space.
+        candidates = [index for index, character in enumerate(buffer[:cutoff + 1]) if character.isspace()]
+        split_at, index = -1, len(candidates) - 1
+        while index >= 0:
+            position = candidates[index]
+            left = normalise(buffer[:position])
+            offset = len(left)
+            if not view.startswith(left):
+                index -= 1
+                continue
+            cover = next((start for start, end in protected if start < offset < end), None)
+            if cover is not None:
+                index = bisect_right(candidates, position - (offset - cover), hi=index) - 1
+                continue
+            right = normalise(buffer[position + 1:])
+            separator = view[offset:len(view) - len(right)]
+            if len(view) - offset - len(right) not in (0, 1) or not view.endswith(right) \
+                    or not (separator == "" or separator.isspace()):
+                index -= 1
+                continue
+            split_at = position
+            break
         if split_at < 0:
             raise BufferError(
                 "Streaming buffer exceeded max_buffer_chars without a safe whitespace split. "
@@ -180,7 +132,7 @@ class WindowedStreamingRedactor:
 
         prefix = self._buffer[:split_at]
         # the cleaner's whitespace step turns any space (\u00a0, \u202f) into " "; the separator follows it
-        separator = " " if self._cleaner.cfg.check_normalize_whitespace else self._buffer[split_at]
+        separator = " " if cfg.check_normalize_whitespace else separator
         self._buffer = self._buffer[split_at + 1:]
         return self._cleaner.process(prefix).lm_text + separator
 
