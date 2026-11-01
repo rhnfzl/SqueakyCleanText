@@ -564,6 +564,7 @@ new_cfg = dataclasses.replace(cfg, check_ner_process=False)
 | `check_detect_language` | `True` | Auto-detect language |
 | `check_fix_bad_unicode` | `True` | Fix encoding issues via ftfy |
 | `check_decode_unicode_escapes` | `True` | Part of `check_fix_bad_unicode`: decode literal backslash escapes (`\u00e9` to `é`, `\n` to a line break). `False` keeps them as written (code, JSON) |
+| `keep_html_entities_with_markup` | `False` | Part of `check_fix_bad_unicode`. `False` decodes HTML entities (`&amp;`, `&#64;`) everywhere, each on its own, so `<p>john&#64;example.com</p>` is replaced and `WindowedStreamingRedactor` splits markup with entities as the whole text reads it. `True` = ftfy's `"auto"` (0.7): from the first line holding a `<` on, entities stay as written; the windowed stream then often finds no safe split in such text and raises `BufferError` (use `BufferedStreamingRedactor`) |
 | `check_to_ascii_unicode` | `False` | Transliterate to ASCII with unidecode. `False` keeps every script (`日本語`, `München`); the multilingual NER models read native script, and folded output hid names from them (0 of 8 Hindi/Bengali/Tamil names found). `True` = 0.7 (`日本語` -> `Ri Ben Yu`); `sct-clean --to-ascii`, `SCT_MCP_TO_ASCII=1` |
 | `check_replace_html` | `True` | Strip/replace HTML tags |
 | `check_replace_urls` | `True` | Replace URLs with token |

@@ -222,7 +222,7 @@ class NormaliseText:
         pass
 
     def fix_bad_unicode(self, text, normalization="NFC", decode_escapes=True, fix_character_width=False,
-                        fold_styled_characters=True):
+                        fold_styled_characters=True, keep_html_entities_with_markup=False):
         """
         Fix unicode text that's "broken" using `ftfy <http://ftfy.readthedocs.org/>`_;
         this includes mojibake, HTML entities and other code cruft,
@@ -234,6 +234,9 @@ class NormaliseText:
         full-width emails and phones are still found; ``True`` is ftfy's full width fix (0.7).
         ``fold_styled_characters=True`` also folds math-alphanumeric (𝐞), circled (ⓙ) and full-width
         URL punctuation (``：／？``) inside ASCII runs, so styled emails, URLs and phones are found.
+        ``keep_html_entities_with_markup=False`` decodes HTML entities everywhere (each entity on its own,
+        so a text split at whitespace decodes as the whole); ``True`` is ftfy's ``"auto"``: from the first
+        line holding a ``<`` on, entities stay (0.7).
         """
         if decode_escapes:
             try:
@@ -241,7 +244,8 @@ class NormaliseText:
             except (UnicodeDecodeError, UnicodeEncodeError):
                 logger.debug("Unicode escape decoding failed, using original text", exc_info=True)
 
-        text = fix_text(text, normalization=normalization, fix_character_width=fix_character_width)
+        text = fix_text(text, normalization=normalization, fix_character_width=fix_character_width,
+                        unescape_html="auto" if keep_html_entities_with_markup else True)
         if fold_styled_characters:
             return fold_styled(text)
         if fix_character_width:

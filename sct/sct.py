@@ -815,7 +815,8 @@ class TextCleaner:
         return self.NormaliseText.fix_bad_unicode(
             text, decode_escapes=self.cfg.check_decode_unicode_escapes,
             fix_character_width=self.cfg.fix_character_width,
-            fold_styled_characters=self.cfg.fold_styled_characters)
+            fold_styled_characters=self.cfg.fold_styled_characters,
+            keep_html_entities_with_markup=self.cfg.keep_html_entities_with_markup)
 
     def _to_ascii_unicode(self, text):
         return self.NormaliseText.to_ascii_unicode(text)
