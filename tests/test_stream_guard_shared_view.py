@@ -73,3 +73,20 @@ def test_split_jump_maps_expanding_characters_back_to_the_source():
     text = "Call 06 ⑫㉞ ⑤⑥⑦⑧ now please."
     stream = WindowedStreamingRedactor(cleaner, max_buffer_chars=26, overlap_chars=17)
     assert stream.feed(text) + stream.finish() == cleaner.process(text).lm_text == "Call <PHONE> now please."
+
+
+@pytest.mark.parametrize("chunk", [1, 7, 20])
+def test_split_keeps_overlap_of_read_text_before_unspaced_run(chunk):
+    # fuzz seed 15673: the guard dropped the unfinished CJK token after "㉚ ", so "㉚" lost the digit group that
+    # folds it ("㉚ ⓪⑦" -> "30 07") and the split after it emitted "+49 ㉚" unredacted
+    cleaner = TextCleaner(cfg=preset_config("training", check_ner_process=False))
+    whole_phone = "書" * 30 + "、​﬩④𝟡 ㉚ ⓪⑦⓪㊵⑲③（" + "蠊" * 40 + "）"
+    with_split = "Notes for the call: " * 3 + "書" * 10 + "、​﬩④𝟡 ㉚ ⓪⑦⓪㊵⑲③（" + "蠊" * 40 + "）"
+    for text, safe in ((whole_phone, False), (with_split, True)):
+        stream = WindowedStreamingRedactor(cleaner, max_buffer_chars=80, overlap_chars=24)
+        try:
+            out = "".join(stream.feed(text[i:i + chunk]) for i in range(0, len(text), chunk)) + stream.finish()
+        except BufferError:
+            assert not safe  # no split outside the phone: fail closed, never emit part of it
+            continue
+        assert out == cleaner.process(text).lm_text and "+49" not in out

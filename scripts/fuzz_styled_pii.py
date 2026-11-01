@@ -810,6 +810,9 @@ def check_case(seed: int, modes=MODES, folds=(True, False)) -> dict:
                 failures.append(_record(case, context_doc, "false_positive", preset, fold_styled, "placeholder", prose,
                                         signature=f"false_positive|{preset}|{'+'.join(case['scripts'])}{suffix}"))
             whole = placeholder.process(doc).lm_text
+            # restore gives back what the cleaner read: its own normalised view (ftfy repairs mojibake "Î\u00ad" to
+            # "έ" before any redaction), so a value that view changed is compared there, not with the input
+            seen = fold(placeholder.normalise(doc))
             for mode in modes:
                 out = outputs(doc, preset, fold_styled, mode, seed)
                 for key, text in out.items():
@@ -835,7 +838,7 @@ def check_case(seed: int, modes=MODES, folds=(True, False)) -> dict:
                     text_fold = fold(text)
                     is_restore = key == "restored"
                     for index, core in cores:
-                        if leaked(core, text_fold) == is_restore:
+                        if leaked(core, text_fold) == is_restore or (is_restore and not leaked(core, seen)):
                             continue
                         value = case["values"][index]
                         check = "restore" if is_restore else "leak"
@@ -847,13 +850,13 @@ def check_case(seed: int, modes=MODES, folds=(True, False)) -> dict:
                             steps=steps(value), minimal_kinds=kinds,
                             signature=f"{check}|{value['type']}|{'+'.join(kinds) or 'plain'}|{mode}{suffix}"))
                         break  # one record per output is enough to cluster
-                    if is_restore and preset.startswith("training") and text_fold != fold(_unescape_html(doc)):
+                    if is_restore and preset.startswith("training") and text_fold not in (fold(_unescape_html(doc)), seen):
                         # training keeps the prose, so restore gives the whole input back (up to the fold and the
                         # cleaner's HTML entity decoding)
                         def restore_differs(off):
                             changed = build_doc(case, off)
                             got = outputs(changed, preset, fold_styled, "reversible", seed)["restored"]
-                            return fold(got) != fold(_unescape_html(changed))
+                            return fold(got) not in (fold(_unescape_html(changed)), fold(placeholder.normalise(changed)))
                         kinds = _shrink_all(case, restore_differs)
                         failures.append(_record(
                             case, doc, "restore_exact", preset, fold_styled, mode, text, minimal_kinds=kinds,

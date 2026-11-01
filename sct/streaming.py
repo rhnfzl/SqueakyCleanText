@@ -68,16 +68,21 @@ class WindowedStreamingRedactor:
         if len(self._buffer) <= self._max_buffer_chars:
             return ""
 
-        cutoff = len(self._buffer) - self._overlap_chars
         # Never split inside a contact token that holds spaces ("06 12 34 56 78"). The guard reads the
         # cleaner's own normalised text (cleaner.normalise, the steps process runs before its regexes)
         # and the regexes on the views the cleaner's steps use, so the two cannot differ.
         cleaner, cfg = self._cleaner, self._cleaner.cfg
         normalise = cleaner.normalise
-        # The unfinished last token is left out: it may end in a cut escape ("\\U000000"), which would stop the
-        # cleaner's escape decoding for the whole buffer (the whole text decodes it once complete).
-        buffer = self._buffer[:max((i for i, c in enumerate(self._buffer) if c.isspace()), default=-1) + 1]
-        view = normalise(buffer)
+        # The unfinished last token is left out when it changes the view before it: a cut escape ("\\U000000")
+        # stops the cleaner's escape decoding for the whole buffer (the whole text decodes it once complete).
+        buffer, view = self._buffer, normalise(self._buffer)
+        head = buffer[:max((i for i, c in enumerate(buffer) if c.isspace()), default=-1) + 1]
+        if head != buffer and not view.startswith(head_view := normalise(head)):
+            buffer, view = head, head_view
+        # The overlap is kept on the text the guard reads: a split needs overlap_chars of it to its right, so a
+        # rule that reads past a space (a phone's next group: "㉚ ⓪⑦" folds to "30 07") sees what the whole
+        # document gives it.
+        cutoff = len(buffer) - self._overlap_chars
         phone_view = contact.PHONE_VIEW if cfg.fold_styled_characters else contact.PHONE_DIGIT_VIEW
         views = [constants.URL_REGEX, constants.EMAIL_REGEX, contact.IP_VIEW, phone_view]
         if cfg.check_replace_dates:

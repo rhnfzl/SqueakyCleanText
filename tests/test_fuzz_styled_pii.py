@@ -170,6 +170,8 @@ FIXED_CLUSTERS = {
     "stream_mismatch|training|EMAIL:glue+PHONE:glue": 100963,
     "stream_mismatch|training|NUMBER:glue+PHONE:glue": 1364,
     "stream_mismatch|training|PHONE:glue": 283,
+    "stream_mismatch|training|PHONE:enclosed_pair+PHONE:glue": 15673,
+    "stream_mismatch|training+dates|PHONE:enclosed_pair+PHONE:glue": 15673,
 }
 # Extra seeds (round 3): PHONE|glue leaking again by another root cause, and URLs whose query holds a
 # percent-encoded email with a Thai/CJK domain (%40ถมยฌฒ.in), which the round-3 fix must keep whole.
@@ -177,7 +179,9 @@ FIXED_CLUSTERS = {
 # addresses glued through one prose run (no boundary to find) are not generated; these seeds showed them.
 # 3894 and 9130: a URL token longer than 48 - 12 hit a BufferError at 48/12 only through chunk alignment
 # (its plain spelling fails on the same buffer), so it is not a counted stream_error.
-EXTRA_SEEDS = {301478, 301690, 115, 100322, 200040, 300221, 202031, 202264, 300758, 3184, 3356, 3894, 9130}
+# 15041: ftfy repairs the mojibake "Î\u00ad" in a mail domain to "έ" before redaction; restore is compared with the
+# cleaner's own normalised view, so it is not counted.
+EXTRA_SEEDS = {301478, 301690, 115, 100322, 200040, 300221, 202031, 202264, 300758, 3184, 3356, 3894, 9130, 15041}
 SEEDS = sorted(set(range(10)) | set(KNOWN_CLUSTERS.values()) | set(FIXED_CLUSTERS.values()) | EXTRA_SEEDS)
 
 
