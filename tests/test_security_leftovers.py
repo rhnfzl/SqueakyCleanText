@@ -65,6 +65,8 @@ def _seconds(cleaner, text):
     lambda n: "x@" + "a-" * n,
     lambda n: "á" * n,  # decomposed letters
     lambda n: "http://" + "a:" * n,  # URL user info
+    lambda n: "a" + "\uff0d" * 2 * n + " ",  # styled punctuation run with no letter or digit after it
+    lambda n: "a" + "-" * n + "\uff0e" + "\uff0f" * n + " ",
 ])
 @pytest.mark.parametrize("fold", [True, False])
 def test_long_tokens_near_linear(make, fold):

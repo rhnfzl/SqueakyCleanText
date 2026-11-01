@@ -95,8 +95,9 @@ _PARENS = re.escape('()' + ''.join(constants.PHONE_PARENS))
 # URL/email/phone/date punctuation in compatibility form folds between ASCII letters or digits of
 # any script (a run may mix forms: http：/／x); contact syntax also beside letters of any script:
 # ＠ between letters/digits, ． with an ASCII side (例え．jp) and a ：／／ scheme after ASCII letters (https：／／例え.jp).
+# The run is taken whole (possessive) once a styled form is seen in it, so a failing right side is linear.
 _STYLED_JOINER_REGEX = re.compile(
-    rf'(?<=[A-Za-z\d])[{_PUNCT_ANY}]*[{_STYLED_PUNCT}][{_PUNCT_ANY}]*(?=[A-Za-z\d])|[{_forms("+")}](?=\d)'
+    rf'(?<=[A-Za-z\d])(?=[{_PUNCT_ANY}]*?[{_STYLED_PUNCT}])[{_PUNCT_ANY}]++(?=[A-Za-z\d])|[{_forms("+")}](?=\d)'
     rf'|{_WORD_END}[{_forms("@")}](?=[^\W_])|{_WORD_END}[{_forms(".")}](?=[0-9A-Za-z])'
     rf'|(?<=[0-9A-Za-z])[{_forms(".")}](?=[^\W_])|(?<=[A-Za-z])[:{_forms(":")}][/{_forms("/")}]{{2}}')
 

@@ -52,6 +52,7 @@ from pathlib import Path
 import random
 import re
 import sys
+import time
 import unicodedata
 
 from ftfy.chardata import CONTROL_CHARS
@@ -65,7 +66,7 @@ PRESETS = ("training", "sct", "training+dates")
 PRESET_ARGS = {"training": ("training", {}), "sct": ("sct", {}),
                "training+dates": ("training", {"check_replace_dates": True})}
 MODES = ("placeholder", "synthetic", "reversible", "stream")
-CHECKS = ("leak", "restore", "restore_exact", "false_positive", "stream_mismatch", "stream_error")
+CHECKS = ("leak", "restore", "restore_exact", "false_positive", "stream_mismatch", "stream_error", "slow")
 STREAM_PARAMS = ((48, 12), (80, 24), (160, 48))
 TYPE_FLAG = {
     "EMAIL": "check_replace_emails", "PHONE": "check_replace_phone_numbers", "IP": "check_replace_ips",
@@ -129,6 +130,9 @@ def _unicode_tables():
 
 
 VARIANTS, DIGIT_ZEROS, LETTERS, ACCENTED, DEVA_SIGNS = _unicode_tables()
+# Styled forms of contact punctuation, for long runs whose right side is no letter or digit (a@－－－ ).
+STYLED_PUNCT = [ch for target in "@.-_+:/?=&#%~" for kind in ("wide", "small", "font")
+                for ch in VARIANTS.get(target, {}).get(kind, ())]
 _DIGIT_FOLD = {cp: str(unicodedata.decimal(chr(cp))) for zero in DIGIT_ZEROS for cp in range(zero, zero + 10)}
 
 
@@ -812,6 +816,15 @@ def _shrink_all(case, still_fails):
     return sorted(f"{case['values'][i]['type']}:{k}" for i, k in pairs if k not in off[i])
 
 
+def _seconds(cl, text):
+    best = float("inf")
+    for _ in range(2):
+        start = time.perf_counter()
+        cl.process(text)
+        best = min(best, time.perf_counter() - start)
+    return best
+
+
 def _record(case, doc, check, preset, fold_styled, mode, output, **extra):
     return {"seed": case["seed"], "check": check, "preset": preset, "fold_styled_characters": fold_styled,
             "mode": mode, "counts": fold_styled, "input": doc, "output": output, **extra}
@@ -841,6 +854,14 @@ def check_case(seed: int, modes=MODES, folds=(True, False)) -> dict:
                 failures.append(_record(case, context_doc, "false_positive", preset, fold_styled, "placeholder", prose,
                                         signature=f"false_positive|{preset}|{'+'.join(case['scripts'])}{suffix}"))
             whole = placeholder.process(doc).lm_text
+            # a long run of styled punctuation after a letter, with no letter or digit after it, stays linear
+            rng = random.Random(f"{seed}-slow-{preset}")  # noqa: S311
+            left = rng.choice("aZ7" + "".join(word[-1] for word in doc.split()))
+            run = rng.choices(STYLED_PUNCT + list("@.-_+:/?=&#%~"), k=8000)
+            small, large = (_seconds(placeholder, left + "".join(run[:n]) + " ") for n in (2000, 8000))
+            if large > 8 * small + 0.05:
+                failures.append(_record(case, left + "".join(run) + " ", "slow", preset, fold_styled, "placeholder",
+                                        f"{small:.3f}s -> {large:.3f}s", signature=f"slow|{preset}{suffix}"))
             # restore gives back what the cleaner read: its own normalised view (ftfy repairs mojibake "Î\u00ad" to
             # "έ" before any redaction), so a value that view changed is compared there, not with the input
             seen = fold(placeholder.normalise(doc))
