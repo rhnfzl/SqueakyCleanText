@@ -38,11 +38,13 @@ When any part of B is on, both `sct_quality` (`float | None`) and
 | `minhash_seed` | `1` | seed |
 | `minhash_shingle` | `5` | tokens per shingle |
 | `minhash_min_tokens` | `5` | below this many non-placeholder tokens the signature is `None` |
-| `data_card` | `False` | build a data card |
+| `data_card` | `False` | set by `sct-report --card`; `score_records` ignores it |
 
 ```python
-from sct.score import ScoreConfig, score_records
+from sct.score import ScoreConfig, score_records, build_data_card, render_data_card
 rows = score_records(results, texts, ScoreConfig(minhash=True), scorer=my_scorer)
+card = build_data_card(rows)       # dict: counts, languages, PII types
+markdown = render_data_card(card)  # the same card as Markdown
 ```
 
 ### Quality

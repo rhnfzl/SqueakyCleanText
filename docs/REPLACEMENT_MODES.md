@@ -61,8 +61,11 @@ result = cleaner.process("Dear Sir, please find attached the contract...")
 
 # Classification results in metadata
 print(result.metadata['classes'])
-# [{"label": "email", "score": 0.92}, {"label": "legal", "score": 0.78}]
+# [{"label": "email", "score": 0.92}]
 ```
+
+The default `gliclass_classification_type='single-label'` returns only the top label.
+Set `gliclass_classification_type='multi-label'` to get every label above the threshold.
 
 GLiClass runs in torch only. The gliclass package has no ONNX loader, so `gliclass_onnx=True`
 raises `ValueError`. Configs from before 0.7 that set it must drop it.
