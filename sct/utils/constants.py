@@ -122,7 +122,9 @@ def _script_class(*scripts):
 # (צ׳.co.il) and the katakana middle dot in a label with Hiragana, Katakana or Han (例・え.jp).
 # shortcut: the middle dot needs such a character right beside it, not anywhere in the label; widen if one shows up.
 _KANA_HAN = _script_class('Hiragana', 'Katakana', 'Han')
-_KATAKANA_MIDDLE_DOT = f"(?:(?<=[{_KANA_HAN}])\u30fb|\u30fb(?=[{_KANA_HAN}]))"
+# The two branches never match the same dot (the second needs a non-kana/Han left neighbour), so a run of
+# dots between Han has one parse and a host with no TLD fails in linear time.
+_KATAKANA_MIDDLE_DOT = f"(?:(?<=[{_KANA_HAN}])\u30fb|(?<![{_KANA_HAN}])\u30fb(?=[{_KANA_HAN}]))"
 _GERESH = f"(?<=[{_script_class('Hebrew')}])[\u05f3\u05f4]"
 # One run of label characters (X+ with those marks inside, a geresh also at its end), so a label stays X+(-+X+)*.
 _IDN_RUN = rf"[{_IDN_CHAR}]+(?:(?:{_MIDDLE_DOT}|{_KATAKANA_MIDDLE_DOT})[{_IDN_CHAR}]+|{_GERESH}[{_IDN_CHAR}]*)*"
