@@ -819,7 +819,11 @@ def check_case(seed: int, modes=MODES, folds=(True, False)) -> dict:
                         # ("⑫" -> "12"); glue stays on in both, it drops the spaces a split needs
                         plain = build_doc(case, {i: frozenset(v["kinds"]) - {"glue"}
                                                  for i, v in enumerate(case["values"])})
-                        if text is None and key not in short and len(doc) <= len(plain) and outputs(
+                        # a token longer than size - overlap leaves no split in some feed whatever its spelling,
+                        # so there chunk alignment alone decides (the plain one fails on the same buffer)
+                        size, overlap = map(int, key.split("/")) if mode == "stream" else (len(doc), 0)
+                        fits = max(map(len, doc.split()), default=0) <= size - overlap
+                        if text is None and key not in short and fits and len(doc) <= len(plain) and outputs(
                                 plain, preset, fold_styled, mode, seed)[key] is not None:
                             kinds = _shrink_all(case, lambda off, key=key: outputs(
                                 build_doc(case, off), preset, fold_styled, "stream", seed)[key] is None)

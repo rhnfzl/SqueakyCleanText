@@ -175,7 +175,9 @@ FIXED_CLUSTERS = {
 # percent-encoded email with a Thai/CJK domain (%40ถมยฌฒ.in), which the round-3 fix must keep whole.
 # Final check (10000 seeds): an IDNA dot before a native digit (native-digit IP host, rejected) and two
 # addresses glued through one prose run (no boundary to find) are not generated; these seeds showed them.
-EXTRA_SEEDS = {301478, 301690, 115, 100322, 200040, 300221, 202031, 202264, 300758, 3184, 3356}
+# 3894 and 9130: a URL token longer than 48 - 12 hit a BufferError at 48/12 only through chunk alignment
+# (its plain spelling fails on the same buffer), so it is not a counted stream_error.
+EXTRA_SEEDS = {301478, 301690, 115, 100322, 200040, 300221, 202031, 202264, 300758, 3184, 3356, 3894, 9130}
 SEEDS = sorted(set(range(10)) | set(KNOWN_CLUSTERS.values()) | set(FIXED_CLUSTERS.values()) | EXTRA_SEEDS)
 
 
