@@ -86,3 +86,40 @@ jobs:
 
     - name: Publish to PyPI with provenance
       uses: pypa/gh-action-pypi-publish@release/v1
+
+  github-release:
+    # Every tag gets a GitHub Release page, so PyPI and GitHub never drift.
+    needs: publish
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Download package artifacts
+      uses: actions/download-artifact@v4
+      with:
+        name: python-package-distributions
+        path: dist/
+
+    - name: Create GitHub Release from CHANGELOG
+      env:
+        GH_TOKEN: ${{ github.token }}
+        TAG: ${{ github.ref_name }}
+      run: |
+        version="${TAG#v}"
+        awk -v v="$version" '
+          $0 ~ "^## \\[?" v "[] ]" || $0 == "## " v || $0 == "## [" v "]" {f=1; next}
+          /^## / {if (f) exit}
+          f' CHANGELOG.md > notes.md
+        if [ ! -s notes.md ]; then
+          echo "::error::No CHANGELOG.md section for $version"
+          exit 1
+        fi
+        if gh release view "$TAG" >/dev/null 2>&1; then
+          gh release upload "$TAG" dist/* --clobber
+        else
+          gh release create "$TAG" dist/* --verify-tag --latest \
+            --title "SqueakyCleanText $version" --notes-file notes.md
+        fi
