@@ -30,8 +30,12 @@ _FORMAT_CHARS = re.escape(''.join(chr(cp) for cp in range(0x110000) if unicodeda
 # character precedes it, so each run is scanned once (linear time).
 _LOCAL_ATEXT = re.escape("!#$%&'*+-.")
 _EMAIL_RUN_LOCAL = rf'\w．－＿＋{constants.MARKS}{_FORMAT_CHARS}{_LOCAL_ATEXT}'
+# A Catalan l·l (col·legi) continues the run in the local part and the domain, as EMAIL_REGEX reads it; a run
+# never starts right after one, so it is scanned once.
+_RUN_START = r'(?!(?<=l\u00b7)l)'
 _EMAIL_RUN_REGEX = re.compile(
-    rf'(?<![{_EMAIL_RUN_LOCAL}])[{_EMAIL_RUN_LOCAL}]*+[@＠][\w．－＿{constants.MARKS}{_FORMAT_CHARS}]*\w')
+    rf'(?<![{_EMAIL_RUN_LOCAL}]){_RUN_START}(?:[{_EMAIL_RUN_LOCAL}]|{constants._MIDDLE_DOT})*+[@＠]'
+    rf'(?:[\w．－＿{constants.MARKS}{_FORMAT_CHARS}]|{constants._MIDDLE_DOT})*\w')
 _EMAIL_RUN_JOINER = str.maketrans('＠．－＿＋', '@.-_+')
 
 
@@ -141,9 +145,9 @@ _LOCAL_FORMS = _forms("!#$%&'*+-._", _COMPAT_PUNCT)
 _CIRCLED = re.escape(''.join(map(chr, _CIRCLED_ALNUM)))
 _STYLED_EMAIL_RUN_LOCAL = rf'\w{_CIRCLED}{_LOCAL_FORMS}{constants.MARKS}{_FORMAT_CHARS}{_LOCAL_ATEXT}{_HOST_SEP_CHARS}'
 _STYLED_EMAIL_RUN_REGEX = re.compile(
-    rf'(?<![{_STYLED_EMAIL_RUN_LOCAL}])[{_STYLED_EMAIL_RUN_LOCAL}]*+[@{_forms("@")}]'
+    rf'(?<![{_STYLED_EMAIL_RUN_LOCAL}]){_RUN_START}(?:[{_STYLED_EMAIL_RUN_LOCAL}]|{constants._MIDDLE_DOT})*+[@{_forms("@")}]'
     rf'(?:[\w{_CIRCLED}.\-{_forms(".-_")}{_HOST_SEP_CHARS}{constants.MARKS}{_FORMAT_CHARS}]|{_IDNA_DOT}'
-    rf'|{constants._KATAKANA_MIDDLE_DOT}|{constants._GERESH})*[\w{_CIRCLED}]')
+    rf'|{constants._MIDDLE_DOT}|{constants._KATAKANA_MIDDLE_DOT}|{constants._GERESH})*[\w{_CIRCLED}]')
 _STYLED_EMAIL_RUN_JOINER = {**str.maketrans({ch: plain for ch, plain in _COMPAT_PUNCT.items() if plain in "@!#$%&'*+-._"}),
                             **_CIRCLED_ALNUM}
 # In the domain every format character but the join controls (ZWNJ/ZWJ, which spell words) is a
@@ -159,15 +163,15 @@ def _fold_styled_email_run(m):
 
 
 # Invisible format characters (category Cf: ZWSP, word joiner, soft hyphen, bidi marks) beside a
-# contact-run character (ASCII alnum, any decimal digit, circled alnum, contact or mail local-part punctuation or a phone
-# parenthesis in any form) are line-break or layout hints copied with the text ("06\u00ad12" reads "0612"): a run of
-# them drops when its other side is a run character, a letter of any script (例え\u200b．jp), a space
-# ("06\u200b 12") or the text edge; between a letter of any script and a space or the text edge it joins nothing
-# and drops too (1990년 6월\u2060 1일). Between two other letters they stay (ZWNJ in Persian, ZWSP
-# between Thai words).
+# contact-run character (ASCII alnum, any decimal digit, circled alnum, contact or mail local-part punctuation, the IDNA
+# middle dot of col·legi or a phone parenthesis in any form) are line-break or layout hints copied with the text
+# ("06\u00ad12" reads "0612"): a run of them drops when its other side is a run character, a letter of any script
+# (例え\u200b．jp), a space ("06\u200b 12") or the text edge; between a letter of any script and a space or the
+# text edge it joins nothing and drops too (1990년 6월\u2060 1일). Between two other letters they stay (ZWNJ in
+# Persian, ZWSP between Thai words).
 _INVISIBLE_REGEX = re.compile(f'[{_FORMAT_CHARS}]+')
-_RUN_CHAR = re.compile('[A-Za-z\\d%s%s%s%s%s%s%s%s]' % (''.join(map(chr, _CIRCLED_ALNUM)), _PUNCT_ANY, _DASHES, _IDNA_DOTS,
-                                                         _HOST_DOTS, _LOCAL_FORMS, _LOCAL_ATEXT, _PARENS))
+_RUN_CHAR = re.compile('[A-Za-z\\d\u00b7%s%s%s%s%s%s%s%s]' % (
+    ''.join(map(chr, _CIRCLED_ALNUM)), _PUNCT_ANY, _DASHES, _IDNA_DOTS, _HOST_DOTS, _LOCAL_FORMS, _LOCAL_ATEXT, _PARENS))
 _LETTER = re.compile(rf'[^\W_]|[{constants.MARKS}]')
 
 

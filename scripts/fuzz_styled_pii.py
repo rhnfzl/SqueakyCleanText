@@ -478,6 +478,21 @@ def _local_sep(rng, plain, slots, kinds):
     return sorted(set(kinds) | {"local_sep"}) if any(slot and slot[0] == "local_sep" for slot in slots) else kinds
 
 
+def _catalan_dot(rng, plain, cores):
+    """A Catalan l·l (col·legi) inside a local-part word or a host label, so a styled separator elsewhere in
+    the address (。, ＿) folds across it; own RNG so the cases of earlier rounds stay the same."""
+    words = [core for core in cores if core[1].isascii() and core[1].isalnum() and core[1] in plain]
+    if not words or rng.random() >= 0.25:
+        return plain, cores
+    for core in words:
+        if rng.random() < 0.7:
+            word = core[1]
+            dotted = word[:len(word) // 2] + "l\u00b7l" + word[len(word) // 2:]
+            plain = plain.replace(word, dotted, 1)
+            cores = [("str", dotted) if c == core else c for c in cores]
+    return plain, cores
+
+
 def _upper(rng, plain):
     """An address written in capitals (JOHN@EXAMPLE.COM), so squared letters (🄹) have a target;
     own RNG so the cases of earlier rounds stay the same."""
@@ -587,6 +602,7 @@ def make_case(seed: int) -> dict:
             plain, cores = _email_shape(random.Random(f"{seed}-{len(values)}-mail"), plain, cores)  # noqa: S311
             plain, cores = _local_shape(random.Random(f"{seed}-{len(values)}-local"), plain, cores)  # noqa: S311
             plain = _upper(random.Random(f"{seed}-{len(values)}-upper"), plain)  # noqa: S311
+            plain, cores = _catalan_dot(random.Random(f"{seed}-{len(values)}-catalan"), plain, cores)  # noqa: S311
         if typ in ("EMAIL", "URL"):
             plain, cores = _host_hyphen(random.Random(f"{seed}-{len(values)}-hyphen"), plain, cores, typ)  # noqa: S311
         if typ == "URL":
