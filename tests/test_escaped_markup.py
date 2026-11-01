@@ -14,6 +14,8 @@ CASES = [
     ("<p>Escaped &lt;i&gt;mail john@example.com&lt;/i&gt; here</p>", "<HTML>Escaped <i>mail <EMAIL></i> here<HTML>"),
     ("<p>Write &lt;john@example.com&gt; now</p>", "<HTML>Write <<EMAIL>> now<HTML>"),
     ('<a title="x &gt; y">link</a> &lt;i&gt;', "<HTML>link<HTML> <i>"),
+    ("Mail john&lt;at&gt;example.com now", "Mail <EMAIL> now"),  # brackets hide from the tag step only
+    ("Mail john&#60;at&#62;example.com now", "Mail <EMAIL> now"),
 ]
 
 
@@ -41,6 +43,18 @@ def test_escaped_tags_stay_text_in_other_modes(text, expected, mode):
     assert "john@example.com" not in result.lm_text
     if mode == "reversible":  # the map gives back the tags and the email around the decoded escapes
         assert result.metadata["anon_map"].deanonymize(result.lm_text) == normtext.unescape_markup(text)
+
+
+def test_escaped_bracket_in_contact_restores_as_text():
+    text = "See https://example.com/?q=a&lt;b now."
+    result = _cleaner("reversible").process(text)
+    assert result.metadata["anon_map"].deanonymize(result.lm_text) == normtext.unescape_markup(text)
+    assert all(ord(ch) < 0xF0000 for e in result.metadata["anon_map"].to_dict()["entries"] for ch in e["original"])
+
+
+def test_escaped_email_in_json():
+    from sct.adapters import process_json
+    assert "john" not in str(process_json(_cleaner(), {"a": "Mail john&lt;at&gt;example.com now"}).value)
 
 
 def test_escaped_marker_is_still_reserved():

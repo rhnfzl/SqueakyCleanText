@@ -230,6 +230,8 @@ class TextCleaner:
             self._pipeline.append(self._unescape_markup)
         if cfg.check_replace_html:
             self._pipeline.append(self._replace_html)
+        if cfg.check_fix_bad_unicode:  # brackets hide from the tag step only; contacts see "john<at>x.com"
+            self._pipeline.append(self._restore_brackets)
         if cfg.check_replace_urls:
             self._pipeline.append(self._replace_urls)
         if cfg.check_replace_emails:
@@ -822,6 +824,13 @@ class TextCleaner:
 
     def _unescape_markup(self, text):
         return normtext.unescape_markup(text, self._protect)
+
+    def _restore_brackets(self, text):
+        protected = getattr(self._document_context, 'protected', None) or {}
+        for value in ('<', '>'):
+            if value in protected:
+                text = text.replace(protected[value], value)
+        return text
 
     def _to_ascii_unicode(self, text):
         return self.NormaliseText.to_ascii_unicode(text)
