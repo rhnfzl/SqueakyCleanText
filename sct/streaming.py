@@ -100,9 +100,9 @@ class WindowedStreamingRedactor:
 
         # A whitespace split is safe where the view is the two halves' own views with at most one whitespace
         # character between them ("\r\n" is one "\n"), so no step reads across it, and no protected match
-        # covers the cut. Candidates are tried from the cutoff back; a protected one jumps back by its distance
-        # to the match start (exact where the view keeps the length, short where escapes make the text
-        # longer, so the next try jumps again by the rest), so a feed normalises a few times, not once per space.
+        # covers the cut. Candidates are tried from the cutoff back; a protected one jumps to the last candidate
+        # whose own view ends at or before the match start (a bisect on view offsets, since NFKC can make the
+        # view longer, "⑫" -> "12", or escapes shorter), so a feed normalises a few times, not once per space.
         candidates = [index for index, character in enumerate(buffer[:cutoff + 1]) if character.isspace()]
         split_at, index = -1, len(candidates) - 1
         while index >= 0:
@@ -114,7 +114,7 @@ class WindowedStreamingRedactor:
                 continue
             cover = next((start for start, end in protected if start < offset < end), None)
             if cover is not None:
-                index = bisect_right(candidates, position - (offset - cover), hi=index) - 1
+                index = bisect_right(candidates, cover, hi=index, key=lambda p: len(normalise(buffer[:p]))) - 1
                 continue
             right = normalise(buffer[position + 1:])
             separator = view[offset:len(view) - len(right)]

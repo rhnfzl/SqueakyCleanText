@@ -64,7 +64,7 @@ PRESETS = ("training", "sct", "training+dates")
 PRESET_ARGS = {"training": ("training", {}), "sct": ("sct", {}),
                "training+dates": ("training", {"check_replace_dates": True})}
 MODES = ("placeholder", "synthetic", "reversible", "stream")
-CHECKS = ("leak", "restore", "restore_exact", "false_positive", "stream_mismatch")
+CHECKS = ("leak", "restore", "restore_exact", "false_positive", "stream_mismatch", "stream_error")
 STREAM_PARAMS = ((48, 12), (80, 24), (160, 48))
 TYPE_FLAG = {
     "EMAIL": "check_replace_emails", "PHONE": "check_replace_phone_numbers", "IP": "check_replace_ips",
@@ -803,6 +803,18 @@ def check_case(seed: int, modes=MODES, folds=(True, False)) -> dict:
                 for key, text in out.items():
                     if text is None or (mode == "stream" and key in short):
                         stream_errors += text is None and mode == "stream"
+                        # a styled spelling no longer than the plain one must not cost a split the plain one has
+                        # ("⑫" -> "12"); glue stays on in both, it drops the spaces a split needs
+                        plain = build_doc(case, {i: frozenset(v["kinds"]) - {"glue"}
+                                                 for i, v in enumerate(case["values"])})
+                        if text is None and key not in short and len(doc) <= len(plain) and outputs(
+                                plain, preset, fold_styled, mode, seed)[key] is not None:
+                            kinds = _shrink_all(case, lambda off, key=key: outputs(
+                                build_doc(case, off), preset, fold_styled, "stream", seed)[key] is None)
+                            failures.append(_record(
+                                case, doc, "stream_error", preset, fold_styled, mode, "BufferError", stream=key,
+                                minimal_kinds=kinds,
+                                signature=f"stream_error|{preset}|{'+'.join(kinds) or 'plain'}{suffix}"))
                         continue
                     text_fold = fold(text)
                     is_restore = key == "restored"
