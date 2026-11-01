@@ -15,7 +15,8 @@ IDNA dot separators (。 ｡) in a mail domain or URL host, host hyphens and dot
 another dash or dot form (my\u2010site, example\u2024com), upper-case addresses (so squared
 letters 🄹 occur), break hints between non-Latin letters of a mail domain or URL host,
 area-code parentheses glued to the digits (+49(30)123456), URL user info whose password ends
-in punctuation (https://alice:p4ss!@host/),
+in punctuation (https://alice:p4ss!@host/), mail local parts mixing separators and other punctuation
+(josé_smith.work@, anna.smith!@) with their hyphens and dots typed as another form (john\u2011smith@),
 and glued to CJK/Thai prose without a space. Every variant comes from Unicode
 data (decomposition tag, NFKC, decimal value, category), and every
 rendered value folds back to the plain value (NFKC, Cf removed, Nd -> ASCII).
@@ -381,6 +382,32 @@ def _email_shape(rng, plain, cores):
     return f"{plain.rsplit('@', 1)[0]}@{label}.{_word(rng, script, 2, 4)}", cores[:-1] + [("str", label)]
 
 
+def _local_shape(rng, plain, cores):
+    """A mail local part of up to three words joined by different separators, maybe ending in other
+    punctuation the grammar takes (josé_smith.work@, anna.smith!@), so a styled separator sits beside
+    an ASCII one; own RNG so the cases of earlier rounds stay the same."""
+    if rng.random() >= 0.25:
+        return plain, cores
+    local, host = plain.rsplit("@", 1)
+    parts = re.split(r"[.\-_+]", local) + [_ascii_token(rng, 4, 6)]
+    local = parts[0] + "".join(rng.choice(".-_+") + part for part in parts[1:])
+    local += rng.choice(("", "", "!", "#", "$", "%", "&", "'", "*", "+", "-"))
+    return f"{local}@{host}", [("str", part) for part in parts] + cores[-1:]
+
+
+def _local_sep(rng, plain, slots, kinds):
+    """Local-part hyphens and dots typed as another dash or dot form (john.smith\u2011billing@), as
+    copied from typeset text; own RNG so the cases of earlier rounds stay the same."""
+    free = [index for index in range(plain.rindex("@") - 1) if plain[index] in "-." and slots[index] is None
+            and plain[index + 1].isascii() and plain[index + 1].isalnum()]
+    if not free or rng.random() >= 0.25:
+        return kinds
+    for index in free:
+        if rng.random() < 0.7:
+            slots[index] = ("local_sep", rng.choice(HOST_DASHES if plain[index] == "-" else HOST_DOTS))
+    return sorted(set(kinds) | {"local_sep"}) if any(slot and slot[0] == "local_sep" for slot in slots) else kinds
+
+
 def _upper(rng, plain):
     """An address written in capitals (JOHN@EXAMPLE.COM), so squared letters (🄹) have a target;
     own RNG so the cases of earlier rounds stay the same."""
@@ -479,6 +506,7 @@ def make_case(seed: int) -> dict:
             plain, cores = _paren_phone(random.Random(f"{seed}-{len(values)}-paren"), plain, cores)  # noqa: S311
         if typ == "EMAIL":
             plain, cores = _email_shape(random.Random(f"{seed}-{len(values)}-mail"), plain, cores)  # noqa: S311
+            plain, cores = _local_shape(random.Random(f"{seed}-{len(values)}-local"), plain, cores)  # noqa: S311
             plain = _upper(random.Random(f"{seed}-{len(values)}-upper"), plain)  # noqa: S311
         if typ in ("EMAIL", "URL"):
             plain, cores = _host_hyphen(random.Random(f"{seed}-{len(values)}-hyphen"), plain, cores, typ)  # noqa: S311
@@ -489,6 +517,7 @@ def make_case(seed: int) -> dict:
             kinds = _host_sep(random.Random(f"{seed}-{len(values)}-hostsep"), plain, slots, kinds, typ)  # noqa: S311
         if typ == "EMAIL":
             kinds = _zw_domain(random.Random(f"{seed}-{len(values)}-zwd"), plain, inserts, kinds)  # noqa: S311
+            kinds = _local_sep(random.Random(f"{seed}-{len(values)}-localsep"), plain, slots, kinds)  # noqa: S311
         if typ == "URL":
             kinds = _zw_domain(random.Random(f"{seed}-{len(values)}-zwh"), plain, inserts, kinds, typ)  # noqa: S311
         if typ in ("PHONE", "DATE"):

@@ -25,10 +25,13 @@ _FORMAT_CHARS = re.escape(''.join(chr(cp) for cp in range(0x110000) if unicodeda
 # Inside an address-shaped run (word characters around an @), full-width . - _ + fold whatever
 # script sits beside them (john@例え．テスト, josé＿smith@...); prose without an @ keeps them.
 # Format characters inside a word (ZWNJ in نامه\u200cای, ZWJ in क्\u200dष) continue the run and stay.
-# A start right after a word character (or one joiner after it) is covered by that earlier start, so
-# each run is scanned once (linear time); ＋ is left out, as a mail domain ends before it.
+# The local part takes every ASCII character EMAIL_REGEX takes there (josé＿smith.work@, anna!＠), so a
+# fold run and a detected address start at the same place. A run starts only where no local-part
+# character precedes it, so each run is scanned once (linear time).
+_LOCAL_ATEXT = re.escape("!#$%&'*+-.")
+_EMAIL_RUN_LOCAL = rf'\w．－＿＋{constants.MARKS}{_FORMAT_CHARS}{_LOCAL_ATEXT}'
 _EMAIL_RUN_REGEX = re.compile(
-    rf'(?<!\w)(?<!\w[．－＿{constants.MARKS}{_FORMAT_CHARS}])\w[\w．－＿＋{constants.MARKS}{_FORMAT_CHARS}]*[@＠][\w．－＿{constants.MARKS}{_FORMAT_CHARS}]*\w')
+    rf'(?<![{_EMAIL_RUN_LOCAL}])[{_EMAIL_RUN_LOCAL}]*+[@＠][\w．－＿{constants.MARKS}{_FORMAT_CHARS}]*\w')
 _EMAIL_RUN_JOINER = str.maketrans('＠．－＿＋', '@.-_+')
 
 
@@ -58,14 +61,15 @@ _CIRCLED_ALNUM = {**_nfkc_ascii_alnum({'<circle>'}),
 _CIRCLED_RUN_REGEX = re.compile('[%s]+' % ''.join(map(chr, _CIRCLED_ALNUM)))
 # Contact punctuation in every compatibility form (full-width ＠, small ﹫, font ﬩ for +), picked by
 # decomposition tag and NFKC value so every rule below folds the same set; ideographic space too.
-_STYLED_SEP = {ch: unicodedata.normalize('NFKC', ch) for ch in map(chr, range(0x20000))
-               if unicodedata.decomposition(ch).split(' ', 1)[0] in ('<wide>', '<small>', '<font>')
-               and unicodedata.normalize('NFKC', ch) in '@.-_+:/?=&#%~ '}
+_COMPAT_PUNCT = {ch: unicodedata.normalize('NFKC', ch) for ch in map(chr, range(0x20000))
+                 if unicodedata.decomposition(ch).split(' ', 1)[0] in ('<wide>', '<small>', '<font>')
+                 and unicodedata.normalize('NFKC', ch) in "@.-_+:/?=&#%~ !$'*"}
+_STYLED_SEP = {ch: plain for ch, plain in _COMPAT_PUNCT.items() if plain in '@.-_+:/?=&#%~ '}
 
 
-def _forms(ascii_chars):
+def _forms(ascii_chars, table=_STYLED_SEP):
     """Character-class body of the styled forms of ``ascii_chars``."""
-    return re.escape(''.join(ch for ch, plain in _STYLED_SEP.items() if plain in ascii_chars))
+    return re.escape(''.join(ch for ch, plain in table.items() if plain in ascii_chars))
 
 
 _STYLED_PUNCT = _forms('@.-_+:/?=&#%~ ')
@@ -126,11 +130,15 @@ def _fold_url_run(m):
     return _URL_AUTHORITY.sub(
         lambda a: _IDNA_DOT_REGEX.sub('.', a.group().translate(_AUTHORITY_JOINER)).translate(_DOMAIN_HINTS),
         m.group().translate(_URL_RUN_JOINER))
-# Inside an address-shaped run every styled form of @ . - _ + folds (the full-width-only rule above, widened).
+# Inside an address-shaped run every styled form of @ . - _ + folds (the full-width-only rule above, widened),
+# and in the local part, as in the domain, any dash is a hyphen and any NFKC dot a dot (john.smith\u2011billing@).
+# Styled forms of the other local-part punctuation (anna＆co＠, ＊＠) fold there too.
+_LOCAL_FORMS = _forms("!#$%&'*+-._", _COMPAT_PUNCT)
+_STYLED_EMAIL_RUN_LOCAL = rf'\w{_LOCAL_FORMS}{constants.MARKS}{_FORMAT_CHARS}{_LOCAL_ATEXT}{_HOST_SEP_CHARS}'
 _STYLED_EMAIL_RUN_REGEX = re.compile(
-    rf'(?<!\w)(?<!\w[{_forms(".-_")}{constants.MARKS}{_FORMAT_CHARS}])\w[\w{_forms(".-_+")}{constants.MARKS}{_FORMAT_CHARS}]*[@{_forms("@")}]'
+    rf'(?<![{_STYLED_EMAIL_RUN_LOCAL}])[{_STYLED_EMAIL_RUN_LOCAL}]*+[@{_forms("@")}]'
     rf'(?:[\w.\-{_forms(".-_")}{_HOST_SEP_CHARS}{constants.MARKS}{_FORMAT_CHARS}]|{_IDNA_DOT})*\w')
-_STYLED_EMAIL_RUN_JOINER = str.maketrans({ch: plain for ch, plain in _STYLED_SEP.items() if plain in '@.-_+'})
+_STYLED_EMAIL_RUN_JOINER = str.maketrans({ch: plain for ch, plain in _COMPAT_PUNCT.items() if plain in "@!#$%&'*+-._"})
 # In the domain every format character but the join controls (ZWNJ/ZWJ, which spell words) is a
 # copied layout hint (例\u200bえ.jp), whatever script sits beside it.
 _DOMAIN_HINTS = {cp: None for cp in range(0x110000)
@@ -138,20 +146,20 @@ _DOMAIN_HINTS = {cp: None for cp in range(0x110000)
 
 
 def _fold_styled_email_run(m):
-    run = m.group().translate(_STYLED_EMAIL_RUN_JOINER)
+    run = m.group().translate(_STYLED_EMAIL_RUN_JOINER).translate(_HOST_SEP)
     at = run.index('@')
-    return run[:at] + _IDNA_DOT_REGEX.sub('.', run[at:].translate(_HOST_SEP)).translate(_DOMAIN_HINTS)
+    return run[:at] + _IDNA_DOT_REGEX.sub('.', run[at:]).translate(_DOMAIN_HINTS)
 
 
 # Invisible format characters (category Cf: ZWSP, word joiner, soft hyphen, bidi marks) beside a
-# contact-run character (ASCII alnum, any decimal digit, circled alnum, contact punctuation or a phone
+# contact-run character (ASCII alnum, any decimal digit, circled alnum, contact or mail local-part punctuation or a phone
 # parenthesis in any form) are line-break or layout hints copied with the text ("06\u00ad12" reads "0612"): a run of
 # them drops when its other side is a run character, a letter of any script (例え\u200b．jp), a space
 # ("06\u200b 12") or the text edge. Between two other letters they stay (ZWNJ in Persian, ZWSP
 # between Thai words).
 _INVISIBLE_REGEX = re.compile(f'[{_FORMAT_CHARS}]+')
-_RUN_CHAR = re.compile('[A-Za-z\\d%s%s%s%s%s]' % (''.join(map(chr, _CIRCLED_ALNUM)), _PUNCT_ANY, _DASHES, _IDNA_DOTS,
-                                                   _PARENS))
+_RUN_CHAR = re.compile('[A-Za-z\\d%s%s%s%s%s%s%s%s]' % (''.join(map(chr, _CIRCLED_ALNUM)), _PUNCT_ANY, _DASHES, _IDNA_DOTS,
+                                                         _HOST_DOTS, _LOCAL_FORMS, _LOCAL_ATEXT, _PARENS))
 _LETTER = re.compile(rf'[^\W_]|[{constants.MARKS}]')
 
 

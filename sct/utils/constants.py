@@ -106,15 +106,20 @@ _IDN_LETTER = ("a-z" + _class_ranges('CLMNSZ', (0xA1, 0x1FFF), (0x2070, 0x2FFF),
                + _CJK_SYMBOL_LETTERS + _SUPPLEMENTARY_ALNUM)
 # ZWNJ/ZWJ (U+200C/D) join letters inside IDNA labels (Persian, Devanagari conjuncts).
 _IDN_CHAR = _IDN_LETTER + r"0-9\uff10-\uff19\u200c\u200d"
+# The one punctuation IDNA2008 allows in a label in a Latin context (RFC 5892 A.3): the middle dot between
+# two l's (col·legi.cat, Catalan); elsewhere it stays punctuation that ends a label.
+_MIDDLE_DOT = "(?<=l)\u00b7(?=l)"
+# One run of label characters (X+ with middle dots inside), so a label stays X+(-+X+)*.
+_IDN_RUN = rf"[{_IDN_CHAR}]+(?:{_MIDDLE_DOT}[{_IDN_CHAR}]+)*"
 # A punycode TLD (xn--p1ai) is tried first, so ".xn" alone never ends the match; ZWNJ/ZWJ join
 # letters inside it as in any other label.
 _TLD = (rf"(?:xn--[a-z0-9-]*[a-z0-9]"
         rf"|{_NO_GLUE}[{_IDN_LETTER}](?:[\u200c\u200d]*{_NO_GLUE}[{_IDN_LETTER}])+)")
 EMAIL_REGEX = re.compile(
     rf"(?:^|(?<=[^\w@.){MARKS}])|(?={_GLUE}))[\w+-]"
-    rf"(?:{_NO_GLUE}[\w!#$%&'*+{MARKS}\u200c\u200d-]|\.(?!\.)){{0,63}}?(?<!\.)(@|[(<{{\[]at[)>}}\]])"
+    rf"(?:{_NO_GLUE}[\w!#$%&'*+{MARKS}\u200c\u200d-]|\.(?!\.)|{_MIDDLE_DOT}){{0,63}}?(?<!\.)(@|[(<{{\[]at[)>}}\]])"
     # Host labels as X+(-+X+)*: one way to split a label, so a host with no TLD fails in linear time.
-    rf"[{_IDN_CHAR}]+(?:-+[{_IDN_CHAR}]+)*(?:\.[{_IDN_CHAR}]+(?:-+[{_IDN_CHAR}]+)*)*(?:\.{_TLD})",
+    rf"{_IDN_RUN}(?:-+{_IDN_RUN})*(?:\.{_IDN_RUN}(?:-+{_IDN_RUN})*)*(?:\.{_TLD})",
     flags=re.IGNORECASE | re.UNICODE,
 )
 
@@ -240,9 +245,9 @@ URL_REGEX = re.compile(
     # host name (with proper Unicode support, beyond the BMP too); the label characters of an email
     # domain, so CJK and full-width prose punctuation (，、「) glued after a host ends it
     # (labels as X+(-+X+)*, as in EMAIL_REGEX, so a host with no TLD fails in linear time)
-    rf"[{_IDN_CHAR}]+(?:-+[{_IDN_CHAR}]+)*"
+    rf"{_IDN_RUN}(?:-+{_IDN_RUN})*"
     # domain name
-    rf"(?:\.[{_IDN_CHAR}]+(?:-+[{_IDN_CHAR}]+)*)*"
+    rf"(?:\.{_IDN_RUN}(?:-+{_IDN_RUN})*)*"
     # TLD identifier (punycode first, so ".xn" alone never ends the host)
     rf"(?:\.(?:xn--[a-z0-9-]*[a-z0-9]|(?:{_NO_GLUE}[{_IDN_LETTER}]){{2,}}))"
     r"|" r"(?:(localhost))" r")"
