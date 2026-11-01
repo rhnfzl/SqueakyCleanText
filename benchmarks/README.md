@@ -60,15 +60,17 @@ PII (per language and per SCT type):
   prediction is correct when it overlaps a gold span of the same type.
 - **leak rate** (the main number): share of gold PII values still in the output, fully
   or as a 4+ character word of the value outside the placeholders. It is an upper
-  bound: the same word elsewhere in the doc also counts. DATE is shown per type but is
-  not in the total.
+  bound: the same word elsewhere in the doc also counts. Values are compared after
+  NFKC, so a full-width name SCT folds to ASCII still counts. DATE is shown per type
+  but is not in the total or the per-language rates.
 - **by position**: partial recall by the gold span's start offset (1000-char
   buckets), so recall lost after the first model window shows up.
 
 Gold labels are mapped to SCT types in `labels.py` (a schema mapping, not
 detection). Gold types with no SCT type are out of scope: not misses, and a
 prediction that only overlaps out-of-scope gold is not a false positive. Adjacent
-first name + last name spans merge into one PERSON. SCT `YEAR` counts as `DATE`.
+first name + last name spans (datasets with name-part labels) merge into one PERSON;
+two adjacent PER entities in BIO data stay two. SCT `YEAR` counts as `DATE`.
 SCT has no ID type: ID numbers map to `NUMBER`, which `default` replaces and
 `training` keeps, so `training` leaks them on purpose.
 

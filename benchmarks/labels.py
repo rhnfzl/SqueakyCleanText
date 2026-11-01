@@ -12,6 +12,10 @@ EMAIL, PHONE, IP, URL, DATE, NUMBER = "EMAIL", "PHONE", "IP", "URL", "DATE", "NU
 # SCT placeholder type -> scored type. YEAR is a date; the rest are pre-0.8 names.
 PRED_ALIASES = {"YEAR": DATE, "PHONE_NUMBER": PHONE, "IP_ADDRESS": IP}
 
+# Gold labels that mark one part of a name (given name, surname). Only these merge
+# into a full name; two plain PERSON entities next to each other stay two entities.
+NAME_PARTS = frozenset({"GIVENNAME", "SURNAME", "first_name", "last_name", "First_Given_Name", "Last_Family_Name"})
+
 _PER_LOC_ORG = {"PER": PERSON, "LOC": LOCATION, "ORG": ORGANISATION}
 
 DATASET_LABELS: dict[str, dict[str, str]] = {
@@ -78,24 +82,27 @@ DATASET_LABELS: dict[str, dict[str, str]] = {
 def normalise_gold(text: str, spans: list[dict], mapping: dict[str, str]) -> tuple[list[dict], list[dict]]:
     """Return ``(in_scope, out_of_scope)`` gold spans; in-scope ones carry SCT labels.
 
-    Adjacent PERSON spans with only whitespace between them merge into one name
-    (GIVENNAME + SURNAME), since SCT tags a full name as one span. A span inside
+    Adjacent name-part spans (``NAME_PARTS``: GIVENNAME + SURNAME) with only whitespace
+    between them merge into one name, since SCT tags a full name as one span. A span inside
     another span of the same type is dropped, and duplicates are removed.
     """
     in_scope, out_of_scope = [], []
     for span in spans:
         label = mapping.get(span["label"])
-        target = in_scope if label else out_of_scope
-        target.append({"start": span["start"], "end": span["end"], "label": label or span["label"]})
+        if label:
+            in_scope.append({"start": span["start"], "end": span["end"], "label": label,
+                             "part": span["label"] in NAME_PARTS})
+        else:
+            out_of_scope.append({"start": span["start"], "end": span["end"], "label": span["label"]})
     in_scope.sort(key=lambda s: (s["start"], -s["end"]))
     merged: list[dict] = []
     for span in in_scope:
         previous = next((m for m in reversed(merged) if m["label"] == span["label"]), None)
         if previous and span["end"] <= previous["end"]:
             continue  # nested in (or equal to) a same-type span
-        if (previous and span["label"] == PERSON and previous["end"] <= span["start"]
-                and not text[previous["end"]:span["start"]].strip()):
+        if (previous and span["label"] == PERSON and previous["part"] and span["part"]
+                and previous["end"] <= span["start"] and not text[previous["end"]:span["start"]].strip()):
             previous["end"] = span["end"]
             continue
         merged.append(dict(span))
-    return merged, out_of_scope
+    return [{k: v for k, v in m.items() if k != "part"} for m in merged], out_of_scope

@@ -9,7 +9,8 @@ PII (per language and per SCT type):
 - **leak**: a gold PII value is *fully* leaked when it is still in the output, and
   *partly* leaked when a 4+ char word of it is still outside the placeholders.
   ``leak_rate`` counts both. It is an upper bound: a word that also occurs elsewhere
-  in the document counts as a leak. DATE is reported per type but not in the total.
+  in the document counts as a leak. Both sides are NFKC-normalised. DATE is reported
+  per type but not in the total or per language.
 - **by_position**: partial recall by the gold span's start offset in 1000-char
   buckets, so recall lost after the first model window shows up.
 
@@ -53,7 +54,9 @@ def prepare(record: dict, predicted: list[dict], mapping: dict[str, str]) -> tup
 
 def leak(value: str, output: str) -> str | None:
     """``"full"`` if *value* is still in *output*, ``"partial"`` if a long word of it is, else None."""
-    visible = PLACEHOLDER.sub("\0", output)  # placeholder names ("PERSON") are not leaks
+    # NFKC on both sides: SCT folds full-width text, so raw "Ａｌｉｃｅ" shows up as "Alice".
+    value = unicodedata.normalize("NFKC", value)
+    visible = unicodedata.normalize("NFKC", PLACEHOLDER.sub("\0", output))  # placeholder names are not leaks
     if value in visible:
         return "full"
     if any(len(word) >= LEAK_MIN_CHARS and word in visible for word in re.findall(r"\w+", value)):
@@ -105,9 +108,9 @@ def score_pii(records: list[dict], predictions: dict[str, list[dict]], outputs: 
             position[name]["gold"] += 1
             position[name]["gold_found"] += found
             kind = leak(text[g["start"]:g["end"]], output)
-            groups = [("by_label", g["label"]), ("by_language", lang)]
+            groups = [("by_label", g["label"])]
             if g["label"] not in LEAK_EXCLUDED:
-                groups.append(("overall", "all"))
+                groups += [("by_language", lang), ("overall", "all")]
             for group, key in groups:
                 leaks[group][key]["total"] += 1
                 if kind:
