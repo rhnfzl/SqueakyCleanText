@@ -36,6 +36,17 @@ The built-in cleaners use the library default config, which keeps every script
 `日本語` -> `Ri Ben Yu`), or `SCT_MCP_PRESET=training` to keep text as written apart
 from PII (numbers, case, whitespace).
 
+| Variable | Default | Effect |
+|---|---|---|
+| `SCT_MCP_PRESET` | `sct` | config preset of the built-in cleaners |
+| `SCT_MCP_TO_ASCII` | off | `1` folds output to ASCII |
+| `SCT_MCP_ROOT` | unset | folder `clean_text` may read files from; `path` input is off while unset |
+| `SCT_MCP_MAX_BYTES` | 1 MiB | largest file `path` may read |
+
+```bash
+SCT_MCP_PRESET=training SCT_MCP_ROOT=~/notes sct-mcp
+```
+
 ## Reading files (`path`)
 
 Off by default. Set `SCT_MCP_ROOT` to a folder to let `clean_text` read files
@@ -65,8 +76,11 @@ file error above.
 ## In Python
 
 ```python
+from pathlib import Path
 from sct.mcp_server import create_mcp_server
-server = create_mcp_server(cleaner=None, root="/data/in", max_bytes=1 << 20)
+
+Path("notes").mkdir(exist_ok=True)  # root must be an existing folder
+server = create_mcp_server(cleaner=None, root="notes", max_bytes=1 << 20)
 ```
 
 `root` and `max_bytes` default to the environment variables.

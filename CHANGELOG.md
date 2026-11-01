@@ -27,6 +27,7 @@ Haystack), score columns and data cards (`sct-report`), a reworked MCP server an
 
 ### Added
 
+- Docs: a shorter README with a new pipeline diagram (`resources/sct_flow.excalidraw`, `.svg`, `.png`). The reference moved to `docs/`: `INSTALL.md`, `CONFIG.md`, `API.md`, `NER_BACKENDS.md`, `REPLACEMENT_MODES.md`, `PRIVACY.md`, `ADAPTERS.md`, `EVALUATION.md`, `LANGUAGES.md`; release notes of 0.4.5 to 0.6.0 moved here.
 - `ProcessResult.signals`: a value-free public view (language, confidence, PII counts,
   share and types, regex and entity counts, warnings, model provenance). Never entity text.
   Details under "Behaviour changes".
@@ -343,4 +344,37 @@ Applications can apply policies, inspect decisions, and use consistent adapters.
 
 ## 0.6.0
 
-- Added PII mode, synthetic replacement, reversible anonymization, and document classification.
+- **PII detection mode** (`ner_mode='pii'`): auto-configures GLiNER with 60+ PII entity labels (personal, financial, healthcare, identity, digital)
+- **Synthetic replacement** (`replacement_mode='synthetic'`): Faker-generated realistic values instead of `<TAG>` placeholders, with per-document consistency
+- **Reversible anonymization** (`replacement_mode='reversible'`): indexed placeholders (`<PERSON_0>`) with `AnonymizationMap` for round-trip deanonymization
+- **Document classification** (`check_classify_document=True`): zero-shot GLiClass pre-classification before text processing
+- **ProcessResult**: `process()` returns `ProcessResult` (backward-compatible 3-tuple) with `.metadata` for anonymization maps and classification results
+- **GLiNER ONNX mode** (`gliner_onnx=True`): load GLiNER with pre-built ONNX weights from HuggingFace Hub (auto-set for PII + ONNX backend)
+- **Bi-encoder support**: auto-detects ModernBERT and other bi-encoder GLiNER models, caches label embeddings, dynamic context windows (2048-8192 tokens)
+- **Entity description labels**: ZERONER-style natural-language descriptions for improved zero-shot accuracy
+- **Presidio GLiNER backend** (beta): opt-in `ner_backend='presidio_gliner'` for Presidio's context-aware recognition pipeline
+- **ModernBERT ONNX export**: updated export script with ModernBERT support (English, 8192 token context)
+- **Dynamic chunk sizing**: GLiNER chunk size adapts to model's actual context window instead of hardcoded 384
+
+## 0.5.x
+
+- `aprocess_batch()`: async batch processing for FastAPI / aiohttp integrations
+- `warmup(languages)`: pre-load NER models at startup to eliminate first-request latency
+- `custom_pipeline_steps`: attach arbitrary `(text: str) -> str` callables after the built-in pipeline
+- French, Portuguese, and Italian NER support via a shared multilingual ONNX session
+- Improved NER sentence boundary detection with abbreviation guard
+
+## 0.4.5
+
+- Frozen `TextCleanerConfig` dataclass: immutable, thread-safe, per-instance configuration
+- ONNX-first NER inference: torch-free base install (~400 MB models vs ~7 GB)
+- Thread-parallel batch processing via `ThreadPoolExecutor`
+- Five NER backends: `onnx`, `torch`, `gliner`, `ensemble_onnx`, `ensemble_torch`
+- GLiNER zero-shot NER for custom entity types (PRODUCT, EVENT, SKILL, etc.)
+- Ensemble voting across backends for improved recall
+- Lazy per-language model loading
+- Multilingual date detection and fuzzy date matching
+- Configurable emoji removal, bracket/brace content removal, and smart case folding
+- `stop-words` replaces NLTK (50 KB bundled vs 30 MB download)
+- PyTorch and Transformers moved to optional extras
+- Migrated to `pyproject.toml` (PEP 517), Python 3.11-3.13, ruff linter
