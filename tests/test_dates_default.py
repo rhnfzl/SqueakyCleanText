@@ -77,3 +77,37 @@ def test_training_preset_keeps_dates_as_written():
     )).process("Signed 2023-10-01 here")
 
     assert result.lm_text == "Signed 2023-10-01 here"
+
+
+# Thai month names (CLDR full and abbreviated) with Buddhist-era years, and Month/YY(YY).
+MONTH_NAME_DATES = [
+    ("วันที่ 24 ก.พ. 2562", "วันที่ <DATE>"),
+    ("เกิด 14 กุมภาพันธ์ 2561", "เกิด <DATE>"),
+    ("He was born in October/55", "He was born in <DATE>"),
+    ("Joined Oct/2019 here", "Joined <DATE> here"),
+]
+
+
+@pytest.mark.parametrize("text,expected", MONTH_NAME_DATES)
+def test_thai_and_month_slash_year_dates(text, expected):
+    assert _cleaner().process(text).lm_text == expected
+
+
+def test_dotted_month_abbreviation_is_literal():
+    assert DATE_REGEX.search("วันที่ 24 กXพX 2562") is None
+    assert DATE_REGEX.search("October/555") is None
+
+
+def test_month_slash_year_off_by_config():
+    assert _cleaner(date_month_name_slash_year=False).process("born October/55").lm_text == "born October/<NUMBER>"
+
+
+def test_builtin_month_languages_by_config():
+    result = _cleaner(date_builtin_month_languages=("en",)).process("วันที่ 24 ก.พ. 2562, 3 maart 2020, 3 March 2020")
+
+    assert result.lm_text == "วันที่ <NUMBER> ก.พ. <NUMBER>, <NUMBER> maart <YEAR>, <DATE>"
+
+
+def test_builtin_month_languages_rejects_unknown_code():
+    with pytest.raises(ValueError):
+        TextCleanerConfig(date_builtin_month_languages=("xx",))

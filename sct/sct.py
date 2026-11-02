@@ -89,16 +89,18 @@ class TextCleaner:
 
         # Instance-scoped datetime (with custom month names -> per-instance regex)
         mn_dict = None
-        if self.cfg.custom_month_names:
+        custom_months = self.cfg.custom_month_names or {}
+        slash_year = self.cfg.date_month_name_slash_year
+        if custom_months or self.cfg.date_builtin_month_languages is not None or not slash_year:
             extra = {}
-            for lang, names in self.cfg.custom_month_names.items():
+            for lang, names in custom_months.items():
                 extra[resources.language_to_iso(lang)] = names
-            mn_dict = constants.build_month_names_dict(extra)
-            date_regex = constants.build_date_regex(mn_dict)
+            mn_dict = constants.build_month_names_dict(extra, self.cfg.date_builtin_month_languages)
+            date_regex = constants.build_date_regex(mn_dict, slash_year=slash_year)
             fuzzy_all, fuzzy_by_lang = constants.build_fuzzy_vocabulary(
                 mn_dict,
                 {**constants._LANG_TO_VOCAB,
-                 **{lang: resources.language_to_iso(lang) for lang in self.cfg.custom_month_names}},
+                 **{lang: resources.language_to_iso(lang) for lang in custom_months}},
             )
             self.ProcessDateTime = datetime.ProcessDateTime(
                 date_regex=date_regex,
@@ -110,7 +112,8 @@ class TextCleaner:
         # fold_styled_characters: dates, like phones, read any space as " " and any dash as "-" (1987\u201105\u201112),
         # any dot form as "." (1990﹒ 1﹒ 15﹒), and a month-name date's day may be a circled number (⑮ January 1990).
         self._date_view = (
-            contact.DigitView(constants.build_date_regex(mn_dict, styled=True), contact.DATE_SEPARATOR_VIEW)
+            contact.DigitView(constants.build_date_regex(mn_dict, styled=True, slash_year=slash_year),
+                              contact.DATE_SEPARATOR_VIEW)
             if self.cfg.fold_styled_characters else self.ProcessDateTime._date_regex)
 
         self.ProcessContacts = contact.ProcessContacts()

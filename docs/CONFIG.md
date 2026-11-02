@@ -66,7 +66,7 @@ cfg = TextCleanerConfig(ner_models={'ENGLISH': '...', 'MULTILINGUAL': '...', 'HI
 
 Auto-detection covers all 75 Lingua languages (`detect_all_languages=True`). Languages
 without their own NER model run the MULTILINGUAL + ENGLISH fallback; stopwords exist for
-EN/NL/DE/ES (others use English) and month names for 7 languages plus `custom_month_names`.
+EN/NL/DE/ES (others use English) and month names for 8 languages (EN NL DE ES FR PT IT TH) plus `custom_month_names`.
 `ner_backend='gliner'` is language independent, so any pinned language works with it.
 
 ## Field reference
@@ -96,7 +96,9 @@ new_cfg = dataclasses.replace(cfg, check_ner_process=False)
 | `check_replace_ips` | `True` | Replace IPv4/IPv6 addresses (runs before dates, phones, years) |
 | `replace_ips_public_only` | `False` | Keep private, loopback and reserved IPs; replace only public ones |
 | `check_replace_years` | `True` | Replace years (1900-2099) |
-| `check_replace_dates` | `True` | Replace full dates and date-times with one `<DATE>` (ISO 8601, numeric with `-` `/` `.` in digits of any script and any 4-digit year, so Buddhist-era `15/01/2533` too, month names, CJK/Korean unit dates `1990年1月15日` `1990년 1월 15일`, Korean `1990. 1. 15.`, Han-numeral `一九九〇年一月十五日` read by Unicode numeric value); runs before phones, years and numbers. A date ends where no digit or Latin/Greek/Cyrillic letter touches it, so one glued to Thai or CJK text is found (`生日是15 January 1990谢谢`). Only full dates become one `<DATE>`: `1990年1月`, `1月15日`, Japanese era years (`令和6年1月15日`), `1990.1.15.` (CalVer-shaped) and month names outside the 7 built-in languages (add them with `custom_month_names`) do not, and the year and number steps can still change them (`1990年1月` becomes `<YEAR>年<NUMBER>月`). `False`: digits fall to the year and number steps |
+| `check_replace_dates` | `True` | Replace full dates and date-times with one `<DATE>` (ISO 8601, numeric with `-` `/` `.` in digits of any script and any 4-digit year, so Buddhist-era `15/01/2533` too, month names (Thai with Buddhist-era years too, `24 ก.พ. 2562`), month name / year (`October/55`), CJK/Korean unit dates `1990年1月15日` `1990년 1월 15일`, Korean `1990. 1. 15.`, Han-numeral `一九九〇年一月十五日` read by Unicode numeric value); runs before phones, years and numbers. A date ends where no digit or Latin/Greek/Cyrillic letter touches it, so one glued to Thai or CJK text is found (`生日是15 January 1990谢谢`). Only full dates become one `<DATE>`: `1990年1月`, `1月15日`, Japanese era years (`令和6年1月15日`), `1990.1.15.` (CalVer-shaped) and month names outside the 8 built-in languages (add them with `custom_month_names`) do not, and the year and number steps can still change them (`1990年1月` becomes `<YEAR>年<NUMBER>月`). `False`: digits fall to the year and number steps |
+| `date_month_name_slash_year` | `True` | A month name, `/` and a 2- or 4-digit year is one `<DATE>` (`October/55`, `Oct/2019`). `False` = 0.8.0 (`October/<NUMBER>`) |
+| `date_builtin_month_languages` | `None` | ISO codes of the built-in month data dates use, from `en nl de es fr pt it th`; `None` = all. `('en','nl','de','es','fr','pt','it')` = the 0.8.0 data (no Thai) |
 | `check_fuzzy_replace_dates` | `False` | Fuzzy match misspelled months (requires `[fuzzy]`) |
 | `check_replace_phone_numbers` | `True` | Replace phone numbers |
 | `check_replace_numbers` | `True` | Replace standalone numbers |

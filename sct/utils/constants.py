@@ -322,7 +322,7 @@ SINGLE_QUOTE_REGEX = re.compile("|".join(strange_single_quotes))
 YEAR_REGEX = re.compile(r"(?<![\d_])(19|20)\d{2}(?![\d_])")
 
 # ---------------------------------------------------------------------------
-# Multilingual month name vocabulary (EN, NL, DE, ES, FR, PT, IT)
+# Multilingual month name vocabulary (EN, NL, DE, ES, FR, PT, IT, TH)
 # Used by DATE_REGEX (exact match) and fuzzy_replace_dates (RapidFuzz).
 # Keys are canonical lowercase forms; values are frozensets of language codes
 # (some month names are shared across languages, e.g. "juni" is NL and DE,
@@ -385,6 +385,13 @@ MONTH_NAMES_MULTILINGUAL = {
     "gen": frozenset({"it"}), "mag": frozenset({"it"}),
     "giu": frozenset({"it"}), "lug": frozenset({"it"}),
     "ott": frozenset({"it"}),
+    # Thai (CLDR th, format wide and abbreviated); Buddhist-era years are plain 4 digits
+    **{name: frozenset({"th"}) for name in (
+        "มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน",
+        "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม",
+        "ม.ค.", "ก.พ.", "มี.ค.", "เม.ย.", "พ.ค.", "มิ.ย.",
+        "ก.ค.", "ส.ค.", "ก.ย.", "ต.ค.", "พ.ย.", "ธ.ค.",
+    )},
 }
 
 # Flat set for quick membership check (lowercase)
@@ -409,6 +416,7 @@ _LANG_TO_VOCAB = {
     "FRENCH": "fr",
     "PORTUGUESE": "pt",
     "ITALIAN": "it",
+    "THAI": "th",
 }
 
 # Per-language fuzzy vocabulary (full names only, len > 4)
@@ -421,7 +429,7 @@ for _lang_name, _lang_code in _LANG_TO_VOCAB.items():
 
 # Build month name alternation for regex (longest first to avoid prefix issues)
 _MONTH_ALTERNATION = '|'.join(
-    sorted(_MONTH_NAMES_SET, key=len, reverse=True)
+    map(re.escape, sorted(_MONTH_NAMES_SET, key=len, reverse=True))
 )
 
 
@@ -431,16 +439,19 @@ _MONTH_ALTERNATION = '|'.join(
 # Module-level constants above remain the defaults.
 # ---------------------------------------------------------------------------
 
-def build_month_names_dict(extra_month_names=None):
+def build_month_names_dict(extra_month_names=None, builtin_languages=None):
     """Build month-name lookup dict, merging defaults + custom names.
 
     Args:
         extra_month_names: dict mapping language ISO code -> tuple of month names
                           e.g. {'pl': ('styczen', 'luty', ...)}
+        builtin_languages: ISO codes of the built-in month data to keep (None = all).
     Returns:
         dict mapping lowercase month name -> frozenset of ISO codes
     """
-    result = dict(MONTH_NAMES_MULTILINGUAL)  # copy defaults
+    keep = None if builtin_languages is None else frozenset(builtin_languages)
+    result = {name: langs if keep is None else langs & keep
+              for name, langs in MONTH_NAMES_MULTILINGUAL.items() if keep is None or langs & keep}
     if extra_month_names:
         for iso_code, names in extra_month_names.items():
             for name in names:
@@ -500,28 +511,33 @@ _CIRCLED_DAYS = ''.join(chr(cp) for cp in range(0x2460, 0x3300)
                         and 1 <= int(unicodedata.normalize('NFKC', chr(cp))) <= 31)
 
 
-def build_date_regex(month_names_dict=None, styled=False):
+def build_date_regex(month_names_dict=None, styled=False, slash_year=True):
     """Build DATE_REGEX from a month-names dict.
 
     Args:
         month_names_dict: output of build_month_names_dict().
                          Uses module-level MONTH_NAMES_MULTILINGUAL if None.
         styled: a month-name date's day may be a circled number (fold_styled_characters).
+        slash_year: also match a month name, "/" and a 2- or 4-digit year (October/55, Oct/2019).
     Returns:
         Compiled regex pattern
     """
-    names = month_names_dict or MONTH_NAMES_MULTILINGUAL
-    alt = '|'.join(sorted(names.keys(), key=len, reverse=True))
+    names = MONTH_NAMES_MULTILINGUAL if month_names_dict is None else month_names_dict
+    # Escaped: a dotted abbreviation (ก.พ.) is literal, not "any character".
+    alt = '|'.join(map(re.escape, sorted(names.keys(), key=len, reverse=True)))
     day = rf'(?:\d{{1,2}}|[{_CIRCLED_DAYS}])' if styled else r'\d{1,2}'
-    # A numeric date glued to letters of an unspaced script (Thai, CJK) is a date, as numbers are.
-    return re.compile(
-        _DATE_START + _NUMERIC_DATE + _DATE_END + '|' + _HAN_DATE + '|' + _DATE_START + r'(?:'
+    month_dates = (
         r'(?:' + alt + r')'
         r'\.?\s+' + day + r'(?:st|nd|rd|th)?,?\s+\d{4}'
         r'|'
         + day + r'\.?\s+(?:de\s+)?(?:' + alt + r')'
         r'(?:\s+de)?\s+\d{4}'
-        r')' + _DATE_END,
+        + (r'|(?:' + alt + r')\.?/(?:\d{4}|\d{2})' if slash_year else '')
+    )
+    # A numeric date glued to letters of an unspaced script (Thai, CJK) is a date, as numbers are.
+    return re.compile(
+        _DATE_START + _NUMERIC_DATE + _DATE_END + '|' + _HAN_DATE
+        + ('|' + _DATE_START + r'(?:' + month_dates + r')' + _DATE_END if names else ''),
         flags=re.IGNORECASE,
     )
 

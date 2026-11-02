@@ -382,6 +382,10 @@ class TextCleanerConfig:
     bracket_content_max_words: int = 3
     # A {...} that parses as a JSON object (json.raw_decode, nested ones included) is never removed
     keep_json_braces: bool = True
+    # A month name, "/" and a 2- or 4-digit year is one <DATE> (October/55, Oct/2019)
+    date_month_name_slash_year: bool = True
+    # ISO codes of the built-in month data dates use (en nl de es fr pt it th); None = all
+    date_builtin_month_languages: Optional[Tuple[str, ...]] = None
 
     def __post_init__(self):
         if self.synthetic_reference_date is not None:
@@ -643,6 +647,15 @@ class TextCleanerConfig:
             object.__setattr__(self, 'custom_stopwords',
                                MappingProxyType(resolved_sw))
 
+        if self.date_builtin_month_languages is not None:
+            from sct.utils.constants import MONTH_NAMES_MULTILINGUAL
+            codes = tuple(self.date_builtin_month_languages)
+            unknown = set(codes) - set().union(*MONTH_NAMES_MULTILINGUAL.values())
+            if isinstance(self.date_builtin_month_languages, str) or unknown:
+                raise ValueError(f"date_builtin_month_languages must be a tuple of built-in month ISO codes, "
+                                 f"got {self.date_builtin_month_languages!r}")
+            object.__setattr__(self, 'date_builtin_month_languages', codes)
+
         # Validate and freeze custom_month_names
         if self.custom_month_names:
             resolved_mn = {resolve_language(k): tuple(v) for k, v in self.custom_month_names.items()}
@@ -766,6 +779,8 @@ def _config_from_module_globals() -> TextCleanerConfig:
         bracket_content_max_chars=getattr(m, 'BRACKET_CONTENT_MAX_CHARS', 32),
         bracket_content_max_words=getattr(m, 'BRACKET_CONTENT_MAX_WORDS', 3),
         keep_json_braces=getattr(m, 'KEEP_JSON_BRACES', True),
+        date_month_name_slash_year=getattr(m, 'DATE_MONTH_NAME_SLASH_YEAR', True),
+        date_builtin_month_languages=getattr(m, 'DATE_BUILTIN_MONTH_LANGUAGES', None),
         check_replace_currency_symbols=m.CHECK_REPLACE_CURRENCY_SYMBOLS,
         check_ner_process=m.CHECK_NER_PROCESS,
         check_remove_isolated_letters=m.CHECK_REMOVE_ISOLATED_LETTERS,
@@ -885,6 +900,8 @@ REPLACE_WITH_IDENTIFIERS = "<ID>"
 BRACKET_CONTENT_MAX_CHARS = 32
 BRACKET_CONTENT_MAX_WORDS = 3
 KEEP_JSON_BRACES = True
+DATE_MONTH_NAME_SLASH_YEAR = True
+DATE_BUILTIN_MONTH_LANGUAGES = None
 GLINER_ONNX = False
 LANGUAGE = None
 
