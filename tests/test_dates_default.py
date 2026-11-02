@@ -79,18 +79,24 @@ def test_training_preset_keeps_dates_as_written():
     assert result.lm_text == "Signed 2023-10-01 here"
 
 
-# Thai month names (CLDR full and abbreviated) with Buddhist-era years, and Month/YY(YY).
+# Month/YY(YY).
 MONTH_NAME_DATES = [
-    ("วันที่ 24 ก.พ. 2562", "วันที่ <DATE>"),
-    ("เกิด 14 กุมภาพันธ์ 2561", "เกิด <DATE>"),
     ("He was born in October/55", "He was born in <DATE>"),
     ("Joined Oct/2019 here", "Joined <DATE> here"),
 ]
 
 
 @pytest.mark.parametrize("text,expected", MONTH_NAME_DATES)
-def test_thai_and_month_slash_year_dates(text, expected):
+def test_month_slash_year_dates(text, expected):
     assert _cleaner().process(text).lm_text == expected
+
+
+def test_thai_month_names_come_from_custom_month_names():
+    # No built-in Thai month data (no word lists); the user passes month names.
+    text = "วันที่ 24 ก.พ. 2562"
+    assert _cleaner().process(text).lm_text == "วันที่ <NUMBER> ก.พ. <NUMBER>"
+    custom = _cleaner(custom_month_names={"th": ("ก.พ.",)}).process(text)
+    assert custom.lm_text == "วันที่ <DATE>"
 
 
 def test_dotted_month_abbreviation_is_literal():
