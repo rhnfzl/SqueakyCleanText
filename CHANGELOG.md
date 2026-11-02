@@ -1,6 +1,13 @@
 # Changelog
 
-## Unreleased
+## 0.8.1 - 2026-11-02
+
+0.8.1 fixes the weak spots found by the new open-dataset benchmark (`benchmarks/`). On the
+12 PII datasets (default config) leak falls and recall rises on every one: REDACT leak 18.1 to
+8.2 and recall 72.1 to 85.6, TAB (long documents) leak 42.4 to 11.7, OpenPII leak 13.1 to 10.6
+and recall 69.2 to 74.4. Speed is unchanged. Several defaults change, so output text changes;
+each change has a config field that restores 0.8.0. Full tables:
+`benchmarks/results/comparison-0.8.0-unreleased.md`.
 
 ### Benchmarks
 
