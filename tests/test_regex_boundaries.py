@@ -459,3 +459,28 @@ def test_url_trailing_punct_outside_off_restores_080():
     assert _cleaner(url_trailing_punct_outside=False).process(text).lm_text == "Visit <URL> Next."
     js = build_browser_manifest(TextCleanerConfig(url_trailing_punct_outside=False))
     assert js["rules"]["url"]["pattern"] == constants.URL_REGEX_LEGACY.pattern
+
+
+# F12: EMAIL_GATE is a cheap pre-check for the email regex's separator; it must never skip a match.
+@pytest.mark.parametrize("text", [
+    "a@b.com", "x[AT]y.org", "foo{at}bar.de", "mail (at) host", "用户@例子.广告", "anna!@example.com",
+    "Contact John Smith <john.smith@example.com> today.", "<x@y.org>", "joe<AT>mail.example.net",
+])
+def test_email_gate_passes_every_regex_match(text):
+    for match in constants.EMAIL_REGEX.finditer(text):
+        assert constants.EMAIL_GATE.search(match.group())
+
+
+class _NoSub:
+    def sub(self, *args, **kwargs):
+        raise AssertionError("email regex ran on text with no separator")
+
+
+@pytest.mark.parametrize("reversible", [False, True])
+def test_email_regex_skipped_without_separator(monkeypatch, reversible):
+    cleaner = _cleaner(replacement_mode="reversible" if reversible else "placeholder")
+    monkeypatch.setattr(constants, "EMAIL_REGEX", _NoSub())
+    text = "A long paragraph with no address in it, only words."
+    assert CONTACTS.replace_emails(text) == text
+    assert CONTACTS.replace_emails_with_fn(text, lambda s: "<EMAIL>") == text
+    cleaner.process(text)

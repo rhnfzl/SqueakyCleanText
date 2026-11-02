@@ -882,6 +882,8 @@ class TextCleaner:
         return self._url_regex.sub(lambda m: self._emit('URL', m.group(), self.cfg.replace_with_url), text)
 
     def _replace_emails(self, text):
+        if not constants.EMAIL_GATE.search(text):  # no separator, no email: skip the slow regex
+            return text
         reversible = self._replace_reversible(
             text,
             constants.EMAIL_REGEX,

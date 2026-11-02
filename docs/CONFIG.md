@@ -94,7 +94,7 @@ new_cfg = dataclasses.replace(cfg, check_ner_process=False)
 | `html_tag_strict` | `True` | The HTML rule reads only tag shapes: a name after `<` (`<b>`, `</a>`, `<br/>`, `<!DOCTYPE html>`, `<?xml ...?>`, multi-line tags) or a `<!-- -->` comment, plus entities. `Name <a@b.com>`, `<https://...>` and a stray `a < b ... >` are left to the email/URL rules and the text. `False` restores the 0.8.0 `<.*?>`, which masks those as `<HTML>`. Legacy global `HTML_TAG_STRICT` |
 | `url_trailing_punct_outside` | `True` | `. , ; : ! ? '` end a URL path or query unless more URL text follows, so `see https://x.com/a/b. Next` gives `see <URL>. Next` and the sentence keeps its full stop or comma. `/a.html`, `?a=1,2&b=3`, `/v1.2/x`, `;jsessionid=` and a fully qualified host's final dot before a path stay inside. Format regex only; reaches the plain, reversible and synthetic paths, the streaming split guard and the browser export. `False` restores the 0.8.0 URL, which takes the trailing mark. Legacy global `URL_TRAILING_PUNCT_OUTSIDE` |
 | `check_replace_urls` | `True` | Replace URLs with token |
-| `check_replace_emails` | `True` | Replace emails with token |
+| `check_replace_emails` | `True` | Replace emails with token. Text with no `@` and no bracketed `at` (`[at]`, `(at)`, `<at>`, `{at}`) skips the email regex; output is unchanged |
 | `check_replace_ips` | `True` | Replace IPv4/IPv6 addresses (runs before dates, phones, years) |
 | `replace_ips_public_only` | `False` | Keep private, loopback and reserved IPs; replace only public ones |
 | `check_replace_years` | `True` | Replace years (1900-2099) |

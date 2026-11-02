@@ -148,6 +148,9 @@ EMAIL_REGEX = re.compile(
     rf"{_IDN_RUN}(?:-+{_IDN_RUN})*(?:\.{_IDN_RUN}(?:-+{_IDN_RUN})*)*(?:\.{_TLD})",
     flags=re.IGNORECASE | re.UNICODE,
 )
+# Cheap pre-check: every EMAIL_REGEX match holds its separator group, so text with no hit here has no
+# email and the regex (13x slower than 0.7.1 on email-free text) is skipped. Keep in step with that group.
+EMAIL_GATE = re.compile(r"@|[(<{\[]at[)>}\]]", re.IGNORECASE)
 
 # Area-code parentheses in compatibility form (full-width （ ）, small ﹙ ﹚): the phone view reads them as
 # "(" ")" (+49（30）123456) and the styled fold treats them as phone punctuation.

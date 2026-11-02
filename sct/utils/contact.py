@@ -154,6 +154,8 @@ class ProcessContacts:
 
     def replace_emails(self, text, replace_with="<EMAIL>"):
         """Replace all emails in ``text`` str with ``replace_with`` str."""
+        if not constants.EMAIL_GATE.search(text):
+            return text
         return constants.EMAIL_REGEX.sub(replace_with, text)
 
     def replace_ips(self, text, replace_with="<IP>", public_only=False):
@@ -175,6 +177,8 @@ class ProcessContacts:
 
     def replace_emails_with_fn(self, text, replace_fn):
         """Replace emails using a callable: replace_fn(matched_text) -> replacement."""
+        if not constants.EMAIL_GATE.search(text):
+            return text
         return constants.EMAIL_REGEX.sub(lambda m: replace_fn(m.group()), text)
 
     def replace_urls_with_fn(self, text, replace_fn):

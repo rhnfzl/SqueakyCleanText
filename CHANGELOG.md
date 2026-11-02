@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+### Performance
+
+- The email step now runs a cheap pre-check (`constants.EMAIL_GATE`: `@` or a bracketed `at`)
+  and skips the email regex when the text has neither. Every email match needs that separator,
+  so output is byte-identical; no config field. On email-free text the 0.8.0 regex was 5-18x
+  slower than 0.7.1 (English 17x) and took about 25% of NER-off run time (benchmark section 12);
+  the pre-check costs about 0.01 ms per 1,400-character document against 1.7 ms for the regex.
+  Covers `TextCleaner` (all replacement modes) and `ProcessContacts.replace_emails` /
+  `replace_emails_with_fn`. Not re-measured on the benchmark mix yet; the other NER-off slowdowns
+  (dates on by default, language ID, styled-character folding) are unchanged.
+
 ### Behaviour changes
 
 - `url_trailing_punct_outside` (default `True`, legacy module global `URL_TRAILING_PUNCT_OUTSIDE`):
