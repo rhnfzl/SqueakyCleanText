@@ -2,12 +2,15 @@
 
 ## 0.8.1 - 2026-11-02
 
-0.8.1 fixes the weak spots found by the new open-dataset benchmark (`benchmarks/`). On the
-12 PII datasets (default config) leak falls and recall rises on every one: REDACT leak 18.1 to
-8.2 and recall 72.1 to 85.6, TAB (long documents) leak 42.4 to 11.7, OpenPII leak 13.1 to 10.6
-and recall 69.2 to 74.4. Speed is unchanged. Several defaults change, so output text changes;
-each change has a config field that restores 0.8.0. Full tables:
-`benchmarks/results/comparison-0.8.0-unreleased.md`.
+**Fewer leaks, same speed.** 0.8.1 closes the gaps found by our new open-dataset benchmark.
+
+- **Fewer names and IDs slip through:** leaked PII drops on all 12 test datasets, for example 18% to 8% on REDACT and 42% to 12% on long court documents.
+- **Bank and card numbers get their own labels** (`<IBAN>`, `<CARD>`) instead of being treated as phone numbers.
+- **Less collateral damage:** JSON and longer text in brackets are no longer deleted during cleanup.
+- **Cleaner output:** URLs no longer swallow the full stop, and `Name <email>` is read as an email.
+- **No slowdown.**
+
+Heads-up: some defaults changed, so output text can differ from 0.8.0. Every change has a setting to switch it back.
 
 ### Benchmarks
 
@@ -162,10 +165,15 @@ each change has a config field that restores 0.8.0. Full tables:
 
 ## 0.8.0 - 2026-11-01
 
-0.8.0 makes batch cleaning faster, detects all 75 Lingua languages, and adds a value-free
-signal view that feeds new framework adapters (Hugging Face `datasets`, DataTrove, LangChain,
-Haystack), score columns and data cards (`sct-report`), a reworked MCP server and a
-`training` preset. It has many breaking changes; read "Behaviour changes" before upgrading.
+**Faster, more languages, ready for data pipelines.**
+
+- **Up to 4x faster** batch cleaning on multi-core machines, plus GPU support.
+- **75 languages detected** instead of 4.
+- **More accurate:** fewer false masks and more PII found on our benchmarks.
+- **Plugs into your stack:** Hugging Face `datasets`, DataTrove, LangChain and Haystack adapters, a `training` preset and an MCP server.
+- **Data reports:** `sct-report` writes quality scores and data cards without exposing any text.
+
+Heads-up: this release has breaking changes. Read "Behaviour changes" in the changelog before you upgrade.
 
 ### Highlights
 
