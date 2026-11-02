@@ -17,12 +17,14 @@ _TRAINING = {
     'check_replace_emails': True,
     'check_replace_phone_numbers': True,
     'check_replace_ips': True,
+    'check_replace_iban_cards': True,
     'check_ner_process': True,
     'check_fix_bad_unicode': True,
     'check_detect_language': True,
     # Off
     'check_to_ascii_unicode': False,
     'check_replace_numbers': False,
+    'check_replace_identifiers': False,  # takes product/reference codes too; not measured on training data
     'check_replace_years': False,
     'check_replace_dates': False,
     'check_fuzzy_replace_dates': False,

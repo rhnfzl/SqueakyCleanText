@@ -155,6 +155,7 @@ def build_browser_manifest(config: TextCleanerConfig) -> dict[str, Any]:
             "Regular expressions require JavaScript compatibility tests.",
             "Model files remain external and must keep their recorded revisions.",
             "Reversible and synthetic replacement are server-side features.",
+            "IBAN/card checksum typing and identifier tokens are server-side rules.",
             "Rules with fold_decimal_digits match on a copy of the text where every Unicode "
             "decimal digit (Nd, such as ٠٦ or ०६) is its ASCII digit, one code point for one, "
             "and replace the same offsets in the original text (JavaScript \\d is ASCII only).",

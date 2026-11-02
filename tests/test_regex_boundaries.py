@@ -342,3 +342,56 @@ def test_browser_number_rule_follows_flag():
     strict = build_browser_manifest(
         TextCleanerConfig(check_ner_process=False, replace_numbers_in_words=True))
     assert default != strict
+
+
+# --- F3: IBAN / card checksums and identifier tokens (made-up values) ---
+
+@pytest.mark.parametrize("value", [
+    "NL91ABNA0417164300", "NL91 ABNA 0417 1643 00", "GB82 WEST 1234 5698 7654 32",
+])
+def test_valid_iban_is_one_iban_span(value):
+    out = _cleaner().process(f"IBAN {value} ok").lm_text
+    assert out == "IBAN <IBAN> ok"
+
+
+def test_bad_iban_checksum_is_not_iban():
+    out = _cleaner().process("IBAN NL92ABNA0417164300 ok").lm_text
+    assert "<IBAN>" not in out
+
+
+@pytest.mark.parametrize("value", ["4111 1111 1111 1111", "4111-1111-1111-1111", "4111111111111111"])
+def test_luhn_card_is_one_card_span(value):
+    assert _cleaner().process(f"Card {value} ok").lm_text == "Card <CARD> ok"
+
+
+def test_bad_luhn_is_not_card_and_old_behaviour_reachable():
+    assert "<CARD>" not in _cleaner().process("Card 4111111111111112").lm_text
+    out = _cleaner(check_replace_iban_cards=False).process("Card 4111 1111 1111 1111").lm_text
+    assert "<CARD>" not in out and "<PHONE>" in out
+
+
+def test_iban_followed_by_code_word_keeps_checksum_prefix():
+    out = _cleaner().process("BE68 5390 0754 7034 ABCD paid").lm_text
+    assert out == "<IBAN> ABCD paid"
+
+
+def test_identifier_rule_off_by_default_on_with_flag():
+    text = "Licence RBCON68T08 and GPU RTX4090, ID XK4729QP31; word Model5 A1B2"
+    assert _cleaner().process(text).lm_text.count("RBCON68T08") == 1
+    out = _cleaner(check_replace_identifiers=True).process(text).lm_text
+    assert out == "Licence <ID> and GPU <ID>, ID <ID>; word Model5 A1B2"
+
+
+def test_new_types_reversible_and_counted():
+    result = _cleaner(replacement_mode="reversible", check_replace_identifiers=True).process(
+        "pay NL91ABNA0417164300 card 4111111111111111 ref RBCON68T08")
+    anon_map = result.metadata["anon_map"]
+    assert anon_map.deanonymize(result.lm_text) == "pay NL91ABNA0417164300 card 4111111111111111 ref RBCON68T08"
+    assert {e.entity_type for e in anon_map.entries} == {"IBAN", "CARD", "ID"}
+    assert {"IBAN", "CARD", "ID"} <= set(result.signals["pii_types"])
+
+
+def test_new_types_synthetic():
+    out = _cleaner(replacement_mode="synthetic", check_replace_identifiers=True).process(
+        "pay NL91ABNA0417164300 card 4111111111111111 ref RBCON68T08").lm_text
+    assert "NL91ABNA0417164300" not in out and "4111111111111111" not in out and "RBCON68T08" not in out

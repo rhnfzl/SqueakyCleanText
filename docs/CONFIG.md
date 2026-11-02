@@ -153,6 +153,11 @@ new_cfg = dataclasses.replace(cfg, check_ner_process=False)
 | `ner_ensemble_vote` | `'max'` | How the NER models vote on one span: `'max'` keeps it when the best model score reaches `ner_confidence_threshold`, so a weak second model on the same (widened) span never hides a strong hit; `'mean'` averages the scores (0.8.0) |
 | `ner_propagate_masked` | `True` | After NER, mask every other case-sensitive whole-word copy of a masked PER/ORG/LOC value in the same document with the same type, so a name masked once is not left visible elsewhere. Values come from the model's own spans (no word lists); values under 2 characters or without a letter are not spread. A wrong tag is repeated too. `False` = 0.8.0 output |
 | `ner_propagate_min_score` | `None` | Score (0..1) a span needs before its value is propagated. `None` = the effective NER cut; raise it to spread fewer wrong tags at the cost of more visible repeats |
+| `check_replace_iban_cards` | `True` | Before the phone step, mask an IBAN whose mod-97 checksum holds as one `<IBAN>` and a 13-19 digit card number (first digit 2-6, spaces/hyphens allowed) whose Luhn checksum holds as one `<CARD>`. Bad checksums go to the phone/number steps. `False` = 0.8.0 (`NL91ABNA<PHONE>`) |
+| `replace_with_iban` | `"<IBAN>"` | Replacement for IBANs |
+| `replace_with_cards` | `"<CARD>"` | Replacement for card numbers |
+| `check_replace_identifiers` | `False` | Mask identifier tokens: 6+ uppercase letters and digits (any script), 2+ digits and a letter, not glued to another letter or digit (`RBCON68T08`). Off by default: also takes product and reference codes (`RTX4090`, `COVID19`) |
+| `replace_with_identifiers` | `"<ID>"` | Replacement for identifier tokens |
 | `ner_batch_size` | `8` | NER chunks per model forward pass, batched across the documents of a `process_batch` call (must be >= 1). `1` = 0.7.1 call pattern and exact scores, and less memory; which is faster depends on the CPU, so measure |
 | `onnx_intra_op_threads` | `None` | ONNX Runtime threads per inference (`None` = ORT default: every physical core, ignoring CPU affinity). Set it to cap CPU use; fewer threads is usually slower |
 | `onnx_inter_op_threads` | `None` | ONNX Runtime inter-op threads (`None` = ORT default). Only matters with ORT parallel execution mode, so `onnx_intra_op_threads` is the usual knob |

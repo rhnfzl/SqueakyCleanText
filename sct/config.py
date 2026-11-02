@@ -367,6 +367,15 @@ class TextCleanerConfig:
     # score a span needs before its value is propagated (0..1); None = the effective NER cut.
     # Raising it spreads fewer wrong tags at the cost of more visible repeats
     ner_propagate_min_score: Optional[float] = None
+    # IBANs (mod-97 checksum) and payment cards (Luhn checksum) become one <IBAN> / <CARD> each,
+    # before the phone step; False = 0.8.0 (the phone/number steps take pieces of them)
+    check_replace_iban_cards: bool = True
+    replace_with_iban: str = "<IBAN>"
+    replace_with_cards: str = "<CARD>"
+    # Identifier tokens: 6+ uppercase letters and digits with 2+ digits and a letter (RBCON68T08).
+    # Off by default: the shape also takes product and reference codes (RTX4090, COVID19)
+    check_replace_identifiers: bool = False
+    replace_with_identifiers: str = "<ID>"
 
     def __post_init__(self):
         if self.synthetic_reference_date is not None:
@@ -743,6 +752,11 @@ def _config_from_module_globals() -> TextCleanerConfig:
         ner_ensemble_vote=getattr(m, 'NER_ENSEMBLE_VOTE', 'max'),
         ner_propagate_masked=getattr(m, 'NER_PROPAGATE_MASKED', True),
         ner_propagate_min_score=getattr(m, 'NER_PROPAGATE_MIN_SCORE', None),
+        check_replace_iban_cards=getattr(m, 'CHECK_REPLACE_IBAN_CARDS', True),
+        replace_with_iban=getattr(m, 'REPLACE_WITH_IBAN', '<IBAN>'),
+        replace_with_cards=getattr(m, 'REPLACE_WITH_CARDS', '<CARD>'),
+        check_replace_identifiers=getattr(m, 'CHECK_REPLACE_IDENTIFIERS', False),
+        replace_with_identifiers=getattr(m, 'REPLACE_WITH_IDENTIFIERS', '<ID>'),
         check_replace_currency_symbols=m.CHECK_REPLACE_CURRENCY_SYMBOLS,
         check_ner_process=m.CHECK_NER_PROCESS,
         check_remove_isolated_letters=m.CHECK_REMOVE_ISOLATED_LETTERS,
@@ -854,6 +868,11 @@ SYNTHETIC_REFERENCE_DATE = '2026-01-01'
 NER_ENSEMBLE_VOTE = 'max'
 NER_PROPAGATE_MASKED = True
 NER_PROPAGATE_MIN_SCORE = None
+CHECK_REPLACE_IBAN_CARDS = True
+REPLACE_WITH_IBAN = "<IBAN>"
+REPLACE_WITH_CARDS = "<CARD>"
+CHECK_REPLACE_IDENTIFIERS = False
+REPLACE_WITH_IDENTIFIERS = "<ID>"
 GLINER_ONNX = False
 LANGUAGE = None
 

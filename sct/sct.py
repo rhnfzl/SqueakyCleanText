@@ -62,6 +62,8 @@ class TextCleaner:
             'DATE': self.cfg.replace_with_dates, 'YEAR': self.cfg.replace_with_years,
             self._phone_type: self.cfg.replace_with_phone_numbers,
             'NUMBER': self.cfg.replace_with_numbers, 'CURRENCY': self.cfg.replace_with_currency_symbols,
+            'IBAN': self.cfg.replace_with_iban, 'CARD': self.cfg.replace_with_cards,
+            'ID': self.cfg.replace_with_identifiers,
         }
         # Markers that are not <TAG>-shaped ("EMAIL"): NER protects them like <EMAIL> (ner.regex_markers).
         self._custom_markers = tuple(sorted({
@@ -248,6 +250,11 @@ class TextCleaner:
         # fuzzy_replace_dates runs here (between replace_dates and replace_years)
         # but is called explicitly in _process_single with language context.
         # Phones before years, so a year step cannot split "+31 6 1234 2019".
+        # Checksum-valid IBANs/cards and identifier tokens before phones, so a phone cannot take their digits.
+        if cfg.check_replace_iban_cards:
+            self._post_fuzzy_pipeline.append(self._replace_iban_cards)
+        if cfg.check_replace_identifiers:
+            self._post_fuzzy_pipeline.append(self._replace_identifiers)
         if cfg.check_replace_phone_numbers:
             self._post_fuzzy_pipeline.append(self._replace_phone_numbers)
         if cfg.check_replace_years:
@@ -952,6 +959,25 @@ class TextCleaner:
             text, lambda orig: self._emit(self._phone_type, orig, self.cfg.replace_with_phone_numbers),
             view=phone_view,
         )
+
+    def _replace_typed(self, text, pattern, entity_type):
+        """Replace *pattern* matches as *entity_type* in every replacement mode."""
+        reversible = self._replace_reversible(text, pattern, entity_type)
+        if reversible is not None:
+            return reversible
+        if self._synthetic_replacer:
+            def value(orig):
+                return self._synthetic_replacer.get_replacement(entity_type, orig)
+        else:
+            def value(orig):
+                return self._tags[entity_type]
+        return pattern.sub(lambda m: self._emit(entity_type, m.group(), value(m.group())), text)
+
+    def _replace_iban_cards(self, text):
+        return self._replace_typed(self._replace_typed(text, contact.IBAN_VIEW, 'IBAN'), contact.CARD_VIEW, 'CARD')
+
+    def _replace_identifiers(self, text):
+        return self._replace_typed(text, constants.IDENTIFIER_REGEX, 'ID')
 
     def _replace_numbers(self, text):
         anon_map = getattr(self._document_context, 'anon_map', None)

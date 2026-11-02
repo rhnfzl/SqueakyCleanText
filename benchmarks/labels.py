@@ -10,7 +10,7 @@ PERSON, LOCATION, ORGANISATION = "PERSON", "LOCATION", "ORGANISATION"
 EMAIL, PHONE, IP, URL, DATE, NUMBER = "EMAIL", "PHONE", "IP", "URL", "DATE", "NUMBER"
 
 # SCT placeholder type -> scored type. YEAR is a date; the rest are pre-0.8 names.
-PRED_ALIASES = {"YEAR": DATE, "PHONE_NUMBER": PHONE, "IP_ADDRESS": IP}
+PRED_ALIASES = {"YEAR": DATE, "PHONE_NUMBER": PHONE, "IP_ADDRESS": IP, "IBAN": NUMBER, "CARD": NUMBER, "ID": NUMBER}
 
 # Gold labels that mark one part of a name (given name, surname). Only these merge
 # into a full name; two plain PERSON entities next to each other stay two entities.

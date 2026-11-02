@@ -60,6 +60,7 @@ def candidate_config(candidate: ModelCandidate) -> TextCleanerConfig:
         "check_replace_years": False,
         "check_replace_dates": False,
         "check_replace_phone_numbers": False,
+        "check_replace_iban_cards": False,
         "check_replace_numbers": False,
         "check_replace_currency_symbols": False,
         "check_remove_isolated_letters": False,

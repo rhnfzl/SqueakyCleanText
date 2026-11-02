@@ -178,6 +178,18 @@ PHONE_REGEX = re.compile(
     r"(?:\s?(?:ext\.?|[#x])\s?\d{2,6})?(?![\d_]|\(\d)"
 )
 
+# IBAN: country code, check digits, then 11-30 letters/digits, in groups of 4 or unspaced.
+# A match is only an IBAN when its ISO 7064 mod-97 checksum holds (contact.IBAN_VIEW).
+IBAN_REGEX = re.compile(r"(?<![^\W_])[A-Z]{2}[0-9]{2}(?: ?[A-Z0-9]{4}){2,7}(?: ?[A-Z0-9]{1,3})?(?![^\W_])")
+# Payment card: 13-19 digits starting 2-6 (the issuer ranges), optional space/hyphen groups;
+# only a card when the Luhn checksum holds (contact.CARD_VIEW).
+CARD_REGEX = re.compile(r"(?<![\w+.,])[2-6](?:[ -]?[0-9]){12,18}(?![\w])")
+# Identifier token (licence/ID codes like RBCON68T08): 6+ uppercase letters and digits of any
+# script, at least 2 digits and 1 letter, not glued to another letter, digit or mark.
+IDENTIFIER_REGEX = regex.compile(
+    r"(?<![\p{L}\p{N}\p{M}_])(?=(?:\p{Lu}*\p{Nd}){2})(?=\p{Nd}*\p{Lu})[\p{Lu}\p{Nd}]{6,}(?![\p{L}\p{N}\p{M}_])"
+)
+
 # IPv4 and IPv6 (incl. "::" forms and IPv4-mapped tails). Runs before the
 # date/year/phone steps so "2001:4860:4860::8888" is not read as a year.
 _IPV4 = r"(?:(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])\.){3}(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])"

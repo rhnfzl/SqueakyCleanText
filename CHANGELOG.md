@@ -28,6 +28,24 @@
   single word of a masked multi-word value stays visible unless the model tags it: a surname
   after a full name (`Lars Petersen` ... `Petersen`), or `Okonkwo` after the model merged
   `Okonkwo\nOkonkwo` into one span.
+- `check_replace_iban_cards` (default `True`, legacy `CHECK_REPLACE_IBAN_CARDS`), with
+  `replace_with_iban="<IBAN>"` and `replace_with_cards="<CARD>"` (legacy `REPLACE_WITH_IBAN`,
+  `REPLACE_WITH_CARDS`): before the phone step, an IBAN (country code, check digits, 11-30
+  letters/digits, unspaced or in groups of 4) whose ISO 7064 mod-97 checksum holds becomes one
+  `<IBAN>`, and a 13-19 digit number starting 2-6 (spaces/hyphens allowed) whose Luhn checksum
+  holds becomes one `<CARD>`. 0.8.0 gave `NL91ABNA<PHONE>` (country, check digits and bank code
+  visible) and `<PHONE> <PHONE>` for a card. Values with a bad checksum go to the phone/number
+  steps as before. Benchmark section 3: bayanat IBAN 97/122 and gretel 51/77 pass the checksum;
+  few synthetic values do (openpii cards 191/2,096). Not measured end to end yet. `False` = 0.8.0.
+- `check_replace_identifiers` (default `False`, legacy `CHECK_REPLACE_IDENTIFIERS`), with
+  `replace_with_identifiers="<ID>"` (legacy `REPLACE_WITH_IDENTIFIERS`): a token of 6+ uppercase
+  letters and digits (any script) with 2+ digits and a letter, not glued to another letter or
+  digit (`RBCON68T08`, `XK4729QP31`), becomes `<ID>`. Format rule only. Off by default and in the
+  `training` preset: the shape also takes product and reference codes (`RTX4090`, `COVID19`);
+  benchmark section 3 simulates openpii leak 13.1 to 7.6, but 83% of gretel hits and 27% of
+  REDACT hits are unlabelled reference codes.
+- New types `IBAN`, `CARD`, `ID` in reversible maps, synthetic fakes, `regex_counts` and the
+  `signals` PII types. The browser export does not include these rules (listed in its limitations).
   `False` restores 0.8.0.
 
 ## 0.8.0 - 2026-11-01

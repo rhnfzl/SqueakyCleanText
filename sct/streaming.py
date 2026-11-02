@@ -91,6 +91,8 @@ class WindowedStreamingRedactor:
             views.append(cleaner._date_view)
         if cfg.check_fuzzy_replace_dates:  # every candidate the fuzzy step may mask ("15 Janury 1990")
             views.append(constants.FUZZY_DATE_CANDIDATE_REGEX)
+        if cfg.check_replace_iban_cards:  # "NL91 ABNA 0417 1643 00"
+            views += [constants.IBAN_REGEX, constants.CARD_REGEX]
         if cfg.check_replace_numbers:  # a grouped number ("5 379") is one token too
             views.append(contact.numbers_regex(cfg.replace_numbers_in_words))
         # (start, end) of view text a split must not cut: start < split < end
