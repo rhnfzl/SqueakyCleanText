@@ -49,6 +49,8 @@ ENTITY_TYPE_MAP = {
 # so an emitted marker of the same text keeps its protection) gets none, so it cannot hide PII.
 # Custom replace_with_* markers ("EMAIL") are protected the same way through *regex_markers*.
 _PLACEHOLDER_TOKEN = re.compile(r"<[A-Z][A-Z0-9_]*>")
+# Ends a LOCATION merge gap: a line break or a sentence end (format only, no words).
+_GAP_BREAK = re.compile(r"[\n\r\u2028\u2029]|[.!?;:]\s|[。！？]")
 
 
 # Freeing an inherited ONNX session in a forked child crashes or hangs, so children pin every live
@@ -94,6 +96,7 @@ class GeneralNER:
     _ner_ensemble_vote = 'max'  # 'max' or 'mean' (0.8.0); __init__ sets it
     _ner_propagate_masked = True  # mask other whole-word copies of a masked PER/ORG/LOC value
     _ner_propagate_min_score = None  # None = the NER cut; __init__ sets both
+    _ner_merge_location_gap = 0  # max chars between two LOCATION spans joined into one; 0 = off
 
     def __init__(self, cache_dir: Optional[Path] = None, device: Optional[str] = None,
                  model_names: Optional[Union[Dict[str, str], List[str]]] = None,
@@ -117,7 +120,8 @@ class GeneralNER:
                  onnx_cuda_provider_options: Optional[Dict] = None,
                  ner_ensemble_vote: str = 'max',
                  ner_propagate_masked: bool = True,
-                 ner_propagate_min_score: Optional[float] = None):
+                 ner_propagate_min_score: Optional[float] = None,
+                 ner_merge_location_gap: int = 0):
         """Initialize NER processor.
 
         Args:
@@ -145,6 +149,8 @@ class GeneralNER:
             ner_propagate_masked: Mask every other case-sensitive whole-word copy of a
                 masked PER/ORG/LOC value in the same document; False = 0.8.0 output.
             ner_propagate_min_score: Score a span needs to be propagated; None = the NER cut.
+            ner_merge_location_gap: Join two LOCATION spans whose gap holds at most this many
+                characters (placeholders not counted), no line break and no sentence end; 0 = off.
         """
         _LIVE_NER.add(self)
         self._ner_backend = ner_backend
@@ -155,6 +161,7 @@ class GeneralNER:
         self._ner_ensemble_vote = ner_ensemble_vote
         self._ner_propagate_masked = ner_propagate_masked
         self._ner_propagate_min_score = ner_propagate_min_score
+        self._ner_merge_location_gap = ner_merge_location_gap
         self._replacement_mode = replacement_mode
         self._synthetic_replacer = synthetic_replacer
         self._regex_markers = tuple(regex_markers)
@@ -1100,6 +1107,9 @@ class GeneralNER:
                     ensemble_results[index] = {**item, 'start': start, 'end': end, 'word': text[start:end]}
         if self._ner_propagate_masked:
             ensemble_results = self._propagate(text, ensemble_results, markers)
+        if self._ner_merge_location_gap:
+            ensemble_results = self._merge_location_gaps(
+                text, ensemble_results, markers, self._ner_merge_location_gap)
         if not ensemble_results:
             return NERProcessingResult(text=text, findings=())
         entities = tuple(self._entity(item) for item in ensemble_results)
@@ -1117,6 +1127,31 @@ class GeneralNER:
             for entity in entities
         )
         return NERProcessingResult(text=result.text, findings=findings)
+
+    @staticmethod
+    def _merge_location_gaps(text, spans, markers, max_gap):
+        """Join neighbouring LOCATION spans into one, so an address is one span.
+
+        Format rule only: the gap between them may hold at most *max_gap* characters outside
+        placeholders (``<NUMBER>`` in ``IL <NUMBER>,`` is not counted and is taken in), no line
+        break and no sentence end (``.!?;:`` before whitespace, or ``。！？``).
+        """
+        merged = []
+        for item in sorted(spans, key=lambda x: (x['start'], -x['end'])):
+            last = merged[-1] if merged else None
+            if last and ENTITY_TYPE_MAP.get(last['entity_group']) == 'LOCATION' \
+                    and ENTITY_TYPE_MAP.get(item['entity_group']) == 'LOCATION':
+                a, b = last['end'], item['start']
+                gap = text[a:b]
+                visible = sum(1 for i in range(a, b) if not any(s <= i < e for s, e in markers))
+                if visible <= max_gap and not _GAP_BREAK.search(gap):
+                    best = last if last['score'] >= item['score'] else item
+                    start, end = last['start'], max(last['end'], item['end'])
+                    merged[-1] = {**best, 'start': start, 'end': end,
+                                  'word': text[start:end], 'key': f"{start}:{end}"}
+                    continue
+            merged.append(item)
+        return merged
 
     def _propagate(self, text, spans, markers):
         """Add a span at every other whole-word, case-sensitive copy of a masked PER/ORG/LOC value.

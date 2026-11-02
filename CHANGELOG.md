@@ -36,6 +36,21 @@
   single word of a masked multi-word value stays visible unless the model tags it: a surname
   after a full name (`Lars Petersen` ... `Petersen`), or `Okonkwo` after the model merged
   `Okonkwo\nOkonkwo` into one span.
+- `ner_merge_location_gap` (default `0` = off, legacy module global `NER_MERGE_LOCATION_GAP`): when
+  set, two neighbouring LOCATION spans become one when the text between them holds at most that
+  many characters outside placeholders, no line break and no sentence end (`.!?;:` before
+  whitespace, `。！？`). The NER models tag street, district, city and country as separate
+  entities and the NUMBER rule takes house numbers and postcodes, so `1234 Elm Street, Apt 5B,
+  Springfield, IL 62704, USA` gave five spans with `Apt 5B` and `IL` visible; with `12` it gives
+  `<NUMBER> <LOCATION>`. Placeholders inside the gap are taken into the merged span; reversible
+  maps restore exactly. Format rule only, no word lists. A replay on the 0.8.0 benchmark output
+  (benchmark section 8) at gap 20: LOCATION leak thai_pii 55% to 42%, gretel -4.5 pts, REDACT
+  -3.1, openpii -2.2, tab flat; at 12 the gains are about a third of that. The cost is non-gold
+  text masked inside merges (about 4 characters per merge on openpii) and short lists of places
+  (`Paris, London and Berlin`) becoming one `<LOCATION>`, so it stays off until measured end to
+  end. Known limit: Thai prefixes glued to a tagged name (`ถนน`, `เขต`) stay visible at the edge
+  of a span (word-boundary snapping, a separate finding), and text the models never tag (road
+  names after an abbreviation, landmark text before the address) is outside any merge.
 - `check_replace_iban_cards` (default `True`, legacy `CHECK_REPLACE_IBAN_CARDS`), with
   `replace_with_iban="<IBAN>"` and `replace_with_cards="<CARD>"` (legacy `REPLACE_WITH_IBAN`,
   `REPLACE_WITH_CARDS`): before the phone step, an IBAN (country code, check digits, 11-30

@@ -388,6 +388,9 @@ class TextCleanerConfig:
     date_builtin_month_languages: Optional[Tuple[str, ...]] = None
     # HTML rule reads only tag shapes (<b>, </a>, <br/>, <!-- -->); False = 0.8.0 "<.*?>" (eats "<a@b.com>")
     html_tag_strict: bool = True
+    # join two LOCATION spans whose gap has <= N chars (placeholders not counted), no line break
+    # and no sentence end, so an address is one <LOCATION>; 0 = off (0.8.0 output)
+    ner_merge_location_gap: int = 0
 
     def __post_init__(self):
         if self.synthetic_reference_date is not None:
@@ -508,6 +511,8 @@ class TextCleanerConfig:
                 raise ValueError(f"{name} must be None or in [0, 1], got {value}")
         if self.ner_ensemble_vote not in ('max', 'mean'):
             raise ValueError(f"ner_ensemble_vote must be 'max' or 'mean', got {self.ner_ensemble_vote!r}")
+        if self.ner_merge_location_gap < 0:
+            raise ValueError(f"ner_merge_location_gap must be >= 0, got {self.ner_merge_location_gap}")
         if self.ner_propagate_min_score is not None and not 0.0 <= self.ner_propagate_min_score <= 1.0:
             raise ValueError(f"ner_propagate_min_score must be None or in [0, 1], got {self.ner_propagate_min_score}")
         if self.ner_subword_widen is not None and self.ner_subword_widen < 0:
@@ -784,6 +789,7 @@ def _config_from_module_globals() -> TextCleanerConfig:
         date_month_name_slash_year=getattr(m, 'DATE_MONTH_NAME_SLASH_YEAR', True),
         date_builtin_month_languages=getattr(m, 'DATE_BUILTIN_MONTH_LANGUAGES', None),
         html_tag_strict=getattr(m, 'HTML_TAG_STRICT', True),
+        ner_merge_location_gap=getattr(m, 'NER_MERGE_LOCATION_GAP', 0),
         check_replace_currency_symbols=m.CHECK_REPLACE_CURRENCY_SYMBOLS,
         check_ner_process=m.CHECK_NER_PROCESS,
         check_remove_isolated_letters=m.CHECK_REMOVE_ISOLATED_LETTERS,
@@ -906,6 +912,7 @@ KEEP_JSON_BRACES = True
 DATE_MONTH_NAME_SLASH_YEAR = True
 DATE_BUILTIN_MONTH_LANGUAGES = None
 HTML_TAG_STRICT = True
+NER_MERGE_LOCATION_GAP = 0
 GLINER_ONNX = False
 LANGUAGE = None
 

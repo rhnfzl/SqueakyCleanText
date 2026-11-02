@@ -200,3 +200,47 @@ def test_propagate_config_and_legacy_global(monkeypatch):
     monkeypatch.setattr(cfg_module, "NER_PROPAGATE_MIN_SCORE", 0.9)
     cfg = cfg_module._config_from_module_globals()
     assert (cfg.ner_propagate_masked, cfg.ner_propagate_min_score) == (False, 0.9)
+
+
+def _loc_spans(text, *words):
+    return [(text.index(w), text.index(w) + len(w), 'LOC', 0.99) for w in words]
+
+
+def test_location_gap_merge_joins_address_parts():
+    # F8: one address came out as many LOCATION/NUMBER spans with "Apt 5B" and "IL" visible
+    text = "Ship to <NUMBER> Elm Street, Apt 5B, Springfield, IL <NUMBER>, USA. Then Paris.\nRome"
+    ner, windows, results = _finalize_spans(
+        text, _loc_spans(text, "Elm Street", "Springfield", "USA", "Paris", "Rome"))
+    out = ner._finalize(text, windows, results, 0.85, None, None).text
+    assert out == ("Ship to <NUMBER> <LOCATION>, Apt 5B, <LOCATION>, IL <NUMBER>, <LOCATION>. "
+                   "Then <LOCATION>.\n<LOCATION>")  # 0 = off, 0.8.0 output
+    ner._ner_merge_location_gap = 12
+    out = ner._finalize(text, windows, results, 0.85, None, None).text
+    # placeholders in the gap do not count; a sentence end or a line break stops the merge
+    assert out == "Ship to <NUMBER> <LOCATION>. Then <LOCATION>.\n<LOCATION>"
+    ner._ner_merge_location_gap = 7
+    out = ner._finalize(text, windows, results, 0.85, None, None).text
+    assert out == "Ship to <NUMBER> <LOCATION>, Apt 5B, <LOCATION>. Then <LOCATION>.\n<LOCATION>"
+
+
+def test_location_gap_merge_reversible_restores_exactly():
+    from sct.utils.anonymization_map import AnonymizationMap
+
+    anon_map = AnonymizationMap()
+    anon_map.add('<NUMBER_0>', '62704', 'NUMBER', 0, 0)
+    text = "Springfield, IL <NUMBER_0>, USA"
+    ner, windows, results = _finalize_spans(
+        text, _loc_spans(text, "Springfield", "USA"), mode='reversible', _ner_merge_location_gap=12)
+    out = ner._finalize(text, windows, results, 0.85, anon_map, None).text
+    assert out == "<LOCATION_0>"
+    assert anon_map.deanonymize(out) == "Springfield, IL 62704, USA"
+
+
+def test_location_gap_config_and_legacy_global(monkeypatch):
+    from sct import config as cfg_module
+
+    assert TextCleanerConfig().ner_merge_location_gap == 0
+    with pytest.raises(ValueError):
+        TextCleanerConfig(ner_merge_location_gap=-1)
+    monkeypatch.setattr(cfg_module, "NER_MERGE_LOCATION_GAP", 20)
+    assert cfg_module._config_from_module_globals().ner_merge_location_gap == 20
