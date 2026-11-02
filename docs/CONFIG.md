@@ -150,6 +150,7 @@ new_cfg = dataclasses.replace(cfg, check_ner_process=False)
 | `synthetic_reference_date` | `'2026-01-01'` | Synthetic mode: the ISO date that date fakes (`DATE`, `DATE_OF_BIRTH`) end on and that Faker reads as today (the birthday inside native `SOCIAL_SECURITY_NUMBER`/`TAX_ID` fakes, e.g. `zh_CN`, `fi_FI`, `sv_SE`), so a document gets the same fakes whatever day it is cleaned. `None` uses today's date from the clock |
 | `positional_tags` | `('PER', 'LOC', 'ORG', 'MISC')` | Entity types to recognize |
 | `ner_confidence_threshold` | `None` | Minimum confidence score (0..1). `None` = 0.85, or the GLiNER threshold in PII mode; an explicit value is always used as given |
+| `ner_ensemble_vote` | `'max'` | How the NER models vote on one span: `'max'` keeps it when the best model score reaches `ner_confidence_threshold`, so a weak second model on the same (widened) span never hides a strong hit; `'mean'` averages the scores (0.8.0) |
 | `ner_batch_size` | `8` | NER chunks per model forward pass, batched across the documents of a `process_batch` call (must be >= 1). `1` = 0.7.1 call pattern and exact scores, and less memory; which is faster depends on the CPU, so measure |
 | `onnx_intra_op_threads` | `None` | ONNX Runtime threads per inference (`None` = ORT default: every physical core, ignoring CPU affinity). Set it to cap CPU use; fewer threads is usually slower |
 | `onnx_inter_op_threads` | `None` | ONNX Runtime inter-op threads (`None` = ORT default). Only matters with ORT parallel execution mode, so `onnx_intra_op_threads` is the usual knob |

@@ -91,6 +91,7 @@ class GeneralNER:
 
     _ner_batch_size = 8  # chunks per model call; __init__ sets the configured value
     _ner_chunk_overlap = 0  # tokens of context each window adds per side; __init__ sets it
+    _ner_ensemble_vote = 'max'  # 'max' or 'mean' (0.8.0); __init__ sets it
 
     def __init__(self, cache_dir: Optional[Path] = None, device: Optional[str] = None,
                  model_names: Optional[Union[Dict[str, str], List[str]]] = None,
@@ -111,7 +112,8 @@ class GeneralNER:
                  onnx_inter_op_threads: Optional[int] = None,
                  ner_chunk_overlap: int = 0,
                  cuda_device_id: int = 0,
-                 onnx_cuda_provider_options: Optional[Dict] = None):
+                 onnx_cuda_provider_options: Optional[Dict] = None,
+                 ner_ensemble_vote: str = 'max'):
         """Initialize NER processor.
 
         Args:
@@ -134,6 +136,8 @@ class GeneralNER:
                 both sides of its chunk; 0 keeps the 0.7.1 chunks.
             cuda_device_id: GPU index used when *device* resolves to CUDA.
             onnx_cuda_provider_options: Extra ``CUDAExecutionProvider`` options.
+            ner_ensemble_vote: Per-span vote across models: 'max' keeps a span whose best
+                model score passes the cut, 'mean' averages the scores (0.8.0).
         """
         _LIVE_NER.add(self)
         self._ner_backend = ner_backend
@@ -141,6 +145,7 @@ class GeneralNER:
         self._ner_subword_widen = ner_subword_widen
         self._ner_subword_widen_same_script = ner_subword_widen_same_script
         self._ner_chunk_overlap = ner_chunk_overlap
+        self._ner_ensemble_vote = ner_ensemble_vote
         self._replacement_mode = replacement_mode
         self._synthetic_replacer = synthetic_replacer
         self._regex_markers = tuple(regex_markers)
@@ -573,18 +578,19 @@ class GeneralNER:
     def ner_ensemble(self, ner_results, t):
         """Apply ensemble voting across multiple model results.
 
-        Groups entities by position key, averages their confidence scores,
-        and filters by threshold. Returns the highest-scoring entity per position.
+        Groups entities by position key and keeps a key whose vote passes threshold *t*:
+        the best model score ('max'), or the mean score ('mean', 0.8.0, where a second
+        weak vote can sink a strong one). Returns the highest-scoring entity per position.
         """
         if not ner_results:
             return []
 
-        ner_keys = defaultdict(lambda: [0, 0])
+        ner_keys = defaultdict(list)
         for entity in ner_results:
-            ner_keys[entity['key']][0] += 1
-            ner_keys[entity['key']][1] += entity['score']
+            ner_keys[entity['key']].append(entity['score'])
 
-        passing_keys = [key for key, val in ner_keys.items() if val[1] / val[0] >= t]
+        vote = max if self._ner_ensemble_vote == 'max' else (lambda s: sum(s) / len(s))
+        passing_keys = [key for key, scores in ner_keys.items() if vote(scores) >= t]
         filter_ner_results = self.filter_ner_data(ner_results, passing_keys)
         filter_ner_results.sort(key=lambda x: x['start'])
         return filter_ner_results

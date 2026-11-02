@@ -357,6 +357,10 @@ class TextCleanerConfig:
     # synthetic: ISO date that date fakes (DATE, DATE_OF_BIRTH) end on, so a document gets the
     # same dates on any day; None = today, from the clock (earlier 0.8.0)
     synthetic_reference_date: Optional[str] = '2026-01-01'
+    # NER ensemble vote per span: 'max' keeps a span when its best model score passes
+    # ner_confidence_threshold, so a weak second model never hides a strong hit; 'mean' averages
+    # the model scores (0.8.0)
+    ner_ensemble_vote: str = 'max'
 
     def __post_init__(self):
         if self.synthetic_reference_date is not None:
@@ -475,6 +479,8 @@ class TextCleanerConfig:
             value = getattr(self, name)
             if value is not None and not 0.0 <= value <= 1.0:
                 raise ValueError(f"{name} must be None or in [0, 1], got {value}")
+        if self.ner_ensemble_vote not in ('max', 'mean'):
+            raise ValueError(f"ner_ensemble_vote must be 'max' or 'mean', got {self.ner_ensemble_vote!r}")
         if self.ner_subword_widen is not None and self.ner_subword_widen < 0:
             raise ValueError(f"ner_subword_widen must be None or >= 0, got {self.ner_subword_widen}")
         if not 0.0 <= self.language_confidence_warning <= 1.0:
@@ -726,6 +732,7 @@ def _config_from_module_globals() -> TextCleanerConfig:
         synthetic_low_confidence_locale=getattr(m, 'SYNTHETIC_LOW_CONFIDENCE_LOCALE', 'en_US'),
         synthetic_collapse_period=getattr(m, 'SYNTHETIC_COLLAPSE_PERIOD', True),
         synthetic_reference_date=getattr(m, 'SYNTHETIC_REFERENCE_DATE', '2026-01-01'),
+        ner_ensemble_vote=getattr(m, 'NER_ENSEMBLE_VOTE', 'max'),
         check_replace_currency_symbols=m.CHECK_REPLACE_CURRENCY_SYMBOLS,
         check_ner_process=m.CHECK_NER_PROCESS,
         check_remove_isolated_letters=m.CHECK_REMOVE_ISOLATED_LETTERS,
@@ -834,6 +841,7 @@ NER_SEES_TAGS = True
 SYNTHETIC_LOW_CONFIDENCE_LOCALE = 'en_US'
 SYNTHETIC_COLLAPSE_PERIOD = True
 SYNTHETIC_REFERENCE_DATE = '2026-01-01'
+NER_ENSEMBLE_VOTE = 'max'
 GLINER_ONNX = False
 LANGUAGE = None
 

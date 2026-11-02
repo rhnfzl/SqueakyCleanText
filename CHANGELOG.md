@@ -1,5 +1,19 @@
 # Changelog
 
+## Unreleased
+
+### Behaviour changes
+
+- `ner_ensemble_vote` (default `'max'`, legacy module global `NER_ENSEMBLE_VOTE`): the NER
+  ensemble keeps a span when its best model score reaches `ner_confidence_threshold`. 0.8.0
+  averaged the scores of every model on the span, so when WordPiece widening moved a weak
+  second vote onto the same span, agreement pulled a strong hit under the cut: `সুইডেন` in a
+  Bengali sentence got XLM-R 1.0 and wikineural 0.40, mean 0.70 < 0.85, and stayed visible.
+  The new vote can only add masks. Benchmark section 1 (cut 0.85 to 0.7, a related lever) shows
+  leak -5 to -23 pts, recall +1 to +7, precision -0 to -3 on tab, multiconer, iahlt, thainer,
+  naamapadam, thai_pii, nemotron, stockmark and bayanat; the vote change itself, and openpii,
+  gretel and REDACT, are not measured yet. The cut stays at 0.85. `'mean'` restores 0.8.0.
+
 ## 0.8.0 - 2026-11-01
 
 0.8.0 makes batch cleaning faster, detects all 75 Lingua languages, and adds a value-free

@@ -190,6 +190,7 @@ class TextCleaner:
                 onnx_intra_op_threads=self.cfg.onnx_intra_op_threads,
                 onnx_inter_op_threads=self.cfg.onnx_inter_op_threads,
                 ner_chunk_overlap=self.cfg.ner_chunk_overlap,
+                ner_ensemble_vote=self.cfg.ner_ensemble_vote,
             )
         # GLiClass document-level pre-classification (optional, lazy-loaded)
         self._gliclass: Any = None

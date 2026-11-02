@@ -117,3 +117,26 @@ def test_widen_same_script_config_and_legacy_global(monkeypatch):
     assert TextCleanerConfig().ner_subword_widen_same_script is True
     monkeypatch.setattr(cfg_module, "NER_SUBWORD_WIDEN_SAME_SCRIPT", False)
     assert cfg_module._config_from_module_globals().ner_subword_widen_same_script is False
+
+
+def test_ensemble_agreement_never_drops_a_strong_single_model_hit():
+    # F1: XLM-R 1.0 + wikineural 0.40 on the same widened span averaged to 0.70 < 0.85
+    from sct.utils.ner import GeneralNER
+
+    ner = object.__new__(GeneralNER)
+    strong = {'entity_group': 'LOC', 'score': 0.95, 'key': '0:5', 'start': 0, 'end': 5, 'model': 'a'}
+    weak = {**strong, 'score': 0.60, 'model': 'b'}
+    assert ner.ner_ensemble([strong, weak], 0.85) == [strong]
+    assert ner.ner_ensemble([{**weak, 'score': 0.5}], 0.85) == []
+    ner._ner_ensemble_vote = 'mean'
+    assert ner.ner_ensemble([strong, weak], 0.85) == []
+
+
+def test_ensemble_vote_config_and_legacy_global(monkeypatch):
+    from sct import config as cfg_module
+
+    assert TextCleanerConfig().ner_ensemble_vote == 'max'
+    with pytest.raises(ValueError):
+        TextCleanerConfig(ner_ensemble_vote='median')
+    monkeypatch.setattr(cfg_module, "NER_ENSEMBLE_VOTE", 'mean')
+    assert cfg_module._config_from_module_globals().ner_ensemble_vote == 'mean'
