@@ -80,7 +80,7 @@ class GLiNERAdapter:
         else:
             raise ValueError(f"Unknown GLiNER variant: {variant!r}. Use 'gliner' or 'gliner2'.")
         # The effective backend decides: an ONNX load that fell back to torch still moves.
-        if device.startswith('cuda') and not self._onnx:
+        if device.startswith(('cuda', 'mps')) and not self._onnx:
             self.model = self.model.to(device)
 
         # Bi-encoder detection: ModernBERT and similar architectures expose encode_labels()

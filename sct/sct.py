@@ -495,6 +495,8 @@ class TextCleaner:
         if any(m['provider'] == 'CPUExecutionProvider' for m in models) \
                 and self.GeneralNER.device == 'cuda':
             warnings.add('cuda_fallback')
+        if any(m['provider'] == 'cpu' for m in models) and self.GeneralNER.device == 'mps':
+            warnings.add('mps_fallback')
         metadata: Dict[str, Any] = {
             'source_chars': source_chars,
             'regex_counts': regex_counts,

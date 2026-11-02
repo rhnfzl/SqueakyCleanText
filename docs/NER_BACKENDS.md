@@ -20,7 +20,8 @@
 - `ner_confidence_threshold` drops low-score entities; a privacy policy can keep, redact
   or raise the minimum score per entity type ([PRIVACY.md](PRIVACY.md)).
 - CUDA works for the ONNX and PyTorch backends (`ner_device`, `cuda_device_id`; see
-  [PERFORMANCE.md](PERFORMANCE.md)).
+  [PERFORMANCE.md](PERFORMANCE.md)). The Apple GPU (`ner_device='mps'`, opt-in) works for the
+  PyTorch backend and GLiNER in torch mode; ONNX stays on CPU.
 
 ## Backends
 

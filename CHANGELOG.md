@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+**Apple GPU for torch and GLiNER.** Set `ner_device="mps"` on an Apple silicon Mac to run torch NER and GLiNER on the GPU, about 1.6x faster `process_batch` on an M4 Max with the same output.
+
+- `ner_device` accepts `'mps'`. ONNX models and GLiClass stay on CPU; auto still never picks the Apple GPU.
+- If torch has no MPS backend, NER runs on CPU with a logged warning and the new `mps_fallback` code in `metadata['warnings']`; provenance shows `cpu`.
+- ONNX on CoreML was measured and left out: not reliably faster, 35 minutes and 82 GB for the first compile.
+
 ## 0.8.1 - 2026-11-02
 
 **Fewer leaks, same speed.** 0.8.1 closes the gaps found by our new open-dataset benchmark.
