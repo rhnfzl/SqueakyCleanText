@@ -229,8 +229,9 @@ excluded from totals:
 |---|---|---|
 | sct-default / sct-gliner | model windows inside SCT | SCT's own chunking (native) |
 | presidio | spaCy, no hard limit | whole doc (`nlp.max_length` raised if needed) |
-| gliner-nvidia, gliner2-fastino | 384-512 tokens | common chunker |
-| opf | 128k context | whole doc (native) and common chunker |
+| gliner-nvidia | 384 words / 512 subwords | vendor truncation at 384 words (native, logged) and common chunker |
+| gliner2-fastino | 384 words | library `batch_extract_entities_long`: 384-word windows, 64 overlap (native) |
+| opf | 128k context | vendor CPU setting on every device: 4,096-token windows, no overlap (128k does not fit ~6 GB under transformers) |
 | bardsai-v3 | 512 | bundled detector: 512-token windows, 128 overlap (native) |
 | datafog | regex | whole doc |
 
@@ -398,7 +399,9 @@ Each entry runs in its own venv (`uv venv --python 3.12` + `envs/<entry>.txt`; t
 - an exception becomes `error` for that doc (a failing batch is retried doc by doc); spans out
   of range make the doc an error; `<output>.ready` is written once the model has loaded.
 
-The runner checks offsets on seven hand-made fixtures first (an entry that fails is not run),
+The runner checks offsets on seven hand-made fixtures first (an entry with a misplaced e-mail span
+is not run; a missed e-mail or a span that covers it plus extra text is a detection error, recorded
+in `offset-check.json` but not a skip),
 then supervises: per-doc timeout counted from the last line or the ready marker, one retry of
 the doc that was running, then an `error` line (`timeout`, `crash: exit N`); three docs in a row
 failing with no output at all abort the rest (`aborted`). Raw outputs (they hold dataset text)

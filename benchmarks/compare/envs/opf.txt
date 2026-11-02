@@ -1,3 +1,5 @@
-# opf: openai/privacy-filter via the transformers token-classification pipeline.
+# opf: openai/privacy-filter @7ffa9a043d54d1be65afb281eddf0ffbe629385b on transformers
+# (AutoModelForTokenClassification), decoded with the vendor's constrained Viterbi ported
+# into adapters/opf_adapter.py. The vendor's own `opf` package is not on PyPI and is not installed.
 transformers==5.22.1
 torch==2.15.0

@@ -257,9 +257,28 @@ def test_supervisor_aborts_when_the_adapter_cannot_start(tmp_path):
 def test_offset_fixtures_pass_for_a_correct_adapter(tmp_path):
     fixtures = [{"id": k, "lang": lang, "text": text} for k, (lang, text) in runner.OFFSET_FIXTURES.items()]
     results, _ = runner.supervise(dummy_cmd({}), fixtures, tmp_path, runner.child_env(), 30, 30)
-    assert runner.check_offsets(results, {"EMAIL": "EMAIL"}) == {}
+    assert runner.check_offsets(results, {"EMAIL": "EMAIL"}) == ({}, {})
     shifted = {k: {**v, "spans": [{**s, "start": s["start"] + 1} for s in v["spans"]]} for k, v in results.items()}
-    assert set(runner.check_offsets(shifted, {"EMAIL": "EMAIL"})) == set(runner.OFFSET_FIXTURES)
+    problems, misses = runner.check_offsets(shifted, {"EMAIL": "EMAIL"})
+    assert set(problems) == set(runner.OFFSET_FIXTURES) and misses == {}
+
+
+def test_offset_check_separates_detection_errors_from_offset_bugs():
+    text = runner.OFFSET_FIXTURES["cjk"][1]
+    start = text.index(runner.FIXTURE_EMAIL)
+    end = start + len(runner.FIXTURE_EMAIL)
+    labels = {"EMAIL": "EMAIL"}
+
+    def check(spans):  # -> (cjk is an offset problem, cjk is a detection error)
+        problems, misses = runner.check_offsets({"cjk": {"spans": [span(a, b, "EMAIL") for a, b in spans]}}, labels)
+        return "cjk" in problems, "cjk" in misses
+
+    assert check([(start, end)]) == (False, False)
+    assert check([(start, end + 3)]) == (False, True)  # swallowed the next word: detection error
+    assert check([]) == (False, True)  # missed: detection error
+    assert check([(start + 2, end + 2)]) == (True, False)  # misplaced: offset bug
+    assert check([(start, end - 1)]) == (True, False)  # cut short: offset bug
+    assert "latin-combining" in runner.check_offsets({}, labels)[0]  # no output at all
 
 
 def test_runner_end_to_end_with_dummy(tmp_path, monkeypatch):
@@ -311,3 +330,41 @@ def test_speed_mode_reports_cold_start_latency_throughput_and_rss(tmp_path):
     summary = speed.summarise([run, run, {"error": "timeout after 1s"}])
     assert summary["repeats"] == 3 and summary["failed"] == ["timeout after 1s"]
     assert summary["common_batch_docs_per_second"]["median"] > 0 and len(summary["other_batch"]) == 2
+
+
+def _adapter_module(name):
+    import importlib.util
+
+    sys.path.insert(0, str(runner.ADAPTERS))
+    try:
+        spec = importlib.util.spec_from_file_location(name.removesuffix(".py"), runner.ADAPTERS / name)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)  # stdlib-only at import time: tool packages load inside load()
+        return module
+    finally:
+        sys.path.remove(str(runner.ADAPTERS))
+
+
+def test_every_entry_has_a_runnable_adapter():
+    from benchmarks.compare import entries as reg
+
+    for name in reg.ENTRIES:
+        adapter = reg.tool(name)["adapter"]
+        assert adapter and adapter.endswith("_adapter.py") and (runner.ADAPTERS / adapter).exists(), name
+        assert callable(_adapter_module(adapter).load), name
+
+
+def test_adapter_label_tables_match_the_frozen_entries():
+    from benchmarks.compare import entries as reg
+
+    bardsai = _adapter_module("bardsai_v3_adapter.py")
+    assert reg.ENTRIES["bardsai-v3"]["labels"] == bardsai.LABELS
+    assert not set(bardsai.OUT_OF_SCOPE) & set(bardsai.LABELS)
+    nvidia = _adapter_module("gliner_nvidia_adapter.py")
+    assert nvidia.COMMON == list(reg.GLINER_PROMPTS)  # the adapter's literal copy of the shared prompts
+    assert set(nvidia.CARD) <= set(reg.ENTRIES["gliner-nvidia"]["labels"])
+    fastino = _adapter_module("gliner2_fastino_adapter.py")
+    assert {k: v for k, v in fastino.CARD_LABELS.items() if v} == reg.FASTINO_CARD
+    for name in ("gliner-nvidia", "gliner2-fastino"):  # card names never re-map a shared prompt
+        labels = reg.ENTRIES[name]["labels"]
+        assert all(labels[k] == v for k, v in reg.GLINER_PROMPTS.items()), name

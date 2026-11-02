@@ -17,6 +17,26 @@ GLINER_PROMPTS = {
     "date of birth": DATE, "credit card number": NUMBER, "iban": NUMBER, "social security number": NUMBER,
     "passport number": NUMBER, "account number": NUMBER, "tax id": NUMBER, "national id": NUMBER,
 }
+# Tuned-track alternative per GLiNER model (adapter config labels='card'): the model card's own label
+# names. Merged into that entry's labels so card-mode spans are scored, not dropped.
+NVIDIA_CARD = {
+    "first_name": PERSON, "last_name": PERSON, "company_name": ORGANISATION,
+    **dict.fromkeys(("street_address", "city", "state", "country", "postcode"), LOCATION),
+    "email": EMAIL, "phone_number": PHONE, "fax_number": PHONE, "ipv4": IP, "ipv6": IP, "url": URL,
+    "date": DATE, "date_of_birth": DATE, "date_time": DATE,
+    **dict.fromkeys(("account_number", "credit_debit_card", "ssn", "bank_routing_number", "swift_bic"), NUMBER),
+}
+FASTINO_CARD = {  # credentials and usernames are out of scope (absent)
+    **dict.fromkeys(("person", "full_name", "first_name", "middle_name", "last_name"), PERSON),
+    **dict.fromkeys(("address", "street_address", "city", "state_or_region", "country"), LOCATION),
+    "email": EMAIL, "phone_number": PHONE, "ip_address": IP,
+    **dict.fromkeys(("date_of_birth", "sensitive_date", "document_date", "expiration_date",
+                     "transaction_date", "card_expiry"), DATE),
+    **dict.fromkeys(("postal_code", "government_id", "national_id_number", "passport_number",
+                     "drivers_license_number", "license_number", "tax_id", "tax_number", "bank_account",
+                     "account_number", "routing_number", "iban", "payment_card", "card_number", "card_cvv",
+                     "account_id", "sensitive_account_id"), NUMBER),
+}
 
 ENTRIES = {
     "sct-default": {
@@ -42,40 +62,53 @@ ENTRIES = {
         "supports": (PERSON, LOCATION, EMAIL, PHONE, IP, URL, DATE, NUMBER),  # ORG only with a non-spaCy engine
     },
     "gliner-nvidia": {
-        "package": "gliner==0.2.30", "checkpoint": "nvidia/gliner-PII",
-        "revision": "bd23e8ef4425fd04e34c5204ab49ffaa706eae79", "config": "GLINER_PROMPTS, fp16, batch<=4, 384-token chunks",
+        "package": "gliner==0.2.30 torch==2.15.0 transformers==5.22.1",
+        "checkpoint": "nvidia/gliner-PII",
+        "revision": "bd23e8ef4425fd04e34c5204ab49ffaa706eae79",
+        "config": "GLINER_PROMPTS, fp16 on cuda (fp32 cpu), batch<=4, vendor truncation at 384 words",
         "threshold": 0.5, "mask": "common", "device": "cuda|cpu", "gpu_gb": 3,
-        "labels": GLINER_PROMPTS, "supports": SCT_TYPES,
+        "labels": {**GLINER_PROMPTS, **NVIDIA_CARD}, "supports": SCT_TYPES,
     },
     "gliner2-fastino": {
-        "package": "gliner2==2.1.0", "checkpoint": "fastino/gliner2-privacy-filter-PII-multi",
+        "package": "gliner2[local]==2.1.0 torch==2.15.0 transformers==5.22.1",
+        "checkpoint": "fastino/gliner2-privacy-filter-PII-multi",
         "revision": "1cb4166094dc58fa8d836429f060d6c95f62b495", "config": "GLINER_PROMPTS, batch<=4",
         "threshold": 0.5, "mask": "common", "device": "cuda|cpu", "gpu_gb": 2,
-        "labels": GLINER_PROMPTS, "supports": SCT_TYPES,
+        "labels": {**GLINER_PROMPTS, **FASTINO_CARD}, "supports": SCT_TYPES,
     },
     "opf": {
         "package": "transformers==5.22.1 torch==2.15.0", "checkpoint": "openai/privacy-filter",
         "revision": "7ffa9a043d54d1be65afb281eddf0ffbe629385b",
-        "config": "token-classification pipeline, aggregation_strategy='simple', default decoder biases",
+        "config": "vendor BIOES constrained Viterbi (checkpoint viterbi_calibration biases), bf16, 4096-token windows",
         "threshold": "default operating point", "mask": "common", "device": "cuda|cpu", "gpu_gb": 5,
         "labels": {"private_person": PERSON, "private_address": LOCATION, "private_email": EMAIL,
                    "private_phone": PHONE, "private_url": URL, "private_date": DATE, "account_number": NUMBER},
         "supports": (PERSON, LOCATION, EMAIL, PHONE, URL, DATE, NUMBER),  # no ORG, no IP class
     },
     "bardsai-v3": {
-        "package": "transformers==5.22.1 onnxruntime==1.31.1", "checkpoint": "bardsai/eu-pii-anonimization-multilang-v3",
+        "package": "transformers==5.22.1 onnxruntime==1.31.1 torch==2.15.0",
+        "checkpoint": "bardsai/eu-pii-anonimization-multilang-v3",
         "revision": "091984b5fbce4c161abc4776ed0f4e3206e1b374",
         "config": "bundled pii_detector.py (read first), onnx/model_quantized.onnx, 512-token windows, 128 overlap",
         "threshold": "card default", "mask": "common", "device": "cpu", "gpu_gb": 0,
-        # Filled from the model's config.json id2label at adapter time; target types listed here.
-        "labels": {}, "supports": SCT_TYPES,
+        # Frozen from config.json id2label at the pinned revision (adapter LABELS; the rest out of scope).
+        "labels": {"PERSON_NAME": PERSON, "PERSON_ALIAS": PERSON, "LOCATION": LOCATION, "POSTAL_ADDRESS": LOCATION,
+                   "GEO_LOCATION": LOCATION, "ORGANIZATION_NAME": ORGANISATION, "EMAIL_ADDRESS": EMAIL,
+                   "PHONE_NUMBER": PHONE, "IP_ADDRESS": IP, "URL": URL, "IDENTIFYING_LINK": URL,
+                   "DATE_TIME": DATE, "DATE_OF_BIRTH": DATE,
+                   **dict.fromkeys(("PERSON_IDENTIFIER", "ORGANIZATION_IDENTIFIER", "BANK_ACCOUNT_IDENTIFIER",
+                                    "ACCOUNT_IDENTIFIER", "PAYMENT_CARD", "PAYMENT_CARD_SECURITY",
+                                    "DOCUMENT_IDENTIFIER", "VEHICLE_IDENTIFIER", "DEVICE_IDENTIFIER"), NUMBER)},
+        "supports": SCT_TYPES,
     },
     "datafog": {
         "package": "datafog==4.9.0", "checkpoint": "regex engine (no model)", "revision": "-",
         "config": "DataFog() quick-start defaults", "threshold": "-", "mask": "common", "device": "cpu", "gpu_gb": 0,
-        # shortcut: label names from the shortlist notes; check against the 4.9.0 wheel when the adapter is written.
+        # Checked against the 4.9.0 wheel; DE_* come from the German locale pack (tuned track).
         "labels": {"EMAIL": EMAIL, "PHONE": PHONE, "IP_ADDRESS": IP, "CREDIT_CARD": NUMBER, "SSN": NUMBER,
-                   "DOB": DATE, "ZIP": NUMBER},
+                   "DATE": DATE, "ZIP_CODE": NUMBER,
+                   **dict.fromkeys(("DE_IBAN", "DE_VAT_ID", "DE_TAX_ID", "DE_SOCIAL_SECURITY_NUMBER", "DE_POSTAL_CODE",
+                                    "DE_PASSPORT_NUMBER", "DE_RESIDENCE_PERMIT_NUMBER"), NUMBER)},
         "supports": (EMAIL, PHONE, IP, DATE, NUMBER),
     },
 }
@@ -84,12 +117,12 @@ RESERVE = ("scrubadub==2.0.1", "datatrove==0.10.1 PIIFormatter", "urchade/gliner
            "OpenMed/privacy-filter-multilingual-v2", "iiiorg/piiranha-v1-detect-personal-information")
 
 # Runner registry: adapter script (in ``adapters/``) and its config. The pinned install spec
-# is ``envs/<entry>.txt``; every venv uses PYTHON. ``adapter`` None = not written yet.
+# is ``envs/<entry>.txt``; every venv uses PYTHON. Config {} = the vendor default track.
 PYTHON = "3.12"
 RUNS = {
     "sct-default": {"adapter": "sct_adapter.py", "config": {"mode": "default", "language": "gold"}},
     "sct-gliner": {"adapter": "sct_adapter.py", "config": {"mode": "gliner", "language": "gold"}},
-    **{name: {"adapter": None, "config": {}} for name in
+    **{name: {"adapter": f"{name.replace('-', '_')}_adapter.py", "config": {}} for name in
        ("presidio", "gliner-nvidia", "gliner2-fastino", "opf", "bardsai-v3", "datafog")},
 }
 

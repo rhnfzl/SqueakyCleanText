@@ -202,19 +202,32 @@ def supervise(cmd: list[str], docs: list[dict], work: Path, env: dict, doc_timeo
     return results, {"processes": attempts, "restarts": dict(restarts)}
 
 
-def check_offsets(results: dict[str, dict], labels: dict[str, str]) -> dict[str, str]:
-    """Fixture name -> problem, for fixtures whose e-mail span is not returned exactly."""
-    problems = {}
+def check_offsets(results: dict[str, dict], labels: dict[str, str]) -> tuple[dict[str, str], dict[str, str]]:
+    """(offset problems, detection errors): fixture name -> reason, for fixtures not returned exactly.
+
+    An error line or an EMAIL span that cuts into the e-mail is an offset problem (the entry is
+    skipped). No overlapping EMAIL span, or one that covers the whole e-mail plus extra text, is
+    the model's detection error: recorded, not a skip.
+    """
+    problems, misses = {}, {}
     for name, (_, text) in OFFSET_FIXTURES.items():
         line = results.get(name, {})
         start = text.index(FIXTURE_EMAIL)
-        want = (start, start + len(FIXTURE_EMAIL))
-        if "error" in line:
-            problems[name] = line["error"]
-        elif not any((s["start"], s["end"]) == want and labels.get(s["label"]) == "EMAIL" for s in line.get("spans", ())):
+        end = start + len(FIXTURE_EMAIL)
+        emails = [(s["start"], s["end"]) for s in line.get("spans", ()) if labels.get(s["label"]) == "EMAIL"]
+        if name not in results or "error" in line:
+            problems[name] = line.get("error", "no output")
+        elif (start, end) in emails:
+            continue
+        else:
             got = [(s["start"], s["end"], s["label"]) for s in line.get("spans", ())]
-            problems[name] = f"want EMAIL {want}, got {got}"
-    return problems
+            reason = f"want EMAIL {(start, end)}, got {got}"
+            overlapping = [(a, b) for a, b in emails if a < end and b > start]
+            if all(a <= start and b >= end for a, b in overlapping):
+                misses[name] = reason
+            else:
+                problems[name] = reason
+    return problems, misses
 
 
 def _jsonable(value):
@@ -290,8 +303,9 @@ def main(argv=None) -> None:
         if not args.skip_offset_check:
             fixtures = [{"id": k, "lang": lang, "text": text} for k, (lang, text) in OFFSET_FIXTURES.items()]
             res, _ = supervise(cmd, fixtures, args.cache / name / "offsets", env, args.doc_timeout, args.start_timeout)
-            problems = check_offsets(res, t["labels"])
-            _write(args.out / name / "offset-check.json", {"passed": not problems, "problems": problems})
+            problems, misses = check_offsets(res, t["labels"])
+            _write(args.out / name / "offset-check.json",
+                   {"passed": not problems, "problems": problems, "detection_errors": misses})
             if problems:
                 print(f"[{name}] offset check failed, skipped: {problems}", file=sys.stderr)
                 continue

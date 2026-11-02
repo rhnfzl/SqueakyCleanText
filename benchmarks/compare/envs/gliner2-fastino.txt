@@ -1,2 +1,5 @@
-# gliner2-fastino: fastino/gliner2-privacy-filter-PII-multi.
-gliner2==2.1.0
+# gliner2-fastino: fastino/gliner2-privacy-filter-PII-multi @ 1cb4166094dc58fa8d836429f060d6c95f62b495.
+# gliner2 2.1.0 base install is torch-free (API client only); the [local] extra brings the ML stack.
+gliner2[local]==2.1.0
+torch==2.15.0
+transformers==5.22.1
