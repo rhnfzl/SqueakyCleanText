@@ -5,9 +5,19 @@
 [![Python Versions](https://img.shields.io/badge/Python-3.12%20|%203.13%20|%203.14-blue)](https://pypi.org/project/squeakycleantext/)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/rhnfzl/SqueakyCleanText/blob/main/LICENSE)
 
-**Clean, privacy-safe text for LLM training, fine-tuning and RAG, in 75 languages.**
+**Clean, privacy-safe text datasets for LLM training, fine-tuning and RAG, in 75 languages.**
 
-SqueakyCleanText (SCT) is a text processing pipeline for datasets. Raw text from the web, tickets, chats or documents goes in. Clean text comes out, with personal data replaced and a value-free record of what was found. Run it on one string, a batch, a Hugging Face dataset or a DataTrove pipeline, on CPU or GPU.
+SqueakyCleanText (SCT) is a text processing pipeline for datasets. A JSONL file, a Hugging Face dataset or a DataTrove job goes in. Cleaned text comes out, plus `sct_*` columns and a data card that describe each record without storing personal data. It runs on CPU or GPU.
+
+```text
+in:   Iâ€™m Anna Berg &amp; my mail is anna@example.se. Order 4711 ships on 2024-05-01.
+out:  I'm <PERSON> & my mail is <EMAIL>. Order 4711 ships on 2024-05-01.
+      sct_language=ENGLISH  sct_pii_count=2  sct_pii_types=['EMAIL', 'PERSON']
+
+in:   Bel +31 20 123 4567 voor Jan de Vries.
+out:  Bel <PHONE> voor <PERSON>.
+      sct_language=DUTCH  sct_pii_count=2  sct_pii_types=['PERSON', 'PHONE']
+```
 
 Documentation: <https://rhnfzl.github.io/SqueakyCleanText/>
 
@@ -15,12 +25,14 @@ Documentation: <https://rhnfzl.github.io/SqueakyCleanText/>
 
 One call runs these stages. Each one is a config field with a safe default, so you can switch it off.
 
-1. **Detect the language.** One of 75 languages, with a confidence score. Pin it or limit it when you know.
-2. **Fix broken text.** Repairs mojibake and HTML entities (ftfy), folds styled characters, replaces or drops HTML tags, and tidies whitespace.
-3. **Find personal data.** Regex rules for emails, phones, URLs, IPs, IBAN and card numbers, dates and numbers, then an ensemble of multilingual NER models for names, places and organisations.
-4. **Replace it.** With tags (`<PERSON>`), reversible placeholders (`<PERSON_0>` plus a map you store apart), or realistic fake values.
-5. **Report on it.** Every result has value-free `signals` (counts, types, shares, warnings, model ids). Turn them into score columns and a data card with `sct-report`.
-6. **Scale it.** `process_batch` runs documents in threads and batches the NER calls. NER runs on CPU (ONNX Runtime, no PyTorch needed) or an NVIDIA GPU.
+1. **Repair the text.** Fixes mojibake and HTML entities (ftfy), folds styled characters, tidies whitespace, and can replace HTML tags, numbers and dates with tags.
+2. **Detect the language.** One of 75 languages, with a confidence score. Pin it or limit it when you know.
+3. **Remove personal data.** Regex rules (emails, phones, URLs, IPs, IBAN and card numbers) and an ensemble of multilingual NER models (names, places, organisations). Found values become:
+   - tags such as `<PERSON>` (default),
+   - realistic fake values (`synthetic`), or
+   - reversible placeholders `<PERSON_0>` plus a map you store apart.
+4. **Score and document.** Every result has value-free `signals`. Turn them into `sct_*` columns (language, PII share, warnings; optional quality score and MinHash for near-duplicate removal) and a data card with `sct-report` ([docs/SCORE.md](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/SCORE.md)).
+5. **Scale.** `process_batch` runs documents in threads and batches the NER calls, on CPU (ONNX Runtime, no PyTorch needed) or an NVIDIA GPU. Adapters for Hugging Face `datasets`, DataTrove, LangChain, Haystack and MCP.
 
 SCT finds most personal data, not all of it. Check its output before you publish sensitive data.
 
@@ -39,6 +51,7 @@ Python 3.12 or newer. Add extras for what you use, for example `pip install "squ
 | `langchain`, `haystack` | Clean documents in RAG pipelines |
 | `gpu` | Run NER on an NVIDIA GPU |
 | `synthetic` | Replace personal data with fake values |
+| `score` | MinHash signatures for near-duplicate removal |
 | `gliner` | Your own entity labels, and `ner_mode="pii"` (58 PII labels) |
 | `mcp` | Run SCT as an MCP server for AI assistants |
 
@@ -46,38 +59,29 @@ All extras: [docs/INSTALL.md](https://github.com/rhnfzl/SqueakyCleanText/blob/ma
 
 ## Quickstart
 
-```python
-from sct import TextCleaner
-
-cleaner = TextCleaner()
-result = cleaner.process("<p>Hi, Iâ€™m John Smith. Mail me at john.smith@example.com or call +31 6 1234 5678.</p>")
-print(result.lm_text)
-# -> <HTML>Hi, I'm <PERSON>. Mail me at <EMAIL> or call <PHONE>.<HTML>
-print(result.language, result.signals["pii_types"])
-# -> ENGLISH {'EMAIL': 1, 'PERSON': 1, 'PHONE': 1}
-```
-
-The broken `â€™` became an apostrophe, the HTML tags became `<HTML>` (set `replace_with_html=""` to drop them), and the name, email and phone became tags. The first run downloads the NER models.
-
-**For training and RAG data, use the `training` preset.** It only replaces personal data and repairs unicode. Numbers, dates, HTML, case, line breaks and code stay as written:
+For training and RAG data, use the `training` preset. It repairs the text and replaces personal data. Numbers, dates, HTML, case, line breaks and code stay as written.
 
 ```python
 from sct import TextCleaner, preset_config
+from sct.score import score_record
 
 cleaner = TextCleaner(cfg=preset_config("training"))
 for r in cleaner.process_batch([
-    "Order 4711 from <b>Anna Berg</b> (anna@example.se) on 2024-05-01.",
+    "Iâ€™m Anna Berg &amp; my mail is anna@example.se. Order 4711 ships on 2024-05-01.",
     "Bel +31 20 123 4567 voor Jan de Vries.",
 ]):
-    print(r.language, r.lm_text)
-# -> ENGLISH Order 4711 from <b><PERSON></b> (<EMAIL>) on 2024-05-01.
-# -> DUTCH Bel <PHONE> voor <PERSON>.
+    row = score_record(r)
+    print(r.lm_text)
+    print(row["sct_language"], row["sct_pii_count"], row["sct_pii_types"])
+# -> I'm <PERSON> & my mail is <EMAIL>. Order 4711 ships on 2024-05-01.
+# -> ENGLISH 2 ['EMAIL', 'PERSON']
+# -> Bel <PHONE> voor <PERSON>.
+# -> DUTCH 2 ['PERSON', 'PHONE']
 ```
-<!-- --8<-- [end:quickstart] -->
 
-## Use it in your data pipeline
+The first run downloads the NER models.
 
-**Hugging Face `datasets`** (`datasets` extra). `score=True` adds the `sct_*` score columns:
+**A whole Hugging Face dataset** (`datasets` extra). `clean_dataset` wraps `Dataset.map`: `batch_size`, `num_proc` and other `map` arguments pass through. `output="new_column"` keeps the original text next to the cleaned `text_clean`, and `score=True` adds the `sct_*` columns.
 
 ```python
 from datasets import Dataset
@@ -85,10 +89,23 @@ from sct.integrations.hf import clean_dataset
 
 if __name__ == "__main__":
     ds = Dataset.from_dict({"text": ["Mail jan@example.nl", "Call Maria Chen on +44 20 7946 0958."]})
-    ds = clean_dataset(ds, columns=["text"], score=True)
-    print(ds[0]["text"], ds[0]["sct_pii_types"])
-    # -> Mail <EMAIL> ['EMAIL']
+    ds = clean_dataset(ds, columns=["text"], output="new_column", score=True, num_proc=2)
+    print(ds[1]["text_clean"], ds[1]["sct_pii_types"])
+    # -> Call <PERSON> on <PHONE>. ['PERSON', 'PHONE']
 ```
+
+**Full cleanup for classic ML.** The default config (`TextCleaner()`) also replaces numbers, dates and HTML, and `stat_text` gives a lower-cased version without stopwords and punctuation:
+
+```python
+from sct import TextCleaner
+
+result = TextCleaner().process("Iâ€™m Anna Berg &amp; my mail is anna@example.se. Order 4711 ships on 2024-05-01.")
+print(result.lm_text)    # -> I'm <PERSON> & my mail is <EMAIL>. Order <NUMBER> ships on <DATE>.
+print(result.stat_text)  # -> person mail email number ships date
+```
+<!-- --8<-- [end:quickstart] -->
+
+## Use it in your data pipeline
 
 **DataTrove** (`datatrove` extra). Put SCT after your language and quality filters, so the NER step only sees documents you keep:
 
@@ -118,7 +135,7 @@ if __name__ == "__main__":
 | Data card for a file | `sct-report data.jsonl --text-column text --out report.json --card card.md` | [SCORE](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/SCORE.md) |
 | AI assistants | `sct-mcp` (MCP server, `mcp` extra) | [MCP](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/MCP.md) |
 
-The framework adapters use the `training` preset unless you pass a config, build one cleaner per worker process, and reject reversible mode. Plan for 5 to 7 GB of RAM per worker with the default NER ensemble.
+The framework adapters use the `training` preset unless you pass a config, so their output keeps numbers, dates, HTML and case. They build one cleaner per worker process and reject reversible mode. Plan for 5 to 7 GB of RAM per worker with the default NER ensemble.
 
 ## How it works
 
@@ -140,7 +157,7 @@ Every step is a `TextCleanerConfig` field ([docs/CONFIG.md](https://github.com/r
 <!-- --8<-- [start:results] -->
 ## What you get back
 
-`process` returns a `ProcessResult`:
+`process` and `process_batch` return a `ProcessResult`:
 
 - `lm_text`: the cleaned text, sentences intact, for LLMs, RAG and training.
 - `stat_text`: lower-cased, without stopwords and punctuation, for classic ML models.
@@ -148,61 +165,40 @@ Every step is a `TextCleanerConfig` field ([docs/CONFIG.md](https://github.com/r
 - `signals`: a value-free view with the same keys for every input: language and confidence, `pii_count`, `pii_share`, `pii_types`, `sensitive`, warnings and the NER models that ran. Safe to log or store next to the text.
 - `metadata`: the same counts, plus raw values only when you ask for them (the reversible map, or `findings` with `include_entities=True`). Keep those out of logs.
 
-```python
-from sct import TextCleaner, TextCleanerConfig
-from sct.score import score_record
+`score_record` turns a result into flat `sct_*` columns for filtering and data cards. `ScoreConfig` adds an optional quality score and a MinHash signature. Fields: [docs/API.md](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/API.md), columns: [docs/SCORE.md](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/SCORE.md).
 
-cleaner = TextCleaner(cfg=TextCleanerConfig(check_ner_process=False))  # regex only, for speed
-row = score_record(cleaner.process("Mail jan@example.nl or call +31 20 123 4567."))
-print(row["sct_pii_count"], row["sct_pii_types"], round(row["sct_pii_share"], 2))
-# -> 2 ['EMAIL', 'PHONE'] 0.66
-```
-
-`score_record` gives flat `sct_*` columns for filtering and data cards. Full field list: [docs/API.md](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/API.md), score columns: [docs/SCORE.md](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/SCORE.md).
-
-## PII modes
-
-| Mode | Output | Use it for |
+| PII mode | Output | Use it for |
 |---|---|---|
 | `placeholder` (default) | `<PERSON> lives in <LOCATION>.` | Training and RAG data |
-| `reversible` | `<PERSON_0> lives in <LOCATION_0>.` plus a map | Sending text to an LLM and restoring the answer |
 | `synthetic` (`synthetic` extra) | Fake values, for example `Lena Vos lives in Delft.` (the same document always gets the same fakes) | Data that must still read naturally |
+| `reversible` | `<PERSON_0> lives in <LOCATION_0>.` plus a map | Sending text to an LLM and restoring the answer |
 
-```python
-from sct import InMemoryTokenStore, TextCleaner, TextCleanerConfig
-
-store = InMemoryTokenStore()
-cleaner = TextCleaner(cfg=TextCleanerConfig(replacement_mode="reversible"), token_store=store)
-result = cleaner.process("Maria lives in Utrecht.")
-print(result.lm_text)  # -> <PERSON_0> lives in <LOCATION_0>.
-print(store.load(result.metadata["anon_map_reference"]).deanonymize(result.lm_text))  # -> Maria lives in Utrecht.
-```
-
-A `PrivacyPolicy` decides per entity type what to keep or redact and leaves a versioned audit trail. For more PII types (IDs, bank numbers, health data), use the GLiNER PII model with `ner_mode="pii"` (`gliner` extra). Details: [docs/REPLACEMENT_MODES.md](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/REPLACEMENT_MODES.md), [docs/PRIVACY.md](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/PRIVACY.md), [docs/NER_BACKENDS.md](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/NER_BACKENDS.md).
+Modes, privacy policies and more PII types (`ner_mode="pii"`): [docs/REPLACEMENT_MODES.md](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/REPLACEMENT_MODES.md), [docs/PRIVACY.md](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/PRIVACY.md), [docs/NER_BACKENDS.md](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/NER_BACKENDS.md).
 <!-- --8<-- [end:results] -->
 
 ## Speed and hardware
 
-Default config (full multilingual NER ensemble), release benchmark documents, SCT 0.8.0, AMD Threadripper PRO 7985WX and RTX 4090, median of 3 runs. 0.8.1 runs at the same speed.
+Default config (full multilingual NER ensemble), release benchmark documents (up to about 900 characters), SCT 0.8.0, AMD Threadripper PRO 7985WX and RTX 4090, median of 3 runs. 0.8.1 runs at the same speed.
 
 | Workload | Hardware | Docs/s |
 |---|---|---|
 | `process`, one document at a time | 16 CPU cores | 5.0 |
 | `process_batch`, short documents, 16 workers | 16 CPU cores | 15.5 |
 | `process_batch`, short documents, 16 workers | 64 CPU cores | 29.2 |
-| `process_batch`, short documents, full ensemble | RTX 4090 | 130 |
-| `process_batch`, short documents, English only (2 models) | RTX 4090 | 646 |
+| `process_batch`, short documents, full ensemble | 3x RTX 4090 (models split across GPUs) | 130 |
+| `process_batch`, short documents, English only (2 models) | 1x RTX 4090 | 646 |
+
+The full ensemble needs about 12 to 16 GB of free memory on one GPU; English only needs 3 to 5 GB. As a rough estimate from this table, 1 million short documents take about 26 minutes English-only on one RTX 4090, about 2 hours with the full ensemble on 3 GPUs, and about 10 hours on 64 CPU cores.
 
 NER is the slow stage. Turn it off (`check_ner_process=False`) for regex-only cleaning, or limit `language=` to load fewer models. Hardware advice and GPU setup: [docs/PERFORMANCE.md](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/PERFORMANCE.md).
 
 ## Quality
 
-Measured on open datasets with [benchmarks/](https://github.com/rhnfzl/SqueakyCleanText/tree/main/benchmarks); scores per release in `benchmarks/results/`, the 0.8.1 run in [comparison-0.8.0-unreleased.md](https://github.com/rhnfzl/SqueakyCleanText/blob/main/benchmarks/results/comparison-0.8.0-unreleased.md).
+Measured on open datasets with [benchmarks/](https://github.com/rhnfzl/SqueakyCleanText/tree/main/benchmarks).
 
 - **Cleaning** (FineWeb-2 with injected noise, default config): 100% of HTML, 99.6% of mojibake and 100% of URLs removed.
-- **Language detection** (WiLI, 0.8.0 run): 95.1% accuracy over 7,200 documents.
-- **PII** (12 open PII datasets, about 30 languages, default config): leaked values fell on every dataset in 0.8.1, for example 18.1% to 8.2% on REDACT and 42.4% to 11.7% on long court documents (TAB).
-- **Release benchmark** (30 documents, 9 languages): exact-span F1 0.99, 0 of 67 PII values leaked (0.8.0).
+- **Language detection** (WiLI): 95.1% accuracy over 7,200 documents.
+- **PII** (12 open PII datasets, about 40 languages): the 0.8.1 release branch leaked fewer values than 0.8.0 on every dataset, for example 18.1% to 8.2% on REDACT ([comparison](https://github.com/rhnfzl/SqueakyCleanText/blob/main/benchmarks/results/comparison-0.8.0-unreleased.md), pre-release commit `2078e8c4`).
 - **Multilingual PII eval** (220 records, 11 languages): 0.93 recall, 0.95 precision ([docs/MULTILINGUAL_EVAL.md](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/MULTILINGUAL_EVAL.md)).
 
 Test your own data or model with the evaluation harness ([docs/EVALUATION.md](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/EVALUATION.md)).
@@ -216,27 +212,13 @@ Language detection covers 75 languages. Full NER models cover English, Dutch, Ge
 
 - **Safe defaults, every choice configurable.** Each behaviour is a config field; nothing is forced.
 - **No guarantee that all PII is found.** Models miss entities, mostly organisations and non-Latin scripts. Review output before you publish it.
-- **Reversible maps are personal data.** Anyone with the map can restore the values. Store maps apart from the cleaned data, with access control.
-- **Offsets are post-regex.** Finding offsets point into the text after the regex step, not into the raw input.
-- **Synthetic data is not anonymisation.** Fake values keep the data useful; they do not make it anonymous in a legal sense.
 - **Free text, not tables.** For tables with known PII columns, drop or hash those columns first.
-
-<details>
-<summary>Known limits of 0.8.1 (details in <a href="https://github.com/rhnfzl/SqueakyCleanText/blob/main/CHANGELOG.md">CHANGELOG.md</a>)</summary>
-
-- Dates: only full dates become one `<DATE>`. `1990年1月`, `1月15日`, Japanese era years and `1990.1.15.` do not; the year and number steps still change them (`1990年1月` becomes `<YEAR>年<NUMBER>月`). Thai month names need `custom_month_names`.
-- In ensembles with GLiNER, windows are sized for the token-classification models, not for GLiNER's own word limit. Torch models and GLiNER keep one lock per model, so they do not run in parallel across threads.
-- Only `process_batch` is faster; `process` of one document is not batched across documents.
-- `ner_chunk_overlap` (off by default) can still cut an entity longer than the overlap that starts at the very end of a chunk.
-- `06-12345678` becomes `06-<PHONE>`. Adversarial strings such as `+000000000(000)0` can leave `(000)0` after phone replacement.
-- ORGANISATION is the weakest NER label (0.75 recall in the multilingual eval); Bengali and Tamil name spans can be a few characters off.
-- A URL path that switches from Latin letters straight into a script written without spaces is replaced only up to the switch (`https://x.org/a東京secret` becomes `<URL>東京secret`).
-- Score B's quality head was tested with a small ONNX graph only; GLiNER PII mode was not run end to end for this release.
-- An unpinned NER model makes one Hub request per worker when the parent never loaded it before forking; pin `ner_model_revisions` or set `HF_HUB_OFFLINE=1`.
-- `WindowedStreamingRedactor` raises `BufferError` when the buffer passes `max_buffer_chars` (default 4096) with no safe whitespace split; raise the limit or use `BufferedStreamingRedactor`.
-
-</details>
+- **Reversible maps are personal data.** Anyone with the map can restore the values. Store maps apart from the cleaned data, with access control.
+- **Synthetic data is not anonymisation.** Fake values keep the data useful; they do not make it anonymous in a legal sense.
+- **Offsets are post-regex.** Finding offsets point into the text after the regex step, not into the raw input.
 <!-- --8<-- [end:limits] -->
+
+Detailed known limits of 0.8.1: [docs/limits.md](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/limits.md).
 
 ## Documentation
 
@@ -247,7 +229,7 @@ Language detection covers 75 languages. Full NER models cover English, Dutch, Ge
 | `TextCleaner`, `ProcessResult`, `signals` | [docs/API.md](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/API.md) |
 | Data pipelines, other engines, MCP server | [docs/INTEGRATIONS.md](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/INTEGRATIONS.md), [docs/RECIPES.md](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/RECIPES.md), [docs/MCP.md](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/MCP.md) |
 | JSON, DataFrame, RAG, CLI, streaming, OCR | [docs/ADAPTERS.md](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/ADAPTERS.md) |
-| Score columns, data cards, `sct-report` | [docs/SCORE.md](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/SCORE.md) |
+| Score columns, quality, MinHash, data cards, `sct-report` | [docs/SCORE.md](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/SCORE.md) |
 | NER backends, GLiNER, PII mode | [docs/NER_BACKENDS.md](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/NER_BACKENDS.md) |
 | Replacement modes, privacy policies, `TokenStore` | [docs/REPLACEMENT_MODES.md](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/REPLACEMENT_MODES.md), [docs/PRIVACY.md](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/PRIVACY.md) |
 | Evaluation | [docs/EVALUATION.md](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/EVALUATION.md), [docs/MULTILINGUAL_EVAL.md](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/MULTILINGUAL_EVAL.md) |
@@ -255,9 +237,7 @@ Language detection covers 75 languages. Full NER models cover English, Dutch, Ge
 | The whole API in one file, for AI coding assistants | [llms.txt](https://github.com/rhnfzl/SqueakyCleanText/blob/main/llms.txt) |
 | Release notes | [CHANGELOG.md](https://github.com/rhnfzl/SqueakyCleanText/blob/main/CHANGELOG.md) |
 
-## What's new in 0.8.1
-
-Fewer leaks, same speed: leaked PII drops on all 12 open benchmark datasets, bank and card numbers get their own `<IBAN>` and `<CARD>` tags, and JSON and longer bracketed text survive cleanup. Some defaults changed; each has a setting to switch it back ([CHANGELOG.md](https://github.com/rhnfzl/SqueakyCleanText/blob/main/CHANGELOG.md)).
+**New in 0.8.1:** fewer leaks at the same speed, `<IBAN>` and `<CARD>` tags, and JSON and longer bracketed text survive cleanup. Some defaults changed; each has a setting to switch it back ([CHANGELOG.md](https://github.com/rhnfzl/SqueakyCleanText/blob/main/CHANGELOG.md)).
 
 ## Contributing
 
