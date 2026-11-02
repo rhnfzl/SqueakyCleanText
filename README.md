@@ -189,6 +189,7 @@ Source and method: [docs/PERFORMANCE.md](https://github.com/rhnfzl/SqueakyCleanT
 
 ## Quality and evaluation
 
+- Open-dataset benchmark (12 PII datasets, about 30 languages, long documents, language ID, cleaning, speed): [benchmarks/](https://github.com/rhnfzl/SqueakyCleanText/tree/main/benchmarks), scores per release in `benchmarks/results/`.
 - Release benchmark (30 documents, 84 entities, 9 languages): exact-span F1 0.99 and 0 of 67 PII values leaked in 0.8.0. Run `python -m scripts.benchmark_release`.
 - Multilingual PII eval (220 synthetic records, 11 languages): the default ensemble scores 0.93 recall and 0.95 precision. Run `python -m scripts.run_multilingual_eval` ([docs/MULTILINGUAL_EVAL.md](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/MULTILINGUAL_EVAL.md)).
 - Score columns and data cards: `sct-report data.jsonl --text-column text --out report.json` writes counts, shares and hashes, never text ([docs/SCORE.md](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/SCORE.md)).
@@ -207,7 +208,7 @@ Language detection covers 75 languages. Full NER models cover 4 (English, Dutch,
 - **Synthetic data is not anonymisation.** Fake values keep the data useful; they do not make it anonymous in a legal sense.
 
 <details>
-<summary>Known limits of 0.8.0 (details in <a href="CHANGELOG.md">CHANGELOG.md</a>)</summary>
+<summary>Known limits of 0.8.1 (details in <a href="CHANGELOG.md">CHANGELOG.md</a>)</summary>
 
 - Dates: only full dates become one `<DATE>`. `1990年1月`, `1月15日`, Japanese era years and `1990.1.15.` do not; the year and number steps still change them (`1990年1月` becomes `<YEAR>年<NUMBER>月`, `生日1990.1.15谢谢` becomes `<YEAR><NUMBER>.15`). A circled number glued to a unit character (`1月⑮日`) stays a list marker. Thai month names need `custom_month_names`.
 - In ensembles with GLiNER, windows are sized for the token-classification models, not for GLiNER's own word limit. GLiNER2 runs one chunk per call; torch models and GLiNER keep one lock per model, so they do not run in parallel across threads.
@@ -216,7 +217,7 @@ Language detection covers 75 languages. Full NER models cover 4 (English, Dutch,
 - `06-12345678` becomes `06-<PHONE>`. Adversarial strings such as `+000000000(000)0` can leave `(000)0` after phone replacement.
 - Two addresses glued with no separator in a script written without spaces can be read as one address or split at the wrong place.
 - ORGANISATION is the weakest NER label (0.75 recall in the multilingual eval); Bengali and Tamil name spans can be a few characters off.
-- A URL with a path swallows a trailing sentence period (`see https://x.org/a.` becomes `see <URL>`). A URL path that switches from Latin letters or digits straight into a script written without spaces is replaced only up to the switch (`https://x.org/a東京secret` becomes `<URL>東京secret`). Rare styled URL hosts and mail addresses (`https://ab｡⑧․cd.ex.com/...`, `INFO@COL·LEGI。CAT`) are not fully replaced.
+- A URL path that switches from Latin letters or digits straight into a script written without spaces is replaced only up to the switch (`https://x.org/a東京secret` becomes `<URL>東京secret`). Rare styled URL hosts and mail addresses (`https://ab｡⑧․cd.ex.com/...`, `INFO@COL·LEGI。CAT`) are not fully replaced.
 - Score B's quality head was tested with a small ONNX graph only; GLiNER PII mode was not run end to end for this release. CI does not install the `mcp` extra; FastMCP-only tests skip there.
 - An unpinned NER model makes one Hub request per worker when the parent never loaded it before forking; pin `ner_model_revisions` or set `HF_HUB_OFFLINE=1`.
 - With an empty regex marker (`replace_with_email=""`), NER in synthetic or reversible mode can find other entities than in placeholder mode.
@@ -239,6 +240,14 @@ Language detection covers 75 languages. Full NER models cover 4 (English, Dutch,
 | Evaluation, score columns, `sct-report` | [docs/EVALUATION.md](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/EVALUATION.md), [docs/SCORE.md](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/SCORE.md), [docs/MULTILINGUAL_EVAL.md](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/MULTILINGUAL_EVAL.md) |
 | Languages and adding a language | [docs/LANGUAGES.md](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/LANGUAGES.md), [docs/ADDING_LANGUAGES.md](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/ADDING_LANGUAGES.md) |
 | The whole API in one file, for AI coding assistants | [llms.txt](https://github.com/rhnfzl/SqueakyCleanText/blob/main/llms.txt) |
+
+## What's new in 0.8.1
+
+Fixes from the open-dataset benchmark ([benchmarks/](https://github.com/rhnfzl/SqueakyCleanText/tree/main/benchmarks)). Leak falls on all 12 PII datasets (REDACT 18.1% to 8.2%, long documents 42.4% to 11.7%); speed is unchanged.
+
+- NER keeps a span when its best model passes the cut; other copies of a masked name are masked too.
+- IBAN and card numbers get their own types; JSON and longer bracketed text survive cleanup.
+- `Month/YY` dates, `Name <email>`, URLs before a full stop, and span edges inside words are fixed.
 
 ## What's new in 0.8.0
 
@@ -268,7 +277,7 @@ Issues and pull requests are welcome. Read [AGENTS.md](https://github.com/rhnfzl
   author = {Fazal, Rehan},
   title = {SqueakyCleanText},
   url = {https://github.com/rhnfzl/SqueakyCleanText},
-  version = {0.8.0},
+  version = {0.8.1},
   year = {2026}
 }
 ```
