@@ -8,6 +8,8 @@ import threading
 from collections import defaultdict
 import logging
 from typing import Any, Collection, Dict, List, Optional, Sequence, Union
+
+import regex
 from pathlib import Path
 
 import onnxruntime as ort
@@ -1213,7 +1215,8 @@ class GeneralNER:
         taken = [(s['start'], s['end']) for s in spans] + list(markers)
         added = []
         for value in sorted(sources, key=len, reverse=True):
-            for m in re.finditer(rf"(?<!\w){re.escape(value)}(?!\w)", text):
+            # \p{M}: a combining mark (Hindi ा, Thai ิ) continues the word, though stdlib \w excludes it.
+            for m in regex.finditer(rf"(?<![\w\p{{M}}]){regex.escape(value)}(?![\w\p{{M}}])", text):
                 a, b = m.span()
                 if not any(x < b and a < y for x, y in taken):
                     taken.append((a, b))

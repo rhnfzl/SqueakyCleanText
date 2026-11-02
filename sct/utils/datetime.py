@@ -14,8 +14,11 @@ class ProcessDateTime:
         """
         # Matched on the decimal-digit view, so ١٥/٠١/١٩٩٠ and १५/०१/१९९० are dates like 15/01/1990.
         self._date_regex = DigitView(date_regex or constants.DATE_REGEX)
-        self._fuzzy_vocabulary = fuzzy_vocabulary or constants.FUZZY_MONTH_VOCABULARY
-        self._fuzzy_vocabulary_by_lang = fuzzy_vocabulary_by_lang or constants.FUZZY_MONTH_VOCABULARY_BY_LANG
+        # Only None means "defaults": an empty vocabulary (date_builtin_month_languages=()) matches no month.
+        self._fuzzy_vocabulary = (constants.FUZZY_MONTH_VOCABULARY if fuzzy_vocabulary is None
+                                  else fuzzy_vocabulary)
+        self._fuzzy_vocabulary_by_lang = (constants.FUZZY_MONTH_VOCABULARY_BY_LANG if fuzzy_vocabulary_by_lang is None
+                                          else fuzzy_vocabulary_by_lang)
 
     def replace_years(self, text, replace_with="<YEAR>"):
         """
@@ -82,6 +85,8 @@ class ProcessDateTime:
             choices = tuple(lang_names)
         else:
             choices = self._fuzzy_vocabulary
+        if not choices:
+            return text
 
         def _is_fuzzy_month(word):
             """Check if word fuzzy-matches any known month name."""

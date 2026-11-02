@@ -139,6 +139,21 @@
   `ก.พ.` (or one passed via `custom_month_names`) no longer matches any character in place of
   its dots.
 
+### Fixes
+
+- JSON preservation (`keep_json_braces`): the object scan is linear on malformed input. `'{"a":' * 20000`
+  took seconds and then raised `RecursionError` out of `process()`; a `'{'` with no `'}'` after it is now
+  skipped, a failed parse resumes after the point it failed, and nesting past the recursion limit ends the scan.
+- JSON preservation: replacement tokens (`<NUMBER>`, `<PERSON>`) count as JSON values, so
+  `{"n":42,"name":"Alice"}` stays as `{"n":<NUMBER>,"name":"Alice"}` instead of being removed as brace content.
+- NER propagation: the whole-word check treats combining marks as part of a word, so a name `राज` no longer
+  masks the start of `राजा` (`<PERSON>ा`).
+- `html_tag_strict`: an HTML comment ends at `-->`, so `<!-- a > secret -->` and comments holding tags are
+  one `<HTML>`; an unclosed `<!--` still ends at the next `>`.
+- Browser export: the date rule follows `custom_month_names`, `date_builtin_month_languages` and
+  `date_month_name_slash_year` (shared helper `resources.configured_month_names`), so it matches Python.
+- `date_builtin_month_languages=()` with fuzzy dates on no longer brings back every built-in month name.
+
 ## 0.8.0 - 2026-11-01
 
 0.8.0 makes batch cleaning faster, detects all 75 Lingua languages, and adds a value-free

@@ -256,10 +256,11 @@ NONBREAKING_SPACE_REGEX = re.compile(r"(?!\n)\s+")
 
 _HTML_ENTITY = r'&([a-z0-9]+|#[0-9]{1,6}|#x[0-9a-f]{1,6});'
 # Tag-shaped only (html_tag_strict): a name after "<" ("<b>", "</b>", "<br/>", "<!DOCTYPE", "<?xml") or a
-# comment, so "Name <a@b.com>", "<https://...>" and a stray "a < b ... >" are not markup. Linear: [^<>] stops
-# at the next bracket, and the pattern is JS-portable (browser export).
+# comment, so "Name <a@b.com>", "<https://...>" and a stray "a < b ... >" are not markup. A comment ends at
+# "-->" (its body may hold "<" and ">"); an unclosed "<!--" falls back to the next ">". Linear: a comment body
+# stops at the next "<!--" and [^<>] at the next bracket, and the pattern is JS-portable (browser export).
 HTML_REGEX = re.compile(
-    r'<!--[^<>]*>|<[!?/]?[A-Za-z][A-Za-z0-9:-]*(?:\s[^<>]*)?/?>|' + _HTML_ENTITY,
+    r'<!--(?:(?!<!--)[\s\S])*?-->|<!--[^<>]*>|<[!?/]?[A-Za-z][A-Za-z0-9:-]*(?:\s[^<>]*)?/?>|' + _HTML_ENTITY,
     flags=re.UNICODE | re.IGNORECASE,
 )
 # 0.8.0 rule (html_tag_strict=False): any "<...>" on one line.
@@ -568,7 +569,7 @@ def build_fuzzy_vocabulary(month_names_dict=None, lang_to_vocab=None):
     Returns:
         (all_vocab_tuple, by_lang_dict)
     """
-    names = month_names_dict or MONTH_NAMES_MULTILINGUAL
+    names = MONTH_NAMES_MULTILINGUAL if month_names_dict is None else month_names_dict  # {} = no months
     lvocab = lang_to_vocab or _LANG_TO_VOCAB
 
     all_vocab = tuple(name for name in names if len(name) > 4)

@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Any
 
 from sct.config import TextCleanerConfig
-from sct.utils import constants
+from sct.utils import constants, resources
 from sct.utils.contact import numbers_regex
 
 
@@ -56,12 +56,15 @@ def build_browser_manifest(config: TextCleanerConfig) -> dict[str, Any]:
     # (an HTML token holding an email or URL, a URL token holding an email).
     html_regex = constants.HTML_REGEX if config.html_tag_strict else constants.HTML_REGEX_ANY
     url_regex = constants.URL_REGEX if config.url_trailing_punct_outside else constants.URL_REGEX_LEGACY
+    month_names = resources.configured_month_names(config)
+    date_regex = (constants.DATE_REGEX if month_names is None
+                  else constants.build_date_regex(month_names, slash_year=config.date_month_name_slash_year))
     ordered = [
         ("html", html_regex, config.replace_with_html, config.check_replace_html),
         ("url", url_regex, config.replace_with_url, config.check_replace_urls),
         ("email", constants.EMAIL_REGEX, config.replace_with_email, config.check_replace_emails),
         ("ip", constants.IP_REGEX, config.replace_with_ips, config.check_replace_ips),
-        ("date", constants.DATE_REGEX, config.replace_with_dates, config.check_replace_dates),
+        ("date", date_regex, config.replace_with_dates, config.check_replace_dates),
         ("phone", constants.PHONE_REGEX, config.replace_with_phone_numbers,
          config.check_replace_phone_numbers),
         ("year", constants.YEAR_REGEX, config.replace_with_years, config.check_replace_years),
@@ -127,7 +130,7 @@ def build_browser_manifest(config: TextCleanerConfig) -> dict[str, Any]:
                 config.check_replace_ips,
             ), "fold_decimal_digits": True},
             "date": {**_rule(
-                constants.DATE_REGEX,
+                date_regex,
                 config.replace_with_dates,
                 config.check_replace_dates,
             ), "fold_decimal_digits": True},

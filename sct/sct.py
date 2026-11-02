@@ -88,14 +88,10 @@ class TextCleaner:
         )
 
         # Instance-scoped datetime (with custom month names -> per-instance regex)
-        mn_dict = None
         custom_months = self.cfg.custom_month_names or {}
         slash_year = self.cfg.date_month_name_slash_year
-        if custom_months or self.cfg.date_builtin_month_languages is not None or not slash_year:
-            extra = {}
-            for lang, names in custom_months.items():
-                extra[resources.language_to_iso(lang)] = names
-            mn_dict = constants.build_month_names_dict(extra, self.cfg.date_builtin_month_languages)
+        mn_dict = resources.configured_month_names(self.cfg)
+        if mn_dict is not None:
             date_regex = constants.build_date_regex(mn_dict, slash_year=slash_year)
             fuzzy_all, fuzzy_by_lang = constants.build_fuzzy_vocabulary(
                 mn_dict,

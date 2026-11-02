@@ -125,3 +125,16 @@ def language_to_iso(name: str) -> str:
         return lang.iso_code_639_1.name.lower()
     except AttributeError:
         return name[:2].lower()
+
+
+def configured_month_names(cfg):
+    """Month-name dict for cfg's date options, or None when all of them are at the default (DATE_REGEX).
+
+    Shared by TextCleaner and the browser export so both build the same date regex.
+    """
+    custom = cfg.custom_month_names or {}
+    if not (custom or cfg.date_builtin_month_languages is not None or not cfg.date_month_name_slash_year):
+        return None
+    from sct.utils import constants
+    extra = {language_to_iso(lang): names for lang, names in custom.items()}
+    return constants.build_month_names_dict(extra, cfg.date_builtin_month_languages)
