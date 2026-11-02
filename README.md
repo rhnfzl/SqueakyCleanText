@@ -34,6 +34,8 @@ One call runs these stages. Each one is a config field with a safe default, so y
 4. **Score and document.** Every result has value-free `signals`. Turn them into `sct_*` columns (language, PII share, warnings; optional quality score and MinHash for near-duplicate removal) and a data card with `sct-report` ([docs/SCORE.md](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/SCORE.md)).
 5. **Scale.** `process_batch` runs documents in threads and batches the NER calls, on CPU (ONNX Runtime, no PyTorch needed) or an NVIDIA GPU. Adapters for Hugging Face `datasets`, DataTrove, LangChain, Haystack and MCP.
 
+<img src="https://raw.githubusercontent.com/rhnfzl/SqueakyCleanText/main/resources/sct_overview.png" alt="What SCT offers: raw text, JSONL, a Hugging Face dataset, a DataTrove job or RAG documents go in; SCT repairs the text, detects the language, removes personal data, scores and documents each record, and scales on CPU or GPU; clean text, sct_* columns and signals, an optional quality score and MinHash, a data card and an optional reversible map come out. Run it from process or process_batch, sct-clean, sct-report, sct-mcp, Hugging Face datasets, DataTrove, LangChain or Haystack." width="900">
+
 SCT finds most personal data, not all of it. Check its output before you publish sensitive data.
 
 <!-- --8<-- [start:quickstart] -->
@@ -139,20 +141,23 @@ The framework adapters use the `training` preset unless you pass a config, so th
 
 ## How it works
 
-<picture>
-  <img src="https://raw.githubusercontent.com/rhnfzl/SqueakyCleanText/main/resources/sct_flow.png" alt="SqueakyCleanText pipeline: entry points, language detection, fixes, regex PII, NER, replacement, outputs and metadata" width="900">
-</picture>
+<img src="https://raw.githubusercontent.com/rhnfzl/SqueakyCleanText/main/resources/sct_flow.png" alt="SqueakyCleanText pipeline in run order: entry points, 1 detect language, 2 fix the text, 3 regex PII and cleanup, 4 NER, 5 replace, 6 output and signals. Dashed steps are off by default." width="900">
 
 <details>
 <summary>The diagram as text</summary>
 
 - Entry points: `process()`, `process_batch()`, the `sct-clean` CLI, the `sct-mcp` server, the Hugging Face `datasets`, DataTrove, LangChain and Haystack adapters, the JSON, DataFrame and RAG adapters, and the streaming redactors. All of them pass text to the same pipeline.
-- 1 Detect language (Lingua, 75 languages, on the raw input) -> 2 Fix the text -> 3 Regex PII (counted in `regex_counts`) -> 4 NER (chunk windows for long text) -> 5 Replace (`<TAG>`, synthetic fakes, or reversible `<PERSON_0>` with a map) -> 6 Output (`lm_text`, `stat_text`, `language`) and `metadata` / `signals`.
-- Across all stages: `process_batch` batches NER across documents; NER runs on CPU or CUDA; the `training` preset turns stages on and off.
+- 1 Detect language: Lingua, 75 languages, on the raw input. Pin it or limit it with `language=`. Low confidence adds a warning. The language picks the NER models and the Faker locale.
+- 2 Fix the text: Unicode repair (ftfy), styled-character folding, HTML entities and tags. ASCII transliteration and emoji removal are off by default.
+- 3 Regex PII and cleanup, in this order: URLs, emails, IPs, dates, fuzzy dates (off), IBANs and cards (checksums), ID codes (off), phones, years, numbers, currency symbols, then isolated symbols, brackets and whitespace. Counted in `regex_counts`.
+- 4 NER: ONNX models per language, a vote that keeps a span when its best model score passes the threshold, chunk windows for long text, propagation of masked names to their other copies, and span edges snapped to word edges. GLiNER and `ner_mode="pii"` are opt in.
+- 5 Replace: `<PERSON>` tags by default; synthetic fakes or reversible `<PERSON_0>` with a map (or a `TokenStore` reference) are opt in. The map holds personal data.
+- 6 Output: `lm_text`, `stat_text` (lower case, no stopwords or punctuation), `language`, value-free `signals`, and `metadata` with `regex_counts`.
+- Across all stages: `process_batch` runs documents in threads and batches NER across documents (`ner_batch_size`); NER runs on CPU or CUDA (`ner_device`); the `training` preset keeps numbers, dates and HTML.
 
 </details>
 
-Every step is a `TextCleanerConfig` field ([docs/CONFIG.md](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/CONFIG.md)). The diagram source is [resources/sct_flow.excalidraw](https://github.com/rhnfzl/SqueakyCleanText/blob/main/resources/sct_flow.excalidraw).
+Every step is a `TextCleanerConfig` field ([docs/CONFIG.md](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/CONFIG.md)). The diagrams are built by [scripts/diagrams/](https://github.com/rhnfzl/SqueakyCleanText/tree/main/scripts/diagrams); open the `.excalidraw` files in [resources/](https://github.com/rhnfzl/SqueakyCleanText/tree/main/resources) to view them in Excalidraw.
 
 <!-- --8<-- [start:results] -->
 ## What you get back
@@ -172,6 +177,8 @@ Every step is a `TextCleanerConfig` field ([docs/CONFIG.md](https://github.com/r
 | `placeholder` (default) | `<PERSON> lives in <LOCATION>.` | Training and RAG data |
 | `synthetic` (`synthetic` extra) | Fake values, for example `Lena Vos lives in Delft.` (the same document always gets the same fakes) | Data that must still read naturally |
 | `reversible` | `<PERSON_0> lives in <LOCATION_0>.` plus a map | Sending text to an LLM and restoring the answer |
+
+<img src="https://raw.githubusercontent.com/rhnfzl/SqueakyCleanText/main/resources/sct_pii_modes.png" alt="One sentence in the three PII modes. Input: Maria Chen lives in Utrecht. Mail her at maria.chen@example.com. Placeholder: PERSON lives in LOCATION. Mail her at EMAIL. Reversible: PERSON_0 lives in LOCATION_0. Mail her at EMAIL_0, plus a map back to the values that map.deanonymize uses. Synthetic: Patty Hunter lives in East Bobbyfurt. Mail her at lindabradley@example.net." width="900">
 
 Modes, privacy policies and more PII types (`ner_mode="pii"`): [docs/REPLACEMENT_MODES.md](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/REPLACEMENT_MODES.md), [docs/PRIVACY.md](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/PRIVACY.md), [docs/NER_BACKENDS.md](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/NER_BACKENDS.md).
 <!-- --8<-- [end:results] -->
