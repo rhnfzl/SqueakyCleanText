@@ -1,6 +1,6 @@
 {
  "batch_size": 1,
- "command": "python -m benchmarks.compare.runner --entries sct-default sct-gliner presidio gliner-nvidia gliner2-fastino opf bardsai-v3 datafog --datasets gretel_en argilla_pii openpii gretel nemotron redact tab bayanat thai_pii iahlt thainer naamapadam multiconer stockmark --part test --n 300 --out results/test/default --cache benchmarks/.cache/merge-default --threads 16 --hf-hub-cache <hf-hub-cache> --reuse --skip-offset-check",
+ "command": "python -m benchmarks.compare.runner --datasets gretel_en argilla_pii openpii gretel nemotron redact tab bayanat thai_pii iahlt thainer naamapadam multiconer stockmark --part test --n 300 --cache benchmarks/.cache/merge-default --threads 16 --hf-hub-cache <hf-hub-cache> --reuse --skip-offset-check --entries sct-default sct-gliner presidio gliner-nvidia gliner2-fastino opf bardsai-v3 datafog --out results/test/default",
  "cpus": null,
  "device": "cpu",
  "doc_timeout": 120.0,

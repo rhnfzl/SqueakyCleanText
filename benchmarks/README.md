@@ -149,7 +149,9 @@ Rerun (Linux box, CPU, 16 cores per job; one job per entry and track, then one m
         --part test --n 300 --out results/test/parts/<track>/<entry> --cache benchmarks/.cache/compare-<entry>-<track> \
         --cpus 0-15 --threads 16 --reuse
     # 3. merge: all entries, one cache dir with a symlink per entry, rescored with --reuse (no inference);
-    #    writes summary.json with per-dataset and group-level (in-domain sets out) paired bootstraps vs SCT
+    #    writes summary.json: per-dataset paired bootstraps vs SCT and the PROTOCOL.md section 17 rule views
+    #    (own clean cells, same-set, pairwise; claimed languages only); --no-recover = SCT without
+    #    recovered dropped copies, into <bundle>/norecover/<track> for the with/without table
     python -m benchmarks.compare.runner --entries <all> --datasets <all> --part test --n 300 \
         --out results/test/<track> --cache <merged cache> --threads 16 --reuse --skip-offset-check [--tuned ...]
     # 4. speed, then tables
@@ -167,9 +169,10 @@ Add a tool:
    per input line). The runner's offset fixtures must pass before any run.
 3. `compare/entries.py`: add the entry to `ENTRIES` (package, checkpoint, revision, threshold,
    `labels` map to SCT types, `supports`), to `RUNS`, to `GOLD_TRACK` if it takes a language, and
-   its training/evaluation exposure to `CONTAMINATION` (from the model card; T/E cells leave the headline).
+   its training/evaluation exposure to `CONTAMINATION` (from the model card; T/E/D cells are excluded, U is
+   reported as unknown) and its claimed languages to `CLAIMED_LANGUAGES` (model card language tags).
 4. `compare/tune.py`: its `GRID` (at most 12 candidates, only the changes PROTOCOL.md section 3 allows).
-5. `compare/report.py`: its languages and licence in `LANGUAGES` / `LICENCES`.
+5. `compare/report.py`: its licence in `LICENCES`.
 6. Smoke-run on dev: `python -m benchmarks.compare.runner --entries <entry> --datasets gretel_en --part dev --n 5 --out benchmarks/.cache/smoke`.
 
 ## Rules

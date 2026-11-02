@@ -48,6 +48,7 @@
   },
   "mask": "SCT placeholder",
   "package": "SqueakyCleanText[gliner]==0.8.1",
+  "recover_dropped": true,
   "revision": "61726e0ad791dcab3e29339bbec3ad42ded65641",
   "supports": [
    "PERSON",
@@ -76,6 +77,7 @@
   "reused": "benchmarks/.cache/merge-default/sct-gliner/naamapadam-test.jsonl"
  },
  "python": "benchmarks/.cache/merge-default/venvs/sct-gliner/bin/python",
+ "recovered_dropped_copies": 0,
  "sample_id_sha256": "cd263af3e3e30e705a4975ac08f4dfe6ef4e546c89f6564002f496dd0b8e6aaa",
  "seconds_total": 93.961,
  "tuning": [
@@ -130,7 +132,7 @@
       "char_precision": 0.2885,
       "char_recall": 0.0236,
       "char_survival": 0.9644,
-      "chrf": 0.6934,
+      "chrf": 0.6933,
       "clean_doc_fp_rate": 0.2439,
       "clean_docs": 41,
       "complete_exposure_rate": 0.9533,
@@ -139,15 +141,15 @@
       "exact_visible_rate": 0.9533,
       "gold": 664,
       "mask_to_gold_ratio": 0.0816,
-      "masked_f2": 0.055,
-      "masked_precision": 0.1908,
+      "masked_f2": 0.0549,
+      "masked_precision": 0.1875,
       "masked_recall": 0.0467,
       "mention_exposure_rate": 0.9714,
       "overmask_rate": 0.0148,
       "partial_f1": 0.011,
-      "partial_precision": 0.0667,
+      "partial_precision": 0.0635,
       "partial_recall": 0.006,
-      "pred": 60,
+      "pred": 63,
       "repeated_exposed_rate": 0.8919,
       "repeated_values": 37,
       "strict_f1": 0.0,
@@ -197,13 +199,13 @@
      "doc_leak_rate": 0.9851,
      "exact_visible_rate": 0.9564,
      "mask_to_gold_ratio": 0.08,
-     "masked_f2": 0.0508,
-     "masked_precision": 0.1565,
+     "masked_f2": 0.0507,
+     "masked_precision": 0.1554,
      "masked_recall": 0.0436,
      "mention_exposure_rate": 0.9785,
      "overmask_rate": 0.0167,
      "partial_f1": 0.0217,
-     "partial_precision": 0.1117,
+     "partial_precision": 0.1106,
      "partial_recall": 0.012,
      "repeated_exposed_rate": 0.9506,
      "strict_f1": 0.0071,
@@ -226,18 +228,18 @@
      "gold": 1659,
      "mask_to_gold_ratio": 0.0792,
      "masked_f2": 0.0514,
-     "masked_precision": 0.1566,
+     "masked_precision": 0.1557,
      "masked_recall": 0.044,
      "mention_exposure_rate": 0.9777,
      "overmask_rate": 0.0162,
-     "partial_f1": 0.0208,
-     "partial_precision": 0.1111,
+     "partial_f1": 0.0207,
+     "partial_precision": 0.1092,
      "partial_recall": 0.0115,
-     "pred": 171,
+     "pred": 174,
      "repeated_exposed_rate": 0.9306,
      "repeated_values": 72,
-     "strict_f1": 0.0066,
-     "strict_precision": 0.0351,
+     "strict_f1": 0.0065,
+     "strict_precision": 0.0345,
      "strict_recall": 0.0036
     }
    },
@@ -257,18 +259,18 @@
     "gold": 1659,
     "mask_to_gold_ratio": 0.0792,
     "masked_f2": 0.0514,
-    "masked_precision": 0.1566,
+    "masked_precision": 0.1557,
     "masked_recall": 0.044,
     "mention_exposure_rate": 0.9777,
     "overmask_rate": 0.0162,
-    "partial_f1": 0.0208,
-    "partial_precision": 0.1111,
+    "partial_f1": 0.0207,
+    "partial_precision": 0.1092,
     "partial_recall": 0.0115,
-    "pred": 171,
+    "pred": 174,
     "repeated_exposed_rate": 0.9306,
     "repeated_values": 72,
-    "strict_f1": 0.0066,
-    "strict_precision": 0.0351,
+    "strict_f1": 0.0065,
+    "strict_precision": 0.0345,
     "strict_recall": 0.0036
    },
    "pii": {
@@ -341,13 +343,13 @@
     "partial": {
      "by_label": {
       "LOCATION": {
-       "f1": 0.0106,
+       "f1": 0.0105,
        "gold": 523,
        "gold_found": 3,
        "gold_masked": 9,
        "masked_recall": 0.0172,
-       "precision": 0.0732,
-       "pred": 41,
+       "precision": 0.0698,
+       "pred": 43,
        "pred_correct": 3,
        "recall": 0.0057
       },
@@ -368,8 +370,8 @@
        "gold_found": 14,
        "gold_masked": 19,
        "masked_recall": 0.0257,
-       "precision": 0.144,
-       "pred": 125,
+       "precision": 0.1429,
+       "pred": 126,
        "pred_correct": 18,
        "recall": 0.0189
       }
@@ -392,8 +394,8 @@
        "gold_found": 4,
        "gold_masked": 30,
        "masked_recall": 0.0452,
-       "precision": 0.0833,
-       "pred": 60,
+       "precision": 0.0794,
+       "pred": 63,
        "pred_correct": 5,
        "recall": 0.006
       },
@@ -415,8 +417,8 @@
       "gold_found": 19,
       "gold_masked": 72,
       "masked_recall": 0.0434,
-      "precision": 0.1361,
-      "pred": 169,
+      "precision": 0.1337,
+      "pred": 172,
       "pred_correct": 23,
       "recall": 0.0115
      }
@@ -424,10 +426,10 @@
     "strict": {
      "by_label": {
       "LOCATION": {
-       "f1": 0.0035460992907801413,
+       "f1": 0.003533568904593639,
        "false_negatives": 522,
-       "false_positives": 40,
-       "precision": 0.024390243902439025,
+       "false_positives": 42,
+       "precision": 0.023255813953488372,
        "recall": 0.0019120458891013384,
        "true_positives": 1
       },
@@ -440,10 +442,10 @@
        "true_positives": 2
       },
       "PERSON": {
-       "f1": 0.006936416184971099,
+       "f1": 0.006928406466512702,
        "false_negatives": 737,
-       "false_positives": 122,
-       "precision": 0.024,
+       "false_positives": 123,
+       "precision": 0.023809523809523808,
        "recall": 0.004054054054054054,
        "true_positives": 3
       }
@@ -460,7 +462,7 @@
       "hi": {
        "f1": 0.0,
        "false_negatives": 664,
-       "false_positives": 60,
+       "false_positives": 63,
        "precision": 0.0,
        "recall": 0.0,
        "true_positives": 0
@@ -475,10 +477,10 @@
       }
      },
      "overall": {
-      "f1": 0.006564551422319475,
+      "f1": 0.006553795740032769,
       "false_negatives": 1653,
-      "false_positives": 163,
-      "precision": 0.03550295857988166,
+      "false_positives": 166,
+      "precision": 0.03488372093023256,
       "recall": 0.003616636528028933,
       "true_positives": 6
      }
@@ -510,18 +512,18 @@
     "gold": 1659,
     "mask_to_gold_ratio": 0.0792,
     "masked_f2": 0.0514,
-    "masked_precision": 0.1566,
+    "masked_precision": 0.1557,
     "masked_recall": 0.044,
     "mention_exposure_rate": 0.9777,
     "overmask_rate": 0.0162,
-    "partial_f1": 0.0208,
-    "partial_precision": 0.1111,
+    "partial_f1": 0.0207,
+    "partial_precision": 0.1092,
     "partial_recall": 0.0115,
-    "pred": 171,
+    "pred": 174,
     "repeated_exposed_rate": 0.9306,
     "repeated_values": 72,
-    "strict_f1": 0.0066,
-    "strict_precision": 0.0351,
+    "strict_f1": 0.0065,
+    "strict_precision": 0.0345,
     "strict_recall": 0.0036
    }
   },
@@ -850,7 +852,7 @@
       "char_precision": 0.2885,
       "char_recall": 0.0236,
       "char_survival": 0.9644,
-      "chrf": 0.6934,
+      "chrf": 0.6933,
       "clean_doc_fp_rate": 0.2439,
       "clean_docs": 41,
       "complete_exposure_rate": 0.9533,
@@ -859,15 +861,15 @@
       "exact_visible_rate": 0.9533,
       "gold": 664,
       "mask_to_gold_ratio": 0.0816,
-      "masked_f2": 0.055,
-      "masked_precision": 0.1908,
+      "masked_f2": 0.0549,
+      "masked_precision": 0.1875,
       "masked_recall": 0.0467,
       "mention_exposure_rate": 0.9714,
       "overmask_rate": 0.0148,
       "partial_f1": 0.011,
-      "partial_precision": 0.0667,
+      "partial_precision": 0.0635,
       "partial_recall": 0.006,
-      "pred": 60,
+      "pred": 63,
       "repeated_exposed_rate": 0.8919,
       "repeated_values": 37,
       "strict_f1": 0.0,
@@ -917,13 +919,13 @@
      "doc_leak_rate": 0.9851,
      "exact_visible_rate": 0.9564,
      "mask_to_gold_ratio": 0.08,
-     "masked_f2": 0.0508,
-     "masked_precision": 0.1565,
+     "masked_f2": 0.0507,
+     "masked_precision": 0.1554,
      "masked_recall": 0.0436,
      "mention_exposure_rate": 0.9785,
      "overmask_rate": 0.0167,
      "partial_f1": 0.0217,
-     "partial_precision": 0.1117,
+     "partial_precision": 0.1106,
      "partial_recall": 0.012,
      "repeated_exposed_rate": 0.9506,
      "strict_f1": 0.0071,
@@ -946,18 +948,18 @@
      "gold": 1659,
      "mask_to_gold_ratio": 0.0792,
      "masked_f2": 0.0514,
-     "masked_precision": 0.1566,
+     "masked_precision": 0.1557,
      "masked_recall": 0.044,
      "mention_exposure_rate": 0.9777,
      "overmask_rate": 0.0162,
-     "partial_f1": 0.0208,
-     "partial_precision": 0.1111,
+     "partial_f1": 0.0207,
+     "partial_precision": 0.1092,
      "partial_recall": 0.0115,
-     "pred": 171,
+     "pred": 174,
      "repeated_exposed_rate": 0.9306,
      "repeated_values": 72,
-     "strict_f1": 0.0066,
-     "strict_precision": 0.0351,
+     "strict_f1": 0.0065,
+     "strict_precision": 0.0345,
      "strict_recall": 0.0036
     }
    },
@@ -977,18 +979,18 @@
     "gold": 1659,
     "mask_to_gold_ratio": 0.0792,
     "masked_f2": 0.0514,
-    "masked_precision": 0.1566,
+    "masked_precision": 0.1557,
     "masked_recall": 0.044,
     "mention_exposure_rate": 0.9777,
     "overmask_rate": 0.0162,
-    "partial_f1": 0.0208,
-    "partial_precision": 0.1111,
+    "partial_f1": 0.0207,
+    "partial_precision": 0.1092,
     "partial_recall": 0.0115,
-    "pred": 171,
+    "pred": 174,
     "repeated_exposed_rate": 0.9306,
     "repeated_values": 72,
-    "strict_f1": 0.0066,
-    "strict_precision": 0.0351,
+    "strict_f1": 0.0065,
+    "strict_precision": 0.0345,
     "strict_recall": 0.0036
    },
    "pii": {
@@ -1061,13 +1063,13 @@
     "partial": {
      "by_label": {
       "LOCATION": {
-       "f1": 0.0106,
+       "f1": 0.0105,
        "gold": 523,
        "gold_found": 3,
        "gold_masked": 9,
        "masked_recall": 0.0172,
-       "precision": 0.0732,
-       "pred": 41,
+       "precision": 0.0698,
+       "pred": 43,
        "pred_correct": 3,
        "recall": 0.0057
       },
@@ -1088,8 +1090,8 @@
        "gold_found": 14,
        "gold_masked": 19,
        "masked_recall": 0.0257,
-       "precision": 0.144,
-       "pred": 125,
+       "precision": 0.1429,
+       "pred": 126,
        "pred_correct": 18,
        "recall": 0.0189
       }
@@ -1112,8 +1114,8 @@
        "gold_found": 4,
        "gold_masked": 30,
        "masked_recall": 0.0452,
-       "precision": 0.0833,
-       "pred": 60,
+       "precision": 0.0794,
+       "pred": 63,
        "pred_correct": 5,
        "recall": 0.006
       },
@@ -1135,8 +1137,8 @@
       "gold_found": 19,
       "gold_masked": 72,
       "masked_recall": 0.0434,
-      "precision": 0.1361,
-      "pred": 169,
+      "precision": 0.1337,
+      "pred": 172,
       "pred_correct": 23,
       "recall": 0.0115
      }
@@ -1144,10 +1146,10 @@
     "strict": {
      "by_label": {
       "LOCATION": {
-       "f1": 0.0035460992907801413,
+       "f1": 0.003533568904593639,
        "false_negatives": 522,
-       "false_positives": 40,
-       "precision": 0.024390243902439025,
+       "false_positives": 42,
+       "precision": 0.023255813953488372,
        "recall": 0.0019120458891013384,
        "true_positives": 1
       },
@@ -1160,10 +1162,10 @@
        "true_positives": 2
       },
       "PERSON": {
-       "f1": 0.006936416184971099,
+       "f1": 0.006928406466512702,
        "false_negatives": 737,
-       "false_positives": 122,
-       "precision": 0.024,
+       "false_positives": 123,
+       "precision": 0.023809523809523808,
        "recall": 0.004054054054054054,
        "true_positives": 3
       }
@@ -1180,7 +1182,7 @@
       "hi": {
        "f1": 0.0,
        "false_negatives": 664,
-       "false_positives": 60,
+       "false_positives": 63,
        "precision": 0.0,
        "recall": 0.0,
        "true_positives": 0
@@ -1195,10 +1197,10 @@
       }
      },
      "overall": {
-      "f1": 0.006564551422319475,
+      "f1": 0.006553795740032769,
       "false_negatives": 1653,
-      "false_positives": 163,
-      "precision": 0.03550295857988166,
+      "false_positives": 166,
+      "precision": 0.03488372093023256,
       "recall": 0.003616636528028933,
       "true_positives": 6
      }
@@ -1230,18 +1232,18 @@
     "gold": 1659,
     "mask_to_gold_ratio": 0.0792,
     "masked_f2": 0.0514,
-    "masked_precision": 0.1566,
+    "masked_precision": 0.1557,
     "masked_recall": 0.044,
     "mention_exposure_rate": 0.9777,
     "overmask_rate": 0.0162,
-    "partial_f1": 0.0208,
-    "partial_precision": 0.1111,
+    "partial_f1": 0.0207,
+    "partial_precision": 0.1092,
     "partial_recall": 0.0115,
-    "pred": 171,
+    "pred": 174,
     "repeated_exposed_rate": 0.9306,
     "repeated_values": 72,
-    "strict_f1": 0.0066,
-    "strict_precision": 0.0351,
+    "strict_f1": 0.0065,
+    "strict_precision": 0.0345,
     "strict_recall": 0.0036
    }
   }

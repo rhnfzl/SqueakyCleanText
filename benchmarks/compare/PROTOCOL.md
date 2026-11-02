@@ -92,7 +92,11 @@ benchmarking only, no redistribution).
 Dropped: nothing in the shortlist top 8 fails the "offline, Linux, CPU or <= 6 GB GPU" bar.
 scrubadub and DataTrove moved to reserve to keep 8 entries (both run, both narrow). Out
 already: NeMo Anonymizer / LLMPiiModifier (need an LLM endpoint or a 70B model), cloud APIs
-(not offline), LLM Guard (archived, Python < 3.13), small-LLM redactors (rewrite text, no spans).
+(not offline), LLM Guard (archived, Python < 3.13), small-LLM redactors (rewrite text, no spans),
+NeMo Curator 1.x (no PII stage; the 0.x one was English-only Presidio), StarPII (gated
+evaluation-only terms, no redistribution) and deduce (GPL-3.0; benchmark use only): neither is an
+entry here. Published scores are compared only at the same unit: OPF's published 96% F1 is per
+token, its per-span F1 is 0.926.
 
 ## 3. Tracks and the configuration contract
 
@@ -296,6 +300,16 @@ is scored on the whole doc anyway.
   accuracy is reported (SCT LID vs gold), and unsupported-language behaviour is listed per
   entry (which languages the entry claims; scored languages outside the claim are flagged).
 - Code-switched data: bayanat `ar-mixed_en` reported separately.
+- **Claimed languages (permanent rule, every round).** Each entry claims a language set
+  (`entries.CLAIMED_LANGUAGES`, from the model card's language tags at the pinned revision; `None`
+  = no claim: regex tools and SCT's multilingual default). Round 1: nvidia/gliner-PII en;
+  bardsai-v3 the 24 official EU languages; gliner2-fastino en fr es de it pt nl; opf en ("primarily
+  English"); presidio en (only `en_core_web_lg` is loaded, both tracks); sct-gliner en (the
+  knowledgator model card; SCT's regex layer is language-agnostic). A code is matched on its base
+  (`pt_br` -> pt, `ar-mixed_en` -> ar). Every headline and pairwise score uses only the documents in
+  languages the entry (both entries, for a pair) claims; scores in other languages are reported
+  apart as "outside claimed languages" and are never shown or counted as plain losses
+  (`runner.rule_views`, `report.own_table`, `°` in the per-language tables).
 - `runner.py --track gold|native` (default gold) applies one track to every entry
   (`entries.GOLD_TRACK`; DataFog gets its locale pack in gold); a results table never mixes them.
 
@@ -311,7 +325,8 @@ is scored on the whole doc anyway.
   aggregated separately; never one pooled number across both.
 - Per-language quota: 300 test docs per language per dataset (fewer where the test part is
   smaller: REDACT 27-40 per language, TAB 106).
-- "Out-of-domain only" averages exclude cells with any exposure in section 16.
+- Headline and same-set averages follow section 17's rule (clean cells only) and section 12's
+  claimed-language rule.
 
 ## 14. Uncertainty (rule 12)
 
@@ -378,8 +393,26 @@ that appear in the PIIMB test sets, not ours. Argilla is a slice of the ai4priva
 TRAIN split, so any model trained on that split may have seen the exact records. SCT's D
 marks are the datasets used in SCT's earlier benchmark rounds; `gretel_en` and
 `argilla_pii` were added after SCT 0.8.1 and are held out for SCT (no tuning on them,
-dev included, until this comparison is published). The headline "out-of-domain" table uses
-only cells marked `-` for that entry.
+dev included, until this comparison is published).
+
+**Contamination rule (decision 21, permanent, every round, SCT included).** If a tool, or any
+model inside it, was trained on a dataset or its family (T), or was developed or tuned against it
+(E: the vendor evaluates on it; D: SCT developed against it), that cell is **excluded** from that
+tool's comparison. `entries.status` gives `excluded` (any T, E or D), `unknown` (U only: training
+data undisclosed) or `clean` (`-`). Reported:
+
+1. Headline: each tool on its own clean cells (claimed languages, section 12), with a 95%
+   bootstrap CI (`summary["own"]`).
+2. Same-set: the datasets clean for every tool compared (`summary["same_set"]`). When there is
+   none, the report says so and gives pairwise same-set tables: SCT vs each tool on the datasets
+   clean for both, languages both claim, paired bootstrap (`summary["pairwise"][...]["clean"]`).
+3. Unknown cells (U: opf, the knowledgator model in sct-gliner) are shown separately, labelled
+   "unknown", never as clean (`own[...]["unknown"]`, `pairwise[...]["unknown"]`).
+4. Excluded cells may be shown for information only, marked: in parentheses in the per-dataset
+   tables, bold in the matrix; they never enter an average that is compared.
+
+SCT is held to the same rule: its D cells are excluded, so in round 1 its clean cells are only
+gretel_en and argilla_pii. Round 2 needs fresh datasets that no entry (SCT included) has seen.
 
 ## 18. Annotation audit (rule 10)
 
@@ -409,7 +442,7 @@ summary.
 | # | rule | where | status |
 |---|---|---|---|
 | 1 | freeze tuning before testing | 1, 3 | split implemented; budget and freeze defined |
-| 2 | contamination matrix | 17 | done from cards |
+| 2 | contamination matrix | 17 | done from cards; decision 21 rule (T/E/D excluded, U apart) |
 | 3 | PII vs NER | 1 | NER sets in a separate table |
 | 4 | three coverage views | 4 | defined (`supports` in `entries.py`) |
 | 5 | over-masking | 8 | defined; downstream utility only as chrF (no downstream task model) |
@@ -458,9 +491,9 @@ failing with no output at all abort the rest (`aborted`). Raw outputs (they hold
 stay in `benchmarks/.cache/compare/`. The bundle gets, per entry x dataset part: completion,
 failure kinds, the three views (each with `compare` per-language/macro/micro, `effective`
 with failed docs unmasked, `with_date`, and the `score.py` report), the threshold curve, native
-leaks, contamination flag, sample-id hash; `summary.json` has the group aggregates (with an
-out-of-domain variant using only `-` cells) and the paired bootstrap of the baseline (SCT)
-minus each entry. Not yet built: the common chunker (section 11) and the PR/leak plots.
+leaks, contamination flag, sample-id hash; `summary.json` has the group aggregates (all datasets, information
+only), the per-dataset paired bootstrap of the baseline (SCT) minus each entry, and the
+section 17 rule views (`own`, `same_set`, `pairwise`). Not yet built: the common chunker (section 11) and the PR/leak plots.
 
 ## Change log
 
@@ -500,3 +533,18 @@ minus each entry. Not yet built: the common chunker (section 11) and the PR/leak
   `masked_precision` joined `scorer.HEADLINE`. Both tracks were rescored from the same raw outputs
   (no inference): aggregates, per-dataset bootstraps and per-entry files are byte-for-byte the same
   scores. Report: `COMPARISON.md` in the bundle.
+- 2026-11-03 (rules): decision 21 and the claimed-language rule applied to every table, as
+  permanent rules (sections 12, 13, 17). `entries.status` replaces `entries.in_domain` (T/E only,
+  D and U stayed in): T, E and D cells are now excluded, U-only cells are "unknown".
+  `entries.CLAIMED_LANGUAGES` / `claims`. `runner.rule_views` writes `summary["own"]`,
+  `["same_set"]` and `["pairwise"]` (replacing `paired_macro` and the ":out-of-domain" aggregate);
+  `report.py` writes the own-clean headline, same-set and pairwise tables, per-language tables with
+  out-of-claim cells marked, and marks excluded / unknown cells everywhere else; the pooled
+  all-datasets quality table is gone.
+  Scoring fix (`scorer.recover_dropped`, SCT entries, `recover_dropped` in `entries.py`): SCT spans
+  come from placeholders found in its output, so a source copy whose placeholder a later cleaning
+  step removed (the link text of `[a@b.se](mailto:a@b.se)`, repeated names merged into one
+  placeholder) was scored as leaked though no character of it is visible. A copy of a value SCT
+  masked elsewhere in the doc now counts as masked when neither the value nor any 3+ char word of
+  it is in SCT's output and the copy is a whole token. `runner.py --no-recover` gives the round-1
+  mapping; both are reported. Both tracks rescored from the ec0fae9 raw outputs (no inference).

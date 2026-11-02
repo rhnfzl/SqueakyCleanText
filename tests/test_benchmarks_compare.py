@@ -570,9 +570,8 @@ def test_report_tables_from_a_tiny_bundle(tmp_path):
                                                             "by_language": {"en": {"masked_recall": 0.6}}}}}}))
     (tmp_path / "tuned" / "x" / "offset-check.json").write_text("{}")
     out = report.tables(tmp_path)
-    assert "| x | 0.900 | 0.800 | 0.850 | 0.200 | 0.700 | n/a (0) |" in out
     assert "| x | 10 | 1 | tab 0.900 |" in out
-    assert "| x | tab | - | 0 |" in out  # baseline significantly better on tab
+    assert "| x | - | - | 0 | 1 |" in out  # tab is excluded (D) for the baseline: counted, not compared
     assert "| tab | 0.500 |" in out
     assert "| en | tab | 0.600 |" in out
 
@@ -603,19 +602,73 @@ def test_macro_bootstrap_is_the_mean_over_datasets():
     assert single["metrics"] == scorer.macro_bootstrap({"x": (one, docs("x", 30, False))}, samples=50)["metrics"]
 
 
-def test_in_domain_flags():
-    assert entries.in_domain("bardsai-v3", "argilla_pii")  # T-family
-    assert entries.in_domain("gliner-nvidia", "gretel_en")  # E
-    assert not entries.in_domain("sct-default", "openpii")  # D stays in
-    assert not entries.in_domain("opf", "tab")  # U stays in
+def test_contamination_status_and_claimed_languages():
+    assert entries.status("bardsai-v3", "argilla_pii") == "excluded"  # T-family
+    assert entries.status("gliner-nvidia", "gretel_en") == "excluded"  # E
+    assert entries.status("sct-default", "openpii") == "excluded"  # D: SCT is held to the same rule
+    assert entries.status("sct-default", "gretel_en") == "clean"
+    assert entries.status("opf", "tab") == "unknown" and entries.status("sct-gliner", "gretel_en") == "unknown"
+    assert entries.status("sct-gliner", "tab") == "excluded"  # U, D
+    assert entries.claims("gliner-nvidia", "en") and not entries.claims("gliner-nvidia", "de")
+    assert entries.claims("bardsai-v3", "pt_eu") and not entries.claims("bardsai-v3", "ja")
+    assert entries.claims("sct-default", "th") and entries.claims("gliner2-fastino", "fr_ca")
 
 
-def test_headline_table_reports_entry_minus_sct(tmp_path):
+def test_recover_dropped_copies_only_when_no_copy_is_visible():
+    text = "E-post: [ann@x.io](mailto:ann@x.io) and ann@x.io"
+    placed = [span(26, 34, "EMAIL")]  # only the URL copy was placed from the output
+    spans, added = scorer.recover_dropped(text, "E-post: (mailto:<EMAIL_1>) and <EMAIL_2>", placed)
+    assert added == 2 and [(s["start"], s["end"]) for s in spans] == [(9, 17), (26, 34), (40, 48)]
+    assert scorer.recover_dropped(text, "E-post: (mailto:<EMAIL_1>) and ann@x.io", placed) == (placed, 0)
+    glued = "ann@x.io and xann@x.io"  # a copy inside a longer token is not a copy
+    assert scorer.recover_dropped(glued, "<EMAIL_0> and x<EMAIL_1>", [span(0, 8, "EMAIL")])[1] == 0
+    records = [gold_record("a", text=text, spans=[span(9, 17, "email"), span(26, 34, "email"), span(40, 48, "email")])]
+    outputs = {"a": {"id": "a", "spans": placed, "masked_text": "E-post: (mailto:<EMAIL_1>) and <EMAIL_2>"}}
+    views = scorer.views_for(("EMAIL",), ("EMAIL",), ("EMAIL",))
+    plain, _ = scorer.score_run(records, outputs, {"EMAIL": "EMAIL"}, MAP, views)
+    fixed, _ = scorer.score_run(records, outputs, {"EMAIL": "EMAIL"}, MAP, views, recover=True)
+    assert plain["views"]["full"]["compare"]["micro"]["masked_recall"] == round(1 / 3, 4)
+    assert fixed["views"]["full"]["compare"]["micro"]["masked_recall"] == 1.0 and fixed["recovered_dropped_copies"] == 2
+
+
+def test_rule_views_clean_cells_claims_same_set_and_pairwise():
+    def docs(prefix, langs, hit):
+        return [(f"{prefix}{i}", f"{prefix}{i}", lang, scorer.doc_stats(
+            gold_record(f"{prefix}{i}", spans=[span(0, 7, "person")]), [span(0, 7, "PERSON")] if hit else [], MAP))
+            for i, lang in enumerate(langs)]
+
+    def entry(hit_en, hit_de):
+        return {d: {"full": docs(d, ["en"] * 10, hit_en) + docs(d + "-de", ["de"] * 10, hit_de)}
+                for d in ("gretel_en", "gretel", "nemotron")}
+
+    per_doc = {"sct-default": entry(True, True), "gliner-nvidia": entry(True, False), "presidio": entry(False, False)}
+    out = runner.rule_views(per_doc, "sct-default", views=("full",), samples=20)
+    sct = out["own"]["sct-default"]["full"]["privacy-synthetic"]
+    assert sct["clean"]["datasets"] == ["gretel_en"] and sct["excluded"]["datasets"] == ["gretel", "nemotron"]
+    nv = out["own"]["gliner-nvidia"]["full"]["privacy-synthetic"]
+    assert nv["clean"]["datasets"] == ["gretel"] and nv["clean"]["ci"]["masked_recall"]["value"] == 1.0  # en only
+    assert nv["clean"]["outside_claim"]["macro"]["masked_recall"] == 0.0  # de reported apart
+    assert out["same_set"]["full"]["privacy-synthetic"]["all"]["datasets"] == []  # none clean for all three
+    others = out["same_set"]["full"]["privacy-synthetic"]["others"]
+    assert others["datasets"] == ["gretel"] and set(others["scores"]) == {"gliner-nvidia", "presidio"}
+    assert "gliner-nvidia" not in out["pairwise"]  # no set clean for both SCT and nvidia
+    pr = out["pairwise"]["presidio"]["full"]["privacy-synthetic"]["clean"]
+    assert pr["datasets"] == ["gretel_en"] and pr["metrics"]["masked_recall"]["b"] == 0.0
+
+
+def test_pairwise_and_own_tables(tmp_path):
     from benchmarks.compare import report
 
     m = {"a": 0.9, "b": 0.8, "a_ci": [0.88, 0.92], "b_ci": [0.78, 0.82], "diff_ci": [0.05, 0.15], "excludes_zero": True}
-    summary = {"paired_macro": {"x": {"full": {"privacy-real": {"datasets": ["tab", "redact"],
-                                                                "metrics": {"masked_recall": m}}}}}}
-    lines = report.headline_table(summary, tmp_path, "full", "privacy-real")
-    assert lines[2].startswith("| sct-default | 2 | 0.900 [0.880, 0.920]")
-    assert "| x | 2 | 0.800 (-0.150, -0.050)* |" in lines[3] and "not run" in lines[3]
+    clean = {"datasets": ["tab"], "outside_claim": None, "ci": {"masked_recall": {"value": 0.8, "ci": [0.7, 0.9]}}}
+    summary = {"own": {"sct-default": {"full": {"privacy-real": {"excluded": {"datasets": ["tab"], "claimed": {
+                   "datasets": ["tab"], "macro": {"masked_recall": 0.95}}}}}},
+                       "x": {"full": {"privacy-real": {"clean": clean}}}},
+               "pairwise": {"x": {"full": {"privacy-real": {"clean": {"datasets": ["tab", "redact"],
+                                                                      "metrics": {"masked_recall": m}}}}}}}
+    lines = report.pairwise_table(summary, "full", "privacy-real")
+    assert "| x | tab, redact | 0.800 (-0.150, -0.050)* |" in lines[2]
+    own = report.own_table(summary, tmp_path, "full", "privacy-real")
+    assert own[2].startswith("| x | none (1) | 0.800 [0.700, 0.900] |")
+    assert own[3].startswith("| sct-default | none (0) | - |") and "((0.950 (1))" not in own[3] and "(0.950 (1))" in own[3]
+    assert report.same_set_table({}, "full", "privacy-real", "all")[0].startswith("No dataset")

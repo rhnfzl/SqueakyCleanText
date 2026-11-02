@@ -86,6 +86,33 @@ def merge_same_type(spans: list[dict]) -> list[dict]:
     return sorted(merged, key=lambda s: (s["start"], s["end"]))
 
 
+def recover_dropped(text: str, masked_text: str, spans: list[dict]) -> tuple[list[dict], int]:
+    """Add the source copies of a masked value that the tool's own output no longer holds anywhere.
+
+    SCT spans come from placeholders found in its output; a placeholder a later cleaning step removed
+    (the link text of ``[a@b.se](mailto:a@b.se)`` becomes ``<EMAIL_0>`` and is then dropped) leaves its
+    source copy unmapped, so the copy scored as leaked although no character of it is visible. A copy is
+    added only when neither the value nor any 3+ char word of it is in the output (``leak`` finds nothing,
+    so no copy can still be visible, even in part) and it is a whole token (no letter or digit glued on).
+    Returns the merged spans and the number of copies added.
+    """
+    extra = []
+    for value, label in {(text[s["start"]:s["end"]], s["label"]) for s in spans}:
+        if len(value.strip()) < 4 or leak(value, masked_text) or leak(" ".join(value.split()), masked_text):
+            continue
+        at = text.find(value)
+        while at >= 0:
+            end = at + len(value)
+            if not (at and text[at - 1].isalnum()) and not (end < len(text) and text[end].isalnum()):
+                extra.append({"start": at, "end": end, "label": label, "score": None})
+            at = text.find(value, at + 1)
+    if not extra:
+        return spans, 0
+    before = covered(len(text), spans)
+    added = sum(1 for e in extra if not all(before[e["start"]:e["end"]]))
+    return merge_same_type(spans + extra), added
+
+
 def covered(length: int, spans: list[dict]) -> bytearray:
     flags = bytearray(length)
     for s in spans:
@@ -342,20 +369,24 @@ def native_leak(records: list[dict], outputs: dict[str, dict], mapping: dict[str
 
 def score_run(records: list[dict], outputs: dict[str, dict], labels: dict[str, str], mapping: dict[str, str],
               views: dict[str, tuple], curve_view: str = "shared", curve_floor: float | None = None,
-              curve_by_filter: bool = True) -> tuple[dict, dict]:
+              curve_by_filter: bool = True, recover: bool = False) -> tuple[dict, dict]:
     """Score one entry on one dataset part. Returns ``(result, per_doc)``.
 
     *outputs* maps every record id to its adapter line. *views* maps a view name to its SCT
     types. ``per_doc[view]`` is ``[(id, group, lang, Counter)]`` over ALL docs with failed docs
     scored as unmasked (effective protection): the input of ``paired_bootstrap``.
     *curve_floor* is the threshold the adapter ran at; ``curve_by_filter=False`` (scores that
-    are not the decoder's operating point, e.g. OPF bias presets) reports no curve.
+    are not the decoder's operating point, e.g. OPF bias presets) reports no curve. *recover* adds the
+    copies the tool removed from its own output (``recover_dropped``; SCT entries).
     """
     failed = {r["id"] for r in records if "error" in outputs[r["id"]]}
     completed = [r for r in records if r["id"] not in failed]
-    mapped, out_of_scope = {}, 0
+    mapped, out_of_scope, recovered = {}, 0, 0
     for r in records:
         spans, dropped = map_spans([] if r["id"] in failed else outputs[r["id"]]["spans"], labels)
+        if recover and r["id"] not in failed and "masked_text" in outputs[r["id"]]:
+            spans, added = recover_dropped(r["text"], outputs[r["id"]]["masked_text"], spans)
+            recovered += added
         mapped[r["id"]], out_of_scope = spans, out_of_scope + dropped
     result = {
         "documents": len(records), "completed": len(completed), "completion_rate": _round(_r(len(completed), len(records))),
@@ -363,6 +394,7 @@ def score_run(records: list[dict], outputs: dict[str, dict], labels: dict[str, s
         "failure_kinds": dict(Counter(failure_kind(outputs[i]["error"]) for i in failed)),
         "out_of_scope_tool_spans": out_of_scope,
         "unplaced_spans": sum(outputs[r["id"]].get("unplaced", 0) for r in records),
+        "recovered_dropped_copies": recovered if recover else None,
         "views": {},
     }
     per_doc = {}

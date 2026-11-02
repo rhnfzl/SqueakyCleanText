@@ -47,14 +47,14 @@ ENTRIES = {
         "package": "SqueakyCleanText==0.8.1", "checkpoint": "sct DEFAULT_NER_MODELS (xlm-r conll ONNX, wikineural ONNX)",
         "revision": "sct/config.py DEFAULT_NER_REVISIONS", "config": "TextCleanerConfig() + reversible scoring mode",
         "threshold": "SCT default", "mask": "SCT placeholder", "device": "cpu", "gpu_gb": 0,
-        "labels": SCT_LABELS, "supports": SCT_TYPES,
+        "labels": SCT_LABELS, "supports": SCT_TYPES, "recover_dropped": True,
     },
     "sct-gliner": {
         "package": "SqueakyCleanText[gliner]==0.8.1",
         "checkpoint": "knowledgator/gliner-pii-base-v1.0 (PyTorch: no root model.onnx in the repo, SCT falls back)",
         "revision": "61726e0ad791dcab3e29339bbec3ad42ded65641", "config": "TextCleanerConfig(ner_mode='pii')",
         "threshold": "SCT default", "mask": "SCT placeholder", "device": "cpu|cuda", "gpu_gb": 1,
-        "labels": SCT_LABELS, "supports": SCT_TYPES,
+        "labels": SCT_LABELS, "supports": SCT_TYPES, "recover_dropped": True,
     },
     "presidio": {
         "package": "presidio-analyzer==2.2.366 spacy==3.8.18 en_core_web_lg==3.8.0", "checkpoint": "en_core_web_lg",
@@ -188,9 +188,28 @@ def contamination(entry: str, dataset: str) -> str:
     return flags.get(dataset, flags["*"])
 
 
-def in_domain(entry: str, dataset: str) -> bool:
-    """T (trained on it, or its generator family) or E (vendor evaluates on it): excluded from the headline.
-
-    D (SCT developed against it) and U (undisclosed) stay in, flagged in the matrix (PROTOCOL.md section 17).
+def status(entry: str, dataset: str) -> str:
+    """Decision 21 (PROTOCOL.md section 17): ``excluded`` (T, E or D: the tool or a model in it was trained,
+    evaluated or developed on the set or its family), ``unknown`` (U only: training data undisclosed), else ``clean``.
     """
-    return any(flag.strip()[:1] in ("T", "E") for flag in contamination(entry, dataset).split(","))
+    flags = {flag.strip()[:1] for flag in contamination(entry, dataset).split(",")}
+    return "excluded" if flags & {"T", "E", "D"} else "unknown" if "U" in flags else "clean"
+
+
+# PROTOCOL.md section 12, rule 2: languages each entry claims (model card language tags; None = no
+# language claim: regex, or SCT's multilingual default). Scores outside the claim are reported apart.
+EU24 = ("bg", "cs", "da", "de", "el", "en", "es", "et", "fi", "fr", "ga", "hr", "hu", "it", "lt", "lv", "mt", "nl",
+        "pl", "pt", "ro", "sk", "sl", "sv")
+CLAIMED_LANGUAGES = {
+    "sct-default": None, "sct-gliner": ("en",),  # knowledgator/gliner-pii-base-v1.0 card: en
+    "presidio": ("en",),  # en_core_web_lg only, in both tracks
+    "gliner-nvidia": ("en",), "gliner2-fastino": ("en", "fr", "es", "de", "it", "pt", "nl"),
+    "opf": ("en",),  # "primarily English"
+    "bardsai-v3": EU24, "datafog": None,
+}
+
+
+def claims(entry: str, lang: str) -> bool:
+    """Is a gold language code (``pt_br``, ``ar-mixed_en``) inside the entry's claimed languages?"""
+    claimed = CLAIMED_LANGUAGES.get(entry)
+    return claimed is None or lang.replace("_", "-").split("-")[0] in claimed

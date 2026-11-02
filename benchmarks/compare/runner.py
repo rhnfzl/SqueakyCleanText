@@ -263,6 +263,80 @@ def _write(path: Path, data) -> None:
     path.write_text(json.dumps(data, indent=1, ensure_ascii=False, sort_keys=True) + "\n", encoding="utf-8")
 
 
+def _pick(docs: list, keep) -> list:
+    return [x for x in docs if keep(x[2])]
+
+
+def _agg(per_doc: dict, datasets, keep) -> dict | None:
+    """Group macro over *datasets* using only the docs whose language passes *keep*; None when no doc does."""
+    chosen = {d: [(lang, c) for _, _, lang, c in _pick(per_doc[d], keep)] for d in datasets}
+    chosen = {d: v for d, v in chosen.items() if v}
+    return scorer.aggregate(chosen) if chosen else None
+
+
+def rule_views(per_doc: dict, baseline: str, views=("shared", "full"), samples: int = scorer.BOOTSTRAP_SAMPLES) -> dict:
+    """Decision 21 + claimed languages (PROTOCOL.md sections 12, 17), from ``per_doc[entry][dataset][view]``.
+
+    - ``own[entry][view][group]``: per contamination status (clean / unknown / excluded) the datasets and the
+      group macro on the entry's claimed languages (``claimed``) and outside them (``outside_claim``); the
+      clean, claimed cell (the headline) carries a 95% bootstrap CI (``ci``).
+    - ``same_set[view][group][pool]``: datasets clean for every entry of the pool, languages all of them claim
+      (``all``: every entry; ``others``: the non-SCT entries with a clean set in the group). Empty: none.
+    - ``pairwise[entry][view][group]``: baseline minus entry, paired bootstrap, on the datasets clean for both
+      (``clean``) and on those clean or unknown for both with at least one unknown (``unknown``), languages
+      both claim.
+    """
+    own: dict = {}
+    pairwise: dict = {}
+    same_set: dict = {}
+    entries = list(per_doc)
+    for view in views:
+        for group, members in scorer.GROUPS.items():
+            present = [d for d in members if all(d in per_doc[e] for e in entries)]
+            for e in entries:
+                cells = own.setdefault(e, {}).setdefault(view, {})
+                by_doc = {d: per_doc[e][d][view] for d in members if d in per_doc[e]}
+                if not by_doc:
+                    continue
+                cell = {}
+                mine = (lambda lang, e=e: registry.claims(e, lang))  # noqa: E731
+                for status in ("clean", "unknown", "excluded"):
+                    sets = [d for d in by_doc if registry.status(e, d) == status]
+                    if not sets:
+                        continue
+                    cell[status] = {"datasets": sets,
+                                    "claimed": _agg(by_doc, sets, mine),
+                                    "outside_claim": _agg(by_doc, sets, lambda lang, mine=mine: not mine(lang))}
+                    if status == "clean" and cell[status]["claimed"]:
+                        pairs = {d: (v, v) for d in sets if (v := _pick(by_doc[d], mine))}
+                        res = scorer.macro_bootstrap(pairs, samples=samples)["metrics"]
+                        cell[status]["ci"] = {k: {"value": m["a"], "ci": m["a_ci"]} for k, m in res.items()}
+                cells[group] = cell
+            others = [e for e in entries if e != baseline and not e.startswith("sct")
+                      and any(registry.status(e, d) == "clean" for d in present)]
+            for pool, chosen in (("all", entries), ("others", others)):
+                sets = [d for d in present if chosen and all(registry.status(e, d) == "clean" for e in chosen)]
+                keep = (lambda lang, chosen=chosen: all(registry.claims(e, lang) for e in chosen))  # noqa: E731
+                scores = {e: _agg({d: per_doc[e][d][view] for d in sets}, sets, keep) for e in chosen} if sets else {}
+                same_set.setdefault(view, {}).setdefault(group, {})[pool] = {
+                    "entries": chosen, "datasets": sets, "scores": {e: a for e, a in scores.items() if a}}
+            base = per_doc.get(baseline, {})
+            for e in entries:
+                if e == baseline:
+                    continue
+                keep = (lambda lang, e=e: registry.claims(e, lang) and registry.claims(baseline, lang))  # noqa: E731
+                both = [d for d in members if d in base and d in per_doc[e]]
+                statuses = {d: {registry.status(e, d), registry.status(baseline, d)} for d in both}
+                for kind, sets in (("clean", [d for d in both if statuses[d] == {"clean"}]),
+                                   ("unknown", [d for d in both if statuses[d] in ({"unknown"}, {"clean", "unknown"})])):
+                    pairs = {d: (a, b) for d in sets
+                             if (a := _pick(base[d][view], keep)) and (b := _pick(per_doc[e][d][view], keep))}
+                    if pairs:
+                        pairwise.setdefault(e, {}).setdefault(view, {}).setdefault(group, {})[kind] = {
+                            "datasets": list(pairs), **scorer.macro_bootstrap(pairs, samples=samples)}
+    return {"own": own, "same_set": same_set, "pairwise": pairwise}
+
+
 def main(argv=None) -> None:
     parser = argparse.ArgumentParser(description=(__doc__ or "").splitlines()[0])
     parser.add_argument("--entries", nargs="+", required=True)
@@ -292,6 +366,8 @@ def main(argv=None) -> None:
     parser.add_argument("--hf-hub-cache", help="HF_HUB_CACHE for the adapters")
     parser.add_argument("--reuse", action="store_true", help="score cached raw outputs when their cache key matches")
     parser.add_argument("--skip-offset-check", action="store_true")
+    parser.add_argument("--no-recover", action="store_true",
+                        help="score without recovered dropped copies (scorer.recover_dropped): the round-1 mapping")
     args = parser.parse_args(argv)
 
     pythons = dict(item.split("=", 1) for item in args.python)
@@ -361,7 +437,8 @@ def main(argv=None) -> None:
             views = scorer.views_for(t["supports"], shared, registry.SCT_TYPES)
             result, docs = scorer.score_run(records, outputs, t["labels"], DATASET_LABELS[dataset], views,
                                             curve_floor=curve_floor(config, t),
-                                            curve_by_filter=t.get("curve_by_filter", True))
+                                            curve_by_filter=t.get("curve_by_filter", True),
+                                            recover=t.get("recover_dropped", False) and not args.no_recover)
             per_doc[name][dataset] = docs
             ids = sorted(r["id"] for r in records)
             result.update(meta, dataset={"name": dataset, "source": module.HF_ID, "revision": module.REVISION,
@@ -387,8 +464,6 @@ def main(argv=None) -> None:
                 chosen = {d: [(lang, c) for _, _, lang, c in by_dataset[d][view]] for d in members if d in by_dataset}
                 if chosen:
                     agg[group] = scorer.aggregate(chosen)
-                    clean = {d: v for d, v in chosen.items() if registry.contamination(name, d) == "-"}
-                    agg[group + ":out-of-domain"] = scorer.aggregate(clean) if clean else None
             summary["aggregate"][name][view] = agg
     base = per_doc.get(args.baseline, {})
     for name, by_dataset in per_doc.items():
@@ -398,16 +473,10 @@ def main(argv=None) -> None:
             if dataset in base:
                 summary["paired"].setdefault(name, {})[dataset] = scorer.paired_bootstrap(base[dataset]["shared"],
                                                                                           docs["shared"])
-        for view in ("shared", "full"):  # headline CIs: group macro over the datasets in-domain for neither side
-            for group, members in scorer.GROUPS.items():
-                kept = [d for d in members if d in by_dataset and d in base
-                        and not registry.in_domain(name, d) and not registry.in_domain(args.baseline, d)]
-                if kept:
-                    res = scorer.macro_bootstrap({d: (base[d][view], by_dataset[d][view]) for d in kept})
-                    summary.setdefault("paired_macro", {}).setdefault(name, {}).setdefault(view, {})[group] = {
-                        "datasets": kept, **res}
+    summary.update(rule_views(per_doc, args.baseline))
     summary["paired_note"] = (f"a = {args.baseline}, b = entry, effective protection (failed docs unmasked); paired: "
-                              "shared view per dataset; paired_macro: group macro without in-domain (T/E) datasets")
+                              "shared view per dataset, every cell; own / same_set / pairwise: decision 21 and the "
+                              "claimed-language rule (PROTOCOL.md sections 12 and 17)")
     _write(args.out / "summary.json", summary)
     print(args.out / "summary.json")
 
