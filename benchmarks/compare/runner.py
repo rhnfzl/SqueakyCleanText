@@ -398,7 +398,16 @@ def main(argv=None) -> None:
             if dataset in base:
                 summary["paired"].setdefault(name, {})[dataset] = scorer.paired_bootstrap(base[dataset]["shared"],
                                                                                           docs["shared"])
-    summary["paired_note"] = f"a = {args.baseline}, b = entry, shared view, effective protection (failed docs unmasked)"
+        for view in ("shared", "full"):  # headline CIs: group macro over the datasets in-domain for neither side
+            for group, members in scorer.GROUPS.items():
+                kept = [d for d in members if d in by_dataset and d in base
+                        and not registry.in_domain(name, d) and not registry.in_domain(args.baseline, d)]
+                if kept:
+                    res = scorer.macro_bootstrap({d: (base[d][view], by_dataset[d][view]) for d in kept})
+                    summary.setdefault("paired_macro", {}).setdefault(name, {}).setdefault(view, {})[group] = {
+                        "datasets": kept, **res}
+    summary["paired_note"] = (f"a = {args.baseline}, b = entry, effective protection (failed docs unmasked); paired: "
+                              "shared view per dataset; paired_macro: group macro without in-domain (T/E) datasets")
     _write(args.out / "summary.json", summary)
     print(args.out / "summary.json")
 

@@ -566,13 +566,15 @@ def test_report_tables_from_a_tiny_bundle(tmp_path):
     (tmp_path / "tuned" / "summary.json").write_text(json.dumps(summary))
     (tmp_path / "tuned" / "x" / "tab-test.json").write_text(json.dumps(
         {"documents": 10, "completed": 9, "flag_low_completion": True, "completion_rate": 0.9,
-         "dataset": {"name": "tab"}, "views": {"full": {"compare": {"macro": {"masked_f2": 0.5}}}}}))
+         "dataset": {"name": "tab"}, "views": {"full": {"compare": {"macro": {"masked_f2": 0.5},
+                                                            "by_language": {"en": {"masked_recall": 0.6}}}}}}))
     (tmp_path / "tuned" / "x" / "offset-check.json").write_text("{}")
     out = report.tables(tmp_path)
     assert "| x | 0.900 | 0.800 | 0.850 | 0.200 | 0.700 | n/a (0) |" in out
     assert "| x | 10 | 1 | tab 0.900 |" in out
     assert "| x | tab | - | 0 |" in out  # baseline significantly better on tab
     assert "| tab | 0.500 |" in out
+    assert "| en | tab | 0.600 |" in out
 
 
 def test_vm_hwm_reads_proc_status_or_gives_none():
@@ -584,3 +586,36 @@ def test_vm_hwm_reads_proc_status_or_gives_none():
     assert speed.vm_hwm_mb(2**22 + 12345) is None  # no such process
     own = speed.vm_hwm_mb(os.getpid())
     assert own is None if not sys.platform.startswith("linux") else own > 0
+
+
+def test_macro_bootstrap_is_the_mean_over_datasets():
+    def docs(prefix, n, hit):
+        return [(f"{prefix}{i}", f"{prefix}{i}", "en",
+                 scorer.doc_stats(gold_record(f"{prefix}{i}", spans=[span(0, 7, "person")]),
+                                  [span(0, 7, "PERSON")] if hit else [], MAP)) for i in range(n)]
+
+    one = docs("x", 30, True)
+    pairs = {"x": (one, one), "y": (docs("y", 5, False), docs("y", 5, True))}
+    out = scorer.macro_bootstrap(pairs, samples=100)["metrics"]["masked_recall"]
+    assert out["a"] == 0.5 and out["b"] == 1.0  # mean of datasets, not pooled over 35 docs
+    assert out["diff_ci"] == [-0.5, -0.5] and out["excludes_zero"]
+    single = scorer.paired_bootstrap(one, docs("x", 30, False), samples=50)
+    assert single["metrics"] == scorer.macro_bootstrap({"x": (one, docs("x", 30, False))}, samples=50)["metrics"]
+
+
+def test_in_domain_flags():
+    assert entries.in_domain("bardsai-v3", "argilla_pii")  # T-family
+    assert entries.in_domain("gliner-nvidia", "gretel_en")  # E
+    assert not entries.in_domain("sct-default", "openpii")  # D stays in
+    assert not entries.in_domain("opf", "tab")  # U stays in
+
+
+def test_headline_table_reports_entry_minus_sct(tmp_path):
+    from benchmarks.compare import report
+
+    m = {"a": 0.9, "b": 0.8, "a_ci": [0.88, 0.92], "b_ci": [0.78, 0.82], "diff_ci": [0.05, 0.15], "excludes_zero": True}
+    summary = {"paired_macro": {"x": {"full": {"privacy-real": {"datasets": ["tab", "redact"],
+                                                                "metrics": {"masked_recall": m}}}}}}
+    lines = report.headline_table(summary, tmp_path, "full", "privacy-real")
+    assert lines[2].startswith("| sct-default | 2 | 0.900 [0.880, 0.920]")
+    assert "| x | 2 | 0.800 (-0.150, -0.050)* |" in lines[3] and "not run" in lines[3]

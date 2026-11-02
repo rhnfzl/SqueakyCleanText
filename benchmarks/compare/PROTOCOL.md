@@ -492,3 +492,11 @@ minus each entry. Not yet built: the common chunker (section 11) and the PR/leak
   presidio and bardsai-v3. `speed.py` now reads `/proc/<pid>/status` VmHWM while the adapter runs
   (`peak_rss_mb`; the getrusage value is kept as `peak_rss_mb_getrusage`). Those three entries
   were rerun at 16 threads with the fix (`speed-16t-rss`); entries above 2 GB were unaffected.
+- 2026-11-02 (report): headline CIs at group level. Section 14 asks for CIs on the headline (group
+  macro), but the runner only bootstrapped per dataset. `scorer.macro_bootstrap` resamples groups
+  within each dataset and recomputes the macro over datasets; the runner stores it as
+  `summary["paired_macro"][entry][view][group]` for the shared and full views, over the datasets that
+  are in-domain (T or E, `entries.in_domain`) for neither side. D and U cells stay in (flagged).
+  `masked_precision` joined `scorer.HEADLINE`. Both tracks were rescored from the same raw outputs
+  (no inference): aggregates, per-dataset bootstraps and per-entry files are byte-for-byte the same
+  scores. Report: `COMPARISON.md` in the bundle.

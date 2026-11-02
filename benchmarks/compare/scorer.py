@@ -50,7 +50,8 @@ CHRF_BETA = 2
 BOOTSTRAP_SAMPLES = 1000
 SEED = 13
 TUNING = ("masked_f2", "masked_recall", "masked_precision", "char_f2", "doc_leak_rate", "overmask_rate")
-HEADLINE = ("masked_recall", "partial_f1", "strict_f1", "char_f2", "char_survival", "doc_leak_rate", "overmask_rate")
+HEADLINE = ("masked_recall", "masked_precision", "partial_f1", "strict_f1", "char_f2", "char_survival", "doc_leak_rate",
+            "overmask_rate")
 # PROTOCOL.md sections 1 and 13: never pooled across these groups.
 GROUPS = {
     "privacy-synthetic": ("openpii", "gretel", "gretel_en", "nemotron", "argilla_pii", "thai_pii", "bayanat"),
@@ -414,31 +415,49 @@ def paired_bootstrap(a: list[tuple], b: list[tuple], names=HEADLINE, samples: in
     A difference counts only when its 95% CI excludes 0 (``excludes_zero``); the metric decides
     whether higher or lower is better.
     """
-    if [x[0] for x in a] != [x[0] for x in b]:
-        raise ValueError("paired bootstrap needs the same docs in the same order")
-    keys = sorted(set().union(*(x[3] for x in a), *(x[3] for x in b)))
-    groups = {g: i for i, g in enumerate(dict.fromkeys(x[1] for x in a))}
-    langs = {lang: i for i, lang in enumerate(sorted({x[2] for x in a}))}
-    mats = []
-    for side in (a, b):
-        m = np.zeros((len(langs), len(groups), len(keys)))  # per language, so each draw is a language macro
-        for _, group, lang, c in side:
-            m[langs[lang], groups[group]] += [c[k] for k in keys]
-        mats.append(m)
+    out = macro_bootstrap({"": (a, b)}, names, samples, seed)
+    out["doc_leak_mcnemar"] = mcnemar([x[3]["docs_exposed"] > 0 for x in a], [x[3]["docs_exposed"] > 0 for x in b])
+    return out
 
-    def score(m, weights):
-        return macro([metrics(Counter(dict(zip(keys, (weights @ per_lang).tolist())))) for per_lang in m])
+
+def macro_bootstrap(pairs: dict[str, tuple[list, list]], names=HEADLINE, samples: int = BOOTSTRAP_SAMPLES,
+                    seed: int = SEED) -> dict:
+    """Paired bootstrap of A minus B on the macro over datasets, as ``aggregate`` scores a group.
+
+    *pairs* maps a dataset to its ``(a, b)`` ``per_doc`` lists. Each draw resamples groups within
+    every dataset independently (datasets are separate samples) and recomputes each dataset's
+    language macro, then the mean over datasets. One dataset gives the per-dataset bootstrap.
+    """
+    prepared = []
+    for a, b in pairs.values():
+        if [x[0] for x in a] != [x[0] for x in b]:
+            raise ValueError("paired bootstrap needs the same docs in the same order")
+        keys = sorted(set().union(*(x[3] for x in a), *(x[3] for x in b)))
+        groups = {g: i for i, g in enumerate(dict.fromkeys(x[1] for x in a))}
+        langs = {lang: i for i, lang in enumerate(sorted({x[2] for x in a}))}
+        mats = []
+        for side in (a, b):
+            m = np.zeros((len(langs), len(groups), len(keys)))  # per language, so each draw is a language macro
+            for _, group, lang, c in side:
+                m[langs[lang], groups[group]] += [c[k] for k in keys]
+            mats.append(m)
+        prepared.append((keys, len(groups), mats))
+
+    def score(side, weights):
+        return macro([macro([metrics(Counter(dict(zip(keys, (w @ per_lang).tolist())))) for per_lang in mats[side]])
+                      for (keys, _, mats), w in zip(prepared, weights, strict=True)])
 
     rng = np.random.default_rng(seed)
     draws: dict[str, list] = {n: [] for n in names}
     for _ in range(samples):
-        weights = np.bincount(rng.integers(0, len(groups), len(groups)), minlength=len(groups))
-        ma, mb = (score(m, weights) for m in mats)
+        weights = [np.bincount(rng.integers(0, n, n), minlength=n) for _, n, _ in prepared]
+        ma, mb = score(0, weights), score(1, weights)
         for n in names:
             if ma.get(n) is not None and mb.get(n) is not None:
                 draws[n].append((ma[n], mb[n], ma[n] - mb[n]))
-    point_a, point_b = (score(m, np.ones(len(groups))) for m in mats)
-    out = {"groups": len(groups), "samples": samples, "seed": seed, "metrics": {}}
+    ones = [np.ones(n) for _, n, _ in prepared]
+    point_a, point_b = score(0, ones), score(1, ones)
+    out = {"groups": sum(n for _, n, _ in prepared), "samples": samples, "seed": seed, "metrics": {}}
     for n, rows in draws.items():
         if not rows:
             continue
@@ -447,7 +466,6 @@ def paired_bootstrap(a: list[tuple], b: list[tuple], names=HEADLINE, samples: in
         out["metrics"][n] = {"a": point_a.get(n), "b": point_b.get(n),
                              "a_ci": [round(lo[0], 4), round(hi[0], 4)], "b_ci": [round(lo[1], 4), round(hi[1], 4)],
                              "diff_ci": [round(lo[2], 4), round(hi[2], 4)], "excludes_zero": bool(lo[2] > 0 or hi[2] < 0)}
-    out["doc_leak_mcnemar"] = mcnemar([x[3]["docs_exposed"] > 0 for x in a], [x[3]["docs_exposed"] > 0 for x in b])
     return out
 
 

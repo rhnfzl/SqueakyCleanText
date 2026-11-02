@@ -186,3 +186,11 @@ CONTAMINATION = {
 def contamination(entry: str, dataset: str) -> str:
     flags = CONTAMINATION.get(entry, {"*": "-"})
     return flags.get(dataset, flags["*"])
+
+
+def in_domain(entry: str, dataset: str) -> bool:
+    """T (trained on it, or its generator family) or E (vendor evaluates on it): excluded from the headline.
+
+    D (SCT developed against it) and U (undisclosed) stay in, flagged in the matrix (PROTOCOL.md section 17).
+    """
+    return any(flag.strip()[:1] in ("T", "E") for flag in contamination(entry, dataset).split(","))
