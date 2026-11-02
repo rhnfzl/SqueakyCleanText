@@ -1,0 +1,1 @@
+--8<-- "benchmarks/README.md"

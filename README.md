@@ -9,6 +9,8 @@ Real-world text is messy: broken encoding, HTML, URLs, and personal data such as
 
 It finds most personal data, not all of it. Check its output before you publish sensitive data.
 
+Documentation: <https://rhnfzl.github.io/SqueakyCleanText/>
+
 ## Before and after
 
 ```python
@@ -47,6 +49,7 @@ Python 3.12 or newer. The base install runs NER with ONNX Runtime; it needs no P
 
 Install with `pip install "squeakycleantext[gpu,synthetic]"`. All extras: [docs/INSTALL.md](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/INSTALL.md).
 
+<!-- --8<-- [start:quickstart] -->
 ## Quickstart
 
 ```python
@@ -74,6 +77,7 @@ for r in cleaner.process_batch(["Mail jan@example.nl", "Bel +31 20 123 4567 voor
 ```
 
 For more PII types (IDs, bank numbers, health data and more), use the GLiNER PII model with `TextCleaner(cfg=TextCleanerConfig(ner_mode="pii"))`. It needs the `gliner` extra.
+<!-- --8<-- [end:quickstart] -->
 
 ## How it works
 
