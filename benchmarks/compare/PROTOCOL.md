@@ -467,3 +467,22 @@ minus each entry. Not yet built: the common chunker (section 11) and the PR/leak
 - 2026-11-02: protocol written; splits computed (seed 13, dev share 0.2).
 - 2026-11-02: harness built (adapter contract, runner, scorer, speed runner); no change to
   any frozen rule. Doc leak rate uses "a letter or digit of a mention survives" as the exposure rule.
+- 2026-11-02: test runs (frozen configs from ec0fae9). Gold-language track only, both config
+  tracks (default, tuned), all 8 entries, all 14 datasets, 300 docs per language. Every entry on
+  CPU (same device as tuning; torch wheels see no GPU on the box, section 3), 4 jobs at a time on
+  16 cores each within 0-63, 16 threads. Entries whose tuned config equals the default (presidio,
+  bardsai-v3, datafog) reuse the default raw outputs through the cache key. One rescoring pass
+  over all entries per track gives `summary.json` and the paired bootstrap. Speed: one entry at a
+  time on cores 0-15 (16 threads), seeded random order, 3 repeats, FineWeb-2 speed sample cut to
+  10 docs per language (100 docs; 100 per language would take hours for the CPU-bound models),
+  then a single-thread run on core 0 with 3 docs per language (30 docs). Speed uses each entry's default
+  config (native language routing). The native language track, the common chunker, the matched
+  operating points (masked recall 0.90/0.95) and the blind annotation audit were not run.
+  `report.py` writes the summary tables from a bundle.
+  Run notes: another job of the same user (outside this comparison) held cores 60-63 during the
+  quality runs, which slowed the sct-gliner default run; its remaining datasets were rerun on
+  cores 0-15 (finished datasets reused from the cache; quality does not depend on core
+  placement). The sct-gliner tuned track and the speed runs used their own free 16-core slots.
+  The paired bootstrap is on the shared view (EMAIL, PHONE, NUMBER: DATE out), as the runner
+  computes it; predictions (spans + ids, scores-and-ids datasets only, 75 MB per track) stay
+  on the server with their sha256 in the bundle manifest.

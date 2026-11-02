@@ -551,3 +551,25 @@ def test_tune_grid_budget_select_and_frozen_config(tmp_path):
     assert chosen["threshold"] == 0.3 and chosen["config"] == {"threshold": 0.3}  # tie: grid order
     assert chosen["datasets"] == ["gretel_en", "redact"] and len(chosen["candidates"]) == 6
     assert curves["vendor"]["redact"][1]["threshold"] == 0.3
+
+
+def test_report_tables_from_a_tiny_bundle(tmp_path):
+    import json
+
+    from benchmarks.compare import report
+
+    m = {"masked_recall": 0.9, "masked_precision": 0.8, "masked_f2": 0.85, "doc_leak_rate": 0.2, "partial_f1": 0.7}
+    agg = {"datasets": ["tab"], "macro": m, "micro": m}
+    summary = {"aggregate": {"x": {"shared": {"privacy-real": agg, "privacy-real:out-of-domain": None}}},
+               "paired": {"x": {"tab": {"metrics": {"masked_recall": {"a": 0.95, "b": 0.9, "excludes_zero": True}}}}}}
+    (tmp_path / "tuned" / "x").mkdir(parents=True)
+    (tmp_path / "tuned" / "summary.json").write_text(json.dumps(summary))
+    (tmp_path / "tuned" / "x" / "tab-test.json").write_text(json.dumps(
+        {"documents": 10, "completed": 9, "flag_low_completion": True, "completion_rate": 0.9,
+         "dataset": {"name": "tab"}, "views": {"full": {"compare": {"macro": {"masked_f2": 0.5}}}}}))
+    (tmp_path / "tuned" / "x" / "offset-check.json").write_text("{}")
+    out = report.tables(tmp_path)
+    assert "| x | 0.900 | 0.800 | 0.850 | 0.200 | 0.700 | n/a (0) |" in out
+    assert "| x | 10 | 1 | tab 0.900 |" in out
+    assert "| x | tab | - | 0 |" in out  # baseline significantly better on tab
+    assert "| tab | 0.500 |" in out
