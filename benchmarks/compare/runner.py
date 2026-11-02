@@ -278,6 +278,7 @@ def main(argv=None) -> None:
                         help="use this interpreter instead of building the entry's venv")
     parser.add_argument("--config", action="append", default=[], metavar="ENTRY=JSON",
                         help="adapter config overrides (tuning on dev only; logged)")
+    parser.add_argument("--tuned", type=Path, help="frozen tune.py configs (tuned track), applied under --config")
     parser.add_argument("--baseline", default="sct-default", help="paired bootstrap: baseline minus each entry")
     parser.add_argument("--doc-timeout", type=float, default=120.0)
     parser.add_argument("--start-timeout", type=float, default=1800.0, help="model download + load allowance")
@@ -294,7 +295,10 @@ def main(argv=None) -> None:
     args = parser.parse_args(argv)
 
     pythons = dict(item.split("=", 1) for item in args.python)
-    overrides = {k: json.loads(v) for k, v in (item.split("=", 1) for item in args.config)}
+    tuned = json.loads(args.tuned.read_text())["entries"] if args.tuned else {}
+    overrides = {k: v["config"] for k, v in tuned.items()}
+    for k, v in (item.split("=", 1) for item in args.config):
+        overrides[k] = {**overrides.get(k, {}), **json.loads(v)}
     tools = {name: registry.tool(name, args.track) for name in args.entries}
     for name, t in tools.items():
         if t["adapter"] is None:
@@ -304,7 +308,9 @@ def main(argv=None) -> None:
     shared = scorer.shared_types([t for n, t in tools.items() if n not in registry.TEST_ENTRIES] or list(tools.values()),
                                  registry.SCT_TYPES)
     run_info = {"command": " ".join(["python -m benchmarks.compare.runner", *(argv or sys.argv[1:])]),
-                "part": args.part, "track": args.track, "n_per_language": args.n, "seed": args.seed, "threads": args.threads,
+                "part": args.part, "track": args.track,
+                "tuned": str(args.tuned) if args.tuned else None, "n_per_language": args.n, "seed": args.seed,
+                "threads": args.threads,
                 "cpus": args.cpus, "device": args.device, "gpu": gpu, "gpu_mem_gb": args.gpu_mem_gb,
                 "batch_size": args.batch_size, "doc_timeout": args.doc_timeout, "retries": args.retries,
                 "shared_types": list(shared), "environment": environment()}

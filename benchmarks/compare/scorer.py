@@ -19,6 +19,8 @@ None (N/A), never 0.
   touch out-of-view gold. Masked recall, char scores and leaks all read it, so a gold PERSON
   masked as NUMBER counts as masked everywhere, never masked in one metric and leaked in another.
 - masked recall: gold mentions overlapped by any prediction of the masking set.
+- masked precision / masked F2 (the dev tuning objective, PROTOCOL.md section 3): masking-set
+  predictions that overlap any in-view gold / all masking-set predictions; F2 of that and masked recall.
 - char: type-agnostic per-character P/R/F1/F2 over in-scope gold characters (masking set).
 - F scores come from counts (``(1+b2)TP / (b2*gold + pred)``): 0 when gold or predictions exist
   but nothing matches, None only when both are empty.
@@ -47,6 +49,7 @@ CHRF_ORDER = 6
 CHRF_BETA = 2
 BOOTSTRAP_SAMPLES = 1000
 SEED = 13
+TUNING = ("masked_f2", "masked_recall", "masked_precision", "char_f2", "doc_leak_rate", "overmask_rate")
 HEADLINE = ("masked_recall", "partial_f1", "strict_f1", "char_f2", "char_survival", "doc_leak_rate", "overmask_rate")
 # PROTOCOL.md sections 1 and 13: never pooled across these groups.
 GROUPS = {
@@ -135,6 +138,8 @@ def doc_stats(record: dict, spans: list[dict], mapping: dict[str, str], unplaced
                           & Counter((p["label"], p["start"], p["end"]) for p in kept)).values())
     c["partial_tp"] = _one_to_one(gold, kept)
     c["gold_masked"] = sum(any(overlaps(p, g) for p in masking) for g in gold)
+    c["masked_pred"] = len(masking)
+    c["masked_pred_hit"] = sum(any(overlaps(p, g) for g in gold) for p in masking)
     gold_chars, pred_chars = covered(len(text), gold), covered(len(text), masking)
     c["char_gold"], c["char_pred"] = sum(gold_chars), sum(pred_chars)
     c["char_tp"] = sum(1 for a, b in zip(gold_chars, pred_chars) if a and b)
@@ -209,6 +214,9 @@ def metrics(c: Counter) -> dict:
         "strict_precision": sp, "strict_recall": sr, "strict_f1": _fc(c["strict_tp"], c["pred"], c["gold"]),
         "partial_precision": pp, "partial_recall": pr, "partial_f1": _fc(c["partial_tp"], c["pred"], c["gold"]),
         "masked_recall": _r(c["gold_masked"], c["gold"]),
+        "masked_precision": _r(c["masked_pred_hit"], c["masked_pred"]),
+        "masked_f2": _f(_r(c["masked_pred_hit"], c["masked_pred"]) or 0.0, _r(c["gold_masked"], c["gold"]) or 0.0, 2)
+        if c["gold"] or c["masked_pred"] else None,
         "char_precision": cp, "char_recall": cr, "char_f1": _fc(c["char_tp"], c["char_pred"], c["char_gold"]),
         "char_f2": _fc(c["char_tp"], c["char_pred"], c["char_gold"], 2),
         "char_survival": _r(c["alnum_survived"], c["alnum"]),
@@ -286,6 +294,22 @@ def curve(records: list[dict], outputs: dict[str, dict], labels: dict[str, str],
     return rows
 
 
+def tuning_rows(records: list[dict], outputs: dict[str, dict], labels: dict[str, str], mapping: dict[str, str],
+                thresholds=(None,)) -> list[dict]:
+    """Dev tuning metrics per threshold: language macro over ALL docs, failed docs unmasked.
+
+    ``None`` is the run as decoded (no filter). Used by ``tune.py`` to pick one configuration.
+    """
+    rows = []
+    for t in thresholds:
+        docs = [(r["lang"], doc_stats(r, map_spans([] if "error" in outputs[r["id"]] else outputs[r["id"]]["spans"],
+                                                   labels, t)[0], mapping, outputs[r["id"]].get("unplaced", 0),
+                                      utility=False)) for r in records]
+        m = summarise(docs)["macro"]
+        rows.append({"threshold": t, **{k: m.get(k) for k in TUNING}})
+    return rows
+
+
 def operating_point(rows: list[dict], target_recall: float) -> float | None:
     """Highest threshold whose masked recall reaches *target_recall* (dev only), else None."""
     ok = [row["threshold"] for row in rows if (row["masked_recall"] or 0) >= target_recall]
@@ -360,6 +384,11 @@ def score_run(records: list[dict], outputs: dict[str, dict], labels: dict[str, s
     if curve_view in views:
         view_map = {k: v for k, v in mapping.items() if v in views[curve_view] and v != DATE}
         result["curve"] = curve(completed, outputs, labels, view_map, curve_floor) if curve_by_filter else None
+    if "full" in views:  # tuning objective: full taxonomy minus DATE, so a tool is tuned on everything it must mask
+        view_map = {k: v for k, v in mapping.items() if v in views["full"] and v != DATE}
+        scored = curve_by_filter and any(s.get("score") is not None for r in completed for s in outputs[r["id"]]["spans"])
+        grid = [None, *(t for t in THRESHOLDS if curve_floor is None or t >= curve_floor)] if scored else [None]
+        result["tuning"] = tuning_rows(records, outputs, labels, view_map, grid)
     if any(r.get("annotators") for r in records):  # TAB: DIRECT/QUASI full-coverage rule, every annotator
         result["tab_masking"] = masking_recall(records, mapped)  # failed docs have no spans: unmasked
     result["native"] = native_leak(records, outputs, mapping)

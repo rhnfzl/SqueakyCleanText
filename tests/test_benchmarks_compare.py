@@ -509,3 +509,40 @@ def test_c13_bootstrap_ci_describes_the_language_macro():
     out = scorer.paired_bootstrap(a, b, samples=200)["metrics"]["masked_recall"]
     assert out["a"] == out["b"] == 0.5  # macro, not micro (20/21 vs 1/21)
     assert out["diff_ci"][0] <= 0 <= out["diff_ci"][1] and not out["excludes_zero"]
+
+
+def test_masked_precision_f2_and_tuning_rows():
+    records = [gold_record("a", spans=[span(0, 7, "person"), span(25, 33, "email")]),
+               gold_record("b", spans=[span(0, 7, "person")], lang="de")]
+    outputs = {"a": {"id": "a", "spans": [span(0, 7, "per", 0.8), span(40, 44, "per", 0.2)]},
+               "b": {"id": "b", "spans": [], "error": "timeout"}}
+    m = scorer.metrics(scorer.doc_stats(records[0], scorer.map_spans(outputs["a"]["spans"], {"per": "PERSON"})[0], MAP))
+    assert m["masked_precision"] == 0.5 and m["masked_recall"] == 0.5
+    assert m["masked_f2"] == 0.5
+    rows = scorer.tuning_rows(records, outputs, {"per": "PERSON"}, MAP, (None, 0.5))
+    assert rows[0]["threshold"] is None and rows[0]["masked_recall"] == 0.25  # macro: en 0.5, de 0 (failed = unmasked)
+    assert rows[1]["masked_precision"] == 1.0  # the 0.2 false positive is filtered
+
+
+def test_tune_grid_budget_select_and_frozen_config(tmp_path):
+    from benchmarks.compare import tune
+
+    for entry in tune.GRID:
+        assert 1 <= len(tune.candidates(entry)) <= tune.BUDGET
+        assert set(tune.GRID[entry]["runs"]) and entry in entries.ENTRIES
+    assert tune.frozen_config("gliner-nvidia", "card", 0.3) == {"labels": "card", "threshold": 0.3}
+    assert tune.frozen_config("presidio", "en", None) == {}
+
+    def write(run, rows):
+        for d in ("gretel_en", "redact"):
+            path = tmp_path / f"bardsai-v3.{run}" / "bardsai-v3" / f"{d}-dev.json"
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(json.dumps({"tuning": rows, "completion_rate": 1.0}))
+
+    base = dict.fromkeys(scorer.TUNING, 0.5)
+    write("vendor", [{**base, "threshold": t, "masked_f2": f} for t, f in
+                     ((None, 0.6), (0.3, 0.7), (0.5, 0.7), (0.7, 0.4), (0.8, 0.3), (0.9, 0.2))])
+    chosen, curves = tune.select("bardsai-v3", tmp_path, ("gretel_en", "redact", "tab"))
+    assert chosen["threshold"] == 0.3 and chosen["config"] == {"threshold": 0.3}  # tie: grid order
+    assert chosen["datasets"] == ["gretel_en", "redact"] and len(chosen["candidates"]) == 6
+    assert curves["vendor"]["redact"][1]["threshold"] == 0.3
