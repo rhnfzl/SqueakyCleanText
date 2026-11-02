@@ -1,0 +1,3 @@
+# ProcessResult
+
+::: sct.ProcessResult

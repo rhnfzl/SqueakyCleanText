@@ -1,0 +1,3 @@
+# TextCleanerConfig
+
+::: sct.TextCleanerConfig

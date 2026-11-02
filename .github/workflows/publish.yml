@@ -111,12 +111,15 @@ jobs:
         version="${TAG#v}"
         awk -v v="$version" '
           $0 ~ "^## \\[?" v "[] ]" || $0 == "## " v || $0 == "## [" v "]" {f=1; next}
-          /^## / {if (f) exit}
+          /^##+ / {if (f) exit}
           f' CHANGELOG.md > notes.md
-        if [ ! -s notes.md ]; then
-          echo "::error::No CHANGELOG.md section for $version"
+        # Release page = the short summary at the top of the version's CHANGELOG section
+        # (the text before its first ### heading), plus a link to the full changelog.
+        if ! grep -q '[^[:space:]]' notes.md; then
+          echo "::error::CHANGELOG.md $version needs a short summary before its first ### heading"
           exit 1
         fi
+        printf '\nFull details: https://github.com/%s/blob/%s/CHANGELOG.md\n' "$GITHUB_REPOSITORY" "$TAG" >> notes.md
         if gh release view "$TAG" >/dev/null 2>&1; then
           gh release upload "$TAG" dist/* --clobber
         else

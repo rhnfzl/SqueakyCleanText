@@ -22,7 +22,7 @@ python -m scripts.evaluate_pii \
 ```
 
 The included starter corpus is synthetic and only checks the evaluation path.
-See [`evaluation/README.md`](../evaluation/README.md) for schemas and release rules.
+See [`evaluation/README.md`](https://github.com/rhnfzl/SqueakyCleanText/blob/main/evaluation/README.md) for schemas and release rules.
 
 ## Model candidates
 
