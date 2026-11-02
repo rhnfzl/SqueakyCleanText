@@ -2,9 +2,11 @@
 
 `draw_diagrams.py` (stdlib only) writes three diagrams to `resources/`, each as `.excalidraw` and `.svg`:
 
-- `sct_overview`: what SCT takes in, the five stages, what comes out, and where to run it.
+- `sct_overview`: what SCT takes in, the four stages in run order, what comes out, and where to call it from.
 - `sct_flow`: the pipeline in the order `sct/sct.py` runs it; dashed steps are off by default.
 - `sct_pii_modes`: one sentence in the three PII modes (real SCT 0.8.1 output).
+
+Colours mean the same in all three: blue repair, teal language, purple personal data, orange score, green output and scale.
 
 Rebuild from the repo root:
 
