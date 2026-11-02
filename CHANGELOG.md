@@ -4,6 +4,15 @@
 
 ### Behaviour changes
 
+- `url_trailing_punct_outside` (default `True`, legacy module global `URL_TRAILING_PUNCT_OUTSIDE`):
+  `. , ; : ! ? '` at the end of a URL path or query stay outside the URL unless more URL text
+  follows. 0.8.0 turned `Visit https://example.com/path. Next.` into `Visit <URL> Next.`,
+  losing the sentence's full stop; the 0.8.0 fix for a fully qualified host's final dot covered
+  only a bare host, not a path or query. In the 0.8.0 benchmark dumps, nemotron had 40 of 94
+  gold URLs run past the end (37 by `.`, 3 by `,`) and bayanat 3 of 31 (benchmark section 11);
+  nothing leaked, but strict URL F1 suffered. Format regex only. `/a.html`, `?a=1,2&b=3`,
+  `/v1.2/x`, `;jsessionid=` and `example.com./?q=` are unchanged. Not re-measured yet.
+  `False` restores the 0.8.0 URL rule.
 - `ner_snap_word_edges` (default `True`, legacy module global `NER_SNAP_WORD_EDGES`): a NER span
   whose start or end falls inside a word now moves out to the word edges before the ensemble
   vote, for every backend. 0.8.0 widened only WordPiece (`##`) models, so the SentencePiece

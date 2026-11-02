@@ -118,6 +118,7 @@ class TextCleaner:
 
         self.ProcessContacts = contact.ProcessContacts()
         self._html_regex = constants.HTML_REGEX if self.cfg.html_tag_strict else constants.HTML_REGEX_ANY
+        self._url_regex = constants.URL_REGEX if self.cfg.url_trailing_punct_outside else constants.URL_REGEX_LEGACY
         self.ProcessSpecialSymbols = special.ProcessSpecialSymbols()
         self.NormaliseText = normtext.NormaliseText()
 
@@ -869,18 +870,16 @@ class TextCleaner:
     def _replace_urls(self, text):
         reversible = self._replace_reversible(
             text,
-            constants.URL_REGEX,
+            self._url_regex,
             'URL',
         )
         if reversible is not None:
             return reversible
         if self._synthetic_replacer:
-            return self.ProcessContacts.replace_urls_with_fn(
-                text, lambda orig: self._emit('URL', orig, self._synthetic_replacer.get_replacement('URL', orig)),
+            return self._url_regex.sub(
+                lambda m: self._emit('URL', m.group(), self._synthetic_replacer.get_replacement('URL', m.group())), text,
             )
-        return self.ProcessContacts.replace_urls_with_fn(
-            text, lambda orig: self._emit('URL', orig, self.cfg.replace_with_url),
-        )
+        return self._url_regex.sub(lambda m: self._emit('URL', m.group(), self.cfg.replace_with_url), text)
 
     def _replace_emails(self, text):
         reversible = self._replace_reversible(

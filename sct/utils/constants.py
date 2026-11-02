@@ -269,51 +269,62 @@ _WIDE_PUNCT = re.escape(''.join(
     if unicodedata.category(chr(cp))[0] == 'P' and unicodedata.normalize('NFKC', chr(cp)) not in '/?#%&@:.-_'))
 
 # Fixed: Unicode ranges use actual Unicode escapes (not literal \\u in raw strings)
-URL_REGEX = re.compile(
-    # Only an ASCII letter or digit glues to the scheme, so a URL right after CJK/Thai text
-    # (請見https://..., ดูhttps://...) is still found.
-    r"(?:^|(?<![A-Za-z0-9_\/\.]))(?:"
-    # protocol identifier
-    r"(?:(?:https?:\/\/|ftp:\/\/|www\d{0,3}\.))"
-    # user:pass authentication; never across / ? # " < > so a later "@" in the
-    # query or the markup is not taken as user info
-    # (user up to the first ":", one way to split it, so a long run with no "@" fails in linear time)
-    r"(?:(?=[^\s/?#\"<>@])[^\s/?#\"<>@:]*(?::[^\s/?#\"<>@]*)?@)?" r"(?:"
-    # bracketed IPv6 host; private and loopback IPv4 hosts match too, so the whole
-    # URL (query values included) is replaced, not just the address
-    r"\[[0-9a-f:.]*:[0-9a-f:.]*\]" r"|"
-    # IPv4 host, whole: a longer octet (any decimal digit, "1௨3") or another label after it (any
-    # label start the host grammar below takes, "école" too) is a host name
-    rf"{_IPV4}(?![0-9{_DECIMAL}]|\.[{_IDN_CHAR}])"
-    r"|"
-    # host name (with proper Unicode support, beyond the BMP too); the label characters of an email
-    # domain, so CJK and full-width prose punctuation (，、「) glued after a host ends it
-    # (labels as X+(-+X+)*, as in EMAIL_REGEX, so a host with no TLD fails in linear time)
-    rf"{_IDN_RUN}(?:-+{_IDN_RUN})*"
-    # domain name
-    rf"(?:\.{_IDN_RUN}(?:-+{_IDN_RUN})*)*"
-    # TLD identifier (punycode first, so ".xn" alone never ends the host)
-    rf"(?:\.(?:xn--[a-z0-9-]*[a-z0-9]|(?:{_NO_GLUE}[{_IDN_LETTER}]){{2,}}))"
-    r"|" r"(?:(localhost))" r")"
-    # fully qualified host's final dot ("example.com./?q="), only when a path, port or query follows,
-    # so a sentence-ending period stays outside the URL
-    r"(?:\.(?=/|:\d|[?#][^\s\"<>]))?"
-    # port number
-    r"(?::\d{2,5}\b)?"
-    # resource path, or a query/fragment right after the host ("?id=", "#token=");
-    # " < > are never raw in a URL, so markup around it survives. A bare trailing "?"
-    # stays punctuation. CJK and full-width punctuation (，。！（ ・) ends it, as in an email
-    # domain, so CJK prose glued after a URL stays. ) ] } belong to the URL only when more URL text follows
-    # ("?f=(a)&email=...", "report(1).pdf", "a(b);jsessionid=", a run as in "/(S(id))/a.aspx"); RFC 3986
-    # sub-delimiters (but a possessive ') between bracket and text count as URL text, so a closing bracket
-    # around a URL stays outside it.
-    rf"(?:\/(?:{_NO_GLUE}[^\)\]\}}\s\"<>{_WIDE_PUNCT}]|[\)\]\}}]+(?=[.,;:!$*@]*[\w&=/?#%+~-]))*"
-    rf"|[?#](?:{_NO_GLUE}[^\)\]\}}\s\"<>{_WIDE_PUNCT}]|[\)\]\}}]+(?=[.,;:!$*@]*[\w&=/?#%+~-]))+)?"
-    # Safety net: a scheme-led run whose host fails the grammar above (a look-alike character in it) is
-    # still a URL up to a space or prose punctuation, so its query values never stay visible.
-    rf"|(?:https?|ftp):\/\/(?:{_NO_GLUE}[^\s\"<>{_WIDE_PUNCT}])+(?<=[^\W_]|[{MARKS}]))",
-    flags=re.UNICODE | re.IGNORECASE,
-)
+def _url_regex(trailing_punct_outside):
+    # url_trailing_punct_outside: . , ; : ! ? ' belong to a path or query only when more URL text
+    # follows ("/a.html", "?a=1,2&b=3"), so "see https://x.com/a/b." keeps its full stop as prose.
+    tail = r".,;:!?'" if trailing_punct_outside else ""
+    url_char = rf"{_NO_GLUE}[^{tail}\)\]\}}\s\"<>{_WIDE_PUNCT}]"
+    punct = rf"|[{tail}]+(?=[\)\]\}}]*{url_char})" if trailing_punct_outside else ""
+    path_char = rf"(?:{url_char}{punct}|[\)\]\}}]+(?=[.,;:!$*@]*[\w&=/?#%+~-]))"
+    return re.compile(
+        # Only an ASCII letter or digit glues to the scheme, so a URL right after CJK/Thai text
+        # (請見https://..., ดูhttps://...) is still found.
+        r"(?:^|(?<![A-Za-z0-9_\/\.]))(?:"
+        # protocol identifier
+        r"(?:(?:https?:\/\/|ftp:\/\/|www\d{0,3}\.))"
+        # user:pass authentication; never across / ? # " < > so a later "@" in the
+        # query or the markup is not taken as user info
+        # (user up to the first ":", one way to split it, so a long run with no "@" fails in linear time)
+        r"(?:(?=[^\s/?#\"<>@])[^\s/?#\"<>@:]*(?::[^\s/?#\"<>@]*)?@)?" r"(?:"
+        # bracketed IPv6 host; private and loopback IPv4 hosts match too, so the whole
+        # URL (query values included) is replaced, not just the address
+        r"\[[0-9a-f:.]*:[0-9a-f:.]*\]" r"|"
+        # IPv4 host, whole: a longer octet (any decimal digit, "1௨3") or another label after it (any
+        # label start the host grammar below takes, "école" too) is a host name
+        rf"{_IPV4}(?![0-9{_DECIMAL}]|\.[{_IDN_CHAR}])"
+        r"|"
+        # host name (with proper Unicode support, beyond the BMP too); the label characters of an email
+        # domain, so CJK and full-width prose punctuation (，、「) glued after a host ends it
+        # (labels as X+(-+X+)*, as in EMAIL_REGEX, so a host with no TLD fails in linear time)
+        rf"{_IDN_RUN}(?:-+{_IDN_RUN})*"
+        # domain name
+        rf"(?:\.{_IDN_RUN}(?:-+{_IDN_RUN})*)*"
+        # TLD identifier (punycode first, so ".xn" alone never ends the host)
+        rf"(?:\.(?:xn--[a-z0-9-]*[a-z0-9]|(?:{_NO_GLUE}[{_IDN_LETTER}]){{2,}}))"
+        r"|" r"(?:(localhost))" r")"
+        # fully qualified host's final dot ("example.com./?q="), only when a path, port or query follows,
+        # so a sentence-ending period stays outside the URL
+        r"(?:\.(?=/|:\d|[?#][^\s\"<>]))?"
+        # port number
+        r"(?::\d{2,5}\b)?"
+        # resource path, or a query/fragment right after the host ("?id=", "#token=");
+        # " < > are never raw in a URL, so markup around it survives. A bare trailing "?"
+        # stays punctuation. CJK and full-width punctuation (，。！（ ・) ends it, as in an email
+        # domain, so CJK prose glued after a URL stays. ) ] } belong to the URL only when more URL text follows
+        # ("?f=(a)&email=...", "report(1).pdf", "a(b);jsessionid=", a run as in "/(S(id))/a.aspx"); RFC 3986
+        # sub-delimiters (but a possessive ') between bracket and text count as URL text, so a closing bracket
+        # around a URL stays outside it.
+        rf"(?:\/{path_char}*|[?#]{path_char}+)?"
+        # Safety net: a scheme-led run whose host fails the grammar above (a look-alike character in it) is
+        # still a URL up to a space or prose punctuation, so its query values never stay visible.
+        rf"|(?:https?|ftp):\/\/(?:{_NO_GLUE}[^\s\"<>{_WIDE_PUNCT}])+(?<=[^\W_]|[{MARKS}]))",
+        flags=re.UNICODE | re.IGNORECASE,
+    )
+
+
+URL_REGEX = _url_regex(True)
+# 0.8.0 rule (url_trailing_punct_outside=False): a path or query takes trailing . , ; : ! ? '
+URL_REGEX_LEGACY = _url_regex(False)
 
 
 strange_double_quotes = [

@@ -55,9 +55,10 @@ def build_browser_manifest(config: TextCleanerConfig) -> dict[str, Any]:
     # Same reason for any token a later enabled rule would match
     # (an HTML token holding an email or URL, a URL token holding an email).
     html_regex = constants.HTML_REGEX if config.html_tag_strict else constants.HTML_REGEX_ANY
+    url_regex = constants.URL_REGEX if config.url_trailing_punct_outside else constants.URL_REGEX_LEGACY
     ordered = [
         ("html", html_regex, config.replace_with_html, config.check_replace_html),
-        ("url", constants.URL_REGEX, config.replace_with_url, config.check_replace_urls),
+        ("url", url_regex, config.replace_with_url, config.check_replace_urls),
         ("email", constants.EMAIL_REGEX, config.replace_with_email, config.check_replace_emails),
         ("ip", constants.IP_REGEX, config.replace_with_ips, config.check_replace_ips),
         ("date", constants.DATE_REGEX, config.replace_with_dates, config.check_replace_dates),
@@ -111,7 +112,7 @@ def build_browser_manifest(config: TextCleanerConfig) -> dict[str, Any]:
                 config.check_replace_html,
             ),
             "url": _rule(
-                constants.URL_REGEX,
+                url_regex,
                 config.replace_with_url,
                 config.check_replace_urls,
             ),

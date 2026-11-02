@@ -422,3 +422,40 @@ def test_html_tag_strict_off_restores_any_angle_span():
     assert out == "Contact Jo <HTML> today."
     js = build_browser_manifest(TextCleanerConfig(html_tag_strict=False))
     assert js["rules"]["html"]["pattern"].startswith("<.*?>")
+
+
+@pytest.mark.parametrize("text, url", [
+    ("Visit https://example.com/path. Next.", "https://example.com/path"),
+    ("See https://example.com/a/b.html. Next", "https://example.com/a/b.html"),
+    ("Go to https://x.com/p?q=1. Done", "https://x.com/p?q=1"),
+    ("https://x.com/path, then", "https://x.com/path"),
+    ("https://x.com/p; ok", "https://x.com/p"),
+    ("https://x.com/a! wow", "https://x.com/a"),
+    ("is it https://x.com/a? yes", "https://x.com/a"),
+    ("at https://x.com/a: here", "https://x.com/a"),
+    ("'https://x.com/a' said", "https://x.com/a"),
+    ("(https://x.com/a.) ok", "https://x.com/a"),
+    # punctuation inside the URL stays
+    ("get https://x.com/a.html now", "https://x.com/a.html"),
+    ("get https://x.com/p?a=1,2&b=3 now", "https://x.com/p?a=1,2&b=3"),
+    ("get https://x.com/v1.2/x now", "https://x.com/v1.2/x"),
+    ("get https://x.com/a;jsessionid=AB12 now", "https://x.com/a;jsessionid=AB12"),
+    ("get https://x.com/a(b);jsessionid=1 now", "https://x.com/a(b);jsessionid=1"),
+    ("get https://x.com/it's/x now", "https://x.com/it's/x"),
+    ("get https://portal.example.com./?email=a%40b.org now", "https://portal.example.com./?email=a%40b.org"),
+    ("Bare https://example.com. Next.", "https://example.com"),
+])
+def test_url_trailing_punct_stays_outside(text, url):
+    assert constants.URL_REGEX.search(text).group() == url
+    if text.startswith("'"):  # the cleaner drops the quotes themselves; the regex check above is the point
+        return
+    out = _cleaner(check_replace_numbers=False, check_remove_isolated_letters=False).process(text).lm_text
+    assert out == text.replace(url, "<URL>")
+
+
+def test_url_trailing_punct_outside_off_restores_080():
+    text = "Visit https://example.com/path. Next."
+    assert constants.URL_REGEX_LEGACY.search(text).group() == "https://example.com/path."
+    assert _cleaner(url_trailing_punct_outside=False).process(text).lm_text == "Visit <URL> Next."
+    js = build_browser_manifest(TextCleanerConfig(url_trailing_punct_outside=False))
+    assert js["rules"]["url"]["pattern"] == constants.URL_REGEX_LEGACY.pattern

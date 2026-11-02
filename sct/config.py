@@ -395,6 +395,9 @@ class TextCleanerConfig:
     # edges on every backend ("Salut" -> "Salute"), within the ner_subword_widen cap and
     # same-script rule; False = 0.8.0 spans
     ner_snap_word_edges: bool = True
+    # . , ; : ! ? ' end a URL path or query unless more URL text follows ("https://x.com/a. Next");
+    # False = 0.8.0, where the URL takes the sentence's full stop or comma
+    url_trailing_punct_outside: bool = True
 
     def __post_init__(self):
         if self.synthetic_reference_date is not None:
@@ -795,6 +798,7 @@ def _config_from_module_globals() -> TextCleanerConfig:
         html_tag_strict=getattr(m, 'HTML_TAG_STRICT', True),
         ner_merge_location_gap=getattr(m, 'NER_MERGE_LOCATION_GAP', 0),
         ner_snap_word_edges=getattr(m, 'NER_SNAP_WORD_EDGES', True),
+        url_trailing_punct_outside=getattr(m, 'URL_TRAILING_PUNCT_OUTSIDE', True),
         check_replace_currency_symbols=m.CHECK_REPLACE_CURRENCY_SYMBOLS,
         check_ner_process=m.CHECK_NER_PROCESS,
         check_remove_isolated_letters=m.CHECK_REMOVE_ISOLATED_LETTERS,
@@ -919,6 +923,7 @@ DATE_BUILTIN_MONTH_LANGUAGES = None
 HTML_TAG_STRICT = True
 NER_MERGE_LOCATION_GAP = 0
 NER_SNAP_WORD_EDGES = True
+URL_TRAILING_PUNCT_OUTSIDE = True
 GLINER_ONNX = False
 LANGUAGE = None
 
