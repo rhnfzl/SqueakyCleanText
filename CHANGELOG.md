@@ -127,11 +127,10 @@
   innermost `[...]` spans in fineweb-2 are still removed. Not measured end to end yet. Unspaced
   scripts (CJK, Thai) are held by the character limit only. Both limits `0` and
   `keep_json_braces=False` restore 0.8.0.
-- Dates: Thai month names (CLDR full names and dotted abbreviations) join the built-in month
-  data, so `24 ก.พ. 2562` and `14 กุมภาพันธ์ 2561` (Buddhist-era years) are one `<DATE>`; 0.8.0
-  left `<NUMBER> ก.พ. <NUMBER>`. New `date_builtin_month_languages` (default `None` = all, legacy
-  `DATE_BUILTIN_MONTH_LANGUAGES`) picks which built-in month languages apply; the seven 0.8.0 codes
-  restore 0.8.0. Month data only, no other Thai words (era markers, weekdays) are added.
+- Dates: new `date_builtin_month_languages` (default `None` = all, legacy
+  `DATE_BUILTIN_MONTH_LANGUAGES`) picks which built-in month languages apply. Thai month names
+  are not built in (no word lists); pass them with `custom_month_names` (`{"th": ("ก.พ.", ...)}`)
+  and `24 ก.พ. 2562` (Buddhist-era year) becomes one `<DATE>`.
 - Dates: new `date_month_name_slash_year` (default `True`, legacy `DATE_MONTH_NAME_SLASH_YEAR`):
   a month name, `/` and a 2- or 4-digit year is one `<DATE>` (`October/55`, `Oct/2019`); 0.8.0
   gave `October/<NUMBER>`. `False` restores 0.8.0.

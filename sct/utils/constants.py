@@ -406,13 +406,6 @@ MONTH_NAMES_MULTILINGUAL = {
     "gen": frozenset({"it"}), "mag": frozenset({"it"}),
     "giu": frozenset({"it"}), "lug": frozenset({"it"}),
     "ott": frozenset({"it"}),
-    # Thai (CLDR th, format wide and abbreviated); Buddhist-era years are plain 4 digits
-    **{name: frozenset({"th"}) for name in (
-        "มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน",
-        "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม",
-        "ม.ค.", "ก.พ.", "มี.ค.", "เม.ย.", "พ.ค.", "มิ.ย.",
-        "ก.ค.", "ส.ค.", "ก.ย.", "ต.ค.", "พ.ย.", "ธ.ค.",
-    )},
 }
 
 # Flat set for quick membership check (lowercase)
@@ -437,7 +430,6 @@ _LANG_TO_VOCAB = {
     "FRENCH": "fr",
     "PORTUGUESE": "pt",
     "ITALIAN": "it",
-    "THAI": "th",
 }
 
 # Per-language fuzzy vocabulary (full names only, len > 4)
