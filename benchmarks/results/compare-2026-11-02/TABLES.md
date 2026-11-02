@@ -241,3 +241,43 @@
 | opf | argilla_pii, tab, thai_pii | openpii | 10 |
 | presidio | argilla_pii, bayanat, gretel_en, nemotron, openpii, redact, tab, thai_pii, thainer | - | 5 |
 | sct-gliner | redact | openpii | 12 |
+
+## speed (speed-16t)
+
+device cpu, cpus 0-15, threads 16, 100 docs, 3 repeats, median; peak RSS from getrusage (on Linux it never reads below the runner's own ~2 GB: values at that floor are an upper bound)
+
+| entry | cold start s | latency median ms | p95 ms | batch-8 docs/s | chars/s | peak RSS MB | venv MB | failed |
+|---|---|---|---|---|---|---|---|---|
+| datafog | 0.101 | 0.32 | 2.2 | 1787 | 3.518e+06 | 2014 | 9.3 | 0 |
+| presidio | 1.504 | 20.61 | 118.8 | 27.39 | 5.392e+04 | 2014 | 11398.6 | 0 |
+| bardsai-v3 | 3.614 | 252.6 | 1106 | 2.523 | 4966 | 2014 | 5416.3 | 0 |
+| sct-default | 8.372 | 610 | 2192 | 1.495 | 2943 | 7692 | 473.7 | 0 |
+| sct-gliner | 7.378 | 836.4 | 5656 | 0.529 | 1042 | 6414 | 5769.2 | 0 |
+| gliner2-fastino | 6.666 | 196 | 7431 | 0.524 | 1032 | 6832 | 5402.3 | 0 |
+| opf | 4.371 | 639.2 | 4913 | 0.293 | 577.1 | 2.611e+04 | 5382.7 | 0 |
+| gliner-nvidia | 7.071 | 866.7 | 5298 | 0.148 | 291.4 | 2.573e+04 | 5388.7 | 0 |
+
+## speed (speed-16t-rss)
+
+device cpu, cpus 0-15, threads 16, 100 docs, 3 repeats, median; peak RSS from /proc VmHWM
+
+| entry | cold start s | latency median ms | p95 ms | batch-8 docs/s | chars/s | peak RSS MB | venv MB | failed |
+|---|---|---|---|---|---|---|---|---|
+| datafog | 0.101 | 0.31 | 2.17 | 1793 | 3.529e+06 | 30.3 | 9.3 | 0 |
+| presidio | 1.509 | 20.76 | 119.4 | 27.28 | 5.37e+04 | 826.1 | 11398.6 | 0 |
+| bardsai-v3 | 3.624 | 252.6 | 1220 | 2.514 | 4948 | 1738 | 5416.3 | 0 |
+
+## speed (speed-1t)
+
+device cpu, cpus 0, threads 1, 30 docs, 1 repeats, median; peak RSS from /proc VmHWM
+
+| entry | cold start s | latency median ms | p95 ms | batch-8 docs/s | chars/s | peak RSS MB | venv MB | failed |
+|---|---|---|---|---|---|---|---|---|
+| datafog | 0.104 | 0.29 | 1.21 | 2530 | 3.374e+06 | 30.3 | 9.3 | 0 |
+| presidio | 1.513 | 18.21 | 91.13 | 37.77 | 5.037e+04 | 777.6 | 11398.6 | 0 |
+| bardsai-v3 | 3.48 | 314.9 | 1951 | 1.65 | 2200 | 1272 | 5416.3 | 0 |
+| sct-default | 8.77 | 4244 | 2.014e+04 | 0.194 | 258.6 | 5919 | 474.2 | 0 |
+| opf | 4.134 | 701.4 | 8131 | 0.164 | 218.5 | 8406 | 5382.7 | 0 |
+| gliner2-fastino | 7.162 | 1429 | 2.656e+04 | 0.156 | 208.5 | 4476 | 5402.3 | 0 |
+| sct-gliner | 7.553 | 2953 | 1.825e+04 | 0.145 | 193.1 | 5327 | 5769.2 | 0 |
+| gliner-nvidia | 8.377 | 5958 | 3.809e+04 | 0.025 | 33.4 | 1.757e+04 | 5388.7 | 0 |

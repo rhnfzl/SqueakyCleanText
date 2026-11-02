@@ -573,3 +573,14 @@ def test_report_tables_from_a_tiny_bundle(tmp_path):
     assert "| x | 10 | 1 | tab 0.900 |" in out
     assert "| x | tab | - | 0 |" in out  # baseline significantly better on tab
     assert "| tab | 0.500 |" in out
+
+
+def test_vm_hwm_reads_proc_status_or_gives_none():
+    import os
+    import sys
+
+    from benchmarks.compare import speed
+
+    assert speed.vm_hwm_mb(2**22 + 12345) is None  # no such process
+    own = speed.vm_hwm_mb(os.getpid())
+    assert own is None if not sys.platform.startswith("linux") else own > 0

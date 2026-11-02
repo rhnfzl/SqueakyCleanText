@@ -9,7 +9,9 @@ For each repeat, entries run in a seeded random order, each in a fresh process o
 - cold start: spawn -> first prediction done (imports, model load from the local cache, one doc);
 - warm batch-1 latency: median and p95 after 20 warmup docs (GPU synchronised);
 - throughput at the common batch 8 (and ``--batch-size`` when different), docs/s and chars/s;
-- peak RSS: the adapter's own ``getrusage`` peak; peak VRAM: ``nvidia-smi`` polled for the
+- peak RSS: ``VmHWM`` of the adapter process from ``/proc`` (Linux), read while it runs; the
+  adapter's own ``getrusage`` peak is kept too but on Linux it carries the parent's peak over
+  fork + exec, so it never reads below the runner's size; peak VRAM: ``nvidia-smi`` polled for the
   adapter's PID only (never other users' processes), plus torch's own peak when torch is used;
 - install size: the venv on disk (models are in the HF cache, shared, not counted).
 
@@ -46,6 +48,17 @@ def vram_mb(pid: int) -> float | None:
                if int(p) == pid)
 
 
+def vm_hwm_mb(pid: int) -> float | None:
+    """Peak resident memory (MiB) of *pid* so far from ``/proc/<pid>/status``; None off Linux or once it is gone."""
+    try:
+        for line in Path(f"/proc/{pid}/status").read_text().splitlines():
+            if line.startswith("VmHWM:"):
+                return round(int(line.split()[1]) / 1024, 1)
+    except OSError:
+        return None
+    return None
+
+
 def dir_mb(path: Path) -> float:
     return round(sum(f.stat().st_size for f in path.rglob("*") if f.is_file() and not f.is_symlink()) / 2**20, 1)
 
@@ -73,7 +86,7 @@ def measure(cmd: list[str], docs: list[dict], work: Path, env: dict, batch_size:
     sampler = threading.Thread(target=sample, daemon=True)
     if poll_vram:
         sampler.start()
-    result, offset = {"cold_start_seconds": None}, 0
+    result, offset = {"cold_start_seconds": None, "peak_rss_mb_proc": None}, 0
 
     def take(lines):
         for line in lines:
@@ -88,6 +101,9 @@ def measure(cmd: list[str], docs: list[dict], work: Path, env: dict, batch_size:
         while True:
             lines, offset = _read_lines(out, offset)
             take(lines)
+            hwm = vm_hwm_mb(proc.pid)  # the last read before exit is the process peak
+            if hwm is not None:
+                result["peak_rss_mb_proc"] = max(result["peak_rss_mb_proc"] or 0.0, hwm)
             if proc.poll() is not None:
                 take(_read_lines(out, offset)[0])
                 break
@@ -123,7 +139,8 @@ def summarise(runs: list[dict]) -> dict:
         "common_batch_docs_per_second": _spread([t.get("docs_per_second") for t in common]),
         "common_batch_chars_per_second": _spread([t.get("chars_per_second") for t in common]),
         "other_batch": [t for r in ok for t in r.get("throughput", []) if not t["common"]],
-        "peak_rss_mb": _spread([r["done"]["peak_rss_mb"] for r in ok]),
+        "peak_rss_mb": _spread([r["peak_rss_mb_proc"] for r in ok]),
+        "peak_rss_mb_getrusage": _spread([r["done"]["peak_rss_mb"] for r in ok]),
         "peak_vram_mb": _spread([r["peak_vram_mb_nvidia_smi"] for r in ok]),
         "torch_peak_vram_mb": _spread([r["done"].get("torch_peak_vram_mb") for r in ok]),
     }

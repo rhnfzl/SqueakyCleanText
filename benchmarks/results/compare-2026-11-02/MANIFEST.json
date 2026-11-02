@@ -144,6 +144,9 @@
   "default/sct-gliner/thai_pii-test.json": "f3d1add9a87b85902e8453258384d0aceca389a50116852fdf2b7499e1fedd7c",
   "default/sct-gliner/thainer-test.json": "1adee296379a939f3039ec725847e098d4e942e4e3bea1105bca38385a4f66e4",
   "default/summary.json": "b0b6beb2360c508a2ee7c6e3ef35a117703fe33d10612e81b7e90c8f9296f384",
+  "speed-16t-rss/speed.json": "e952c91b0d197adcb5fd8460da63499ccbb8b48b060be4fb5167b06c807ecfa9",
+  "speed-16t/speed.json": "0db4600ea8866dafed282e8c2299f2335eafb4c5d6e6cac9377ad3d8539ce9e5",
+  "speed-1t/speed.json": "eb7b3b0e13042f02b173a4662ebcfdaa1351f6d125689e73110d5db8d3925732",
   "tuned/bardsai-v3/argilla_pii-test.json": "46cb9e1e51c8ae557c8fa2cedf9b1ee2d2eb54ce505016ca17f01a010579e1d4",
   "tuned/bardsai-v3/bayanat-test.json": "e2053262d1edc5a9b14219545984363bdc6471351a5c764411943033876a07f8",
   "tuned/bardsai-v3/gretel-test.json": "a1a2eac49098c157176474f6611be1399138362ddb73fab3cf9e73aa49c3b7c6",
@@ -487,6 +490,7 @@
  "protocol": "benchmarks/compare/PROTOCOL.md (change log entry 2026-11-02 test runs)",
  "seed": 13,
  "server_dir": "<server>/sct-compare/ec0fae908dce68d8ecb8fd728b774e3b5b37d5d9 (raw outputs hold dataset text: not copied)",
+ "speed": "one entry at a time after the quality runs, seeded random order, default configs (native language routing); speed-16t: cores 0-15, 16 threads, 100 FineWeb-2 docs, 3 repeats (peak RSS from getrusage, ~2 GB floor); speed-16t-rss: datafog, presidio, bardsai-v3 rerun with /proc VmHWM; speed-1t: core 0, 1 thread, 30 docs, 1 repeat (VmHWM); speed.py at the speed-run commit, not ec0fae9",
  "tuned_configs": {
   "path": "benchmarks/compare/configs/tuned.json",
   "sha256": "ce121551b1f43cb5b1ad57140a7f42d91db3f9b81f80b8ed8dd4394a9dd62fe0"

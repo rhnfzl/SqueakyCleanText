@@ -475,7 +475,8 @@ minus each entry. Not yet built: the common chunker (section 11) and the PR/leak
   over all entries per track gives `summary.json` and the paired bootstrap. Speed: one entry at a
   time on cores 0-15 (16 threads), seeded random order, 3 repeats, FineWeb-2 speed sample cut to
   10 docs per language (100 docs; 100 per language would take hours for the CPU-bound models),
-  then a single-thread run on core 0 with 3 docs per language (30 docs). Speed uses each entry's default
+  then a single-thread run on core 0 with 3 docs per language (30 docs), one repeat (three would
+  take about 4 hours for gliner-nvidia and opf alone). Speed uses each entry's default
   config (native language routing). The native language track, the common chunker, the matched
   operating points (masked recall 0.90/0.95) and the blind annotation audit were not run.
   `report.py` writes the summary tables from a bundle.
@@ -486,3 +487,8 @@ minus each entry. Not yet built: the common chunker (section 11) and the PR/leak
   The paired bootstrap is on the shared view (EMAIL, PHONE, NUMBER: DATE out), as the runner
   computes it; predictions (spans + ids, scores-and-ids datasets only, 75 MB per track) stay
   on the server with their sha256 in the bundle manifest.
+  Peak RSS: the adapter's `getrusage` peak never reads below the runner's own size on Linux
+  (ru_maxrss survives fork + exec), so the first 16-thread speed run shows ~2 GB for datafog,
+  presidio and bardsai-v3. `speed.py` now reads `/proc/<pid>/status` VmHWM while the adapter runs
+  (`peak_rss_mb`; the getrusage value is kept as `peak_rss_mb_getrusage`). Those three entries
+  were rerun at 16 threads with the fix (`speed-16t-rss`); entries above 2 GB were unaffected.

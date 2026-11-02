@@ -92,7 +92,10 @@ def speed_table(speed: dict) -> list[str]:
         return "fail" if x is None else f"{x['median']:.4g}"
 
     out = [f"device {speed['device']}, cpus {speed['cpus']}, threads {speed['threads']}, {speed['docs']} docs, "
-           f"{speed['repeats']} repeats, median", "",
+           f"{speed['repeats']} repeats, median; peak RSS from "
+           + ("/proc VmHWM" if any("peak_rss_mb_getrusage" in s for s in speed["entries"].values()) else
+              "getrusage (on Linux it never reads below the runner's own ~2 GB: values at that floor are an upper bound)"),
+           "",
            "| entry | cold start s | latency median ms | p95 ms | batch-8 docs/s | chars/s | peak RSS MB | venv MB | failed |",
            "|---|---|---|---|---|---|---|---|---|"]
     for entry, s in sorted(speed["entries"].items(), key=lambda x: -((x[1]["common_batch_docs_per_second"] or {})
@@ -118,7 +121,7 @@ def tables(bundle: Path) -> str:
                   *dataset_table(bundle / track, summary["aggregate"])]
         lines += ["", f"## {track} track, completion", "", *completion_table(bundle / track, summary["aggregate"])]
         lines += ["", f"## {track} track, paired bootstrap vs baseline", "", *paired_table(summary)]
-    for name in ("speed-16t", "speed-1t"):
+    for name in ("speed-16t", "speed-16t-rss", "speed-1t"):
         path = bundle / name / "speed.json"
         if path.exists():
             lines += ["", f"## speed ({name})", "", *speed_table(json.loads(path.read_text()))]
