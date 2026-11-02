@@ -140,3 +140,63 @@ def test_ensemble_vote_config_and_legacy_global(monkeypatch):
         TextCleanerConfig(ner_ensemble_vote='median')
     monkeypatch.setattr(cfg_module, "NER_ENSEMBLE_VOTE", 'mean')
     assert cfg_module._config_from_module_globals().ner_ensemble_vote == 'mean'
+
+
+def _finalize_spans(text, spans, **attrs):
+    # One window over the whole text; spans are (start, end, group, score) from one model.
+    from sct.utils.ner import GeneralNER
+
+    ner = object.__new__(GeneralNER)
+    ner._replacement_mode = attrs.pop('mode', 'placeholder')
+    for name, value in attrs.items():
+        setattr(ner, name, value)
+    items = [{'entity_group': g, 'score': s, 'start': a, 'end': b, 'model': 'm'} for a, b, g, s in spans]
+    windows = [(text, 0, list(range(len(text) + 1)), 0, len(text))]
+    return ner, windows, [items]
+
+
+def test_masked_value_is_masked_at_its_other_whole_word_occurrences():
+    # F2: a masked surname stayed visible at its other occurrences in the same document
+    text = "Dear Okonkwo, thanks. Okonkwo\nOkonkwos and okonkwo by Okonkwo."
+    ner, windows, results = _finalize_spans(text, [(5, 12, 'PER', 0.99)])
+    out = ner._finalize(text, windows, results, 0.85, None, None).text
+    # whole-word, case-sensitive: a longer word and a lowercase variant stay
+    assert out == "Dear <PERSON>, thanks. <PERSON>\nOkonkwos and okonkwo by <PERSON>."
+    ner._ner_propagate_masked = False
+    assert ner._finalize(text, windows, results, 0.85, None, None).text.count("<PERSON>") == 1
+
+
+def test_propagation_skips_short_letterless_and_low_score_values():
+    text = "A. went to Rome, Rome. -- and -- again A."
+    spans = [(0, 2, 'PER', 0.99), (11, 15, 'LOC', 0.90), (23, 25, 'ORG', 0.99)]
+    ner, windows, results = _finalize_spans(text, spans)
+    assert ner._finalize(text, windows, results, 0.85, None, None).text == \
+        "<PERSON> went to <LOCATION>, <LOCATION>. <ORGANISATION> and -- again <PERSON>"
+    ner._ner_propagate_min_score = 0.95
+    assert ner._finalize(text, windows, results, 0.85, None, None).text == \
+        "<PERSON> went to <LOCATION>, Rome. <ORGANISATION> and -- again <PERSON>"
+
+
+def test_propagation_reversible_restores_exactly():
+    from sct.utils.anonymization_map import AnonymizationMap
+
+    text = "Lars Petersen met Acme. Acme paid Lars Petersen."
+    ner, windows, results = _finalize_spans(
+        text, [(0, 13, 'PER', 0.99), (18, 22, 'ORG', 0.99)], mode='reversible')
+    anon_map = AnonymizationMap()
+    out = ner._finalize(text, windows, results, 0.85, anon_map, None).text
+    assert "Petersen" not in out and "Acme" not in out
+    assert anon_map.deanonymize(out) == text
+
+
+def test_propagate_config_and_legacy_global(monkeypatch):
+    from sct import config as cfg_module
+
+    assert TextCleanerConfig().ner_propagate_masked is True
+    assert TextCleanerConfig().ner_propagate_min_score is None
+    with pytest.raises(ValueError):
+        TextCleanerConfig(ner_propagate_min_score=1.5)
+    monkeypatch.setattr(cfg_module, "NER_PROPAGATE_MASKED", False)
+    monkeypatch.setattr(cfg_module, "NER_PROPAGATE_MIN_SCORE", 0.9)
+    cfg = cfg_module._config_from_module_globals()
+    assert (cfg.ner_propagate_masked, cfg.ner_propagate_min_score) == (False, 0.9)

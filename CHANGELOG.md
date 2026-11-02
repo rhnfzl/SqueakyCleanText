@@ -13,6 +13,22 @@
   leak -5 to -23 pts, recall +1 to +7, precision -0 to -3 on tab, multiconer, iahlt, thainer,
   naamapadam, thai_pii, nemotron, stockmark and bayanat; the vote change itself, and openpii,
   gretel and REDACT, are not measured yet. The cut stays at 0.85. `'mean'` restores 0.8.0.
+- `ner_propagate_masked` (default `True`, legacy module global `NER_PROPAGATE_MASKED`) and
+  `ner_propagate_min_score` (default `None` = the effective NER cut, legacy
+  `NER_PROPAGATE_MIN_SCORE`): after NER, every other case-sensitive whole-word copy of a masked
+  PER/ORG/LOC value in the same document gets the same type, so `Dear Mr. Okonkwo ... Signed
+  Okonkwo` no longer masks one copy and leaves the others visible. The values come from the
+  model's own spans; values under 2 characters or without a letter are not spread, and copies
+  inside a placeholder or another span are left alone. Reversible maps stay exact. A replay on
+  the 0.8.0 benchmark output fills missed gold spans (TAB 357/1216, REDACT 919/3760, gretel
+  524/5309, nemotron 49/226, iahlt 11/129) at a precision cost: about 50% of the new spans in
+  TAB and gretel and 38% in REDACT fall outside gold, partly real PII the gold misses and partly
+  wrong tags now repeated; raise `ner_propagate_min_score` to trade leak for precision. Not
+  measured end to end yet. Known limit: only exact copies of the whole masked value spread, so a
+  single word of a masked multi-word value stays visible unless the model tags it: a surname
+  after a full name (`Lars Petersen` ... `Petersen`), or `Okonkwo` after the model merged
+  `Okonkwo\nOkonkwo` into one span.
+  `False` restores 0.8.0.
 
 ## 0.8.0 - 2026-11-01
 

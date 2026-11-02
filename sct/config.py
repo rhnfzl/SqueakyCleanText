@@ -361,6 +361,12 @@ class TextCleanerConfig:
     # ner_confidence_threshold, so a weak second model never hides a strong hit; 'mean' averages
     # the model scores (0.8.0)
     ner_ensemble_vote: str = 'max'
+    # mask every other case-sensitive whole-word copy of a masked PER/ORG/LOC value in the same
+    # document (the value comes from the model's own span); False = 0.8.0 output
+    ner_propagate_masked: bool = True
+    # score a span needs before its value is propagated (0..1); None = the effective NER cut.
+    # Raising it spreads fewer wrong tags at the cost of more visible repeats
+    ner_propagate_min_score: Optional[float] = None
 
     def __post_init__(self):
         if self.synthetic_reference_date is not None:
@@ -481,6 +487,8 @@ class TextCleanerConfig:
                 raise ValueError(f"{name} must be None or in [0, 1], got {value}")
         if self.ner_ensemble_vote not in ('max', 'mean'):
             raise ValueError(f"ner_ensemble_vote must be 'max' or 'mean', got {self.ner_ensemble_vote!r}")
+        if self.ner_propagate_min_score is not None and not 0.0 <= self.ner_propagate_min_score <= 1.0:
+            raise ValueError(f"ner_propagate_min_score must be None or in [0, 1], got {self.ner_propagate_min_score}")
         if self.ner_subword_widen is not None and self.ner_subword_widen < 0:
             raise ValueError(f"ner_subword_widen must be None or >= 0, got {self.ner_subword_widen}")
         if not 0.0 <= self.language_confidence_warning <= 1.0:
@@ -733,6 +741,8 @@ def _config_from_module_globals() -> TextCleanerConfig:
         synthetic_collapse_period=getattr(m, 'SYNTHETIC_COLLAPSE_PERIOD', True),
         synthetic_reference_date=getattr(m, 'SYNTHETIC_REFERENCE_DATE', '2026-01-01'),
         ner_ensemble_vote=getattr(m, 'NER_ENSEMBLE_VOTE', 'max'),
+        ner_propagate_masked=getattr(m, 'NER_PROPAGATE_MASKED', True),
+        ner_propagate_min_score=getattr(m, 'NER_PROPAGATE_MIN_SCORE', None),
         check_replace_currency_symbols=m.CHECK_REPLACE_CURRENCY_SYMBOLS,
         check_ner_process=m.CHECK_NER_PROCESS,
         check_remove_isolated_letters=m.CHECK_REMOVE_ISOLATED_LETTERS,
@@ -842,6 +852,8 @@ SYNTHETIC_LOW_CONFIDENCE_LOCALE = 'en_US'
 SYNTHETIC_COLLAPSE_PERIOD = True
 SYNTHETIC_REFERENCE_DATE = '2026-01-01'
 NER_ENSEMBLE_VOTE = 'max'
+NER_PROPAGATE_MASKED = True
+NER_PROPAGATE_MIN_SCORE = None
 GLINER_ONNX = False
 LANGUAGE = None
 

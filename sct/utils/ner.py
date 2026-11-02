@@ -92,6 +92,8 @@ class GeneralNER:
     _ner_batch_size = 8  # chunks per model call; __init__ sets the configured value
     _ner_chunk_overlap = 0  # tokens of context each window adds per side; __init__ sets it
     _ner_ensemble_vote = 'max'  # 'max' or 'mean' (0.8.0); __init__ sets it
+    _ner_propagate_masked = True  # mask other whole-word copies of a masked PER/ORG/LOC value
+    _ner_propagate_min_score = None  # None = the NER cut; __init__ sets both
 
     def __init__(self, cache_dir: Optional[Path] = None, device: Optional[str] = None,
                  model_names: Optional[Union[Dict[str, str], List[str]]] = None,
@@ -113,7 +115,9 @@ class GeneralNER:
                  ner_chunk_overlap: int = 0,
                  cuda_device_id: int = 0,
                  onnx_cuda_provider_options: Optional[Dict] = None,
-                 ner_ensemble_vote: str = 'max'):
+                 ner_ensemble_vote: str = 'max',
+                 ner_propagate_masked: bool = True,
+                 ner_propagate_min_score: Optional[float] = None):
         """Initialize NER processor.
 
         Args:
@@ -138,6 +142,9 @@ class GeneralNER:
             onnx_cuda_provider_options: Extra ``CUDAExecutionProvider`` options.
             ner_ensemble_vote: Per-span vote across models: 'max' keeps a span whose best
                 model score passes the cut, 'mean' averages the scores (0.8.0).
+            ner_propagate_masked: Mask every other case-sensitive whole-word copy of a
+                masked PER/ORG/LOC value in the same document; False = 0.8.0 output.
+            ner_propagate_min_score: Score a span needs to be propagated; None = the NER cut.
         """
         _LIVE_NER.add(self)
         self._ner_backend = ner_backend
@@ -146,6 +153,8 @@ class GeneralNER:
         self._ner_subword_widen_same_script = ner_subword_widen_same_script
         self._ner_chunk_overlap = ner_chunk_overlap
         self._ner_ensemble_vote = ner_ensemble_vote
+        self._ner_propagate_masked = ner_propagate_masked
+        self._ner_propagate_min_score = ner_propagate_min_score
         self._replacement_mode = replacement_mode
         self._synthetic_replacer = synthetic_replacer
         self._regex_markers = tuple(regex_markers)
@@ -1089,6 +1098,8 @@ class GeneralNER:
                         start, end = min(start, a), max(end, b)
                 if (start, end) != (item['start'], item['end']):
                     ensemble_results[index] = {**item, 'start': start, 'end': end, 'word': text[start:end]}
+        if self._ner_propagate_masked:
+            ensemble_results = self._propagate(text, ensemble_results, markers)
         if not ensemble_results:
             return NERProcessingResult(text=text, findings=())
         entities = tuple(self._entity(item) for item in ensemble_results)
@@ -1106,6 +1117,31 @@ class GeneralNER:
             for entity in entities
         )
         return NERProcessingResult(text=result.text, findings=findings)
+
+    def _propagate(self, text, spans, markers):
+        """Add a span at every other whole-word, case-sensitive copy of a masked PER/ORG/LOC value.
+
+        The values come from the models' own spans; a span below ``_ner_propagate_min_score``,
+        shorter than 2 characters or without a letter is not spread. Copies that overlap a
+        span or a marker are skipped, longest value first, so added spans stay disjoint.
+        """
+        cut = self._ner_propagate_min_score
+        sources = {}
+        for item in spans:
+            value = text[item['start']:item['end']]
+            if (item['entity_group'] in ('PER', 'ORG', 'LOC') and (cut is None or item['score'] >= cut)
+                    and len(value) >= 2 and any(ch.isalpha() for ch in value)
+                    and (value not in sources or item['score'] > sources[value]['score'])):
+                sources[value] = item
+        taken = [(s['start'], s['end']) for s in spans] + list(markers)
+        added = []
+        for value in sorted(sources, key=len, reverse=True):
+            for m in re.finditer(rf"(?<!\w){re.escape(value)}(?!\w)", text):
+                a, b = m.span()
+                if not any(x < b and a < y for x, y in taken):
+                    taken.append((a, b))
+                    added.append({**sources[value], 'start': a, 'end': b, 'word': value, 'key': f"{a}:{b}"})
+        return sorted(spans + added, key=lambda x: x['start']) if added else spans
 
     @staticmethod
     def _entity(item) -> DetectedEntity:
