@@ -17,7 +17,9 @@ from typing import NamedTuple as _NamedTuple
 
 from sct.utils import constants, resources
 from sct.utils.anonymization_map import AnonymizationMap
-from sct.utils.onnx_pipeline import load_onnx_ner_model
+import unicodedata
+
+from sct.utils.onnx_pipeline import _letter_scripts, load_onnx_ner_model
 from sct.config import DEFAULT_NER_MODELS, DEFAULT_NER_ENSEMBLE, NER_ENSEMBLE_DEFAULT_KEYS, LANG_KEYS
 from sct.privacy import (
     DetectedEntity,
@@ -80,6 +82,35 @@ def _presidio_type_map(gliner_config):
     return types
 
 
+def _snap_word_edges(text, start, end, ratio, same_script):
+    """Move span edges that fall inside a word out to the word edges ("Salut" + "e").
+
+    A word is a run of Unicode letters and marks; wide (CJK) characters never join, since
+    those scripts write no spaces. With *same_script* an added letter must share the script
+    of the span's edge letter. When the added text is over *ratio* times the span (an
+    unspaced Thai clause), the span stays as tagged; *ratio* None = no cap.
+    """
+    if start >= end:
+        return start, end
+    scripts = _letter_scripts(text[start:end]) if same_script else None
+
+    def joins(char, script):
+        if unicodedata.category(char)[0] not in 'LM' or unicodedata.east_asian_width(char) in 'WF':
+            return False
+        return not script or set(_letter_scripts(char)) <= {script}
+
+    new_start, new_end = start, end
+    if joins(text[start], None):
+        while new_start > 0 and joins(text[new_start - 1], scripts and scripts[0]):
+            new_start -= 1
+    if joins(text[end - 1], None):
+        while new_end < len(text) and joins(text[new_end], scripts and scripts[-1]):
+            new_end += 1
+    if ratio is not None and (new_end - new_start) - (end - start) > ratio * (end - start):
+        return start, end
+    return new_start, new_end
+
+
 class GeneralNER:
     """NER processor with lazy model loading, multi-backend support, and ensemble voting.
 
@@ -97,6 +128,9 @@ class GeneralNER:
     _ner_propagate_masked = True  # mask other whole-word copies of a masked PER/ORG/LOC value
     _ner_propagate_min_score = None  # None = the NER cut; __init__ sets both
     _ner_merge_location_gap = 0  # max chars between two LOCATION spans joined into one; 0 = off
+    _ner_snap_word_edges = True  # move span edges cut inside a word out to the word edges
+    _ner_subword_widen = 1.0  # widening cap (added chars <= ratio * span); __init__ sets it
+    _ner_subword_widen_same_script = True
 
     def __init__(self, cache_dir: Optional[Path] = None, device: Optional[str] = None,
                  model_names: Optional[Union[Dict[str, str], List[str]]] = None,
@@ -121,7 +155,8 @@ class GeneralNER:
                  ner_ensemble_vote: str = 'max',
                  ner_propagate_masked: bool = True,
                  ner_propagate_min_score: Optional[float] = None,
-                 ner_merge_location_gap: int = 0):
+                 ner_merge_location_gap: int = 0,
+                 ner_snap_word_edges: bool = True):
         """Initialize NER processor.
 
         Args:
@@ -151,6 +186,9 @@ class GeneralNER:
             ner_propagate_min_score: Score a span needs to be propagated; None = the NER cut.
             ner_merge_location_gap: Join two LOCATION spans whose gap holds at most this many
                 characters (placeholders not counted), no line break and no sentence end; 0 = off.
+            ner_snap_word_edges: Move a span edge that falls inside a word (letters and marks,
+                not wide CJK) out to the word edge, any backend, within the
+                ner_subword_widen cap and script rule; False = 0.8.0 spans.
         """
         _LIVE_NER.add(self)
         self._ner_backend = ner_backend
@@ -162,6 +200,7 @@ class GeneralNER:
         self._ner_propagate_masked = ner_propagate_masked
         self._ner_propagate_min_score = ner_propagate_min_score
         self._ner_merge_location_gap = ner_merge_location_gap
+        self._ner_snap_word_edges = ner_snap_word_edges
         self._replacement_mode = replacement_mode
         self._synthetic_replacer = synthetic_replacer
         self._regex_markers = tuple(regex_markers)
@@ -1051,6 +1090,9 @@ class GeneralNER:
             for item in ner_results:
                 start = win_start + offsets[item['start']]
                 end = win_start + offsets[item['end']]
+                if self._ner_snap_word_edges:
+                    start, end = _snap_word_edges(
+                        text, start, end, self._ner_subword_widen, self._ner_subword_widen_same_script)
                 span = {**item, 'start': start, 'end': end,
                         'word': text[start:end], 'key': f"{start}:{end}"}
                 (spans if own_start <= start < own_end else foreign).append(span)

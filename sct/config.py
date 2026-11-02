@@ -391,6 +391,10 @@ class TextCleanerConfig:
     # join two LOCATION spans whose gap has <= N chars (placeholders not counted), no line break
     # and no sentence end, so an address is one <LOCATION>; 0 = off (0.8.0 output)
     ner_merge_location_gap: int = 0
+    # NER span edges cut inside a word (letters and marks, not wide CJK) move out to the word
+    # edges on every backend ("Salut" -> "Salute"), within the ner_subword_widen cap and
+    # same-script rule; False = 0.8.0 spans
+    ner_snap_word_edges: bool = True
 
     def __post_init__(self):
         if self.synthetic_reference_date is not None:
@@ -790,6 +794,7 @@ def _config_from_module_globals() -> TextCleanerConfig:
         date_builtin_month_languages=getattr(m, 'DATE_BUILTIN_MONTH_LANGUAGES', None),
         html_tag_strict=getattr(m, 'HTML_TAG_STRICT', True),
         ner_merge_location_gap=getattr(m, 'NER_MERGE_LOCATION_GAP', 0),
+        ner_snap_word_edges=getattr(m, 'NER_SNAP_WORD_EDGES', True),
         check_replace_currency_symbols=m.CHECK_REPLACE_CURRENCY_SYMBOLS,
         check_ner_process=m.CHECK_NER_PROCESS,
         check_remove_isolated_letters=m.CHECK_REMOVE_ISOLATED_LETTERS,
@@ -913,6 +918,7 @@ DATE_MONTH_NAME_SLASH_YEAR = True
 DATE_BUILTIN_MONTH_LANGUAGES = None
 HTML_TAG_STRICT = True
 NER_MERGE_LOCATION_GAP = 0
+NER_SNAP_WORD_EDGES = True
 GLINER_ONNX = False
 LANGUAGE = None
 

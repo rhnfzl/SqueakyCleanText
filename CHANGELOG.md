@@ -4,6 +4,17 @@
 
 ### Behaviour changes
 
+- `ner_snap_word_edges` (default `True`, legacy module global `NER_SNAP_WORD_EDGES`): a NER span
+  whose start or end falls inside a word now moves out to the word edges before the ensemble
+  vote, for every backend. 0.8.0 widened only WordPiece (`##`) models, so the SentencePiece
+  XLM-R fallback and GLiNER left pieces visible: gretel `Via della Salute` became
+  `<LOCATION>e`, and 7-13% of placeholders were glued to a letter or mark (multiconer 7.4%,
+  naamapadam 13.2%, gretel 8.1%; benchmark section 9). A word is a run of Unicode letters
+  and marks (wide CJK characters never join); the `ner_subword_widen` cap and same-script rule
+  apply, so an unspaced Thai clause or a Latin name glued to kana is left as tagged
+  (`ner_subword_widen=0` also turns snapping off). Many Bengali glues are case suffixes on an
+  already masked stem, so the leak gain is small; the main gain expected is strict span F1.
+  Unicode-property rule only. Not re-measured yet. `False` restores 0.8.0 spans.
 - `html_tag_strict` (default `True`, legacy module global `HTML_TAG_STRICT`): the HTML rule
   matches only tag shapes (`<b>`, `</a>`, `<br/>`, `<!DOCTYPE ...>`, `<?xml ...?>`, comments,
   multi-line tags) and entities. 0.8.0 used `<.*?>`, which ran before the email rule, so

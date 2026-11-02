@@ -200,6 +200,7 @@ class TextCleaner:
                 ner_propagate_masked=self.cfg.ner_propagate_masked,
                 ner_propagate_min_score=self.cfg.ner_propagate_min_score,
                 ner_merge_location_gap=self.cfg.ner_merge_location_gap,
+                ner_snap_word_edges=self.cfg.ner_snap_word_edges,
             )
         # GLiClass document-level pre-classification (optional, lazy-loaded)
         self._gliclass: Any = None

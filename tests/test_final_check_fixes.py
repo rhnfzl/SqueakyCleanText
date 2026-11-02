@@ -244,3 +244,30 @@ def test_location_gap_config_and_legacy_global(monkeypatch):
         TextCleanerConfig(ner_merge_location_gap=-1)
     monkeypatch.setattr(cfg_module, "NER_MERGE_LOCATION_GAP", 20)
     assert cfg_module._config_from_module_globals().ner_merge_location_gap == 20
+
+
+@pytest.mark.parametrize("text, word, expected", [
+    # F9: a SentencePiece / GLiNER span ending or starting inside a word left a letter visible
+    ("Via della Salute 12", "Via della Salut", "<PERSON> 12"),
+    ("Sig. Mario Rossi", "ario Rossi", "Sig. <PERSON>"),
+    ("রহিমের বাড়ি", "রহিম", "<PERSON> বাড়ি"),  # vowel sign + letter suffix, same script
+    ("Millerは東京", "Mille", "<PERSON>は東京"),  # wide / other-script letters are not taken
+    ("张三说", "张三", "<PERSON>说"),  # unspaced CJK: wide characters never snap
+    ("ย้ายไปนครราชสีมาเมื่อปีที่แล้ว", "นครราชสีมา", "ย้ายไป<PERSON>เมื่อปีที่แล้ว"),  # ratio cap
+])
+def test_span_edges_snap_to_the_whole_word(text, word, expected):
+    start = text.index(word)
+    ner, windows, results = _finalize_spans(
+        text, [(start, start + len(word), 'PER', 0.99)], _ner_propagate_masked=False)
+    assert ner._finalize(text, windows, results, 0.85, None, None).text == expected
+    ner._ner_snap_word_edges = False  # 0.8.0: the span is replaced as tagged
+    assert ner._finalize(text, windows, results, 0.85, None, None).text == \
+        text[:start] + "<PERSON>" + text[start + len(word):]
+
+
+def test_snap_word_edges_config_and_legacy_global(monkeypatch):
+    from sct import config as cfg_module
+
+    assert TextCleanerConfig().ner_snap_word_edges is True
+    monkeypatch.setattr(cfg_module, "NER_SNAP_WORD_EDGES", False)
+    assert cfg_module._config_from_module_globals().ner_snap_word_edges is False
