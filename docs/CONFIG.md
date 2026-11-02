@@ -4,6 +4,9 @@ Every step of the pipeline is a `TextCleanerConfig` field. The pipeline is built
 `TextCleaner` is created; a step that is switched off is skipped entirely (zero overhead).
 Each step has a safe default and an option to change it.
 
+> **Start with a preset.** `preset_config("training")` for training or RAG data, or the default
+> config; see [Presets](#presets). Use the [field reference](#field-reference) only to change one field.
+
 ## Using TextCleanerConfig
 
 ```python
@@ -70,6 +73,8 @@ EN/NL/DE/ES (others use English) and month names for 8 languages (EN NL DE ES FR
 `ner_backend='gliner'` is language independent, so any pinned language works with it.
 
 ## Field reference
+
+The same fields with their docstrings, generated from the code: [TextCleanerConfig API page](https://rhnfzl.github.io/SqueakyCleanText/reference/config/).
 
 Immutable (frozen) dataclass. Create modified copies with `dataclasses.replace()`:
 

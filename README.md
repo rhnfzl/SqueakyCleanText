@@ -31,6 +31,7 @@ The broken `â€™` is repaired to an apostrophe, the HTML tags become `<HTML>
 - You want to log or report what was found without logging the values (value-free `signals`).
 - Do not use it alone for tables with known PII columns: drop or hash those columns, or use a tool built for structured data such as Presidio structured.
 
+<!-- --8<-- [start:quickstart] -->
 ## Install
 
 ```sh
@@ -49,7 +50,6 @@ Python 3.12 or newer. The base install runs NER with ONNX Runtime; it needs no P
 
 Install with `pip install "squeakycleantext[gpu,synthetic]"`. All extras: [docs/INSTALL.md](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/INSTALL.md).
 
-<!-- --8<-- [start:quickstart] -->
 ## Quickstart
 
 ```python
@@ -103,6 +103,7 @@ For more PII types (IDs, bank numbers, health data and more), use the GLiNER PII
 
 Every step is a `TextCleanerConfig` field with a safe default. The source of the diagram is [resources/sct_flow.excalidraw](https://github.com/rhnfzl/SqueakyCleanText/blob/main/resources/sct_flow.excalidraw).
 
+<!-- --8<-- [start:results] -->
 ## What you get back
 
 `process` returns a `ProcessResult` with `lm_text`, `stat_text`, `language` and `metadata`:
@@ -161,6 +162,7 @@ print(TextCleaner(privacy_policy=policy).process("Maria Chen from Acme Corp wrot
 **GPU.** Install the `gpu` extra and set `TextCleanerConfig(ner_device="cuda", cuda_device_id=0)`. If CUDA cannot load, NER runs on CPU and each result gets the `cuda_fallback` warning ([docs/PERFORMANCE.md](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/PERFORMANCE.md)).
 
 **Your own entity labels.** With the `gliner` extra, set `ner_backend="gliner"`, `gliner_model="urchade/gliner_multi-v2.1"` and `gliner_labels=("person", "product", "event")`; unmapped labels become tags such as `<PRODUCT>` ([docs/NER_BACKENDS.md](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/NER_BACKENDS.md)).
+<!-- --8<-- [end:results] -->
 
 ## Use it in your stack
 
@@ -203,6 +205,7 @@ Source and method: [docs/PERFORMANCE.md](https://github.com/rhnfzl/SqueakyCleanT
 
 Language detection covers 75 languages. Full NER models cover 4 (English, Dutch, German, Spanish). The rest use the multilingual WikiNEural model with the English model, or a model you bring with `ner_models`. Full list: [docs/LANGUAGES.md](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/LANGUAGES.md).
 
+<!-- --8<-- [start:limits] -->
 ## Limits and design principles
 
 - **Safe defaults, every choice configurable.** Each behaviour is a config field; nothing is forced.
@@ -212,7 +215,7 @@ Language detection covers 75 languages. Full NER models cover 4 (English, Dutch,
 - **Synthetic data is not anonymisation.** Fake values keep the data useful; they do not make it anonymous in a legal sense.
 
 <details>
-<summary>Known limits of 0.8.1 (details in <a href="CHANGELOG.md">CHANGELOG.md</a>)</summary>
+<summary>Known limits of 0.8.1 (details in <a href="https://github.com/rhnfzl/SqueakyCleanText/blob/main/CHANGELOG.md">CHANGELOG.md</a>)</summary>
 
 - Dates: only full dates become one `<DATE>`. `1990年1月`, `1月15日`, Japanese era years and `1990.1.15.` do not; the year and number steps still change them (`1990年1月` becomes `<YEAR>年<NUMBER>月`, `生日1990.1.15谢谢` becomes `<YEAR><NUMBER>.15`). A circled number glued to a unit character (`1月⑮日`) stays a list marker. Thai month names need `custom_month_names`.
 - In ensembles with GLiNER, windows are sized for the token-classification models, not for GLiNER's own word limit. GLiNER2 runs one chunk per call; torch models and GLiNER keep one lock per model, so they do not run in parallel across threads.
@@ -228,6 +231,7 @@ Language detection covers 75 languages. Full NER models cover 4 (English, Dutch,
 - `WindowedStreamingRedactor` can cut an HTML tag that holds a space when the tag reaches past `overlap_chars`. It raises `BufferError` when the buffer passes `max_buffer_chars` (default 4096) with no safe whitespace split; raise the limit or use `BufferedStreamingRedactor`.
 
 </details>
+<!-- --8<-- [end:limits] -->
 
 ## Documentation
 

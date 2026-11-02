@@ -10,17 +10,24 @@ copyright: MIT License
 # are pulled in with pymdownx.snippets (base_path: repo root), never copied.
 docs_dir: docs
 exclude_docs: |
-  requirements.txt
+  requirements.*
+  hooks.py
+
+hooks:
+  - docs/hooks.py
 
 theme:
   name: material
   features:
     - navigation.tabs
+    - navigation.footer
+    - navigation.instant
     - navigation.sections
     - navigation.top
     - navigation.indexes
     - search.suggest
     - search.highlight
+    - search.share
     - content.code.copy
     - content.action.edit
   palette:
@@ -74,23 +81,17 @@ nav:
   - Get started:
       - Install: INSTALL.md
       - Quickstart: quickstart.md
+      - Limits: limits.md
   - Guides:
       - Configuration: CONFIG.md
+      - Integrations: INTEGRATIONS.md
+      - Adapters: ADAPTERS.md
       - NER backends: NER_BACKENDS.md
       - Replacement modes: REPLACEMENT_MODES.md
       - Privacy: PRIVACY.md
-      - Adapters: ADAPTERS.md
-      - Integrations: INTEGRATIONS.md
       - Recipes: RECIPES.md
       - MCP server: MCP.md
       - Languages: LANGUAGES.md
-      - Adding languages: ADDING_LANGUAGES.md
-  - Evaluation:
-      - Evaluation: EVALUATION.md
-      - Score columns: SCORE.md
-      - Multilingual eval: MULTILINGUAL_EVAL.md
-      - Performance: PERFORMANCE.md
-      - Benchmarks: benchmarks.md
   - Reference:
       - API overview: API.md
       - TextCleaner: reference/text_cleaner.md
@@ -98,6 +99,14 @@ nav:
       - ProcessResult: reference/process_result.md
       - preset_config: reference/presets.md
       - evaluate_pii: reference/evaluation.md
-      - Integrations: reference/integrations.md
+      - Integrations API: reference/integrations.md
       - Score: reference/score.md
-      - Changelog: changelog.md
+  - Evaluation:
+      - PII evaluation harness: EVALUATION.md
+      - Score columns: SCORE.md
+      - Multilingual eval: MULTILINGUAL_EVAL.md
+      - Performance: PERFORMANCE.md
+      - Benchmarks: benchmarks.md
+  - Contributing:
+      - Adding languages: ADDING_LANGUAGES.md
+  - Changelog: changelog.md
