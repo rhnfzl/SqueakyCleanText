@@ -1,5 +1,159 @@
 # Changelog
 
+## Unreleased
+
+### Benchmarks
+
+- Scorer: the partial-leak check now splits values into runs of letters, digits and
+  combining marks (`[\w\p{M}]+`). Python `\w` stops at vowel signs, so Devanagari, Tamil
+  and Kannada words broke into 1-2 character pieces under the 4-character floor and a
+  partial leak in those scripts was never counted. Leak rates for Brahmic-script data go up
+  (benchmark section 14 measured multiconer 19.0 -> 25.8, naamapadam 16.2 -> 22.2); this is
+  a scoring fix, SCT output is unchanged. Thai (no spaces) is still undercounted.
+- Scorer: new type-agnostic `masked_recall` (with `gold_masked`) next to partial recall,
+  overall, per type and per language, for every PII dataset; a gold span counts when any
+  prediction overlaps it whatever its type. The summary gains a "masked R" column.
+
+### Performance
+
+- The email step now runs a cheap pre-check (`constants.EMAIL_GATE`: `@` or a bracketed `at`)
+  and skips the email regex when the text has neither. Every email match needs that separator,
+  so output is byte-identical; no config field. On email-free text the 0.8.0 regex was 5-18x
+  slower than 0.7.1 (English 17x) and took about 25% of NER-off run time (benchmark section 12);
+  the pre-check costs about 0.01 ms per 1,400-character document against 1.7 ms for the regex.
+  Covers `TextCleaner` (all replacement modes) and `ProcessContacts.replace_emails` /
+  `replace_emails_with_fn`. Not re-measured on the benchmark mix yet; the other NER-off slowdowns
+  (dates on by default, language ID, styled-character folding) are unchanged.
+
+### Behaviour changes
+
+- `url_trailing_punct_outside` (default `True`, legacy module global `URL_TRAILING_PUNCT_OUTSIDE`):
+  `. , ; : ! ? '` at the end of a URL path or query stay outside the URL unless more URL text
+  follows. 0.8.0 turned `Visit https://example.com/path. Next.` into `Visit <URL> Next.`,
+  losing the sentence's full stop; the 0.8.0 fix for a fully qualified host's final dot covered
+  only a bare host, not a path or query. In the 0.8.0 benchmark dumps, nemotron had 40 of 94
+  gold URLs run past the end (37 by `.`, 3 by `,`) and bayanat 3 of 31 (benchmark section 11);
+  nothing leaked, but strict URL F1 suffered. Format regex only. `/a.html`, `?a=1,2&b=3`,
+  `/v1.2/x`, `;jsessionid=` and `example.com./?q=` are unchanged. Not re-measured yet.
+  `False` restores the 0.8.0 URL rule.
+- `ner_snap_word_edges` (default `True`, legacy module global `NER_SNAP_WORD_EDGES`): a NER span
+  whose start or end falls inside a word now moves out to the word edges before the ensemble
+  vote, for every backend. 0.8.0 widened only WordPiece (`##`) models, so the SentencePiece
+  XLM-R fallback and GLiNER left pieces visible: gretel `Via della Salute` became
+  `<LOCATION>e`, and 7-13% of placeholders were glued to a letter or mark (multiconer 7.4%,
+  naamapadam 13.2%, gretel 8.1%; benchmark section 9). A word is a run of Unicode letters
+  and marks (wide CJK characters never join); the `ner_subword_widen` cap and same-script rule
+  apply, so an unspaced Thai clause or a Latin name glued to kana is left as tagged
+  (`ner_subword_widen=0` also turns snapping off). Many Bengali glues are case suffixes on an
+  already masked stem, so the leak gain is small; the main gain expected is strict span F1.
+  Unicode-property rule only. Not re-measured yet. `False` restores 0.8.0 spans.
+- `html_tag_strict` (default `True`, legacy module global `HTML_TAG_STRICT`): the HTML rule
+  matches only tag shapes (`<b>`, `</a>`, `<br/>`, `<!DOCTYPE ...>`, `<?xml ...?>`, comments,
+  multi-line tags) and entities. 0.8.0 used `<.*?>`, which ran before the email rule, so
+  `John Smith <john.smith@example.com>` became `John Smith <HTML>` (typed as markup, not
+  counted as PII: REDACT showed 12.8% of EMAIL gold as HTML), `<https://...>` became `<HTML>`,
+  and `If a < b then mail <x@y.org>` lost the words between the brackets. Now those read as
+  `<<EMAIL>>`, `<<URL>>` and plain text. The rule applies to the plain and reversible paths, the
+  streaming split guard and the browser export. `False` restores `<.*?>`. Not re-measured yet.
+- `ner_ensemble_vote` (default `'max'`, legacy module global `NER_ENSEMBLE_VOTE`): the NER
+  ensemble keeps a span when its best model score reaches `ner_confidence_threshold`. 0.8.0
+  averaged the scores of every model on the span, so when WordPiece widening moved a weak
+  second vote onto the same span, agreement pulled a strong hit under the cut: `সুইডেন` in a
+  Bengali sentence got XLM-R 1.0 and wikineural 0.40, mean 0.70 < 0.85, and stayed visible.
+  The new vote can only add masks. Benchmark section 1 (cut 0.85 to 0.7, a related lever) shows
+  leak -5 to -23 pts, recall +1 to +7, precision -0 to -3 on tab, multiconer, iahlt, thainer,
+  naamapadam, thai_pii, nemotron, stockmark and bayanat; the vote change itself, and openpii,
+  gretel and REDACT, are not measured yet. The cut stays at 0.85. `'mean'` restores 0.8.0.
+- `ner_propagate_masked` (default `True`, legacy module global `NER_PROPAGATE_MASKED`) and
+  `ner_propagate_min_score` (default `None` = the effective NER cut, legacy
+  `NER_PROPAGATE_MIN_SCORE`): after NER, every other case-sensitive whole-word copy of a masked
+  PER/ORG/LOC value in the same document gets the same type, so `Dear Mr. Okonkwo ... Signed
+  Okonkwo` no longer masks one copy and leaves the others visible. The values come from the
+  model's own spans; values under 2 characters or without a letter are not spread, and copies
+  inside a placeholder or another span are left alone. Reversible maps stay exact. A replay on
+  the 0.8.0 benchmark output fills missed gold spans (TAB 357/1216, REDACT 919/3760, gretel
+  524/5309, nemotron 49/226, iahlt 11/129) at a precision cost: about 50% of the new spans in
+  TAB and gretel and 38% in REDACT fall outside gold, partly real PII the gold misses and partly
+  wrong tags now repeated; raise `ner_propagate_min_score` to trade leak for precision. Not
+  measured end to end yet. Known limit: only exact copies of the whole masked value spread, so a
+  single word of a masked multi-word value stays visible unless the model tags it: a surname
+  after a full name (`Lars Petersen` ... `Petersen`), or `Okonkwo` after the model merged
+  `Okonkwo\nOkonkwo` into one span.
+- `ner_merge_location_gap` (default `0` = off, legacy module global `NER_MERGE_LOCATION_GAP`): when
+  set, two neighbouring LOCATION spans become one when the text between them holds at most that
+  many characters outside placeholders, no line break and no sentence end (`.!?;:` before
+  whitespace, `。！？`). The NER models tag street, district, city and country as separate
+  entities and the NUMBER rule takes house numbers and postcodes, so `1234 Elm Street, Apt 5B,
+  Springfield, IL 62704, USA` gave five spans with `Apt 5B` and `IL` visible; with `12` it gives
+  `<NUMBER> <LOCATION>`. Placeholders inside the gap are taken into the merged span; reversible
+  maps restore exactly. Format rule only, no word lists. A replay on the 0.8.0 benchmark output
+  (benchmark section 8) at gap 20: LOCATION leak thai_pii 55% to 42%, gretel -4.5 pts, REDACT
+  -3.1, openpii -2.2, tab flat; at 12 the gains are about a third of that. The cost is non-gold
+  text masked inside merges (about 4 characters per merge on openpii) and short lists of places
+  (`Paris, London and Berlin`) becoming one `<LOCATION>`, so it stays off until measured end to
+  end. Known limit: Thai prefixes glued to a tagged name (`ถนน`, `เขต`) stay visible at the edge
+  of a span (word-boundary snapping, a separate finding), and text the models never tag (road
+  names after an abbreviation, landmark text before the address) is outside any merge.
+- `check_replace_iban_cards` (default `True`, legacy `CHECK_REPLACE_IBAN_CARDS`), with
+  `replace_with_iban="<IBAN>"` and `replace_with_cards="<CARD>"` (legacy `REPLACE_WITH_IBAN`,
+  `REPLACE_WITH_CARDS`): before the phone step, an IBAN (country code, check digits, 11-30
+  letters/digits, unspaced or in groups of 4) whose ISO 7064 mod-97 checksum holds becomes one
+  `<IBAN>`, and a 13-19 digit number starting 2-6 (spaces/hyphens allowed) whose Luhn checksum
+  holds becomes one `<CARD>`. 0.8.0 gave `NL91ABNA<PHONE>` (country, check digits and bank code
+  visible) and `<PHONE> <PHONE>` for a card. Values with a bad checksum go to the phone/number
+  steps as before. Benchmark section 3: bayanat IBAN 97/122 and gretel 51/77 pass the checksum;
+  few synthetic values do (openpii cards 191/2,096). Not measured end to end yet. `False` = 0.8.0.
+- `check_replace_identifiers` (default `False`, legacy `CHECK_REPLACE_IDENTIFIERS`), with
+  `replace_with_identifiers="<ID>"` (legacy `REPLACE_WITH_IDENTIFIERS`): a token of 6+ uppercase
+  letters and digits (any script) with 2+ digits and a letter, not glued to another letter or
+  digit (`RBCON68T08`, `XK4729QP31`), becomes `<ID>`. Format rule only. Off by default and in the
+  `training` preset: the shape also takes product and reference codes (`RTX4090`, `COVID19`);
+  benchmark section 3 simulates openpii leak 13.1 to 7.6, but 83% of gretel hits and 27% of
+  REDACT hits are unlabelled reference codes.
+- New types `IBAN`, `CARD`, `ID` in reversible maps, synthetic fakes, `regex_counts` and the
+  `signals` PII types. The browser export does not include these rules (listed in its limitations).
+  `False` restores 0.8.0.
+- `bracket_content_max_chars` (default `32`, legacy `BRACKET_CONTENT_MAX_CHARS`),
+  `bracket_content_max_words` (default `3`, legacy `BRACKET_CONTENT_MAX_WORDS`) and
+  `keep_json_braces` (default `True`, legacy `KEEP_JSON_BRACES`): bracket/brace removal no longer
+  deletes JSON documents and bracketed prose. 0.8.0 removed every `[...]` and `{...}` up to the
+  first closing bracket, so `Order: {"name": ..., "items": [{...}]} done` became `Order: done`
+  and nested JSON left `"items": "payment":` (benchmark section 4: REDACT lost 14.8% of gold
+  spans, 108/1,000 docs lost more than half their text; gretel 7.0%). Now a `{...}` that parses
+  as a JSON object (`json.raw_decode`, also inside invalid outer JSON) is kept whole, and only
+  innermost spans of at most 32 characters and 3 whitespace-separated words are removed
+  (`[img.png]`, `[12]`, `[citation needed]`, `{{template}}`); a `[...]` never spans a brace.
+  Format rules only. Limits come from the cached benchmark text: with both limits at least 87% of
+  innermost `[...]` spans in fineweb-2 are still removed. Not measured end to end yet. Unspaced
+  scripts (CJK, Thai) are held by the character limit only. Both limits `0` and
+  `keep_json_braces=False` restore 0.8.0.
+- Dates: Thai month names (CLDR full names and dotted abbreviations) join the built-in month
+  data, so `24 ก.พ. 2562` and `14 กุมภาพันธ์ 2561` (Buddhist-era years) are one `<DATE>`; 0.8.0
+  left `<NUMBER> ก.พ. <NUMBER>`. New `date_builtin_month_languages` (default `None` = all, legacy
+  `DATE_BUILTIN_MONTH_LANGUAGES`) picks which built-in month languages apply; the seven 0.8.0 codes
+  restore 0.8.0. Month data only, no other Thai words (era markers, weekdays) are added.
+- Dates: new `date_month_name_slash_year` (default `True`, legacy `DATE_MONTH_NAME_SLASH_YEAR`):
+  a month name, `/` and a 2- or 4-digit year is one `<DATE>` (`October/55`, `Oct/2019`); 0.8.0
+  gave `October/<NUMBER>`. `False` restores 0.8.0.
+- Fix: month names are regex-escaped in `build_date_regex`, so a dotted abbreviation such as
+  `ก.พ.` (or one passed via `custom_month_names`) no longer matches any character in place of
+  its dots.
+
+### Fixes
+
+- JSON preservation (`keep_json_braces`): the object scan is linear on malformed input. `'{"a":' * 20000`
+  took seconds and then raised `RecursionError` out of `process()`; a `'{'` with no `'}'` after it is now
+  skipped, a failed parse resumes after the point it failed, and nesting past the recursion limit ends the scan.
+- JSON preservation: replacement tokens (`<NUMBER>`, `<PERSON>`) count as JSON values, so
+  `{"n":42,"name":"Alice"}` stays as `{"n":<NUMBER>,"name":"Alice"}` instead of being removed as brace content.
+- NER propagation: the whole-word check treats combining marks as part of a word, so a name `राज` no longer
+  masks the start of `राजा` (`<PERSON>ा`).
+- `html_tag_strict`: an HTML comment ends at `-->`, so `<!-- a > secret -->` and comments holding tags are
+  one `<HTML>`; an unclosed `<!--` still ends at the next `>`.
+- Browser export: the date rule follows `custom_month_names`, `date_builtin_month_languages` and
+  `date_month_name_slash_year` (shared helper `resources.configured_month_names`), so it matches Python.
+- `date_builtin_month_languages=()` with fuzzy dates on no longer brings back every built-in month name.
+
 ## 0.8.0 - 2026-11-01
 
 0.8.0 makes batch cleaning faster, detects all 75 Lingua languages, and adds a value-free

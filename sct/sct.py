@@ -62,6 +62,8 @@ class TextCleaner:
             'DATE': self.cfg.replace_with_dates, 'YEAR': self.cfg.replace_with_years,
             self._phone_type: self.cfg.replace_with_phone_numbers,
             'NUMBER': self.cfg.replace_with_numbers, 'CURRENCY': self.cfg.replace_with_currency_symbols,
+            'IBAN': self.cfg.replace_with_iban, 'CARD': self.cfg.replace_with_cards,
+            'ID': self.cfg.replace_with_identifiers,
         }
         # Markers that are not <TAG>-shaped ("EMAIL"): NER protects them like <EMAIL> (ner.regex_markers).
         self._custom_markers = tuple(sorted({
@@ -86,17 +88,15 @@ class TextCleaner:
         )
 
         # Instance-scoped datetime (with custom month names -> per-instance regex)
-        mn_dict = None
-        if self.cfg.custom_month_names:
-            extra = {}
-            for lang, names in self.cfg.custom_month_names.items():
-                extra[resources.language_to_iso(lang)] = names
-            mn_dict = constants.build_month_names_dict(extra)
-            date_regex = constants.build_date_regex(mn_dict)
+        custom_months = self.cfg.custom_month_names or {}
+        slash_year = self.cfg.date_month_name_slash_year
+        mn_dict = resources.configured_month_names(self.cfg)
+        if mn_dict is not None:
+            date_regex = constants.build_date_regex(mn_dict, slash_year=slash_year)
             fuzzy_all, fuzzy_by_lang = constants.build_fuzzy_vocabulary(
                 mn_dict,
                 {**constants._LANG_TO_VOCAB,
-                 **{lang: resources.language_to_iso(lang) for lang in self.cfg.custom_month_names}},
+                 **{lang: resources.language_to_iso(lang) for lang in custom_months}},
             )
             self.ProcessDateTime = datetime.ProcessDateTime(
                 date_regex=date_regex,
@@ -108,10 +108,13 @@ class TextCleaner:
         # fold_styled_characters: dates, like phones, read any space as " " and any dash as "-" (1987\u201105\u201112),
         # any dot form as "." (1990﹒ 1﹒ 15﹒), and a month-name date's day may be a circled number (⑮ January 1990).
         self._date_view = (
-            contact.DigitView(constants.build_date_regex(mn_dict, styled=True), contact.DATE_SEPARATOR_VIEW)
+            contact.DigitView(constants.build_date_regex(mn_dict, styled=True, slash_year=slash_year),
+                              contact.DATE_SEPARATOR_VIEW)
             if self.cfg.fold_styled_characters else self.ProcessDateTime._date_regex)
 
         self.ProcessContacts = contact.ProcessContacts()
+        self._html_regex = constants.HTML_REGEX if self.cfg.html_tag_strict else constants.HTML_REGEX_ANY
+        self._url_regex = constants.URL_REGEX if self.cfg.url_trailing_punct_outside else constants.URL_REGEX_LEGACY
         self.ProcessSpecialSymbols = special.ProcessSpecialSymbols()
         self.NormaliseText = normtext.NormaliseText()
 
@@ -190,6 +193,11 @@ class TextCleaner:
                 onnx_intra_op_threads=self.cfg.onnx_intra_op_threads,
                 onnx_inter_op_threads=self.cfg.onnx_inter_op_threads,
                 ner_chunk_overlap=self.cfg.ner_chunk_overlap,
+                ner_ensemble_vote=self.cfg.ner_ensemble_vote,
+                ner_propagate_masked=self.cfg.ner_propagate_masked,
+                ner_propagate_min_score=self.cfg.ner_propagate_min_score,
+                ner_merge_location_gap=self.cfg.ner_merge_location_gap,
+                ner_snap_word_edges=self.cfg.ner_snap_word_edges,
             )
         # GLiClass document-level pre-classification (optional, lazy-loaded)
         self._gliclass: Any = None
@@ -245,6 +253,11 @@ class TextCleaner:
         # fuzzy_replace_dates runs here (between replace_dates and replace_years)
         # but is called explicitly in _process_single with language context.
         # Phones before years, so a year step cannot split "+31 6 1234 2019".
+        # Checksum-valid IBANs/cards and identifier tokens before phones, so a phone cannot take their digits.
+        if cfg.check_replace_iban_cards:
+            self._post_fuzzy_pipeline.append(self._replace_iban_cards)
+        if cfg.check_replace_identifiers:
+            self._post_fuzzy_pipeline.append(self._replace_identifiers)
         if cfg.check_replace_phone_numbers:
             self._post_fuzzy_pipeline.append(self._replace_phone_numbers)
         if cfg.check_replace_years:
@@ -843,32 +856,30 @@ class TextCleaner:
     def _replace_html(self, text):
         reversible = self._replace_reversible(
             text,
-            constants.HTML_REGEX,
+            self._html_regex,
             'HTML',
         )
         if reversible is not None:
             return reversible
-        return self.ProcessContacts.replace_html(
-            text, replace_with=lambda m: self._emit('HTML', m.group(), self.cfg.replace_with_html),
-        )
+        return self._html_regex.sub(lambda m: self._emit('HTML', m.group(), self.cfg.replace_with_html), text)
 
     def _replace_urls(self, text):
         reversible = self._replace_reversible(
             text,
-            constants.URL_REGEX,
+            self._url_regex,
             'URL',
         )
         if reversible is not None:
             return reversible
         if self._synthetic_replacer:
-            return self.ProcessContacts.replace_urls_with_fn(
-                text, lambda orig: self._emit('URL', orig, self._synthetic_replacer.get_replacement('URL', orig)),
+            return self._url_regex.sub(
+                lambda m: self._emit('URL', m.group(), self._synthetic_replacer.get_replacement('URL', m.group())), text,
             )
-        return self.ProcessContacts.replace_urls_with_fn(
-            text, lambda orig: self._emit('URL', orig, self.cfg.replace_with_url),
-        )
+        return self._url_regex.sub(lambda m: self._emit('URL', m.group(), self.cfg.replace_with_url), text)
 
     def _replace_emails(self, text):
+        if not constants.EMAIL_GATE.search(text):  # no separator, no email: skip the slow regex
+            return text
         reversible = self._replace_reversible(
             text,
             constants.EMAIL_REGEX,
@@ -950,6 +961,25 @@ class TextCleaner:
             view=phone_view,
         )
 
+    def _replace_typed(self, text, pattern, entity_type):
+        """Replace *pattern* matches as *entity_type* in every replacement mode."""
+        reversible = self._replace_reversible(text, pattern, entity_type)
+        if reversible is not None:
+            return reversible
+        if self._synthetic_replacer:
+            def value(orig):
+                return self._synthetic_replacer.get_replacement(entity_type, orig)
+        else:
+            def value(orig):
+                return self._tags[entity_type]
+        return pattern.sub(lambda m: self._emit(entity_type, m.group(), value(m.group())), text)
+
+    def _replace_iban_cards(self, text):
+        return self._replace_typed(self._replace_typed(text, contact.IBAN_VIEW, 'IBAN'), contact.CARD_VIEW, 'CARD')
+
+    def _replace_identifiers(self, text):
+        return self._replace_typed(text, constants.IDENTIFIER_REGEX, 'ID')
+
     def _replace_numbers(self, text):
         anon_map = getattr(self._document_context, 'anon_map', None)
         if anon_map is not None:
@@ -1006,6 +1036,9 @@ class TextCleaner:
             text,
             remove_brackets=self.cfg.check_remove_bracket_content,
             remove_braces=self.cfg.check_remove_brace_content,
+            max_chars=self.cfg.bracket_content_max_chars,
+            max_words=self.cfg.bracket_content_max_words,
+            keep_json=self.cfg.keep_json_braces,
         )
 
     def _normalize_whitespace(self, text):

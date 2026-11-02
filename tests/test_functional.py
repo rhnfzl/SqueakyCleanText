@@ -232,6 +232,25 @@ class TestCorePipeline:
         lm, _, _ = tc.process("Hello {variable} World")
         assert "variable" not in lm
 
+    def test_a17b_bracket_removal_keeps_json_and_long_clauses(self):
+        """JSON objects and long bracketed clauses survive; short refs and templates go."""
+        tc = TextCleaner(cfg=_make_cfg(check_replace_numbers=False))
+        text = ('Order: {"name": "Alice", "items": [{"sku": "A1"}, "x"], "note": "ok"} done. '
+                'The court [hearing on May, attended by the claimant and counsel] was adjourned. '
+                'See {{template}} and [img.png] and [12].')
+        lm, _, _ = tc.process(text)
+        assert '{"name": "Alice", "items": [{"sku": "A1"}, "x"], "note": "ok"}' in lm
+        assert "[hearing on May, attended by the claimant and counsel]" in lm
+        for gone in ("template", "img.png", "[12]"):
+            assert gone not in lm
+
+    def test_a17c_bracket_removal_old_behaviour_reachable(self):
+        """Limits 0 and keep_json_braces=False give the 0.8.0 output."""
+        tc = TextCleaner(cfg=_make_cfg(check_replace_numbers=False, bracket_content_max_chars=0,
+                                       bracket_content_max_words=0, keep_json_braces=False))
+        lm, _, _ = tc.process('Order: {"name": "Alice"} done [a long clause with many words here] ok')
+        assert lm == "Order: done ok"
+
     def test_a18_whitespace_normalization(self):
         """Multiple spaces, tabs, newlines collapsed to single space."""
         cfg = _make_cfg()

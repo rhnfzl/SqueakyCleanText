@@ -145,6 +145,7 @@ FAKER_GENERATORS: Dict[str, str] = {
     'API_KEY': 'sha256', 'ACCESS_TOKEN': 'sha256',
     # PII misc
     'LICENSE_PLATE': 'license_plate',
+    'IBAN': 'iban', 'CARD': 'credit_card_number', 'ID': 'bothify',
     'SERIAL_NUMBER': 'bothify',
     # PII relationship
     'SPOUSE_NAME': 'name', 'CHILD_NAME': 'first_name',

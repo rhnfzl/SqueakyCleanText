@@ -357,6 +357,47 @@ class TextCleanerConfig:
     # synthetic: ISO date that date fakes (DATE, DATE_OF_BIRTH) end on, so a document gets the
     # same dates on any day; None = today, from the clock (earlier 0.8.0)
     synthetic_reference_date: Optional[str] = '2026-01-01'
+    # NER ensemble vote per span: 'max' keeps a span when its best model score passes
+    # ner_confidence_threshold, so a weak second model never hides a strong hit; 'mean' averages
+    # the model scores (0.8.0)
+    ner_ensemble_vote: str = 'max'
+    # mask every other case-sensitive whole-word copy of a masked PER/ORG/LOC value in the same
+    # document (the value comes from the model's own span); False = 0.8.0 output
+    ner_propagate_masked: bool = True
+    # score a span needs before its value is propagated (0..1); None = the effective NER cut.
+    # Raising it spreads fewer wrong tags at the cost of more visible repeats
+    ner_propagate_min_score: Optional[float] = None
+    # IBANs (mod-97 checksum) and payment cards (Luhn checksum) become one <IBAN> / <CARD> each,
+    # before the phone step; False = 0.8.0 (the phone/number steps take pieces of them)
+    check_replace_iban_cards: bool = True
+    replace_with_iban: str = "<IBAN>"
+    replace_with_cards: str = "<CARD>"
+    # Identifier tokens: 6+ uppercase letters and digits with 2+ digits and a letter (RBCON68T08).
+    # Off by default: the shape also takes product and reference codes (RTX4090, COVID19)
+    check_replace_identifiers: bool = False
+    replace_with_identifiers: str = "<ID>"
+    # Bracket/brace removal only takes innermost spans of at most this many characters and
+    # whitespace-separated words, so prose clauses stay; 0 = no limit (both 0 = 0.8.0 matching)
+    bracket_content_max_chars: int = 32
+    bracket_content_max_words: int = 3
+    # A {...} that parses as a JSON object (json.raw_decode, nested ones included) is never removed
+    keep_json_braces: bool = True
+    # A month name, "/" and a 2- or 4-digit year is one <DATE> (October/55, Oct/2019)
+    date_month_name_slash_year: bool = True
+    # ISO codes of the built-in month data dates use (en nl de es fr pt it th); None = all
+    date_builtin_month_languages: Optional[Tuple[str, ...]] = None
+    # HTML rule reads only tag shapes (<b>, </a>, <br/>, <!-- -->); False = 0.8.0 "<.*?>" (eats "<a@b.com>")
+    html_tag_strict: bool = True
+    # join two LOCATION spans whose gap has <= N chars (placeholders not counted), no line break
+    # and no sentence end, so an address is one <LOCATION>; 0 = off (0.8.0 output)
+    ner_merge_location_gap: int = 0
+    # NER span edges cut inside a word (letters and marks, not wide CJK) move out to the word
+    # edges on every backend ("Salut" -> "Salute"), within the ner_subword_widen cap and
+    # same-script rule; False = 0.8.0 spans
+    ner_snap_word_edges: bool = True
+    # . , ; : ! ? ' end a URL path or query unless more URL text follows ("https://x.com/a. Next");
+    # False = 0.8.0, where the URL takes the sentence's full stop or comma
+    url_trailing_punct_outside: bool = True
 
     def __post_init__(self):
         if self.synthetic_reference_date is not None:
@@ -475,6 +516,12 @@ class TextCleanerConfig:
             value = getattr(self, name)
             if value is not None and not 0.0 <= value <= 1.0:
                 raise ValueError(f"{name} must be None or in [0, 1], got {value}")
+        if self.ner_ensemble_vote not in ('max', 'mean'):
+            raise ValueError(f"ner_ensemble_vote must be 'max' or 'mean', got {self.ner_ensemble_vote!r}")
+        if self.ner_merge_location_gap < 0:
+            raise ValueError(f"ner_merge_location_gap must be >= 0, got {self.ner_merge_location_gap}")
+        if self.ner_propagate_min_score is not None and not 0.0 <= self.ner_propagate_min_score <= 1.0:
+            raise ValueError(f"ner_propagate_min_score must be None or in [0, 1], got {self.ner_propagate_min_score}")
         if self.ner_subword_widen is not None and self.ner_subword_widen < 0:
             raise ValueError(f"ner_subword_widen must be None or >= 0, got {self.ner_subword_widen}")
         if not 0.0 <= self.language_confidence_warning <= 1.0:
@@ -614,6 +661,15 @@ class TextCleanerConfig:
             object.__setattr__(self, 'custom_stopwords',
                                MappingProxyType(resolved_sw))
 
+        if self.date_builtin_month_languages is not None:
+            from sct.utils.constants import MONTH_NAMES_MULTILINGUAL
+            codes = tuple(self.date_builtin_month_languages)
+            unknown = set(codes) - set().union(*MONTH_NAMES_MULTILINGUAL.values())
+            if isinstance(self.date_builtin_month_languages, str) or unknown:
+                raise ValueError(f"date_builtin_month_languages must be a tuple of built-in month ISO codes, "
+                                 f"got {self.date_builtin_month_languages!r}")
+            object.__setattr__(self, 'date_builtin_month_languages', codes)
+
         # Validate and freeze custom_month_names
         if self.custom_month_names:
             resolved_mn = {resolve_language(k): tuple(v) for k, v in self.custom_month_names.items()}
@@ -726,6 +782,23 @@ def _config_from_module_globals() -> TextCleanerConfig:
         synthetic_low_confidence_locale=getattr(m, 'SYNTHETIC_LOW_CONFIDENCE_LOCALE', 'en_US'),
         synthetic_collapse_period=getattr(m, 'SYNTHETIC_COLLAPSE_PERIOD', True),
         synthetic_reference_date=getattr(m, 'SYNTHETIC_REFERENCE_DATE', '2026-01-01'),
+        ner_ensemble_vote=getattr(m, 'NER_ENSEMBLE_VOTE', 'max'),
+        ner_propagate_masked=getattr(m, 'NER_PROPAGATE_MASKED', True),
+        ner_propagate_min_score=getattr(m, 'NER_PROPAGATE_MIN_SCORE', None),
+        check_replace_iban_cards=getattr(m, 'CHECK_REPLACE_IBAN_CARDS', True),
+        replace_with_iban=getattr(m, 'REPLACE_WITH_IBAN', '<IBAN>'),
+        replace_with_cards=getattr(m, 'REPLACE_WITH_CARDS', '<CARD>'),
+        check_replace_identifiers=getattr(m, 'CHECK_REPLACE_IDENTIFIERS', False),
+        replace_with_identifiers=getattr(m, 'REPLACE_WITH_IDENTIFIERS', '<ID>'),
+        bracket_content_max_chars=getattr(m, 'BRACKET_CONTENT_MAX_CHARS', 32),
+        bracket_content_max_words=getattr(m, 'BRACKET_CONTENT_MAX_WORDS', 3),
+        keep_json_braces=getattr(m, 'KEEP_JSON_BRACES', True),
+        date_month_name_slash_year=getattr(m, 'DATE_MONTH_NAME_SLASH_YEAR', True),
+        date_builtin_month_languages=getattr(m, 'DATE_BUILTIN_MONTH_LANGUAGES', None),
+        html_tag_strict=getattr(m, 'HTML_TAG_STRICT', True),
+        ner_merge_location_gap=getattr(m, 'NER_MERGE_LOCATION_GAP', 0),
+        ner_snap_word_edges=getattr(m, 'NER_SNAP_WORD_EDGES', True),
+        url_trailing_punct_outside=getattr(m, 'URL_TRAILING_PUNCT_OUTSIDE', True),
         check_replace_currency_symbols=m.CHECK_REPLACE_CURRENCY_SYMBOLS,
         check_ner_process=m.CHECK_NER_PROCESS,
         check_remove_isolated_letters=m.CHECK_REMOVE_ISOLATED_LETTERS,
@@ -834,6 +907,23 @@ NER_SEES_TAGS = True
 SYNTHETIC_LOW_CONFIDENCE_LOCALE = 'en_US'
 SYNTHETIC_COLLAPSE_PERIOD = True
 SYNTHETIC_REFERENCE_DATE = '2026-01-01'
+NER_ENSEMBLE_VOTE = 'max'
+NER_PROPAGATE_MASKED = True
+NER_PROPAGATE_MIN_SCORE = None
+CHECK_REPLACE_IBAN_CARDS = True
+REPLACE_WITH_IBAN = "<IBAN>"
+REPLACE_WITH_CARDS = "<CARD>"
+CHECK_REPLACE_IDENTIFIERS = False
+REPLACE_WITH_IDENTIFIERS = "<ID>"
+BRACKET_CONTENT_MAX_CHARS = 32
+BRACKET_CONTENT_MAX_WORDS = 3
+KEEP_JSON_BRACES = True
+DATE_MONTH_NAME_SLASH_YEAR = True
+DATE_BUILTIN_MONTH_LANGUAGES = None
+HTML_TAG_STRICT = True
+NER_MERGE_LOCATION_GAP = 0
+NER_SNAP_WORD_EDGES = True
+URL_TRAILING_PUNCT_OUTSIDE = True
 GLINER_ONNX = False
 LANGUAGE = None
 

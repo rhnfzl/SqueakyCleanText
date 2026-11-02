@@ -229,7 +229,7 @@ def decode_html_entities(text):
     return text
 
 
-# A tag as HTML_REGEX reads it from its last "<" (no "<" inside, so linear), or an entity.
+# Any "<...>" on one line (a superset of every HTML_REGEX tag, so entities in a tag stay encoded), or an entity.
 _MARKUP_OR_ENTITY = re.compile(r'<[^<>\n]*>|&#?[0-9A-Za-z]{1,24};')
 
 

@@ -117,3 +117,157 @@ def test_widen_same_script_config_and_legacy_global(monkeypatch):
     assert TextCleanerConfig().ner_subword_widen_same_script is True
     monkeypatch.setattr(cfg_module, "NER_SUBWORD_WIDEN_SAME_SCRIPT", False)
     assert cfg_module._config_from_module_globals().ner_subword_widen_same_script is False
+
+
+def test_ensemble_agreement_never_drops_a_strong_single_model_hit():
+    # F1: XLM-R 1.0 + wikineural 0.40 on the same widened span averaged to 0.70 < 0.85
+    from sct.utils.ner import GeneralNER
+
+    ner = object.__new__(GeneralNER)
+    strong = {'entity_group': 'LOC', 'score': 0.95, 'key': '0:5', 'start': 0, 'end': 5, 'model': 'a'}
+    weak = {**strong, 'score': 0.60, 'model': 'b'}
+    assert ner.ner_ensemble([strong, weak], 0.85) == [strong]
+    assert ner.ner_ensemble([{**weak, 'score': 0.5}], 0.85) == []
+    ner._ner_ensemble_vote = 'mean'
+    assert ner.ner_ensemble([strong, weak], 0.85) == []
+
+
+def test_ensemble_vote_config_and_legacy_global(monkeypatch):
+    from sct import config as cfg_module
+
+    assert TextCleanerConfig().ner_ensemble_vote == 'max'
+    with pytest.raises(ValueError):
+        TextCleanerConfig(ner_ensemble_vote='median')
+    monkeypatch.setattr(cfg_module, "NER_ENSEMBLE_VOTE", 'mean')
+    assert cfg_module._config_from_module_globals().ner_ensemble_vote == 'mean'
+
+
+def _finalize_spans(text, spans, **attrs):
+    # One window over the whole text; spans are (start, end, group, score) from one model.
+    from sct.utils.ner import GeneralNER
+
+    ner = object.__new__(GeneralNER)
+    ner._replacement_mode = attrs.pop('mode', 'placeholder')
+    for name, value in attrs.items():
+        setattr(ner, name, value)
+    items = [{'entity_group': g, 'score': s, 'start': a, 'end': b, 'model': 'm'} for a, b, g, s in spans]
+    windows = [(text, 0, list(range(len(text) + 1)), 0, len(text))]
+    return ner, windows, [items]
+
+
+def test_masked_value_is_masked_at_its_other_whole_word_occurrences():
+    # F2: a masked surname stayed visible at its other occurrences in the same document
+    text = "Dear Okonkwo, thanks. Okonkwo\nOkonkwos and okonkwo by Okonkwo."
+    ner, windows, results = _finalize_spans(text, [(5, 12, 'PER', 0.99)])
+    out = ner._finalize(text, windows, results, 0.85, None, None).text
+    # whole-word, case-sensitive: a longer word and a lowercase variant stay
+    assert out == "Dear <PERSON>, thanks. <PERSON>\nOkonkwos and okonkwo by <PERSON>."
+    ner._ner_propagate_masked = False
+    assert ner._finalize(text, windows, results, 0.85, None, None).text.count("<PERSON>") == 1
+
+
+def test_propagation_skips_short_letterless_and_low_score_values():
+    text = "A. went to Rome, Rome. -- and -- again A."
+    spans = [(0, 2, 'PER', 0.99), (11, 15, 'LOC', 0.90), (23, 25, 'ORG', 0.99)]
+    ner, windows, results = _finalize_spans(text, spans)
+    assert ner._finalize(text, windows, results, 0.85, None, None).text == \
+        "<PERSON> went to <LOCATION>, <LOCATION>. <ORGANISATION> and -- again <PERSON>"
+    ner._ner_propagate_min_score = 0.95
+    assert ner._finalize(text, windows, results, 0.85, None, None).text == \
+        "<PERSON> went to <LOCATION>, Rome. <ORGANISATION> and -- again <PERSON>"
+
+
+def test_propagation_reversible_restores_exactly():
+    from sct.utils.anonymization_map import AnonymizationMap
+
+    text = "Lars Petersen met Acme. Acme paid Lars Petersen."
+    ner, windows, results = _finalize_spans(
+        text, [(0, 13, 'PER', 0.99), (18, 22, 'ORG', 0.99)], mode='reversible')
+    anon_map = AnonymizationMap()
+    out = ner._finalize(text, windows, results, 0.85, anon_map, None).text
+    assert "Petersen" not in out and "Acme" not in out
+    assert anon_map.deanonymize(out) == text
+
+
+def test_propagate_config_and_legacy_global(monkeypatch):
+    from sct import config as cfg_module
+
+    assert TextCleanerConfig().ner_propagate_masked is True
+    assert TextCleanerConfig().ner_propagate_min_score is None
+    with pytest.raises(ValueError):
+        TextCleanerConfig(ner_propagate_min_score=1.5)
+    monkeypatch.setattr(cfg_module, "NER_PROPAGATE_MASKED", False)
+    monkeypatch.setattr(cfg_module, "NER_PROPAGATE_MIN_SCORE", 0.9)
+    cfg = cfg_module._config_from_module_globals()
+    assert (cfg.ner_propagate_masked, cfg.ner_propagate_min_score) == (False, 0.9)
+
+
+def _loc_spans(text, *words):
+    return [(text.index(w), text.index(w) + len(w), 'LOC', 0.99) for w in words]
+
+
+def test_location_gap_merge_joins_address_parts():
+    # F8: one address came out as many LOCATION/NUMBER spans with "Apt 5B" and "IL" visible
+    text = "Ship to <NUMBER> Elm Street, Apt 5B, Springfield, IL <NUMBER>, USA. Then Paris.\nRome"
+    ner, windows, results = _finalize_spans(
+        text, _loc_spans(text, "Elm Street", "Springfield", "USA", "Paris", "Rome"))
+    out = ner._finalize(text, windows, results, 0.85, None, None).text
+    assert out == ("Ship to <NUMBER> <LOCATION>, Apt 5B, <LOCATION>, IL <NUMBER>, <LOCATION>. "
+                   "Then <LOCATION>.\n<LOCATION>")  # 0 = off, 0.8.0 output
+    ner._ner_merge_location_gap = 12
+    out = ner._finalize(text, windows, results, 0.85, None, None).text
+    # placeholders in the gap do not count; a sentence end or a line break stops the merge
+    assert out == "Ship to <NUMBER> <LOCATION>. Then <LOCATION>.\n<LOCATION>"
+    ner._ner_merge_location_gap = 7
+    out = ner._finalize(text, windows, results, 0.85, None, None).text
+    assert out == "Ship to <NUMBER> <LOCATION>, Apt 5B, <LOCATION>. Then <LOCATION>.\n<LOCATION>"
+
+
+def test_location_gap_merge_reversible_restores_exactly():
+    from sct.utils.anonymization_map import AnonymizationMap
+
+    anon_map = AnonymizationMap()
+    anon_map.add('<NUMBER_0>', '62704', 'NUMBER', 0, 0)
+    text = "Springfield, IL <NUMBER_0>, USA"
+    ner, windows, results = _finalize_spans(
+        text, _loc_spans(text, "Springfield", "USA"), mode='reversible', _ner_merge_location_gap=12)
+    out = ner._finalize(text, windows, results, 0.85, anon_map, None).text
+    assert out == "<LOCATION_0>"
+    assert anon_map.deanonymize(out) == "Springfield, IL 62704, USA"
+
+
+def test_location_gap_config_and_legacy_global(monkeypatch):
+    from sct import config as cfg_module
+
+    assert TextCleanerConfig().ner_merge_location_gap == 0
+    with pytest.raises(ValueError):
+        TextCleanerConfig(ner_merge_location_gap=-1)
+    monkeypatch.setattr(cfg_module, "NER_MERGE_LOCATION_GAP", 20)
+    assert cfg_module._config_from_module_globals().ner_merge_location_gap == 20
+
+
+@pytest.mark.parametrize("text, word, expected", [
+    # F9: a SentencePiece / GLiNER span ending or starting inside a word left a letter visible
+    ("Via della Salute 12", "Via della Salut", "<PERSON> 12"),
+    ("Sig. Mario Rossi", "ario Rossi", "Sig. <PERSON>"),
+    ("রহিমের বাড়ি", "রহিম", "<PERSON> বাড়ি"),  # vowel sign + letter suffix, same script
+    ("Millerは東京", "Mille", "<PERSON>は東京"),  # wide / other-script letters are not taken
+    ("张三说", "张三", "<PERSON>说"),  # unspaced CJK: wide characters never snap
+    ("ย้ายไปนครราชสีมาเมื่อปีที่แล้ว", "นครราชสีมา", "ย้ายไป<PERSON>เมื่อปีที่แล้ว"),  # ratio cap
+])
+def test_span_edges_snap_to_the_whole_word(text, word, expected):
+    start = text.index(word)
+    ner, windows, results = _finalize_spans(
+        text, [(start, start + len(word), 'PER', 0.99)], _ner_propagate_masked=False)
+    assert ner._finalize(text, windows, results, 0.85, None, None).text == expected
+    ner._ner_snap_word_edges = False  # 0.8.0: the span is replaced as tagged
+    assert ner._finalize(text, windows, results, 0.85, None, None).text == \
+        text[:start] + "<PERSON>" + text[start + len(word):]
+
+
+def test_snap_word_edges_config_and_legacy_global(monkeypatch):
+    from sct import config as cfg_module
+
+    assert TextCleanerConfig().ner_snap_word_edges is True
+    monkeypatch.setattr(cfg_module, "NER_SNAP_WORD_EDGES", False)
+    assert cfg_module._config_from_module_globals().ner_snap_word_edges is False

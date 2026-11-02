@@ -8,6 +8,8 @@ import threading
 from collections import defaultdict
 import logging
 from typing import Any, Collection, Dict, List, Optional, Sequence, Union
+
+import regex
 from pathlib import Path
 
 import onnxruntime as ort
@@ -17,7 +19,9 @@ from typing import NamedTuple as _NamedTuple
 
 from sct.utils import constants, resources
 from sct.utils.anonymization_map import AnonymizationMap
-from sct.utils.onnx_pipeline import load_onnx_ner_model
+import unicodedata
+
+from sct.utils.onnx_pipeline import _letter_scripts, load_onnx_ner_model
 from sct.config import DEFAULT_NER_MODELS, DEFAULT_NER_ENSEMBLE, NER_ENSEMBLE_DEFAULT_KEYS, LANG_KEYS
 from sct.privacy import (
     DetectedEntity,
@@ -49,6 +53,8 @@ ENTITY_TYPE_MAP = {
 # so an emitted marker of the same text keeps its protection) gets none, so it cannot hide PII.
 # Custom replace_with_* markers ("EMAIL") are protected the same way through *regex_markers*.
 _PLACEHOLDER_TOKEN = re.compile(r"<[A-Z][A-Z0-9_]*>")
+# Ends a LOCATION merge gap: a line break or a sentence end (format only, no words).
+_GAP_BREAK = re.compile(r"[\n\r\u2028\u2029]|[.!?;:]\s|[。！？]")
 
 
 # Freeing an inherited ONNX session in a forked child crashes or hangs, so children pin every live
@@ -78,6 +84,35 @@ def _presidio_type_map(gliner_config):
     return types
 
 
+def _snap_word_edges(text, start, end, ratio, same_script):
+    """Move span edges that fall inside a word out to the word edges ("Salut" + "e").
+
+    A word is a run of Unicode letters and marks; wide (CJK) characters never join, since
+    those scripts write no spaces. With *same_script* an added letter must share the script
+    of the span's edge letter. When the added text is over *ratio* times the span (an
+    unspaced Thai clause), the span stays as tagged; *ratio* None = no cap.
+    """
+    if start >= end:
+        return start, end
+    scripts = _letter_scripts(text[start:end]) if same_script else None
+
+    def joins(char, script):
+        if unicodedata.category(char)[0] not in 'LM' or unicodedata.east_asian_width(char) in 'WF':
+            return False
+        return not script or set(_letter_scripts(char)) <= {script}
+
+    new_start, new_end = start, end
+    if joins(text[start], None):
+        while new_start > 0 and joins(text[new_start - 1], scripts and scripts[0]):
+            new_start -= 1
+    if joins(text[end - 1], None):
+        while new_end < len(text) and joins(text[new_end], scripts and scripts[-1]):
+            new_end += 1
+    if ratio is not None and (new_end - new_start) - (end - start) > ratio * (end - start):
+        return start, end
+    return new_start, new_end
+
+
 class GeneralNER:
     """NER processor with lazy model loading, multi-backend support, and ensemble voting.
 
@@ -91,6 +126,13 @@ class GeneralNER:
 
     _ner_batch_size = 8  # chunks per model call; __init__ sets the configured value
     _ner_chunk_overlap = 0  # tokens of context each window adds per side; __init__ sets it
+    _ner_ensemble_vote = 'max'  # 'max' or 'mean' (0.8.0); __init__ sets it
+    _ner_propagate_masked = True  # mask other whole-word copies of a masked PER/ORG/LOC value
+    _ner_propagate_min_score = None  # None = the NER cut; __init__ sets both
+    _ner_merge_location_gap = 0  # max chars between two LOCATION spans joined into one; 0 = off
+    _ner_snap_word_edges = True  # move span edges cut inside a word out to the word edges
+    _ner_subword_widen = 1.0  # widening cap (added chars <= ratio * span); __init__ sets it
+    _ner_subword_widen_same_script = True
 
     def __init__(self, cache_dir: Optional[Path] = None, device: Optional[str] = None,
                  model_names: Optional[Union[Dict[str, str], List[str]]] = None,
@@ -111,7 +153,12 @@ class GeneralNER:
                  onnx_inter_op_threads: Optional[int] = None,
                  ner_chunk_overlap: int = 0,
                  cuda_device_id: int = 0,
-                 onnx_cuda_provider_options: Optional[Dict] = None):
+                 onnx_cuda_provider_options: Optional[Dict] = None,
+                 ner_ensemble_vote: str = 'max',
+                 ner_propagate_masked: bool = True,
+                 ner_propagate_min_score: Optional[float] = None,
+                 ner_merge_location_gap: int = 0,
+                 ner_snap_word_edges: bool = True):
         """Initialize NER processor.
 
         Args:
@@ -134,6 +181,16 @@ class GeneralNER:
                 both sides of its chunk; 0 keeps the 0.7.1 chunks.
             cuda_device_id: GPU index used when *device* resolves to CUDA.
             onnx_cuda_provider_options: Extra ``CUDAExecutionProvider`` options.
+            ner_ensemble_vote: Per-span vote across models: 'max' keeps a span whose best
+                model score passes the cut, 'mean' averages the scores (0.8.0).
+            ner_propagate_masked: Mask every other case-sensitive whole-word copy of a
+                masked PER/ORG/LOC value in the same document; False = 0.8.0 output.
+            ner_propagate_min_score: Score a span needs to be propagated; None = the NER cut.
+            ner_merge_location_gap: Join two LOCATION spans whose gap holds at most this many
+                characters (placeholders not counted), no line break and no sentence end; 0 = off.
+            ner_snap_word_edges: Move a span edge that falls inside a word (letters and marks,
+                not wide CJK) out to the word edge, any backend, within the
+                ner_subword_widen cap and script rule; False = 0.8.0 spans.
         """
         _LIVE_NER.add(self)
         self._ner_backend = ner_backend
@@ -141,6 +198,11 @@ class GeneralNER:
         self._ner_subword_widen = ner_subword_widen
         self._ner_subword_widen_same_script = ner_subword_widen_same_script
         self._ner_chunk_overlap = ner_chunk_overlap
+        self._ner_ensemble_vote = ner_ensemble_vote
+        self._ner_propagate_masked = ner_propagate_masked
+        self._ner_propagate_min_score = ner_propagate_min_score
+        self._ner_merge_location_gap = ner_merge_location_gap
+        self._ner_snap_word_edges = ner_snap_word_edges
         self._replacement_mode = replacement_mode
         self._synthetic_replacer = synthetic_replacer
         self._regex_markers = tuple(regex_markers)
@@ -573,18 +635,19 @@ class GeneralNER:
     def ner_ensemble(self, ner_results, t):
         """Apply ensemble voting across multiple model results.
 
-        Groups entities by position key, averages their confidence scores,
-        and filters by threshold. Returns the highest-scoring entity per position.
+        Groups entities by position key and keeps a key whose vote passes threshold *t*:
+        the best model score ('max'), or the mean score ('mean', 0.8.0, where a second
+        weak vote can sink a strong one). Returns the highest-scoring entity per position.
         """
         if not ner_results:
             return []
 
-        ner_keys = defaultdict(lambda: [0, 0])
+        ner_keys = defaultdict(list)
         for entity in ner_results:
-            ner_keys[entity['key']][0] += 1
-            ner_keys[entity['key']][1] += entity['score']
+            ner_keys[entity['key']].append(entity['score'])
 
-        passing_keys = [key for key, val in ner_keys.items() if val[1] / val[0] >= t]
+        vote = max if self._ner_ensemble_vote == 'max' else (lambda s: sum(s) / len(s))
+        passing_keys = [key for key, scores in ner_keys.items() if vote(scores) >= t]
         filter_ner_results = self.filter_ner_data(ner_results, passing_keys)
         filter_ner_results.sort(key=lambda x: x['start'])
         return filter_ner_results
@@ -1029,6 +1092,9 @@ class GeneralNER:
             for item in ner_results:
                 start = win_start + offsets[item['start']]
                 end = win_start + offsets[item['end']]
+                if self._ner_snap_word_edges:
+                    start, end = _snap_word_edges(
+                        text, start, end, self._ner_subword_widen, self._ner_subword_widen_same_script)
                 span = {**item, 'start': start, 'end': end,
                         'word': text[start:end], 'key': f"{start}:{end}"}
                 (spans if own_start <= start < own_end else foreign).append(span)
@@ -1083,6 +1149,11 @@ class GeneralNER:
                         start, end = min(start, a), max(end, b)
                 if (start, end) != (item['start'], item['end']):
                     ensemble_results[index] = {**item, 'start': start, 'end': end, 'word': text[start:end]}
+        if self._ner_propagate_masked:
+            ensemble_results = self._propagate(text, ensemble_results, markers)
+        if self._ner_merge_location_gap:
+            ensemble_results = self._merge_location_gaps(
+                text, ensemble_results, markers, self._ner_merge_location_gap)
         if not ensemble_results:
             return NERProcessingResult(text=text, findings=())
         entities = tuple(self._entity(item) for item in ensemble_results)
@@ -1100,6 +1171,57 @@ class GeneralNER:
             for entity in entities
         )
         return NERProcessingResult(text=result.text, findings=findings)
+
+    @staticmethod
+    def _merge_location_gaps(text, spans, markers, max_gap):
+        """Join neighbouring LOCATION spans into one, so an address is one span.
+
+        Format rule only: the gap between them may hold at most *max_gap* characters outside
+        placeholders (``<NUMBER>`` in ``IL <NUMBER>,`` is not counted and is taken in), no line
+        break and no sentence end (``.!?;:`` before whitespace, or ``。！？``).
+        """
+        merged = []
+        for item in sorted(spans, key=lambda x: (x['start'], -x['end'])):
+            last = merged[-1] if merged else None
+            if last and ENTITY_TYPE_MAP.get(last['entity_group']) == 'LOCATION' \
+                    and ENTITY_TYPE_MAP.get(item['entity_group']) == 'LOCATION':
+                a, b = last['end'], item['start']
+                gap = text[a:b]
+                visible = sum(1 for i in range(a, b) if not any(s <= i < e for s, e in markers))
+                if visible <= max_gap and not _GAP_BREAK.search(gap):
+                    best = last if last['score'] >= item['score'] else item
+                    start, end = last['start'], max(last['end'], item['end'])
+                    merged[-1] = {**best, 'start': start, 'end': end,
+                                  'word': text[start:end], 'key': f"{start}:{end}"}
+                    continue
+            merged.append(item)
+        return merged
+
+    def _propagate(self, text, spans, markers):
+        """Add a span at every other whole-word, case-sensitive copy of a masked PER/ORG/LOC value.
+
+        The values come from the models' own spans; a span below ``_ner_propagate_min_score``,
+        shorter than 2 characters or without a letter is not spread. Copies that overlap a
+        span or a marker are skipped, longest value first, so added spans stay disjoint.
+        """
+        cut = self._ner_propagate_min_score
+        sources = {}
+        for item in spans:
+            value = text[item['start']:item['end']]
+            if (item['entity_group'] in ('PER', 'ORG', 'LOC') and (cut is None or item['score'] >= cut)
+                    and len(value) >= 2 and any(ch.isalpha() for ch in value)
+                    and (value not in sources or item['score'] > sources[value]['score'])):
+                sources[value] = item
+        taken = [(s['start'], s['end']) for s in spans] + list(markers)
+        added = []
+        for value in sorted(sources, key=len, reverse=True):
+            # \p{M}: a combining mark (Hindi ा, Thai ิ) continues the word, though stdlib \w excludes it.
+            for m in regex.finditer(rf"(?<![\w\p{{M}}]){regex.escape(value)}(?![\w\p{{M}}])", text):
+                a, b = m.span()
+                if not any(x < b and a < y for x, y in taken):
+                    taken.append((a, b))
+                    added.append({**sources[value], 'start': a, 'end': b, 'word': value, 'key': f"{a}:{b}"})
+        return sorted(spans + added, key=lambda x: x['start']) if added else spans
 
     @staticmethod
     def _entity(item) -> DetectedEntity:

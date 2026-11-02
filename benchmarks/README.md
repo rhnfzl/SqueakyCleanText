@@ -58,8 +58,14 @@ PII (per language and per SCT type):
 - **strict**: exact type and span (`sct.evaluation.evaluate_pii`).
 - **partial**: a gold span is found when a prediction of the same type overlaps it; a
   prediction is correct when it overlaps a gold span of the same type.
+- **masked recall**: type-agnostic partial recall: a gold span counts when any
+  prediction overlaps it, whatever its type (a NUMBER masked as PHONE is masked, not
+  missed). Shown next to partial recall, overall, per type and per language.
 - **leak rate** (the main number): share of gold PII values still in the output, fully
-  or as a 4+ character word of the value outside the placeholders. It is an upper
+  or as a 4+ character word of the value outside the placeholders. Words are runs of
+  letters, digits and combining marks, so Devanagari or Tamil words are not cut at
+  vowel signs. Known limit: scripts written without spaces (Thai) give one long word,
+  so their partial leaks are undercounted. It is an upper
   bound: the same word elsewhere in the doc also counts. Values are compared after
   NFKC, so a full-width name SCT folds to ASCII still counts. DATE is shown per type
   but is not in the total or the per-language rates.

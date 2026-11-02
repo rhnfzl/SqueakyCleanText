@@ -148,6 +148,9 @@ EMAIL_REGEX = re.compile(
     rf"{_IDN_RUN}(?:-+{_IDN_RUN})*(?:\.{_IDN_RUN}(?:-+{_IDN_RUN})*)*(?:\.{_TLD})",
     flags=re.IGNORECASE | re.UNICODE,
 )
+# Cheap pre-check: every EMAIL_REGEX match holds its separator group, so text with no hit here has no
+# email and the regex (13x slower than 0.7.1 on email-free text) is skipped. Keep in step with that group.
+EMAIL_GATE = re.compile(r"@|[(<{\[]at[)>}\]]", re.IGNORECASE)
 
 # Area-code parentheses in compatibility form (full-width （ ）, small ﹙ ﹚): the phone view reads them as
 # "(" ")" (+49（30）123456) and the styled fold treats them as phone punctuation.
@@ -176,6 +179,18 @@ PHONE_REGEX = re.compile(
     # a bracket glued after the number ends it unless digits follow (+49 30 1234567（電話）).
     r"|(?<![\d+])\+(?=(?:[ .()-]{0,2}\d){8})\d{1,3}(?:[ .-]?(?:\(\d{1,5}\)|\d{1,5})){1,5}"
     r"(?:\s?(?:ext\.?|[#x])\s?\d{2,6})?(?![\d_]|\(\d)"
+)
+
+# IBAN: country code, check digits, then 11-30 letters/digits, in groups of 4 or unspaced.
+# A match is only an IBAN when its ISO 7064 mod-97 checksum holds (contact.IBAN_VIEW).
+IBAN_REGEX = re.compile(r"(?<![^\W_])[A-Z]{2}[0-9]{2}(?: ?[A-Z0-9]{4}){2,7}(?: ?[A-Z0-9]{1,3})?(?![^\W_])")
+# Payment card: 13-19 digits starting 2-6 (the issuer ranges), optional space/hyphen groups;
+# only a card when the Luhn checksum holds (contact.CARD_VIEW).
+CARD_REGEX = re.compile(r"(?<![\w+.,])[2-6](?:[ -]?[0-9]){12,18}(?![\w])")
+# Identifier token (licence/ID codes like RBCON68T08): 6+ uppercase letters and digits of any
+# script, at least 2 digits and 1 letter, not glued to another letter, digit or mark.
+IDENTIFIER_REGEX = regex.compile(
+    r"(?<![\p{L}\p{N}\p{M}_])(?=(?:\p{Lu}*\p{Nd}){2})(?=\p{Nd}*\p{Lu})[\p{Lu}\p{Nd}]{6,}(?![\p{L}\p{N}\p{M}_])"
 )
 
 # IPv4 and IPv6 (incl. "::" forms and IPv4-mapped tails). Runs before the
@@ -239,10 +254,17 @@ TWO_LINEBREAK_REGEX = re.compile(r"((\r\n)|[\n\v])+((\r\n)|[\n\v])+")
 MULTI_WHITESPACE_TO_ONE_REGEX = re.compile(r"\s+")
 NONBREAKING_SPACE_REGEX = re.compile(r"(?!\n)\s+")
 
+_HTML_ENTITY = r'&([a-z0-9]+|#[0-9]{1,6}|#x[0-9a-f]{1,6});'
+# Tag-shaped only (html_tag_strict): a name after "<" ("<b>", "</b>", "<br/>", "<!DOCTYPE", "<?xml") or a
+# comment, so "Name <a@b.com>", "<https://...>" and a stray "a < b ... >" are not markup. A comment ends at
+# "-->" (its body may hold "<" and ">"); an unclosed "<!--" falls back to the next ">". Linear: a comment body
+# stops at the next "<!--" and [^<>] at the next bracket, and the pattern is JS-portable (browser export).
 HTML_REGEX = re.compile(
-    '<.*?>|&([a-z0-9]+|#[0-9]{1,6}|#x[0-9a-f]{1,6});',
+    r'<!--(?:(?!<!--)[\s\S])*?-->|<!--[^<>]*>|<[!?/]?[A-Za-z][A-Za-z0-9:-]*(?:\s[^<>]*)?/?>|' + _HTML_ENTITY,
     flags=re.UNICODE | re.IGNORECASE,
 )
+# 0.8.0 rule (html_tag_strict=False): any "<...>" on one line.
+HTML_REGEX_ANY = re.compile('<.*?>|' + _HTML_ENTITY, flags=re.UNICODE | re.IGNORECASE)
 
 # Punctuation (category P) of the CJK symbol, katakana middle dot and full-width blocks, except the
 # full-width forms of URL syntax (／ ？ ＃ ％ ＆ ＠ ： ． － ＿), which the styled fold turns into ASCII.
@@ -251,51 +273,62 @@ _WIDE_PUNCT = re.escape(''.join(
     if unicodedata.category(chr(cp))[0] == 'P' and unicodedata.normalize('NFKC', chr(cp)) not in '/?#%&@:.-_'))
 
 # Fixed: Unicode ranges use actual Unicode escapes (not literal \\u in raw strings)
-URL_REGEX = re.compile(
-    # Only an ASCII letter or digit glues to the scheme, so a URL right after CJK/Thai text
-    # (請見https://..., ดูhttps://...) is still found.
-    r"(?:^|(?<![A-Za-z0-9_\/\.]))(?:"
-    # protocol identifier
-    r"(?:(?:https?:\/\/|ftp:\/\/|www\d{0,3}\.))"
-    # user:pass authentication; never across / ? # " < > so a later "@" in the
-    # query or the markup is not taken as user info
-    # (user up to the first ":", one way to split it, so a long run with no "@" fails in linear time)
-    r"(?:(?=[^\s/?#\"<>@])[^\s/?#\"<>@:]*(?::[^\s/?#\"<>@]*)?@)?" r"(?:"
-    # bracketed IPv6 host; private and loopback IPv4 hosts match too, so the whole
-    # URL (query values included) is replaced, not just the address
-    r"\[[0-9a-f:.]*:[0-9a-f:.]*\]" r"|"
-    # IPv4 host, whole: a longer octet (any decimal digit, "1௨3") or another label after it (any
-    # label start the host grammar below takes, "école" too) is a host name
-    rf"{_IPV4}(?![0-9{_DECIMAL}]|\.[{_IDN_CHAR}])"
-    r"|"
-    # host name (with proper Unicode support, beyond the BMP too); the label characters of an email
-    # domain, so CJK and full-width prose punctuation (，、「) glued after a host ends it
-    # (labels as X+(-+X+)*, as in EMAIL_REGEX, so a host with no TLD fails in linear time)
-    rf"{_IDN_RUN}(?:-+{_IDN_RUN})*"
-    # domain name
-    rf"(?:\.{_IDN_RUN}(?:-+{_IDN_RUN})*)*"
-    # TLD identifier (punycode first, so ".xn" alone never ends the host)
-    rf"(?:\.(?:xn--[a-z0-9-]*[a-z0-9]|(?:{_NO_GLUE}[{_IDN_LETTER}]){{2,}}))"
-    r"|" r"(?:(localhost))" r")"
-    # fully qualified host's final dot ("example.com./?q="), only when a path, port or query follows,
-    # so a sentence-ending period stays outside the URL
-    r"(?:\.(?=/|:\d|[?#][^\s\"<>]))?"
-    # port number
-    r"(?::\d{2,5}\b)?"
-    # resource path, or a query/fragment right after the host ("?id=", "#token=");
-    # " < > are never raw in a URL, so markup around it survives. A bare trailing "?"
-    # stays punctuation. CJK and full-width punctuation (，。！（ ・) ends it, as in an email
-    # domain, so CJK prose glued after a URL stays. ) ] } belong to the URL only when more URL text follows
-    # ("?f=(a)&email=...", "report(1).pdf", "a(b);jsessionid=", a run as in "/(S(id))/a.aspx"); RFC 3986
-    # sub-delimiters (but a possessive ') between bracket and text count as URL text, so a closing bracket
-    # around a URL stays outside it.
-    rf"(?:\/(?:{_NO_GLUE}[^\)\]\}}\s\"<>{_WIDE_PUNCT}]|[\)\]\}}]+(?=[.,;:!$*@]*[\w&=/?#%+~-]))*"
-    rf"|[?#](?:{_NO_GLUE}[^\)\]\}}\s\"<>{_WIDE_PUNCT}]|[\)\]\}}]+(?=[.,;:!$*@]*[\w&=/?#%+~-]))+)?"
-    # Safety net: a scheme-led run whose host fails the grammar above (a look-alike character in it) is
-    # still a URL up to a space or prose punctuation, so its query values never stay visible.
-    rf"|(?:https?|ftp):\/\/(?:{_NO_GLUE}[^\s\"<>{_WIDE_PUNCT}])+(?<=[^\W_]|[{MARKS}]))",
-    flags=re.UNICODE | re.IGNORECASE,
-)
+def _url_regex(trailing_punct_outside):
+    # url_trailing_punct_outside: . , ; : ! ? ' belong to a path or query only when more URL text
+    # follows ("/a.html", "?a=1,2&b=3"), so "see https://x.com/a/b." keeps its full stop as prose.
+    tail = r".,;:!?'" if trailing_punct_outside else ""
+    url_char = rf"{_NO_GLUE}[^{tail}\)\]\}}\s\"<>{_WIDE_PUNCT}]"
+    punct = rf"|[{tail}]+(?=[\)\]\}}]*{url_char})" if trailing_punct_outside else ""
+    path_char = rf"(?:{url_char}{punct}|[\)\]\}}]+(?=[.,;:!$*@]*[\w&=/?#%+~-]))"
+    return re.compile(
+        # Only an ASCII letter or digit glues to the scheme, so a URL right after CJK/Thai text
+        # (請見https://..., ดูhttps://...) is still found.
+        r"(?:^|(?<![A-Za-z0-9_\/\.]))(?:"
+        # protocol identifier
+        r"(?:(?:https?:\/\/|ftp:\/\/|www\d{0,3}\.))"
+        # user:pass authentication; never across / ? # " < > so a later "@" in the
+        # query or the markup is not taken as user info
+        # (user up to the first ":", one way to split it, so a long run with no "@" fails in linear time)
+        r"(?:(?=[^\s/?#\"<>@])[^\s/?#\"<>@:]*(?::[^\s/?#\"<>@]*)?@)?" r"(?:"
+        # bracketed IPv6 host; private and loopback IPv4 hosts match too, so the whole
+        # URL (query values included) is replaced, not just the address
+        r"\[[0-9a-f:.]*:[0-9a-f:.]*\]" r"|"
+        # IPv4 host, whole: a longer octet (any decimal digit, "1௨3") or another label after it (any
+        # label start the host grammar below takes, "école" too) is a host name
+        rf"{_IPV4}(?![0-9{_DECIMAL}]|\.[{_IDN_CHAR}])"
+        r"|"
+        # host name (with proper Unicode support, beyond the BMP too); the label characters of an email
+        # domain, so CJK and full-width prose punctuation (，、「) glued after a host ends it
+        # (labels as X+(-+X+)*, as in EMAIL_REGEX, so a host with no TLD fails in linear time)
+        rf"{_IDN_RUN}(?:-+{_IDN_RUN})*"
+        # domain name
+        rf"(?:\.{_IDN_RUN}(?:-+{_IDN_RUN})*)*"
+        # TLD identifier (punycode first, so ".xn" alone never ends the host)
+        rf"(?:\.(?:xn--[a-z0-9-]*[a-z0-9]|(?:{_NO_GLUE}[{_IDN_LETTER}]){{2,}}))"
+        r"|" r"(?:(localhost))" r")"
+        # fully qualified host's final dot ("example.com./?q="), only when a path, port or query follows,
+        # so a sentence-ending period stays outside the URL
+        r"(?:\.(?=/|:\d|[?#][^\s\"<>]))?"
+        # port number
+        r"(?::\d{2,5}\b)?"
+        # resource path, or a query/fragment right after the host ("?id=", "#token=");
+        # " < > are never raw in a URL, so markup around it survives. A bare trailing "?"
+        # stays punctuation. CJK and full-width punctuation (，。！（ ・) ends it, as in an email
+        # domain, so CJK prose glued after a URL stays. ) ] } belong to the URL only when more URL text follows
+        # ("?f=(a)&email=...", "report(1).pdf", "a(b);jsessionid=", a run as in "/(S(id))/a.aspx"); RFC 3986
+        # sub-delimiters (but a possessive ') between bracket and text count as URL text, so a closing bracket
+        # around a URL stays outside it.
+        rf"(?:\/{path_char}*|[?#]{path_char}+)?"
+        # Safety net: a scheme-led run whose host fails the grammar above (a look-alike character in it) is
+        # still a URL up to a space or prose punctuation, so its query values never stay visible.
+        rf"|(?:https?|ftp):\/\/(?:{_NO_GLUE}[^\s\"<>{_WIDE_PUNCT}])+(?<=[^\W_]|[{MARKS}]))",
+        flags=re.UNICODE | re.IGNORECASE,
+    )
+
+
+URL_REGEX = _url_regex(True)
+# 0.8.0 rule (url_trailing_punct_outside=False): a path or query takes trailing . , ; : ! ? '
+URL_REGEX_LEGACY = _url_regex(False)
 
 
 strange_double_quotes = [
@@ -310,7 +343,7 @@ SINGLE_QUOTE_REGEX = re.compile("|".join(strange_single_quotes))
 YEAR_REGEX = re.compile(r"(?<![\d_])(19|20)\d{2}(?![\d_])")
 
 # ---------------------------------------------------------------------------
-# Multilingual month name vocabulary (EN, NL, DE, ES, FR, PT, IT)
+# Multilingual month name vocabulary (EN, NL, DE, ES, FR, PT, IT, TH)
 # Used by DATE_REGEX (exact match) and fuzzy_replace_dates (RapidFuzz).
 # Keys are canonical lowercase forms; values are frozensets of language codes
 # (some month names are shared across languages, e.g. "juni" is NL and DE,
@@ -373,6 +406,13 @@ MONTH_NAMES_MULTILINGUAL = {
     "gen": frozenset({"it"}), "mag": frozenset({"it"}),
     "giu": frozenset({"it"}), "lug": frozenset({"it"}),
     "ott": frozenset({"it"}),
+    # Thai (CLDR th, format wide and abbreviated); Buddhist-era years are plain 4 digits
+    **{name: frozenset({"th"}) for name in (
+        "มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน",
+        "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม",
+        "ม.ค.", "ก.พ.", "มี.ค.", "เม.ย.", "พ.ค.", "มิ.ย.",
+        "ก.ค.", "ส.ค.", "ก.ย.", "ต.ค.", "พ.ย.", "ธ.ค.",
+    )},
 }
 
 # Flat set for quick membership check (lowercase)
@@ -397,6 +437,7 @@ _LANG_TO_VOCAB = {
     "FRENCH": "fr",
     "PORTUGUESE": "pt",
     "ITALIAN": "it",
+    "THAI": "th",
 }
 
 # Per-language fuzzy vocabulary (full names only, len > 4)
@@ -409,7 +450,7 @@ for _lang_name, _lang_code in _LANG_TO_VOCAB.items():
 
 # Build month name alternation for regex (longest first to avoid prefix issues)
 _MONTH_ALTERNATION = '|'.join(
-    sorted(_MONTH_NAMES_SET, key=len, reverse=True)
+    map(re.escape, sorted(_MONTH_NAMES_SET, key=len, reverse=True))
 )
 
 
@@ -419,16 +460,19 @@ _MONTH_ALTERNATION = '|'.join(
 # Module-level constants above remain the defaults.
 # ---------------------------------------------------------------------------
 
-def build_month_names_dict(extra_month_names=None):
+def build_month_names_dict(extra_month_names=None, builtin_languages=None):
     """Build month-name lookup dict, merging defaults + custom names.
 
     Args:
         extra_month_names: dict mapping language ISO code -> tuple of month names
                           e.g. {'pl': ('styczen', 'luty', ...)}
+        builtin_languages: ISO codes of the built-in month data to keep (None = all).
     Returns:
         dict mapping lowercase month name -> frozenset of ISO codes
     """
-    result = dict(MONTH_NAMES_MULTILINGUAL)  # copy defaults
+    keep = None if builtin_languages is None else frozenset(builtin_languages)
+    result = {name: langs if keep is None else langs & keep
+              for name, langs in MONTH_NAMES_MULTILINGUAL.items() if keep is None or langs & keep}
     if extra_month_names:
         for iso_code, names in extra_month_names.items():
             for name in names:
@@ -488,28 +532,33 @@ _CIRCLED_DAYS = ''.join(chr(cp) for cp in range(0x2460, 0x3300)
                         and 1 <= int(unicodedata.normalize('NFKC', chr(cp))) <= 31)
 
 
-def build_date_regex(month_names_dict=None, styled=False):
+def build_date_regex(month_names_dict=None, styled=False, slash_year=True):
     """Build DATE_REGEX from a month-names dict.
 
     Args:
         month_names_dict: output of build_month_names_dict().
                          Uses module-level MONTH_NAMES_MULTILINGUAL if None.
         styled: a month-name date's day may be a circled number (fold_styled_characters).
+        slash_year: also match a month name, "/" and a 2- or 4-digit year (October/55, Oct/2019).
     Returns:
         Compiled regex pattern
     """
-    names = month_names_dict or MONTH_NAMES_MULTILINGUAL
-    alt = '|'.join(sorted(names.keys(), key=len, reverse=True))
+    names = MONTH_NAMES_MULTILINGUAL if month_names_dict is None else month_names_dict
+    # Escaped: a dotted abbreviation (ก.พ.) is literal, not "any character".
+    alt = '|'.join(map(re.escape, sorted(names.keys(), key=len, reverse=True)))
     day = rf'(?:\d{{1,2}}|[{_CIRCLED_DAYS}])' if styled else r'\d{1,2}'
-    # A numeric date glued to letters of an unspaced script (Thai, CJK) is a date, as numbers are.
-    return re.compile(
-        _DATE_START + _NUMERIC_DATE + _DATE_END + '|' + _HAN_DATE + '|' + _DATE_START + r'(?:'
+    month_dates = (
         r'(?:' + alt + r')'
         r'\.?\s+' + day + r'(?:st|nd|rd|th)?,?\s+\d{4}'
         r'|'
         + day + r'\.?\s+(?:de\s+)?(?:' + alt + r')'
         r'(?:\s+de)?\s+\d{4}'
-        r')' + _DATE_END,
+        + (r'|(?:' + alt + r')\.?/(?:\d{4}|\d{2})' if slash_year else '')
+    )
+    # A numeric date glued to letters of an unspaced script (Thai, CJK) is a date, as numbers are.
+    return re.compile(
+        _DATE_START + _NUMERIC_DATE + _DATE_END + '|' + _HAN_DATE
+        + ('|' + _DATE_START + r'(?:' + month_dates + r')' + _DATE_END if names else ''),
         flags=re.IGNORECASE,
     )
 
@@ -520,7 +569,7 @@ def build_fuzzy_vocabulary(month_names_dict=None, lang_to_vocab=None):
     Returns:
         (all_vocab_tuple, by_lang_dict)
     """
-    names = month_names_dict or MONTH_NAMES_MULTILINGUAL
+    names = MONTH_NAMES_MULTILINGUAL if month_names_dict is None else month_names_dict  # {} = no months
     lvocab = lang_to_vocab or _LANG_TO_VOCAB
 
     all_vocab = tuple(name for name in names if len(name) > 4)
@@ -564,6 +613,9 @@ ISOLATED_SPECIAL_SYMBOLS_REGEX = re.compile(
 # Pre-compiled bracket/brace removal patterns (moved from special.py runtime)
 BRACKET_CONTENT_REGEX = re.compile(r'\[[^\]]+\]')
 BRACE_CONTENT_REGEX = re.compile(r'\{[^}]+\}')
+# innermost spans only, used when a length limit is set; [...] never spans a brace, so it cannot cut into JSON
+BRACKET_INNER_REGEX = re.compile(r'\[[^\[\]{}]+\]')
+BRACE_INNER_REGEX = re.compile(r'\{[^{}]+\}')
 # A quote, dash, * or % is isolated unless a letter, digit or mark of any script touches it
 # (special.py checks the neighbours), so "ইসলাম-এর" and "東京-大阪" keep their hyphen.
 ISOLATED_QUOTES_REGEX = re.compile(r"['\"\-*%]")

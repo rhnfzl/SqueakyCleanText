@@ -66,7 +66,7 @@ cfg = TextCleanerConfig(ner_models={'ENGLISH': '...', 'MULTILINGUAL': '...', 'HI
 
 Auto-detection covers all 75 Lingua languages (`detect_all_languages=True`). Languages
 without their own NER model run the MULTILINGUAL + ENGLISH fallback; stopwords exist for
-EN/NL/DE/ES (others use English) and month names for 7 languages plus `custom_month_names`.
+EN/NL/DE/ES (others use English) and month names for 8 languages (EN NL DE ES FR PT IT TH) plus `custom_month_names`.
 `ner_backend='gliner'` is language independent, so any pinned language works with it.
 
 ## Field reference
@@ -91,12 +91,16 @@ new_cfg = dataclasses.replace(cfg, check_ner_process=False)
 | `check_decode_unicode_escapes` | `True` | Part of `check_fix_bad_unicode`: decode literal backslash escapes (`\u00e9` to `é`, `\n` to a line break). `False` keeps them as written (code, JSON) |
 | `check_to_ascii_unicode` | `False` | Transliterate to ASCII with unidecode. `False` keeps every script (`日本語`, `München`); the multilingual NER models read native script, and folded output hid names from them (0 of 8 Hindi/Bengali/Tamil names found). `True` = 0.7 (`日本語` -> `Ri Ben Yu`); `sct-clean --to-ascii`, `SCT_MCP_TO_ASCII=1` |
 | `check_replace_html` | `True` | Strip/replace HTML tags, found on the markup as written: escaped code (`&lt;b&gt;`) is text, not a tag |
+| `html_tag_strict` | `True` | The HTML rule reads only tag shapes: a name after `<` (`<b>`, `</a>`, `<br/>`, `<!DOCTYPE html>`, `<?xml ...?>`, multi-line tags) or a `<!-- -->` comment, plus entities. `Name <a@b.com>`, `<https://...>` and a stray `a < b ... >` are left to the email/URL rules and the text. `False` restores the 0.8.0 `<.*?>`, which masks those as `<HTML>`. Legacy global `HTML_TAG_STRICT` |
+| `url_trailing_punct_outside` | `True` | `. , ; : ! ? '` end a URL path or query unless more URL text follows, so `see https://x.com/a/b. Next` gives `see <URL>. Next` and the sentence keeps its full stop or comma. `/a.html`, `?a=1,2&b=3`, `/v1.2/x`, `;jsessionid=` and a fully qualified host's final dot before a path stay inside. Format regex only; reaches the plain, reversible and synthetic paths, the streaming split guard and the browser export. `False` restores the 0.8.0 URL, which takes the trailing mark. Legacy global `URL_TRAILING_PUNCT_OUTSIDE` |
 | `check_replace_urls` | `True` | Replace URLs with token |
-| `check_replace_emails` | `True` | Replace emails with token |
+| `check_replace_emails` | `True` | Replace emails with token. Text with no `@` and no bracketed `at` (`[at]`, `(at)`, `<at>`, `{at}`) skips the email regex; output is unchanged |
 | `check_replace_ips` | `True` | Replace IPv4/IPv6 addresses (runs before dates, phones, years) |
 | `replace_ips_public_only` | `False` | Keep private, loopback and reserved IPs; replace only public ones |
 | `check_replace_years` | `True` | Replace years (1900-2099) |
-| `check_replace_dates` | `True` | Replace full dates and date-times with one `<DATE>` (ISO 8601, numeric with `-` `/` `.` in digits of any script and any 4-digit year, so Buddhist-era `15/01/2533` too, month names, CJK/Korean unit dates `1990年1月15日` `1990년 1월 15일`, Korean `1990. 1. 15.`, Han-numeral `一九九〇年一月十五日` read by Unicode numeric value); runs before phones, years and numbers. A date ends where no digit or Latin/Greek/Cyrillic letter touches it, so one glued to Thai or CJK text is found (`生日是15 January 1990谢谢`). Only full dates become one `<DATE>`: `1990年1月`, `1月15日`, Japanese era years (`令和6年1月15日`), `1990.1.15.` (CalVer-shaped) and month names outside the 7 built-in languages (add them with `custom_month_names`) do not, and the year and number steps can still change them (`1990年1月` becomes `<YEAR>年<NUMBER>月`). `False`: digits fall to the year and number steps |
+| `check_replace_dates` | `True` | Replace full dates and date-times with one `<DATE>` (ISO 8601, numeric with `-` `/` `.` in digits of any script and any 4-digit year, so Buddhist-era `15/01/2533` too, month names (Thai with Buddhist-era years too, `24 ก.พ. 2562`), month name / year (`October/55`), CJK/Korean unit dates `1990年1月15日` `1990년 1월 15일`, Korean `1990. 1. 15.`, Han-numeral `一九九〇年一月十五日` read by Unicode numeric value); runs before phones, years and numbers. A date ends where no digit or Latin/Greek/Cyrillic letter touches it, so one glued to Thai or CJK text is found (`生日是15 January 1990谢谢`). Only full dates become one `<DATE>`: `1990年1月`, `1月15日`, Japanese era years (`令和6年1月15日`), `1990.1.15.` (CalVer-shaped) and month names outside the 8 built-in languages (add them with `custom_month_names`) do not, and the year and number steps can still change them (`1990年1月` becomes `<YEAR>年<NUMBER>月`). `False`: digits fall to the year and number steps |
+| `date_month_name_slash_year` | `True` | A month name, `/` and a 2- or 4-digit year is one `<DATE>` (`October/55`, `Oct/2019`). `False` = 0.8.0 (`October/<NUMBER>`) |
+| `date_builtin_month_languages` | `None` | ISO codes of the built-in month data dates use, from `en nl de es fr pt it th`; `None` = all. `('en','nl','de','es','fr','pt','it')` = the 0.8.0 data (no Thai) |
 | `check_fuzzy_replace_dates` | `False` | Fuzzy match misspelled months (requires `[fuzzy]`) |
 | `check_replace_phone_numbers` | `True` | Replace phone numbers |
 | `check_replace_numbers` | `True` | Replace standalone numbers |
@@ -107,6 +111,9 @@ new_cfg = dataclasses.replace(cfg, check_ner_process=False)
 | `check_remove_isolated_special_symbols` | `True` | Remove isolated symbols |
 | `check_remove_bracket_content` | `True` | Remove `[...]` content |
 | `check_remove_brace_content` | `True` | Remove `{...}` content |
+| `bracket_content_max_chars` | `32` | Bracket/brace removal only takes innermost `[...]`/`{...}` spans with at most this many characters inside, so bracketed prose stays. `0` = no limit |
+| `bracket_content_max_words` | `3` | Same, at most this many whitespace-separated words inside. Both limits `0` = 0.8.0 (every span up to the first closing bracket) |
+| `keep_json_braces` | `True` | Never remove a `{...}` that parses as a JSON object (nested ones included), nor anything inside it. `False` = 0.8.0 |
 | `check_normalize_whitespace` | `True` | Normalize whitespace |
 | `check_statistical_model_processing` | `True` | Generate stat model output |
 | `check_casefold` | `True` | Lowercase stat output |
@@ -150,6 +157,16 @@ new_cfg = dataclasses.replace(cfg, check_ner_process=False)
 | `synthetic_reference_date` | `'2026-01-01'` | Synthetic mode: the ISO date that date fakes (`DATE`, `DATE_OF_BIRTH`) end on and that Faker reads as today (the birthday inside native `SOCIAL_SECURITY_NUMBER`/`TAX_ID` fakes, e.g. `zh_CN`, `fi_FI`, `sv_SE`), so a document gets the same fakes whatever day it is cleaned. `None` uses today's date from the clock |
 | `positional_tags` | `('PER', 'LOC', 'ORG', 'MISC')` | Entity types to recognize |
 | `ner_confidence_threshold` | `None` | Minimum confidence score (0..1). `None` = 0.85, or the GLiNER threshold in PII mode; an explicit value is always used as given |
+| `ner_ensemble_vote` | `'max'` | How the NER models vote on one span: `'max'` keeps it when the best model score reaches `ner_confidence_threshold`, so a weak second model on the same (widened) span never hides a strong hit; `'mean'` averages the scores (0.8.0) |
+| `ner_propagate_masked` | `True` | After NER, mask every other case-sensitive whole-word copy of a masked PER/ORG/LOC value in the same document with the same type, so a name masked once is not left visible elsewhere. Values come from the model's own spans (no word lists); values under 2 characters or without a letter are not spread. A wrong tag is repeated too. `False` = 0.8.0 output |
+| `ner_propagate_min_score` | `None` | Score (0..1) a span needs before its value is propagated. `None` = the effective NER cut; raise it to spread fewer wrong tags at the cost of more visible repeats |
+| `check_replace_iban_cards` | `True` | Before the phone step, mask an IBAN whose mod-97 checksum holds as one `<IBAN>` and a 13-19 digit card number (first digit 2-6, spaces/hyphens allowed) whose Luhn checksum holds as one `<CARD>`. Bad checksums go to the phone/number steps. `False` = 0.8.0 (`NL91ABNA<PHONE>`) |
+| `replace_with_iban` | `"<IBAN>"` | Replacement for IBANs |
+| `replace_with_cards` | `"<CARD>"` | Replacement for card numbers |
+| `check_replace_identifiers` | `False` | Mask identifier tokens: 6+ uppercase letters and digits (any script), 2+ digits and a letter, not glued to another letter or digit (`RBCON68T08`). Off by default: also takes product and reference codes (`RTX4090`, `COVID19`) |
+| `replace_with_identifiers` | `"<ID>"` | Replacement for identifier tokens |
+| `ner_merge_location_gap` | `0` | Join two neighbouring LOCATION spans into one when the text between them holds at most this many characters (placeholders such as `<NUMBER>` are not counted and are taken in), no line break and no sentence end (`.!?;:` before whitespace, `。！？`). An address like `Elm Street, Apt 5B, Springfield, IL <NUMBER>, USA` becomes one `<LOCATION>` instead of leaving `Apt 5B` and `IL` visible. Format rule only (no word lists). The cost: a short list of places (`Paris, London and Berlin`) also becomes one `<LOCATION>`. `12` or `20` are the measured settings; `0` = off (0.8.0 output) |
+| `ner_snap_word_edges` | `True` | A NER span whose start or end falls inside a word moves out to the word edges, for every backend (SentencePiece XLM-R, GLiNER, torch), so `Via della Salut` + `e` or a Bengali name + glued case suffix leaves no letters next to the placeholder. A word is a run of Unicode letters and marks; wide CJK characters never join. The `ner_subword_widen` cap and `ner_subword_widen_same_script` rule apply (an unspaced Thai clause is not swallowed; `ner_subword_widen=0` also turns snapping off). Unicode-property rule only. `False` = 0.8.0 spans |
 | `ner_batch_size` | `8` | NER chunks per model forward pass, batched across the documents of a `process_batch` call (must be >= 1). `1` = 0.7.1 call pattern and exact scores, and less memory; which is faster depends on the CPU, so measure |
 | `onnx_intra_op_threads` | `None` | ONNX Runtime threads per inference (`None` = ORT default: every physical core, ignoring CPU affinity). Set it to cap CPU use; fewer threads is usually slower |
 | `onnx_inter_op_threads` | `None` | ONNX Runtime inter-op threads (`None` = ORT default). Only matters with ORT parallel execution mode, so `onnx_intra_op_threads` is the usual knob |

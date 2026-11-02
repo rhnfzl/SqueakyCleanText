@@ -342,3 +342,145 @@ def test_browser_number_rule_follows_flag():
     strict = build_browser_manifest(
         TextCleanerConfig(check_ner_process=False, replace_numbers_in_words=True))
     assert default != strict
+
+
+# --- F3: IBAN / card checksums and identifier tokens (made-up values) ---
+
+@pytest.mark.parametrize("value", [
+    "NL91ABNA0417164300", "NL91 ABNA 0417 1643 00", "GB82 WEST 1234 5698 7654 32",
+])
+def test_valid_iban_is_one_iban_span(value):
+    out = _cleaner().process(f"IBAN {value} ok").lm_text
+    assert out == "IBAN <IBAN> ok"
+
+
+def test_bad_iban_checksum_is_not_iban():
+    out = _cleaner().process("IBAN NL92ABNA0417164300 ok").lm_text
+    assert "<IBAN>" not in out
+
+
+@pytest.mark.parametrize("value", ["4111 1111 1111 1111", "4111-1111-1111-1111", "4111111111111111"])
+def test_luhn_card_is_one_card_span(value):
+    assert _cleaner().process(f"Card {value} ok").lm_text == "Card <CARD> ok"
+
+
+def test_bad_luhn_is_not_card_and_old_behaviour_reachable():
+    assert "<CARD>" not in _cleaner().process("Card 4111111111111112").lm_text
+    out = _cleaner(check_replace_iban_cards=False).process("Card 4111 1111 1111 1111").lm_text
+    assert "<CARD>" not in out and "<PHONE>" in out
+
+
+def test_iban_followed_by_code_word_keeps_checksum_prefix():
+    out = _cleaner().process("BE68 5390 0754 7034 ABCD paid").lm_text
+    assert out == "<IBAN> ABCD paid"
+
+
+def test_identifier_rule_off_by_default_on_with_flag():
+    text = "Licence RBCON68T08 and GPU RTX4090, ID XK4729QP31; word Model5 A1B2"
+    assert _cleaner().process(text).lm_text.count("RBCON68T08") == 1
+    out = _cleaner(check_replace_identifiers=True).process(text).lm_text
+    assert out == "Licence <ID> and GPU <ID>, ID <ID>; word Model5 A1B2"
+
+
+def test_new_types_reversible_and_counted():
+    result = _cleaner(replacement_mode="reversible", check_replace_identifiers=True).process(
+        "pay NL91ABNA0417164300 card 4111111111111111 ref RBCON68T08")
+    anon_map = result.metadata["anon_map"]
+    assert anon_map.deanonymize(result.lm_text) == "pay NL91ABNA0417164300 card 4111111111111111 ref RBCON68T08"
+    assert {e.entity_type for e in anon_map.entries} == {"IBAN", "CARD", "ID"}
+    assert {"IBAN", "CARD", "ID"} <= set(result.signals["pii_types"])
+
+
+def test_new_types_synthetic():
+    out = _cleaner(replacement_mode="synthetic", check_replace_identifiers=True).process(
+        "pay NL91ABNA0417164300 card 4111111111111111 ref RBCON68T08").lm_text
+    assert "NL91ABNA0417164300" not in out and "4111111111111111" not in out and "RBCON68T08" not in out
+
+
+@pytest.mark.parametrize("text, expected", [
+    ("Contact John Smith <john.smith@example.com> today.", "Contact John Smith <<EMAIL>> today."),
+    # a lone "<" is dropped as a symbol, not as markup
+    ("If a < b then mail <x@y.org> please", "If a b then mail <<EMAIL>> please"),
+    ("see <https://example.com/path> now", "see <<URL>> now"),
+    ("x <3 y > 2", "x <3 y 2"),
+    ("a <b>bold</b> <br/> <!-- note --> end", "a <HTML>bold<HTML> <HTML> <HTML> end"),
+    ('<!DOCTYPE html><a\nhref="mailto:x@y.org">hi</a>', "<HTML><HTML>hi<HTML>"),
+])
+@pytest.mark.parametrize("mode", ["placeholder", "reversible"])
+def test_html_rule_reads_only_tag_shapes(text, expected, mode):
+    out = _cleaner(replacement_mode=mode, check_replace_numbers=False,
+                   check_remove_isolated_letters=False).process(text).lm_text
+    if mode == "placeholder":
+        assert out == expected
+    else:
+        assert "<HTML" not in out or "<HTML" in expected
+        assert "@" not in out and "https" not in out
+
+
+def test_html_tag_strict_off_restores_any_angle_span():
+    out = _cleaner(html_tag_strict=False).process("Contact Jo <jo@example.com> today.").lm_text
+    assert out == "Contact Jo <HTML> today."
+    js = build_browser_manifest(TextCleanerConfig(html_tag_strict=False))
+    assert js["rules"]["html"]["pattern"].startswith("<.*?>")
+
+
+@pytest.mark.parametrize("text, url", [
+    ("Visit https://example.com/path. Next.", "https://example.com/path"),
+    ("See https://example.com/a/b.html. Next", "https://example.com/a/b.html"),
+    ("Go to https://x.com/p?q=1. Done", "https://x.com/p?q=1"),
+    ("https://x.com/path, then", "https://x.com/path"),
+    ("https://x.com/p; ok", "https://x.com/p"),
+    ("https://x.com/a! wow", "https://x.com/a"),
+    ("is it https://x.com/a? yes", "https://x.com/a"),
+    ("at https://x.com/a: here", "https://x.com/a"),
+    ("'https://x.com/a' said", "https://x.com/a"),
+    ("(https://x.com/a.) ok", "https://x.com/a"),
+    # punctuation inside the URL stays
+    ("get https://x.com/a.html now", "https://x.com/a.html"),
+    ("get https://x.com/p?a=1,2&b=3 now", "https://x.com/p?a=1,2&b=3"),
+    ("get https://x.com/v1.2/x now", "https://x.com/v1.2/x"),
+    ("get https://x.com/a;jsessionid=AB12 now", "https://x.com/a;jsessionid=AB12"),
+    ("get https://x.com/a(b);jsessionid=1 now", "https://x.com/a(b);jsessionid=1"),
+    ("get https://x.com/it's/x now", "https://x.com/it's/x"),
+    ("get https://portal.example.com./?email=a%40b.org now", "https://portal.example.com./?email=a%40b.org"),
+    ("Bare https://example.com. Next.", "https://example.com"),
+])
+def test_url_trailing_punct_stays_outside(text, url):
+    assert constants.URL_REGEX.search(text).group() == url
+    if text.startswith("'"):  # the cleaner drops the quotes themselves; the regex check above is the point
+        return
+    out = _cleaner(check_replace_numbers=False, check_remove_isolated_letters=False).process(text).lm_text
+    assert out == text.replace(url, "<URL>")
+
+
+def test_url_trailing_punct_outside_off_restores_080():
+    text = "Visit https://example.com/path. Next."
+    assert constants.URL_REGEX_LEGACY.search(text).group() == "https://example.com/path."
+    assert _cleaner(url_trailing_punct_outside=False).process(text).lm_text == "Visit <URL> Next."
+    js = build_browser_manifest(TextCleanerConfig(url_trailing_punct_outside=False))
+    assert js["rules"]["url"]["pattern"] == constants.URL_REGEX_LEGACY.pattern
+
+
+# F12: EMAIL_GATE is a cheap pre-check for the email regex's separator; it must never skip a match.
+@pytest.mark.parametrize("text", [
+    "a@b.com", "x[AT]y.org", "foo{at}bar.de", "mail (at) host", "用户@例子.广告", "anna!@example.com",
+    "Contact John Smith <john.smith@example.com> today.", "<x@y.org>", "joe<AT>mail.example.net",
+])
+def test_email_gate_passes_every_regex_match(text):
+    for match in constants.EMAIL_REGEX.finditer(text):
+        assert constants.EMAIL_GATE.search(match.group())
+
+
+class _NoSub:
+    def sub(self, *args, **kwargs):
+        raise AssertionError("email regex ran on text with no separator")
+
+
+@pytest.mark.parametrize("reversible", [False, True])
+def test_email_regex_skipped_without_separator(monkeypatch, reversible):
+    cleaner = _cleaner(replacement_mode="reversible" if reversible else "placeholder")
+    monkeypatch.setattr(constants, "EMAIL_REGEX", _NoSub())
+    text = "A long paragraph with no address in it, only words."
+    assert CONTACTS.replace_emails(text) == text
+    assert CONTACTS.replace_emails_with_fn(text, lambda s: "<EMAIL>") == text
+    cleaner.process(text)

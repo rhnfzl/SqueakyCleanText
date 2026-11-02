@@ -6,8 +6,13 @@ PII (per language and per SCT type):
 - **partial**: a gold span is found when a predicted span of the same type overlaps
   it; a prediction is correct when it overlaps a gold span of the same type.
   Recall and precision use these two counts (not a one-to-one matching).
+  ``masked_recall`` is the type-agnostic recall: a gold span counts when any kept
+  prediction overlaps it, whatever its type (NUMBER masked as PHONE is not a leak).
 - **leak**: a gold PII value is *fully* leaked when it is still in the output, and
   *partly* leaked when a 4+ char word of it is still outside the placeholders.
+  Words are runs of letters, digits and combining marks, so Brahmic words are not cut
+  at vowel signs. Scripts written without spaces (Thai) give one long "word", so their
+  partial leaks are undercounted.
   ``leak_rate`` counts both. It is an upper bound: a word that also occurs elsewhere
   in the document counts as a leak. Both sides are NFKC-normalised. DATE is reported
   per type but not in the total or per language.
@@ -22,10 +27,13 @@ import re
 import unicodedata
 from collections import Counter, defaultdict
 
+import regex
+
 from sct.evaluation import EntitySpan, EvaluationExample, evaluate_pii
 
 from benchmarks.labels import DATE, PRED_ALIASES, normalise_gold
 
+LEAK_WORD = regex.compile(r"[\w\p{M}]+")  # \w alone splits Devanagari/Tamil at vowel signs
 PLACEHOLDER = re.compile(r"<[A-Z][A-Z_]*(?:_\d+)?>")
 LEAK_MIN_CHARS = 4
 LEAK_EXCLUDED = frozenset({DATE})
@@ -59,7 +67,7 @@ def leak(value: str, output: str) -> str | None:
     visible = unicodedata.normalize("NFKC", PLACEHOLDER.sub("\0", output))  # placeholder names are not leaks
     if value in visible:
         return "full"
-    if any(len(word) >= LEAK_MIN_CHARS and word in visible for word in re.findall(r"\w+", value)):
+    if any(len(word) >= LEAK_MIN_CHARS and word in visible for word in LEAK_WORD.findall(value)):
         return "partial"
     return None
 
@@ -70,8 +78,9 @@ def _ratio(part: int, whole: int) -> float:
 
 def _partial_metrics(c: Counter) -> dict:
     p, r = _ratio(c["pred_correct"], c["pred"]), _ratio(c["gold_found"], c["gold"])
-    counts = {k: c[k] for k in ("gold", "gold_found", "pred", "pred_correct")}
-    return {**counts, "precision": p, "recall": r, "f1": round(2 * p * r / (p + r), 4) if p + r else 0.0}
+    counts = {k: c[k] for k in ("gold", "gold_found", "gold_masked", "pred", "pred_correct")}
+    return {**counts, "precision": p, "recall": r, "f1": round(2 * p * r / (p + r), 4) if p + r else 0.0,
+            "masked_recall": _ratio(c["gold_masked"], c["gold"])}
 
 
 def _leak_metrics(c: Counter) -> dict:
@@ -99,9 +108,11 @@ def score_pii(records: list[dict], predictions: dict[str, list[dict]], outputs: 
         strict_preds[record["id"]] = tuple(EntitySpan(p["label"], p["start"], p["end"]) for p in preds)
         for g in gold:
             found = any(p["label"] == g["label"] and overlaps(p, g) for p in preds)
+            masked = any(overlaps(p, g) for p in preds)
             for group, key in (("overall", "all"), ("by_label", g["label"]), ("by_language", lang)):
                 partial[group][key]["gold"] += 1
                 partial[group][key]["gold_found"] += found
+                partial[group][key]["gold_masked"] += masked
             bucket = min(g["start"] // POSITION_BUCKET, POSITION_BUCKETS - 1)
             name = f"{bucket * POSITION_BUCKET}+" if bucket == POSITION_BUCKETS - 1 else (
                 f"{bucket * POSITION_BUCKET}-{(bucket + 1) * POSITION_BUCKET}")
