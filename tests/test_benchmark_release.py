@@ -85,3 +85,13 @@ def test_run_batch_reports_throughput_keys(tmp_path):
 
     assert {"settings", "seconds", "docs_per_second", "peak_rss_mb", "output_sha256"} <= set(result)
     assert result["settings"]["documents"] == 4 and len(result["seconds"]) == 1
+
+
+def test_predicted_spans_map_unicode_folded_value_to_source_offsets():
+    # Codex bench round 1 #1: SCT folds full-width text before replacing it.
+    source = "Mail Ａｎｎａ＠ｅｘａｍｐｌｅ．ｃｏｍ ok"
+    assert predicted_spans(source, "Mail <EMAIL_0> ok", {"<EMAIL_0>": "Anna@example.com"}) == [
+        EntitySpan("EMAIL", 5, 21)]
+    # A combining accent stays with its letter; a ligature maps to its one source char.
+    assert predicted_spans("René met ﬁ", "<PERSON_0> met <X_0>", {"<PERSON_0>": "René", "<X_0>": "fi"}) == [
+        EntitySpan("PERSON", 0, 5), EntitySpan("X", 10, 11)]
