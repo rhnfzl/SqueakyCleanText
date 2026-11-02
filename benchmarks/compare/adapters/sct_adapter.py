@@ -33,9 +33,40 @@ def sct_language(lang: str | None) -> str | None:
     return None
 
 
+def sct_view(source: str, normalise) -> tuple[str, list[int]]:
+    """SCT's normalised view of *source* (NFKC of *normalise*) and the source offset of each view char.
+
+    *normalise* is SCT's own pre-regex normalisation (unicode fix, entity decoding, invisible-char
+    removal, ``unescape_markup``), so values SCT stored after decoding ("ana@x" from "ana&#64;x")
+    are found and map back to the source range that produced them. SCT's steps read a text split
+    at whitespace as the whole (sct/streaming.py relies on it), so each whitespace-separated token
+    is normalised on its own and a changed token is aligned to its view char by char.
+    shortcut: the alignment is difflib's, so a token rewritten beyond recognition maps its view chars
+    to the start of the changed run; fine for decoding and dropping chars, revisit if a step reorders text.
+    """
+    import difflib
+    import re
+    import unicodedata
+
+    pieces, offsets = [], []
+    for match in re.finditer(r"\S+|\s+", source):
+        token, at = match.group(), match.start()
+        piece = token if token.isspace() else unicodedata.normalize("NFKC", normalise(token))
+        pieces.append(piece)
+        if piece == token:
+            offsets.extend(range(at, at + len(token)))
+            continue
+        for op, i1, i2, j1, j2 in difflib.SequenceMatcher(None, token, piece, autojunk=False).get_opcodes():
+            offsets.extend(range(at + i1, at + i2) if op == "equal" else [at + i1] * (j2 - j1))
+    offsets.append(len(source))
+    return "".join(pieces), offsets
+
+
 def load(config: dict):
     from sct.config import TextCleanerConfig
     from sct.sct import TextCleaner
+
+    from sct.utils.normtext import unescape_markup
 
     from scripts.benchmark_release import predicted_spans
 
@@ -55,6 +86,10 @@ def load(config: dict):
     # processed (sct.TextCleaner._detect_language), so switching it per batch equals a
     # cleaner per language without loading the NER models once per language.
     model = TextCleaner(cfg=TextCleanerConfig(**base))
+
+    def normalise(token: str) -> str:
+        return unescape_markup(model.normalise(token))
+
     warned: set = set()
 
     def predict(docs: list[dict]) -> list[dict]:
@@ -72,7 +107,8 @@ def load(config: dict):
             for i, result in zip(indices, results, strict=True):
                 anon_map = result.metadata.get("anon_map")
                 originals = {e.placeholder: e.original for e in anon_map.entries} if anon_map else {}
-                spans = predicted_spans(docs[i]["text"], result.lm_text, originals)
+                spans = predicted_spans(docs[i]["text"], result.lm_text, originals,
+                                        sct_view(docs[i]["text"], normalise))
                 placed = [{"start": s.start, "end": s.end, "label": s.label, "score": None} for s in spans if s.start >= 0]
                 out[i] = {"spans": placed, "masked_text": result.lm_text, "unplaced": len(spans) - len(placed)}
         return out

@@ -150,6 +150,7 @@ def supervise(cmd: list[str], docs: list[dict], work: Path, env: dict, doc_timeo
         inp.write_text("".join(json.dumps({"id": d["id"], "text": d["text"], "lang": d["lang"]}, ensure_ascii=False) + "\n"
                                for d in pending), encoding="utf-8")
         out.write_bytes(b"")
+        Path(f"{out}.ready").unlink(missing_ok=True)  # attempt names restart per run: a stale marker skips the load allowance
         with err.open("w") as errf:
             proc = subprocess.Popen([*cmd, "--input", str(inp), "--output", str(out), "--batch-size", str(batch_size)],  # noqa: S603
                                     stdout=subprocess.DEVNULL, stderr=errf, env=env)
@@ -202,6 +203,23 @@ def supervise(cmd: list[str], docs: list[dict], work: Path, env: dict, doc_timeo
     return results, {"processes": attempts, "restarts": dict(restarts)}
 
 
+def cache_key(config: dict, adapter: str, frozen: str, records: list[dict]) -> str:
+    """Fingerprint of everything that makes a raw output: adapter config and code, venv, input docs."""
+    h = hashlib.sha256()
+    for part in (json.dumps(config, sort_keys=True), (ADAPTERS / adapter).read_text(encoding="utf-8"),
+                 (ADAPTERS / "_protocol.py").read_text(encoding="utf-8"), frozen):
+        h.update(part.encode() + b"\0")
+    for r in records:
+        h.update(json.dumps([r["id"], r["lang"], r["text"]], ensure_ascii=False).encode() + b"\0")
+    return h.hexdigest()
+
+
+def curve_floor(config: dict, entry: dict) -> float | None:
+    """Threshold the adapter already applied (config override, else the entry's numeric default)."""
+    value = config.get("threshold", entry.get("threshold"))
+    return float(value) if isinstance(value, (int, float)) else None
+
+
 def check_offsets(results: dict[str, dict], labels: dict[str, str]) -> tuple[dict[str, str], dict[str, str]]:
     """(offset problems, detection errors): fixture name -> reason, for fixtures not returned exactly.
 
@@ -250,6 +268,8 @@ def main(argv=None) -> None:
     parser.add_argument("--entries", nargs="+", required=True)
     parser.add_argument("--datasets", nargs="+", required=True)
     parser.add_argument("--part", choices=split.PARTS, required=True)
+    parser.add_argument("--track", choices=registry.TRACKS, default="gold",
+                        help="language track for every entry (PROTOCOL.md section 12; gold is the main track)")
     parser.add_argument("--n", type=int, help="docs per language (default: all of the part)")
     parser.add_argument("--seed", type=int, default=split.SEED)
     parser.add_argument("--out", type=Path, required=True)
@@ -269,13 +289,13 @@ def main(argv=None) -> None:
     parser.add_argument("--gpu", help="GPU index (default: the one with most free memory)")
     parser.add_argument("--gpu-mem-gb", type=float, default=5.0)
     parser.add_argument("--hf-hub-cache", help="HF_HUB_CACHE for the adapters")
-    parser.add_argument("--reuse", action="store_true", help="score cached raw outputs when complete")
+    parser.add_argument("--reuse", action="store_true", help="score cached raw outputs when their cache key matches")
     parser.add_argument("--skip-offset-check", action="store_true")
     args = parser.parse_args(argv)
 
     pythons = dict(item.split("=", 1) for item in args.python)
     overrides = {k: json.loads(v) for k, v in (item.split("=", 1) for item in args.config)}
-    tools = {name: registry.tool(name) for name in args.entries}
+    tools = {name: registry.tool(name, args.track) for name in args.entries}
     for name, t in tools.items():
         if t["adapter"] is None:
             raise SystemExit(f"entry {name!r} has no adapter yet")
@@ -284,7 +304,7 @@ def main(argv=None) -> None:
     shared = scorer.shared_types([t for n, t in tools.items() if n not in registry.TEST_ENTRIES] or list(tools.values()),
                                  registry.SCT_TYPES)
     run_info = {"command": " ".join(["python -m benchmarks.compare.runner", *(argv or sys.argv[1:])]),
-                "part": args.part, "n_per_language": args.n, "seed": args.seed, "threads": args.threads,
+                "part": args.part, "track": args.track, "n_per_language": args.n, "seed": args.seed, "threads": args.threads,
                 "cpus": args.cpus, "device": args.device, "gpu": gpu, "gpu_mem_gb": args.gpu_mem_gb,
                 "batch_size": args.batch_size, "doc_timeout": args.doc_timeout, "retries": args.retries,
                 "shared_types": list(shared), "environment": environment()}
@@ -297,7 +317,8 @@ def main(argv=None) -> None:
                   "gpu_mem_gb": args.gpu_mem_gb, **overrides.get(name, {})}
         cmd = command(py, t["adapter"], config, args.cpus)
         (args.out / "envs").mkdir(parents=True, exist_ok=True)
-        (args.out / "envs" / f"{name}.freeze.txt").write_text(freeze(py))
+        frozen = freeze(py)
+        (args.out / "envs" / f"{name}.freeze.txt").write_text(frozen)
         meta = {"entry": name, "entry_config": _jsonable({k: v for k, v in t.items() if k != "requirements"}),
                 "adapter_config": config, "python": str(py)}
         if not args.skip_offset_check:
@@ -315,8 +336,10 @@ def main(argv=None) -> None:
                 records_by_dataset[dataset] = split.load(dataset, args.part, args.n, args.seed)
             records = records_by_dataset[dataset]
             raw = args.cache / name / f"{dataset}-{args.part}.jsonl"
+            stamp = raw.with_suffix(".key")
+            key = cache_key(config, t["adapter"], frozen, records)
             outputs = {}
-            if args.reuse and raw.exists():
+            if args.reuse and raw.exists() and stamp.exists() and stamp.read_text().strip() == key:
                 outputs = {line["id"]: line for line in map(json.loads, raw.read_text(encoding="utf-8").splitlines())}
             started = time.perf_counter()
             if not {r["id"] for r in records} <= set(outputs):
@@ -326,10 +349,13 @@ def main(argv=None) -> None:
                                                   args.retries, args.batch_size)
                 raw.write_text("".join(json.dumps(outputs[r["id"]], ensure_ascii=False) + "\n" for r in records),
                                encoding="utf-8")
+                stamp.write_text(key)
             else:
                 process_info = {"reused": str(raw)}
             views = scorer.views_for(t["supports"], shared, registry.SCT_TYPES)
-            result, docs = scorer.score_run(records, outputs, t["labels"], DATASET_LABELS[dataset], views)
+            result, docs = scorer.score_run(records, outputs, t["labels"], DATASET_LABELS[dataset], views,
+                                            curve_floor=curve_floor(config, t),
+                                            curve_by_filter=t.get("curve_by_filter", True))
             per_doc[name][dataset] = docs
             ids = sorted(r["id"] for r in records)
             result.update(meta, dataset={"name": dataset, "source": module.HF_ID, "revision": module.REVISION,

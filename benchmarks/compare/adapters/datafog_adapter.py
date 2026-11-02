@@ -29,6 +29,7 @@ os.environ.setdefault("DATAFOG_NO_TELEMETRY", "1")  # telemetry is opt-in in 4.9
 
 from _protocol import serve  # noqa: E402
 
+RUNTIME = ("threads", "device", "gpu_mem_gb")  # set by runner.py and speed.py for every entry
 DEFAULTS = {"engine": "regex", "locales": None, "entity_types": None, "strategy": "token", "backend": "python"}
 
 
@@ -39,13 +40,19 @@ def doc_locales(setting, lang: str | None) -> list[str] | None:
     return ["de"] if (lang or "").lower().replace("_", "-").split("-")[0] == "de" else None
 
 
-def load(config: dict):
-    from datafog.engine import scan_and_redact
-
+def settings(config: dict) -> dict:
+    """Adapter config -> DataFog settings; the runners' runtime keys mean nothing to a regex engine."""
+    config = {k: v for k, v in config.items() if k not in RUNTIME}
     unknown = set(config) - set(DEFAULTS)
     if unknown:
         raise ValueError(f"unknown datafog config keys: {sorted(unknown)}")
-    cfg = {**DEFAULTS, **config}
+    return {**DEFAULTS, **config}
+
+
+def load(config: dict):
+    from datafog.engine import scan_and_redact
+
+    cfg = settings(config)
 
     def predict(docs: list[dict]) -> list[dict]:
         out = []

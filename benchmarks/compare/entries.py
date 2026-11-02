@@ -6,9 +6,12 @@ positive). ``supports`` is the claimed SCT-type coverage used for the "tool-supp
 view. Revisions are HF commit shas; package versions are exact pins for that entry's venv.
 """
 
-from benchmarks.labels import DATE, EMAIL, IP, LOCATION, NUMBER, ORGANISATION, PERSON, PHONE, URL
+from benchmarks.labels import DATE, EMAIL, IP, LOCATION, NUMBER, ORGANISATION, PERSON, PHONE, PRED_ALIASES, URL
 
 SCT_TYPES = (PERSON, LOCATION, ORGANISATION, EMAIL, PHONE, IP, URL, DATE, NUMBER)
+# SCT's own placeholder names (YEAR, IBAN, ...) are aliases of the canonical types: map them
+# here, before map_spans drops unknown labels.
+SCT_LABELS = {**{t: t for t in SCT_TYPES}, **PRED_ALIASES}
 
 # One fixed prompt list for every GLiNER-family entry (free-text labels), mapped to SCT types.
 GLINER_PROMPTS = {
@@ -21,7 +24,8 @@ GLINER_PROMPTS = {
 # names. Merged into that entry's labels so card-mode spans are scored, not dropped.
 NVIDIA_CARD = {
     "first_name": PERSON, "last_name": PERSON, "company_name": ORGANISATION,
-    **dict.fromkeys(("street_address", "city", "state", "country", "postcode"), LOCATION),
+    **dict.fromkeys(("street_address", "city", "state", "country"), LOCATION),
+    "postcode": NUMBER,  # as gold postcode (nemotron, gretel_en) and Fastino postal_code
     "email": EMAIL, "phone_number": PHONE, "fax_number": PHONE, "ipv4": IP, "ipv6": IP, "url": URL,
     "date": DATE, "date_of_birth": DATE, "date_time": DATE,
     **dict.fromkeys(("account_number", "credit_debit_card", "ssn", "bank_routing_number", "swift_bic"), NUMBER),
@@ -43,13 +47,13 @@ ENTRIES = {
         "package": "SqueakyCleanText==0.8.1", "checkpoint": "sct DEFAULT_NER_MODELS (xlm-r conll ONNX, wikineural ONNX)",
         "revision": "sct/config.py DEFAULT_NER_REVISIONS", "config": "TextCleanerConfig() + reversible scoring mode",
         "threshold": "SCT default", "mask": "SCT placeholder", "device": "cpu", "gpu_gb": 0,
-        "labels": {t: t for t in SCT_TYPES}, "supports": SCT_TYPES,
+        "labels": SCT_LABELS, "supports": SCT_TYPES,
     },
     "sct-gliner": {
         "package": "SqueakyCleanText[gliner]==0.8.1", "checkpoint": "knowledgator/gliner-pii-base-v1.0 (ONNX)",
         "revision": "61726e0ad791dcab3e29339bbec3ad42ded65641", "config": "TextCleanerConfig(ner_mode='pii')",
         "threshold": "SCT default", "mask": "SCT placeholder", "device": "cpu|cuda", "gpu_gb": 1,
-        "labels": {t: t for t in SCT_TYPES}, "supports": SCT_TYPES,
+        "labels": SCT_LABELS, "supports": SCT_TYPES,
     },
     "presidio": {
         "package": "presidio-analyzer==2.2.366 spacy==3.8.18 en_core_web_lg==3.8.0", "checkpoint": "en_core_web_lg",
@@ -84,6 +88,9 @@ ENTRIES = {
         "labels": {"private_person": PERSON, "private_address": LOCATION, "private_email": EMAIL,
                    "private_phone": PHONE, "private_url": URL, "private_date": DATE, "account_number": NUMBER},
         "supports": (PERSON, LOCATION, EMAIL, PHONE, URL, DATE, NUMBER),  # no ORG, no IP class
+        # Its score is a mean token probability, not the decoder's operating point (bias presets):
+        # filtering on it is no OPF operating point, so no curve; presets are separate --config runs.
+        "curve_by_filter": False,
     },
     "bardsai-v3": {
         "package": "transformers==5.22.1 onnxruntime==1.31.1 torch==2.15.0",
@@ -120,10 +127,18 @@ RESERVE = ("scrubadub==2.0.1", "datatrove==0.10.1 PIIFormatter", "urchade/gliner
 # is ``envs/<entry>.txt``; every venv uses PYTHON. Config {} = the vendor default track.
 PYTHON = "3.12"
 RUNS = {
-    "sct-default": {"adapter": "sct_adapter.py", "config": {"mode": "default", "language": "gold"}},
-    "sct-gliner": {"adapter": "sct_adapter.py", "config": {"mode": "gliner", "language": "gold"}},
+    "sct-default": {"adapter": "sct_adapter.py", "config": {"mode": "default", "language": "auto"}},
+    "sct-gliner": {"adapter": "sct_adapter.py", "config": {"mode": "gliner", "language": "auto"}},
     **{name: {"adapter": f"{name.replace('-', '_')}_adapter.py", "config": {}} for name in
        ("presidio", "gliner-nvidia", "gliner2-fastino", "opf", "bardsai-v3", "datafog")},
+}
+# Language tracks (PROTOCOL.md section 12), applied to every entry the same way. ``native``:
+# each tool routes as shipped (SCT's own LID, Presidio en, DataFog no locale). ``gold``: every
+# tool that takes a language gets the gold code. Entries absent here take no language input.
+TRACKS = ("gold", "native")
+GOLD_TRACK = {
+    "sct-default": {"language": "gold"}, "sct-gliner": {"language": "gold"},
+    "presidio": {"language": "gold"}, "datafog": {"locales": "gold"},
 }
 
 # Not a comparison entry: a stdlib-only adapter for tests and smoke runs (runs in any Python).
@@ -137,7 +152,7 @@ TEST_ENTRIES = {
 }
 
 
-def tool(name: str) -> dict:
+def tool(name: str, track: str = "native") -> dict:
     """Entry + run settings: ``adapter``, ``adapter_config`` and ``requirements`` (None = current Python)."""
     from pathlib import Path
 
@@ -145,8 +160,11 @@ def tool(name: str) -> dict:
         return {**TEST_ENTRIES[name], "requirements": None}
     if name not in ENTRIES:
         raise ValueError(f"unknown entry {name!r}; known: {', '.join([*ENTRIES, *TEST_ENTRIES])}")
+    if track not in TRACKS:
+        raise ValueError(f"unknown track {track!r}; known: {', '.join(TRACKS)}")
     run = RUNS[name]
-    return {**ENTRIES[name], "adapter": run["adapter"], "adapter_config": run["config"],
+    config = {**run["config"], **(GOLD_TRACK.get(name, {}) if track == "gold" else {})}
+    return {**ENTRIES[name], "adapter": run["adapter"], "adapter_config": config,
             "requirements": Path(__file__).resolve().parent / "envs" / f"{name}.txt"}
 
 

@@ -368,3 +368,144 @@ def test_adapter_label_tables_match_the_frozen_entries():
     for name in ("gliner-nvidia", "gliner2-fastino"):  # card names never re-map a shared prompt
         labels = reg.ENTRIES[name]["labels"]
         assert all(labels[k] == v for k, v in reg.GLINER_PROMPTS.items()), name
+
+
+# --- Codex review round 1 fixes (C1-C13) ---
+
+def test_c1_full_miss_scores_f1_zero_not_na_in_the_macro():
+    record = gold_record(spans=[span(0, 7, "person")])
+    hit = scorer.doc_stats(record, [span(0, 7, "PERSON")], MAP)
+    miss = scorer.doc_stats(record, [], MAP)
+    m = scorer.metrics(miss)
+    assert m["strict_f1"] == m["partial_f1"] == m["char_f2"] == 0.0
+    assert scorer.summarise([("en", hit), ("de", miss)])["macro"]["strict_f1"] == 0.5
+    assert scorer.metrics(scorer.doc_stats({"id": "c", "lang": "en", "text": "x", "spans": []}, [], MAP))["strict_f1"] is None
+
+
+def test_c2_masking_metrics_share_one_type_agnostic_prediction_set():
+    record = gold_record(spans=[span(0, 7, "person"), span(53, 64, "ssn")])
+    person_only = {"person": "PERSON"}
+    c = scorer.doc_stats(record, [span(0, 7, "NUMBER"), span(53, 64, "NUMBER")], person_only)
+    assert c["gold_masked"] == 1 and c["exposed"] == 0 and c["docs_exposed"] == 0  # masked, and not leaked
+    assert c["char_tp"] == 7 and c["char_pred"] == 7  # the NUMBER on out-of-view SSN gold is no char FP
+    assert c["strict_tp"] == 0  # typed scores still need the type
+
+
+def test_c3_datafog_accepts_the_runners_runtime_keys():
+    datafog = _adapter_module("datafog_adapter.py")
+    assert datafog.settings({"threads": 4, "device": "cpu", "gpu_mem_gb": 5.0}) == datafog.DEFAULTS
+    with pytest.raises(ValueError):
+        datafog.settings({"bogus": 1})
+
+
+def test_c4_curve_never_reports_points_below_the_run_threshold():
+    records = [gold_record("a", spans=[span(0, 7, "person")])]
+    outputs = {"a": {"id": "a", "spans": [span(0, 7, "per", 0.8)]}}
+    rows = scorer.curve(records, outputs, {"per": "PERSON"}, MAP, floor=0.5)
+    assert min(r["threshold"] for r in rows) == 0.5
+    views = scorer.views_for(("PERSON",), ("PERSON",), ("PERSON",))
+    result, _ = scorer.score_run(records, outputs, {"per": "PERSON"}, MAP, views, curve_by_filter=False)
+    assert result["curve"] is None  # OPF: its score is no operating point
+    assert runner.curve_floor({}, entries.ENTRIES["gliner-nvidia"]) == 0.5
+    assert runner.curve_floor({"threshold": 0.05}, entries.ENTRIES["gliner-nvidia"]) == 0.05
+    assert runner.curve_floor({}, entries.ENTRIES["presidio"]) is None
+    assert entries.ENTRIES["opf"]["curve_by_filter"] is False
+
+
+def test_c5_reuse_needs_a_matching_cache_key(tmp_path, monkeypatch):
+    records = [gold_record("a", spans=[span(25, 33, "email")])]
+    key = runner.cache_key({"t": 1}, "dummy_adapter.py", "freeze", records)
+    assert key == runner.cache_key({"t": 1}, "dummy_adapter.py", "freeze", records)
+    assert key != runner.cache_key({"t": 2}, "dummy_adapter.py", "freeze", records)
+    assert key != runner.cache_key({"t": 1}, "dummy_adapter.py", "freeze2", records)
+    assert key != runner.cache_key({"t": 1}, "dummy_adapter.py", "freeze", [{**records[0], "text": TEXT + "!"}])
+    monkeypatch.setattr(runner.split, "load", lambda dataset, part, n, seed: records)
+    args = ["--entries", "dummy", "--datasets", "gretel_en", "--part", "dev", "--cache", str(tmp_path / "cache"),
+            "--doc-timeout", "30", "--start-timeout", "30", "--skip-offset-check", "--reuse"]
+    runner.main([*args, "--out", str(tmp_path / "one")])
+    runner.main([*args, "--out", str(tmp_path / "two"), "--config", 'dummy={"raise": ["a"]}'])
+    two = json.loads((tmp_path / "two" / "dummy" / "gretel_en-dev.json").read_text())
+    assert two["completion_rate"] == 0.0 and "reused" not in two["process"]  # new config: rerun, not reused
+    runner.main([*args, "--out", str(tmp_path / "three"), "--config", 'dummy={"raise": ["a"]}'])
+    assert "reused" in json.loads((tmp_path / "three" / "dummy" / "gretel_en-dev.json").read_text())["process"]
+
+
+def test_c6_sct_offsets_survive_entity_decoding_and_invisible_chars():
+    from sct.utils.normtext import NormaliseText, unescape_markup
+
+    from scripts.benchmark_release import predicted_spans
+
+    sct = _adapter_module("sct_adapter.py")
+    fix = NormaliseText().fix_bad_unicode
+
+    def normalise(token):
+        return unescape_markup(fix(token))
+
+    for text in ("Mail ana&#64;example.org now", "Mail ana​@example.org now"):
+        view = sct.sct_view(text, normalise)
+        assert view[0] == "Mail ana@example.org now"
+        got = predicted_spans(text, "Mail <EMAIL_0> now", {"<EMAIL_0>": "ana@example.org"}, view)
+        assert [(s.start, s.end) for s in got] == [(5, len(text) - 4)]
+    text = "Write ana&#64;example.org then ana@example.org ok"
+    got = predicted_spans(text, "Write <EMAIL_0> then <EMAIL_1> ok",
+                          {"<EMAIL_0>": "ana@example.org", "<EMAIL_1>": "ana@example.org"}, sct.sct_view(text, normalise))
+    assert [text[s.start:s.end] for s in got] == ["ana&#64;example.org", "ana@example.org"]
+
+
+def test_c7_nvidia_postcode_is_a_number_like_gold_and_fastino():
+    assert entries.NVIDIA_CARD["postcode"] == DATASET_LABELS["nemotron"]["postcode"] == entries.FASTINO_CARD["postal_code"]
+
+
+def test_c8_sct_year_maps_to_date_before_scope_filtering():
+    for name in ("sct-default", "sct-gliner"):
+        spans, dropped = scorer.map_spans([span(0, 4, "YEAR"), span(5, 9, "IBAN")], entries.ENTRIES[name]["labels"])
+        assert dropped == 0 and [s["label"] for s in spans] == ["DATE", "NUMBER"]
+
+
+def test_c9_one_language_track_for_every_entry():
+    gold = {name: entries.tool(name, "gold")["adapter_config"] for name in entries.ENTRIES}
+    native = {name: entries.tool(name, "native")["adapter_config"] for name in entries.ENTRIES}
+    assert gold["sct-default"]["language"] == gold["presidio"]["language"] == "gold" and gold["datafog"]["locales"] == "gold"
+    assert native["sct-default"]["language"] == "auto" and "language" not in native["presidio"]
+    assert "locales" not in native["datafog"]
+    with pytest.raises(ValueError):
+        entries.tool("presidio", "mixed")
+
+
+def test_c10_tab_masking_recall_uses_every_annotator_and_full_coverage():
+    record = gold_record(spans=[span(0, 7, "person")])
+    record["annotators"] = {"a1": [{"start": 0, "end": 7, "label": "PERSON", "identifier": "DIRECT"}],
+                            "a2": [{"start": 12, "end": 17, "label": "PERSON", "identifier": "QUASI"}]}
+    outputs = {"d1": {"id": "d1", "spans": [span(0, 3, "PERSON"), span(12, 17, "PERSON")]}}
+    views = scorer.views_for(("PERSON",), ("PERSON",), ("PERSON",))
+    result, _ = scorer.score_run([record], outputs, {"PERSON": "PERSON"}, MAP, views)
+    tab = result["tab_masking"]
+    assert tab["annotators"] == 2 and tab["direct"]["micro_recall"] == 0.0 and tab["quasi"]["micro_recall"] == 1.0
+    assert result["views"]["shared"]["compare"]["micro"]["masked_recall"] == 1.0  # overlap credit, reported apart
+
+
+def test_c12_stale_ready_marker_does_not_skip_the_load_allowance(tmp_path):
+    slow = tmp_path / "slow.py"
+    slow.write_text("import sys, time, json\nargs = sys.argv\ntime.sleep(1.0)\n"
+                    "out = args[args.index('--output') + 1]\n"
+                    "docs = [json.loads(x) for x in open(args[args.index('--input') + 1])]\n"
+                    "open(out, 'w').write(''.join(json.dumps({'id': d['id'], 'spans': []}) + '\\n' for d in docs))\n")
+    work = tmp_path / "w"
+    work.mkdir()
+    (work / "out-1.jsonl.ready").write_text("1")  # left by an earlier run
+    results, info = runner.supervise([sys.executable, str(slow)], docs(1), work, runner.child_env(),
+                                     doc_timeout=0.3, start_timeout=30)
+    assert "error" not in results["d0"] and info["processes"] == 1
+
+
+def test_c13_bootstrap_ci_describes_the_language_macro():
+    def doc(i, lang, hit):
+        preds = [span(0, 7, "PERSON")] if hit else []
+        c = scorer.doc_stats(gold_record(f"{lang}{i}", spans=[span(0, 7, "person")]), preds, MAP)
+        return (f"{lang}{i}", f"{lang}{i}", lang, c)
+
+    a = [doc(i, "en", True) for i in range(20)] + [doc(0, "de", False)]
+    b = [doc(i, "en", False) for i in range(20)] + [doc(0, "de", True)]
+    out = scorer.paired_bootstrap(a, b, samples=200)["metrics"]["masked_recall"]
+    assert out["a"] == out["b"] == 0.5  # macro, not micro (20/21 vs 1/21)
+    assert out["diff_ci"][0] <= 0 <= out["diff_ci"][1] and not out["excludes_zero"]

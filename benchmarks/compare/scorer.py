@@ -15,8 +15,13 @@ None (N/A), never 0.
 - partial: same type, >= 1 char overlap, one-to-one: pairs taken by largest overlap, then
   earliest start. ``score_pii`` (many-to-one partial, word leaks, by_position) is still
   reported next to it.
-- masked recall: gold mentions overlapped by any kept prediction, whatever its type.
-- char: type-agnostic per-character P/R/F1/F2 over in-scope gold characters.
+- masking set (one per doc, type-agnostic): every mapped prediction except those that only
+  touch out-of-view gold. Masked recall, char scores and leaks all read it, so a gold PERSON
+  masked as NUMBER counts as masked everywhere, never masked in one metric and leaked in another.
+- masked recall: gold mentions overlapped by any prediction of the masking set.
+- char: type-agnostic per-character P/R/F1/F2 over in-scope gold characters (masking set).
+- F scores come from counts (``(1+b2)TP / (b2*gold + pred)``): 0 when gold or predictions exist
+  but nothing matches, None only when both are empty.
 - leaks, per gold mention on the common mask: ``exposed`` (a letter or digit of it is not
   masked; also the doc leak rule), ``complete_exposure`` (no char of it masked),
   ``char_survival`` (unmasked letters/digits / letters/digits), ``exact_visible`` (the NFKC
@@ -34,8 +39,8 @@ from collections import Counter, defaultdict
 
 import numpy as np
 
-from benchmarks.labels import DATE
-from benchmarks.score import leak, overlaps, prepare, score_pii
+from benchmarks.labels import DATE, normalise_gold
+from benchmarks.score import leak, masking_recall, overlaps, prepare, score_pii
 
 THRESHOLDS = tuple(round(0.05 * i, 2) for i in range(1, 20))
 CHRF_ORDER = 6
@@ -123,12 +128,14 @@ def doc_stats(record: dict, spans: list[dict], mapping: dict[str, str], unplaced
     """Additive counts for one doc. *spans* are mapped + cleaned; *mapping* is the view's dataset map."""
     text = record["text"]
     gold, kept = prepare(record, spans, mapping)
+    _, out_of_view = normalise_gold(text, record["spans"], mapping)
+    masking = [p for p in spans if any(overlaps(p, g) for g in gold) or not any(overlaps(p, o) for o in out_of_view)]
     c = Counter(docs=1, gold=len(gold), pred=len(kept) + unplaced)
     c["strict_tp"] = sum((Counter((g["label"], g["start"], g["end"]) for g in gold)
                           & Counter((p["label"], p["start"], p["end"]) for p in kept)).values())
     c["partial_tp"] = _one_to_one(gold, kept)
-    c["gold_masked"] = sum(any(overlaps(p, g) for p in kept) for g in gold)
-    gold_chars, pred_chars = covered(len(text), gold), covered(len(text), kept)
+    c["gold_masked"] = sum(any(overlaps(p, g) for p in masking) for g in gold)
+    gold_chars, pred_chars = covered(len(text), gold), covered(len(text), masking)
     c["char_gold"], c["char_pred"] = sum(gold_chars), sum(pred_chars)
     c["char_tp"] = sum(1 for a, b in zip(gold_chars, pred_chars) if a and b)
     masked = covered(len(text), spans)
@@ -187,16 +194,23 @@ def _f(p, r, beta=1.0):
     return (1 + b2) * p * r / (b2 * p + r) if p + r else 0.0
 
 
+def _fc(tp, pred, gold, beta=1.0):
+    """F-beta from counts: 0 when only one side is empty (a full miss is a 0, not N/A)."""
+    b2 = beta * beta
+    return (1 + b2) * tp / (b2 * gold + pred) if gold or pred else None
+
+
 def metrics(c: Counter) -> dict:
     sp, sr = _r(c["strict_tp"], c["pred"]), _r(c["strict_tp"], c["gold"])
     pp, pr = _r(c["partial_tp"], c["pred"]), _r(c["partial_tp"], c["gold"])
     cp, cr = _r(c["char_tp"], c["char_pred"]), _r(c["char_tp"], c["char_gold"])
     out = {
         "docs": c["docs"], "gold": c["gold"], "pred": c["pred"],
-        "strict_precision": sp, "strict_recall": sr, "strict_f1": _f(sp, sr),
-        "partial_precision": pp, "partial_recall": pr, "partial_f1": _f(pp, pr),
+        "strict_precision": sp, "strict_recall": sr, "strict_f1": _fc(c["strict_tp"], c["pred"], c["gold"]),
+        "partial_precision": pp, "partial_recall": pr, "partial_f1": _fc(c["partial_tp"], c["pred"], c["gold"]),
         "masked_recall": _r(c["gold_masked"], c["gold"]),
-        "char_precision": cp, "char_recall": cr, "char_f1": _f(cp, cr), "char_f2": _f(cp, cr, 2),
+        "char_precision": cp, "char_recall": cr, "char_f1": _fc(c["char_tp"], c["char_pred"], c["char_gold"]),
+        "char_f2": _fc(c["char_tp"], c["char_pred"], c["char_gold"], 2),
         "char_survival": _r(c["alnum_survived"], c["alnum"]),
         "mention_exposure_rate": _r(c["exposed"], c["mentions"]),
         "complete_exposure_rate": _r(c["complete_exposure"], c["mentions"]),
@@ -250,12 +264,19 @@ def aggregate(datasets: dict[str, list[tuple[str, Counter]]]) -> dict:
             "micro": metrics(total(c for docs in datasets.values() for _, c in docs))}
 
 
-def curve(records: list[dict], outputs: dict[str, dict], labels: dict[str, str], mapping: dict[str, str]) -> list[dict]:
-    """Threshold sweep from one low-threshold run (completed docs only); [] when the tool gives no scores."""
+def curve(records: list[dict], outputs: dict[str, dict], labels: dict[str, str], mapping: dict[str, str],
+          floor: float | None = None) -> list[dict]:
+    """Threshold sweep by filtering one run (completed docs only); [] when the tool gives no scores.
+
+    *floor* is the threshold the adapter already applied: points below it were never decoded,
+    so they are left out (a full curve needs a dev run with the adapter threshold at 0.05).
+    """
     if not any(s.get("score") is not None for o in outputs.values() for s in o["spans"]):
         return []
     rows = []
     for t in THRESHOLDS:
+        if floor is not None and t < floor:
+            continue
         c = total(doc_stats(r, map_spans(outputs[r["id"]]["spans"], labels, t)[0], mapping,
                             outputs[r["id"]].get("unplaced", 0), utility=False)
                   for r in records if "error" not in outputs[r["id"]])
@@ -295,12 +316,15 @@ def native_leak(records: list[dict], outputs: dict[str, dict], mapping: dict[str
 
 
 def score_run(records: list[dict], outputs: dict[str, dict], labels: dict[str, str], mapping: dict[str, str],
-              views: dict[str, tuple], curve_view: str = "shared") -> tuple[dict, dict]:
+              views: dict[str, tuple], curve_view: str = "shared", curve_floor: float | None = None,
+              curve_by_filter: bool = True) -> tuple[dict, dict]:
     """Score one entry on one dataset part. Returns ``(result, per_doc)``.
 
     *outputs* maps every record id to its adapter line. *views* maps a view name to its SCT
     types. ``per_doc[view]`` is ``[(id, group, lang, Counter)]`` over ALL docs with failed docs
     scored as unmasked (effective protection): the input of ``paired_bootstrap``.
+    *curve_floor* is the threshold the adapter ran at; ``curve_by_filter=False`` (scores that
+    are not the decoder's operating point, e.g. OPF bias presets) reports no curve.
     """
     failed = {r["id"] for r in records if "error" in outputs[r["id"]]}
     completed = [r for r in records if r["id"] not in failed]
@@ -335,7 +359,9 @@ def score_run(records: list[dict], outputs: dict[str, dict], labels: dict[str, s
         }
     if curve_view in views:
         view_map = {k: v for k, v in mapping.items() if v in views[curve_view] and v != DATE}
-        result["curve"] = curve(completed, outputs, labels, view_map)
+        result["curve"] = curve(completed, outputs, labels, view_map, curve_floor) if curve_by_filter else None
+    if any(r.get("annotators") for r in records):  # TAB: DIRECT/QUASI full-coverage rule, every annotator
+        result["tab_masking"] = masking_recall(records, mapped)  # failed docs have no spans: unmasked
     result["native"] = native_leak(records, outputs, mapping)
     return result, per_doc
 
@@ -353,6 +379,8 @@ def paired_bootstrap(a: list[tuple], b: list[tuple], names=HEADLINE, samples: in
                      seed: int = SEED) -> dict:
     """Paired bootstrap over groups (template or doc) for entry A minus entry B on the same docs.
 
+    Each draw recomputes the language macro (the headline), not pooled micro counts.
+
     *a* and *b* are ``per_doc`` lists from ``score_run`` for the same records in the same order.
     A difference counts only when its 95% CI excludes 0 (``excludes_zero``); the metric decides
     whether higher or lower is better.
@@ -361,21 +389,26 @@ def paired_bootstrap(a: list[tuple], b: list[tuple], names=HEADLINE, samples: in
         raise ValueError("paired bootstrap needs the same docs in the same order")
     keys = sorted(set().union(*(x[3] for x in a), *(x[3] for x in b)))
     groups = {g: i for i, g in enumerate(dict.fromkeys(x[1] for x in a))}
+    langs = {lang: i for i, lang in enumerate(sorted({x[2] for x in a}))}
     mats = []
     for side in (a, b):
-        m = np.zeros((len(groups), len(keys)))
-        for _, group, _, c in side:
-            m[groups[group]] += [c[k] for k in keys]
+        m = np.zeros((len(langs), len(groups), len(keys)))  # per language, so each draw is a language macro
+        for _, group, lang, c in side:
+            m[langs[lang], groups[group]] += [c[k] for k in keys]
         mats.append(m)
+
+    def score(m, weights):
+        return macro([metrics(Counter(dict(zip(keys, (weights @ per_lang).tolist())))) for per_lang in m])
+
     rng = np.random.default_rng(seed)
     draws: dict[str, list] = {n: [] for n in names}
     for _ in range(samples):
         weights = np.bincount(rng.integers(0, len(groups), len(groups)), minlength=len(groups))
-        ma, mb = (metrics(Counter(dict(zip(keys, (weights @ m).tolist())))) for m in mats)
+        ma, mb = (score(m, weights) for m in mats)
         for n in names:
             if ma.get(n) is not None and mb.get(n) is not None:
                 draws[n].append((ma[n], mb[n], ma[n] - mb[n]))
-    point_a, point_b = metrics(total(x[3] for x in a)), metrics(total(x[3] for x in b))
+    point_a, point_b = (score(m, np.ones(len(groups))) for m in mats)
     out = {"groups": len(groups), "samples": samples, "seed": seed, "metrics": {}}
     for n, rows in draws.items():
         if not rows:

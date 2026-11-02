@@ -217,7 +217,12 @@ excluded from totals:
 
 - Scored tools (GLiNER entries, sct-gliner, presidio scores, bardsai probabilities, OPF via
   decoder bias presets) are run once at a threshold of 0.05 (or the lowest available) and
-  the curve is built by filtering: thresholds 0.05..0.95 step 0.05.
+  the curve is built by filtering: thresholds 0.05..0.95 step 0.05. Points below the
+  threshold the adapter ran at are never reported (a default run at 0.5 gives 0.5..0.95; the
+  full curve is a dev run with `--config <entry>='{"threshold": 0.05}'`). For GLiNER flat
+  decoding a filtered point is an approximation of a run at that threshold (decoding picks
+  among the candidates above the floor). OPF's span score is not its operating point: OPF
+  has no filtered curve; each bias preset is its own `--config` run.
 - Plots: precision-recall (partial, type-agnostic) and leak-vs-over-masking per dataset.
 - Matched operating points: on `dev`, the threshold reaching masked recall 0.90 (and 0.95)
   per entry; those thresholds are then applied on `test`. Tools without scores (regex,
@@ -249,6 +254,8 @@ is scored on the whole doc anyway.
   accuracy is reported (SCT LID vs gold), and unsupported-language behaviour is listed per
   entry (which languages the entry claims; scored languages outside the claim are flagged).
 - Code-switched data: bayanat `ar-mixed_en` reported separately.
+- `runner.py --track gold|native` (default gold) applies one track to every entry
+  (`entries.GOLD_TRACK`; DataFog gets its locale pack in gold); a results table never mixes them.
 
 ## 13. Aggregation (rule 11)
 
@@ -268,7 +275,8 @@ is scored on the whole doc anyway.
 
 - Paired bootstrap over documents (over groups for gretel, gretel_en, nemotron, redact),
   1,000 resamples, seed 13: 95% CI for each score and for each difference SCT minus entry
-  on the same resamples. A "win" needs the difference CI to exclude 0.
+  on the same resamples. A "win" needs the difference CI to exclude 0. Each resample
+  recomputes the language macro (the headline score), not pooled micro counts.
 - Document-level leak: paired McNemar on per-doc "any exposed mention" for SCT vs each entry.
 - Repeat runs: speed 3x (median, spread); quality runs are deterministic on CPU, GPU runs are
   repeated twice and the difference reported.
