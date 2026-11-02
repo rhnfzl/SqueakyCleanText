@@ -22,8 +22,9 @@ def load(n: int | None, seed: int) -> list[dict]:
     import pyarrow.parquet as pq
 
     table = pq.read_table(hf_file(HF_ID, "data/test-00000-of-00001.parquet", REVISION),
-                          columns=["index", "language", "generated_text", "pii_spans"])
+                          columns=["index", "language", "document_type", "generated_text", "pii_spans"])
     rows = ({"id": str(r["index"]), "lang": LANGS[r["language"]], "text": r["generated_text"],
+             "group": r["document_type"],
              "spans": valid_spans(r["generated_text"], json.loads(r["pii_spans"]))}
             for r in table.to_pylist())
     return sample_per_lang(rows, n, seed)

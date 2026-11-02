@@ -29,5 +29,5 @@ def load(n: int | None, seed: int) -> list[dict]:
         spans = [{"start": e["start"], "end": e["end"], "label": e["entity_type"]} for e in _value(row["entities"])
                  if text[e["start"]:e["end"]] == e["entity_string"]]
         records.append({"id": f"{index}:{row['record_id']}", "lang": _value(row["axes"])["language"].lower(),
-                        "text": text, "spans": valid_spans(text, spans)})
+                        "text": text, "group": row["record_id"], "spans": valid_spans(text, spans)})
     return sample_per_lang(records, n, seed)

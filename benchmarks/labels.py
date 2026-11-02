@@ -14,7 +14,8 @@ PRED_ALIASES = {"YEAR": DATE, "PHONE_NUMBER": PHONE, "IP_ADDRESS": IP, "IBAN": N
 
 # Gold labels that mark one part of a name (given name, surname). Only these merge
 # into a full name; two plain PERSON entities next to each other stay two entities.
-NAME_PARTS = frozenset({"GIVENNAME", "SURNAME", "first_name", "last_name", "First_Given_Name", "Last_Family_Name"})
+NAME_PARTS = frozenset({"GIVENNAME", "SURNAME", "first_name", "last_name", "First_Given_Name", "Last_Family_Name",
+                        "FIRSTNAME", "MIDDLENAME", "LASTNAME"})
 
 _PER_LOC_ORG = {"PER": PERSON, "LOC": LOCATION, "ORG": ORGANISATION}
 
@@ -48,6 +49,19 @@ DATASET_LABELS: dict[str, dict[str, str]] = {
         "Date_Time": DATE, "Date_of_Birth": DATE, "Credit_Card_Numbers": NUMBER,
         "National_Identification_Number": NUMBER, "Passport_Number": NUMBER,
         "Tax_Reference_Number": NUMBER, "Driving_License_Number": NUMBER,
+    },
+    "gretel_en": {
+        "name": PERSON, "first_name": PERSON, "last_name": PERSON, "company_name": ORGANISATION,
+        "street_address": LOCATION, "address": LOCATION, "city": LOCATION, "state": LOCATION,
+        "country": LOCATION, "email": EMAIL, "phone_number": PHONE, "ipv4": IP, "ipv6": IP, "url": URL,
+        "date": DATE, "date_of_birth": DATE, "date_time": DATE, "ssn": NUMBER, "credit_card_number": NUMBER,
+        "account_number": NUMBER, "tax_id": NUMBER, "national_id": NUMBER, "postcode": NUMBER,
+    },
+    "argilla_pii": {
+        "FIRSTNAME": PERSON, "MIDDLENAME": PERSON, "LASTNAME": PERSON, "CITY": LOCATION, "STREET": LOCATION,
+        "STATE": LOCATION, "COUNTY": LOCATION, "COMPANYNAME": ORGANISATION, "EMAIL": EMAIL,
+        "PHONENUMBER": PHONE, "IP": IP, "IPV4": IP, "IPV6": IP, "URL": URL, "DATE": DATE, "DOB": DATE,
+        "ACCOUNTNUMBER": NUMBER, "CREDITCARDNUMBER": NUMBER, "SSN": NUMBER, "IBAN": NUMBER, "ZIPCODE": NUMBER,
     },
     "iahlt": {"PER": PERSON, "GPE": LOCATION, "LOC": LOCATION, "FAC": LOCATION, "ORG": ORGANISATION},
     "bayanat": {

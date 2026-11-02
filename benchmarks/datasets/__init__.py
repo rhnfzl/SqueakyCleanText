@@ -17,7 +17,7 @@ CACHE = Path(__file__).resolve().parents[1] / ".cache"
 
 MODULES = (
     "openpii", "gretel", "nemotron", "redact", "iahlt", "bayanat", "thainer",
-    "thai_pii", "naamapadam", "multiconer", "stockmark", "tab", "wili", "fineweb2",
+    "thai_pii", "naamapadam", "multiconer", "stockmark", "tab", "wili", "fineweb2", "gretel_en", "argilla_pii",
 )
 
 

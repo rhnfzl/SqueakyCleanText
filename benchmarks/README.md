@@ -110,6 +110,8 @@ by default, so `default` keeps emoji on purpose.
 | naamapadam | pii | ai4bharat/naamapadam (hi, bn, ta test) | 9d4f21a | CC0-1.0 per card, CC-BY-NC-4.0 in loader | scores + ids |
 | multiconer | pii | MultiCoNER/multiconer_v2 (hi, bn, zh test) | 4be2d62 | CC-BY-4.0 | scores + ids |
 | stockmark | pii | stockmark/ner-wikipedia-dataset (all) | d6c4d48 | CC-BY-SA-3.0 | scores + ids |
+| gretel_en | pii | gretelai/gretel-pii-masking-en-v1 (test) | e06eb14 | Apache-2.0 | scores + ids |
+| argilla_pii | pii | argilla/textcat-tokencat-pii-per-domain (all; 1% of ai4privacy/pii-masking-200k train) | 683954a | none on repo; Ai4Privacy licence upstream | scores only |
 | tab | long | NorskRegnesentral/text-anonymization-benchmark (GitHub, test) | 558e09e | MIT | scores + ids |
 | wili | lid | MartinThoma/wili_2018 (test) | 12c3a51 | ODbL-1.0 | scores + ids |
 | fineweb2 | speed, clean | HuggingFaceFW/fineweb-2 (test splits) | af9c133 | ODC-By-1.0 + CommonCrawl terms | scores + ids |
@@ -119,6 +121,9 @@ Notes:
 - gretel gold comes from an LLM plus GLiNER, so its precision is a lower bound.
 - multiconer entities are public figures and works, not real PII.
 - REDACT is gated: aggregate scores only, never text or ids.
+- gretel_en gold has no offsets: spans are every exact occurrence of each entity string.
+- argilla_pii has no licence of its own and comes from Ai4Privacy data: aggregate scores only.
+- Tool comparisons (dev/test splits, protocol): see `compare/PROTOCOL.md`.
 
 Not run yet: bigcode-pii, PIILO and FLORES+ (no access), Wojood (not available),
 WikiANN and papluca (unclear licence; secondary), Universal NER (no hi/bn/ta/th),
