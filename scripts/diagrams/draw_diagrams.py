@@ -153,7 +153,8 @@ def overview():
     d = Diagram("sct_overview", 600, "What SqueakyCleanText offers")
     top, row_h, gap = 20, 58, 10
     body_h = 52 + 5 * (row_h + gap) + 4
-    row = lambda n: top + 52 + n * (row_h + gap)  # one grid for all three columns
+    def row(n):  # one grid for all three columns
+        return top + 52 + n * (row_h + gap)
 
     d.rect(20, top, 220, body_h, "grey")
     d.text(130, top + 32, "In", 16, True, MUTED, "middle")
