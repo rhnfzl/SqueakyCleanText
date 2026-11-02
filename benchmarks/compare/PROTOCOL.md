@@ -71,7 +71,7 @@ An entry is a full configuration: package + version + checkpoint + revision + la
 | entry | package / version | checkpoint @ revision | GPU need |
 |---|---|---|---|
 | sct-default | SqueakyCleanText 0.8.1 | SCT default ONNX NER (xlm-r conll03/02, wikineural) @ `DEFAULT_NER_REVISIONS` | none (CPU) |
-| sct-gliner | SqueakyCleanText[gliner] 0.8.1, `ner_mode='pii'` | knowledgator/gliner-pii-base-v1.0 ONNX @ `61726e0` | none; ~1 GB if cuda |
+| sct-gliner | SqueakyCleanText[gliner] 0.8.1, `ner_mode='pii'` | knowledgator/gliner-pii-base-v1.0 @ `61726e0`, PyTorch (SCT falls back: no root `model.onnx`) | none; ~1 GB if cuda |
 | presidio | presidio-analyzer 2.2.366, spaCy 3.8.18 | en_core_web_lg 3.8.0 | none (CPU) |
 | gliner-nvidia | gliner 0.2.30 | nvidia/gliner-PII @ `bd23e8e` (570M) | ~3 GB fp16, batch <= 4; CPU fallback |
 | gliner2-fastino | gliner2 2.1.0 | fastino/gliner2-privacy-filter-PII-multi @ `1cb4166` (205M) | ~1.5-2 GB; CPU fine |
@@ -117,8 +117,50 @@ already: NeMo Anonymizer / LLMPiiModifier (need an LLM endpoint or a 70B model),
 - SCT's tuned track follows the same budget (`ner_confidence_threshold`,
   `gliner_threshold`). SCT's `training` and `ner-off` configs are reported only as extra
   SCT rows, not as entries.
-- Tuning happens once, configs are frozen in `entries.py` (with the dev scores that chose
-  them), then test runs happen once. A rerun of test needs a logged reason.
+- Tuning happens once, configs are frozen in `configs/tuned.json` (with the dev scores that
+  chose them; `runner.py --tuned configs/tuned.json` applies them), then test runs happen once.
+  A rerun of test needs a logged reason.
+
+How it ran (`tune.py`, grid in `tune.GRID`, all on the dev part, 100 docs per language, gold
+language track, the 9 privacy datasets; TAB 21 docs, REDACT 175, gretel 487):
+
+- Objective, exactly: per dataset, the language macro of masked F2 on the full taxonomy
+  (DATE out), every doc counted, failed docs unmasked; then the mean over datasets. Masked
+  F2 = F2 of masked recall (gold mentions overlapped by any kept prediction) and masked
+  precision (kept predictions that overlap any in-view gold). Ties: higher masked precision,
+  then grid order. The full view, not the shared one, so a tool is tuned on all it must mask.
+- Scored tools run once per prompt list / language setting at their floor (GLiNER 0.05,
+  Presidio and bardsai at the vendor 0) and the grid thresholds are filtered from that run
+  (exact for Presidio and bardsai; an approximation for GLiNER flat decoding, section 10).
+  Scoreless tools (SCT, DataFog, OPF presets) run once per candidate.
+
+| entry | candidates (<= 12) |
+|---|---|
+| sct-default | `ner_confidence_threshold` 0.5, 0.6, 0.7, 0.8, 0.85 (default), 0.9 |
+| sct-gliner | `gliner_threshold` 0.1, 0.2, 0.3 (default), 0.4, 0.5, 0.6 |
+| presidio | {en model only, gold language packs + phone regions} x `score_threshold` {vendor 0, 0.1..0.5} |
+| gliner-nvidia | {GLINER_PROMPTS, card labels} x threshold 0.1..0.6 |
+| gliner2-fastino | {GLINER_PROMPTS, card labels} x threshold 0.1..0.6 |
+| opf | bias preset b in -1, -0.5, 0 (default), 0.5, 1, 2: background_stay -b, background_to_start +b, inside_to_continue +b |
+| bardsai-v3 | threshold {vendor 0, 0.3, 0.5, 0.7, 0.8, 0.9} |
+| datafog | locales {none, gold}; every regex type is on by default, so no type switch is left |
+
+- Presidio language packs: spaCy `*_core_news_lg` (zh `zh_core_web_lg`, no `nb_core_news_lg`)
+  where one exists, else `xx_ent_wiki_sm` (`tune.PRESIDIO_MODELS`), plus `PhoneRecognizer`
+  regions = vendor default + one region per scored language (`tune.PHONE_REGIONS`).
+- OPF ships one operating point (all biases 0) and a README sentence on the direction
+  (less background stay, easier span entry and continuation = more recall); the preset family
+  scales that one direction. The vendor gives no named presets.
+- Device: every tuning run was on CPU (`taskset` 16 cores per job). torch 2.15.0's Linux
+  wheels are CUDA 13.2 builds and the box's driver is CUDA 12.6, so torch entries see no GPU
+  with the pinned torch; gliner-nvidia therefore runs fp32 (its fp16 is the cuda path). Test
+  runs must use the same device per entry as tuning.
+- sct-gliner: SCT 0.8.1 loads knowledgator/gliner-pii-base-v1.0 with PyTorch (the repo has no
+  root `model.onnx`; SCT logs the fallback), not ONNX.
+- Harness fix after tuning started: `sct_adapter.sct_view` mapped view chars inserted at the end
+  of the doc's last token to `len(source)`, so a placeholder there crashed span placement
+  (`StopIteration`; 1 openpii dev doc of sct-gliner per run, scored as unmasked). Fixed for the
+  test runs; the tuning numbers keep that one failed doc.
 
 ## 4. Entity coverage views (rule 4)
 

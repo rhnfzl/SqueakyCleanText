@@ -50,7 +50,8 @@ ENTRIES = {
         "labels": SCT_LABELS, "supports": SCT_TYPES,
     },
     "sct-gliner": {
-        "package": "SqueakyCleanText[gliner]==0.8.1", "checkpoint": "knowledgator/gliner-pii-base-v1.0 (ONNX)",
+        "package": "SqueakyCleanText[gliner]==0.8.1",
+        "checkpoint": "knowledgator/gliner-pii-base-v1.0 (PyTorch: no root model.onnx in the repo, SCT falls back)",
         "revision": "61726e0ad791dcab3e29339bbec3ad42ded65641", "config": "TextCleanerConfig(ner_mode='pii')",
         "threshold": "SCT default", "mask": "SCT placeholder", "device": "cpu|cuda", "gpu_gb": 1,
         "labels": SCT_LABELS, "supports": SCT_TYPES,

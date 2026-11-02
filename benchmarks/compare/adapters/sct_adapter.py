@@ -57,7 +57,8 @@ def sct_view(source: str, normalise) -> tuple[str, list[int]]:
             offsets.extend(range(at, at + len(token)))
             continue
         for op, i1, i2, j1, j2 in difflib.SequenceMatcher(None, token, piece, autojunk=False).get_opcodes():
-            offsets.extend(range(at + i1, at + i2) if op == "equal" else [at + i1] * (j2 - j1))
+            # chars inserted after the token's last char belong to that char, not to the next token
+            offsets.extend(range(at + i1, at + i2) if op == "equal" else [at + min(i1, len(token) - 1)] * (j2 - j1))
     offsets.append(len(source))
     return "".join(pieces), offsets
 

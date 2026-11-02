@@ -450,6 +450,11 @@ def test_c6_sct_offsets_survive_entity_decoding_and_invisible_chars():
     got = predicted_spans(text, "Write <EMAIL_0> then <EMAIL_1> ok",
                           {"<EMAIL_0>": "ana@example.org", "<EMAIL_1>": "ana@example.org"}, sct.sct_view(text, normalise))
     assert [text[s.start:s.end] for s in got] == ["ana&#64;example.org", "ana@example.org"]
+    text = "Write to ana@example.org và…’."  # NFKC-like expansion at the doc end ("…" -> "...")
+    view = sct.sct_view(text, lambda t: t.replace("…", "...").replace("’", "'"))
+    assert max(view[1][:-1]) < len(text) == view[1][-1]
+    got = predicted_spans(text, "Write to ana@example.org <X_0>", {"<X_0>": "và...'."}, view)
+    assert [(s.start, s.end) for s in got] == [(25, len(text))]
 
 
 def test_c7_nvidia_postcode_is_a_number_like_gold_and_fastino():
