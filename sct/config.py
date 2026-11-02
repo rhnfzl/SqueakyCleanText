@@ -376,6 +376,12 @@ class TextCleanerConfig:
     # Off by default: the shape also takes product and reference codes (RTX4090, COVID19)
     check_replace_identifiers: bool = False
     replace_with_identifiers: str = "<ID>"
+    # Bracket/brace removal only takes innermost spans of at most this many characters and
+    # whitespace-separated words, so prose clauses stay; 0 = no limit (both 0 = 0.8.0 matching)
+    bracket_content_max_chars: int = 32
+    bracket_content_max_words: int = 3
+    # A {...} that parses as a JSON object (json.raw_decode, nested ones included) is never removed
+    keep_json_braces: bool = True
 
     def __post_init__(self):
         if self.synthetic_reference_date is not None:
@@ -757,6 +763,9 @@ def _config_from_module_globals() -> TextCleanerConfig:
         replace_with_cards=getattr(m, 'REPLACE_WITH_CARDS', '<CARD>'),
         check_replace_identifiers=getattr(m, 'CHECK_REPLACE_IDENTIFIERS', False),
         replace_with_identifiers=getattr(m, 'REPLACE_WITH_IDENTIFIERS', '<ID>'),
+        bracket_content_max_chars=getattr(m, 'BRACKET_CONTENT_MAX_CHARS', 32),
+        bracket_content_max_words=getattr(m, 'BRACKET_CONTENT_MAX_WORDS', 3),
+        keep_json_braces=getattr(m, 'KEEP_JSON_BRACES', True),
         check_replace_currency_symbols=m.CHECK_REPLACE_CURRENCY_SYMBOLS,
         check_ner_process=m.CHECK_NER_PROCESS,
         check_remove_isolated_letters=m.CHECK_REMOVE_ISOLATED_LETTERS,
@@ -873,6 +882,9 @@ REPLACE_WITH_IBAN = "<IBAN>"
 REPLACE_WITH_CARDS = "<CARD>"
 CHECK_REPLACE_IDENTIFIERS = False
 REPLACE_WITH_IDENTIFIERS = "<ID>"
+BRACKET_CONTENT_MAX_CHARS = 32
+BRACKET_CONTENT_MAX_WORDS = 3
+KEEP_JSON_BRACES = True
 GLINER_ONNX = False
 LANGUAGE = None
 

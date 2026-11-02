@@ -1035,6 +1035,9 @@ class TextCleaner:
             text,
             remove_brackets=self.cfg.check_remove_bracket_content,
             remove_braces=self.cfg.check_remove_brace_content,
+            max_chars=self.cfg.bracket_content_max_chars,
+            max_words=self.cfg.bracket_content_max_words,
+            keep_json=self.cfg.keep_json_braces,
         )
 
     def _normalize_whitespace(self, text):

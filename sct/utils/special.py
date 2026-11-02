@@ -1,3 +1,4 @@
+import json
 import unicodedata
 
 from sct.utils import constants
@@ -9,6 +10,45 @@ def _drop_if_isolated(match):
         0 <= j < len(text) and unicodedata.category(text[j])[0] in 'LNM' for j in (i - 1, i + 1)
     )
     return match.group() if touches_word else ''
+
+
+_JSON = json.JSONDecoder()
+
+
+def _json_object_spans(text):
+    """(start, end) of each outermost {...} that parses as a JSON object."""
+    spans, i = [], text.find('{')
+    while i != -1:
+        try:
+            # shortcut: a failed parse may scan to the end, so many unclosed '{"' cost O(n^2); fine for documents
+            obj, end = _JSON.raw_decode(text, i)
+        except ValueError:
+            obj = None
+        if isinstance(obj, dict):
+            spans.append((i, end))
+            i = text.find('{', end)
+        else:
+            i = text.find('{', i + 1)
+    return spans
+
+
+def _remove_bracketed(text, remove_brackets, remove_braces, max_chars, max_words):
+    if not (max_chars > 0 or max_words > 0):
+        if remove_brackets:
+            text = constants.BRACKET_CONTENT_REGEX.sub('', text)
+        if remove_braces:
+            text = constants.BRACE_CONTENT_REGEX.sub('', text)
+        return text
+
+    def drop(m):
+        inner = m.group()[1:-1]
+        too_long = (0 < max_chars < len(inner)) or (0 < max_words < len(inner.split()))
+        return m.group() if too_long else ''
+    if remove_brackets:
+        text = constants.BRACKET_INNER_REGEX.sub(drop, text)
+    if remove_braces:
+        text = constants.BRACE_INNER_REGEX.sub(drop, text)
+    return text
 
 
 class ProcessSpecialSymbols:
@@ -43,7 +83,8 @@ class ProcessSpecialSymbols:
 
         return cleaned_text
 
-    def remove_isolated_special_symbols(self, text, remove_brackets=True, remove_braces=True):
+    def remove_isolated_special_symbols(self, text, remove_brackets=True, remove_braces=True,
+                                        max_chars=0, max_words=0, keep_json=False):
         """
         Removes any isolated symbols which shouldn't be present in the text.
 
@@ -51,12 +92,18 @@ class ProcessSpecialSymbols:
             text: Input text.
             remove_brackets: If True, remove [...] content (image/file references).
             remove_braces: If True, remove {...} content (HTML links/templates).
+            max_chars, max_words: when either is > 0, only innermost spans within both limits
+                are removed; 0 and 0 = remove every span (0.8.0).
+            keep_json: never remove a {...} that parses as a JSON object, nor anything inside it.
         """
-        cleaned_text = text
-        if remove_brackets:
-            cleaned_text = constants.BRACKET_CONTENT_REGEX.sub('', cleaned_text)
-        if remove_braces:
-            cleaned_text = constants.BRACE_CONTENT_REGEX.sub('', cleaned_text)
+        spans = _json_object_spans(text) if keep_json and (remove_brackets or remove_braces) else []
+        parts, last = [], 0
+        for start, end in spans:
+            parts += [_remove_bracketed(text[last:start], remove_brackets, remove_braces, max_chars, max_words),
+                      text[start:end]]
+            last = end
+        parts.append(_remove_bracketed(text[last:], remove_brackets, remove_braces, max_chars, max_words))
+        cleaned_text = ''.join(parts)
         cleaned_text = constants.ISOLATED_SPECIAL_SYMBOLS_REGEX.sub('', cleaned_text)
         cleaned_text = constants.ISOLATED_QUOTES_REGEX.sub(_drop_if_isolated, cleaned_text)
 

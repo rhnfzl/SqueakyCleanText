@@ -107,6 +107,9 @@ new_cfg = dataclasses.replace(cfg, check_ner_process=False)
 | `check_remove_isolated_special_symbols` | `True` | Remove isolated symbols |
 | `check_remove_bracket_content` | `True` | Remove `[...]` content |
 | `check_remove_brace_content` | `True` | Remove `{...}` content |
+| `bracket_content_max_chars` | `32` | Bracket/brace removal only takes innermost `[...]`/`{...}` spans with at most this many characters inside, so bracketed prose stays. `0` = no limit |
+| `bracket_content_max_words` | `3` | Same, at most this many whitespace-separated words inside. Both limits `0` = 0.8.0 (every span up to the first closing bracket) |
+| `keep_json_braces` | `True` | Never remove a `{...}` that parses as a JSON object (nested ones included), nor anything inside it. `False` = 0.8.0 |
 | `check_normalize_whitespace` | `True` | Normalize whitespace |
 | `check_statistical_model_processing` | `True` | Generate stat model output |
 | `check_casefold` | `True` | Lowercase stat output |

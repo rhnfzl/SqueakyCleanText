@@ -47,6 +47,20 @@
 - New types `IBAN`, `CARD`, `ID` in reversible maps, synthetic fakes, `regex_counts` and the
   `signals` PII types. The browser export does not include these rules (listed in its limitations).
   `False` restores 0.8.0.
+- `bracket_content_max_chars` (default `32`, legacy `BRACKET_CONTENT_MAX_CHARS`),
+  `bracket_content_max_words` (default `3`, legacy `BRACKET_CONTENT_MAX_WORDS`) and
+  `keep_json_braces` (default `True`, legacy `KEEP_JSON_BRACES`): bracket/brace removal no longer
+  deletes JSON documents and bracketed prose. 0.8.0 removed every `[...]` and `{...}` up to the
+  first closing bracket, so `Order: {"name": ..., "items": [{...}]} done` became `Order: done`
+  and nested JSON left `"items": "payment":` (benchmark section 4: REDACT lost 14.8% of gold
+  spans, 108/1,000 docs lost more than half their text; gretel 7.0%). Now a `{...}` that parses
+  as a JSON object (`json.raw_decode`, also inside invalid outer JSON) is kept whole, and only
+  innermost spans of at most 32 characters and 3 whitespace-separated words are removed
+  (`[img.png]`, `[12]`, `[citation needed]`, `{{template}}`); a `[...]` never spans a brace.
+  Format rules only. Limits come from the cached benchmark text: with both limits at least 87% of
+  innermost `[...]` spans in fineweb-2 are still removed. Not measured end to end yet. Unspaced
+  scripts (CJK, Thai) are held by the character limit only. Both limits `0` and
+  `keep_json_braces=False` restore 0.8.0.
 
 ## 0.8.0 - 2026-11-01
 

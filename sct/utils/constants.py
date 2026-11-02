@@ -576,6 +576,9 @@ ISOLATED_SPECIAL_SYMBOLS_REGEX = re.compile(
 # Pre-compiled bracket/brace removal patterns (moved from special.py runtime)
 BRACKET_CONTENT_REGEX = re.compile(r'\[[^\]]+\]')
 BRACE_CONTENT_REGEX = re.compile(r'\{[^}]+\}')
+# innermost spans only, used when a length limit is set; [...] never spans a brace, so it cannot cut into JSON
+BRACKET_INNER_REGEX = re.compile(r'\[[^\[\]{}]+\]')
+BRACE_INNER_REGEX = re.compile(r'\{[^{}]+\}')
 # A quote, dash, * or % is isolated unless a letter, digit or mark of any script touches it
 # (special.py checks the neighbours), so "ইসলাম-এর" and "東京-大阪" keep their hyphen.
 ISOLATED_QUOTES_REGEX = re.compile(r"['\"\-*%]")
