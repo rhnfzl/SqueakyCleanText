@@ -86,7 +86,7 @@ class WindowedStreamingRedactor:
         phone_view = contact.PHONE_VIEW if cfg.fold_styled_characters else contact.PHONE_DIGIT_VIEW
         views = [constants.URL_REGEX, constants.EMAIL_REGEX, contact.IP_VIEW, phone_view]
         if cfg.check_replace_html:  # a tag holding a space ('<a title="x y">')
-            views.append(constants.HTML_REGEX)
+            views.append(cleaner._html_regex)
         if cfg.check_replace_dates:
             views.append(cleaner._date_view)
         if cfg.check_fuzzy_replace_dates:  # every candidate the fuzzy step may mask ("15 Janury 1990")

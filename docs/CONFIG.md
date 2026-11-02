@@ -91,6 +91,7 @@ new_cfg = dataclasses.replace(cfg, check_ner_process=False)
 | `check_decode_unicode_escapes` | `True` | Part of `check_fix_bad_unicode`: decode literal backslash escapes (`\u00e9` to `é`, `\n` to a line break). `False` keeps them as written (code, JSON) |
 | `check_to_ascii_unicode` | `False` | Transliterate to ASCII with unidecode. `False` keeps every script (`日本語`, `München`); the multilingual NER models read native script, and folded output hid names from them (0 of 8 Hindi/Bengali/Tamil names found). `True` = 0.7 (`日本語` -> `Ri Ben Yu`); `sct-clean --to-ascii`, `SCT_MCP_TO_ASCII=1` |
 | `check_replace_html` | `True` | Strip/replace HTML tags, found on the markup as written: escaped code (`&lt;b&gt;`) is text, not a tag |
+| `html_tag_strict` | `True` | The HTML rule reads only tag shapes: a name after `<` (`<b>`, `</a>`, `<br/>`, `<!DOCTYPE html>`, `<?xml ...?>`, multi-line tags) or a `<!-- -->` comment, plus entities. `Name <a@b.com>`, `<https://...>` and a stray `a < b ... >` are left to the email/URL rules and the text. `False` restores the 0.8.0 `<.*?>`, which masks those as `<HTML>`. Legacy global `HTML_TAG_STRICT` |
 | `check_replace_urls` | `True` | Replace URLs with token |
 | `check_replace_emails` | `True` | Replace emails with token |
 | `check_replace_ips` | `True` | Replace IPv4/IPv6 addresses (runs before dates, phones, years) |

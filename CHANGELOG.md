@@ -4,6 +4,14 @@
 
 ### Behaviour changes
 
+- `html_tag_strict` (default `True`, legacy module global `HTML_TAG_STRICT`): the HTML rule
+  matches only tag shapes (`<b>`, `</a>`, `<br/>`, `<!DOCTYPE ...>`, `<?xml ...?>`, comments,
+  multi-line tags) and entities. 0.8.0 used `<.*?>`, which ran before the email rule, so
+  `John Smith <john.smith@example.com>` became `John Smith <HTML>` (typed as markup, not
+  counted as PII: REDACT showed 12.8% of EMAIL gold as HTML), `<https://...>` became `<HTML>`,
+  and `If a < b then mail <x@y.org>` lost the words between the brackets. Now those read as
+  `<<EMAIL>>`, `<<URL>>` and plain text. The rule applies to the plain and reversible paths, the
+  streaming split guard and the browser export. `False` restores `<.*?>`. Not re-measured yet.
 - `ner_ensemble_vote` (default `'max'`, legacy module global `NER_ENSEMBLE_VOTE`): the NER
   ensemble keeps a span when its best model score reaches `ner_confidence_threshold`. 0.8.0
   averaged the scores of every model on the span, so when WordPiece widening moved a weak

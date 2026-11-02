@@ -251,10 +251,16 @@ TWO_LINEBREAK_REGEX = re.compile(r"((\r\n)|[\n\v])+((\r\n)|[\n\v])+")
 MULTI_WHITESPACE_TO_ONE_REGEX = re.compile(r"\s+")
 NONBREAKING_SPACE_REGEX = re.compile(r"(?!\n)\s+")
 
+_HTML_ENTITY = r'&([a-z0-9]+|#[0-9]{1,6}|#x[0-9a-f]{1,6});'
+# Tag-shaped only (html_tag_strict): a name after "<" ("<b>", "</b>", "<br/>", "<!DOCTYPE", "<?xml") or a
+# comment, so "Name <a@b.com>", "<https://...>" and a stray "a < b ... >" are not markup. Linear: [^<>] stops
+# at the next bracket, and the pattern is JS-portable (browser export).
 HTML_REGEX = re.compile(
-    '<.*?>|&([a-z0-9]+|#[0-9]{1,6}|#x[0-9a-f]{1,6});',
+    r'<!--[^<>]*>|<[!?/]?[A-Za-z][A-Za-z0-9:-]*(?:\s[^<>]*)?/?>|' + _HTML_ENTITY,
     flags=re.UNICODE | re.IGNORECASE,
 )
+# 0.8.0 rule (html_tag_strict=False): any "<...>" on one line.
+HTML_REGEX_ANY = re.compile('<.*?>|' + _HTML_ENTITY, flags=re.UNICODE | re.IGNORECASE)
 
 # Punctuation (category P) of the CJK symbol, katakana middle dot and full-width blocks, except the
 # full-width forms of URL syntax (／ ？ ＃ ％ ＆ ＠ ： ． － ＿), which the styled fold turns into ASCII.

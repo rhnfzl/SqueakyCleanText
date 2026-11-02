@@ -395,3 +395,30 @@ def test_new_types_synthetic():
     out = _cleaner(replacement_mode="synthetic", check_replace_identifiers=True).process(
         "pay NL91ABNA0417164300 card 4111111111111111 ref RBCON68T08").lm_text
     assert "NL91ABNA0417164300" not in out and "4111111111111111" not in out and "RBCON68T08" not in out
+
+
+@pytest.mark.parametrize("text, expected", [
+    ("Contact John Smith <john.smith@example.com> today.", "Contact John Smith <<EMAIL>> today."),
+    # a lone "<" is dropped as a symbol, not as markup
+    ("If a < b then mail <x@y.org> please", "If a b then mail <<EMAIL>> please"),
+    ("see <https://example.com/path> now", "see <<URL>> now"),
+    ("x <3 y > 2", "x <3 y 2"),
+    ("a <b>bold</b> <br/> <!-- note --> end", "a <HTML>bold<HTML> <HTML> <HTML> end"),
+    ('<!DOCTYPE html><a\nhref="mailto:x@y.org">hi</a>', "<HTML><HTML>hi<HTML>"),
+])
+@pytest.mark.parametrize("mode", ["placeholder", "reversible"])
+def test_html_rule_reads_only_tag_shapes(text, expected, mode):
+    out = _cleaner(replacement_mode=mode, check_replace_numbers=False,
+                   check_remove_isolated_letters=False).process(text).lm_text
+    if mode == "placeholder":
+        assert out == expected
+    else:
+        assert "<HTML" not in out or "<HTML" in expected
+        assert "@" not in out and "https" not in out
+
+
+def test_html_tag_strict_off_restores_any_angle_span():
+    out = _cleaner(html_tag_strict=False).process("Contact Jo <jo@example.com> today.").lm_text
+    assert out == "Contact Jo <HTML> today."
+    js = build_browser_manifest(TextCleanerConfig(html_tag_strict=False))
+    assert js["rules"]["html"]["pattern"].startswith("<.*?>")

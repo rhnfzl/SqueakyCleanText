@@ -117,6 +117,7 @@ class TextCleaner:
             if self.cfg.fold_styled_characters else self.ProcessDateTime._date_regex)
 
         self.ProcessContacts = contact.ProcessContacts()
+        self._html_regex = constants.HTML_REGEX if self.cfg.html_tag_strict else constants.HTML_REGEX_ANY
         self.ProcessSpecialSymbols = special.ProcessSpecialSymbols()
         self.NormaliseText = normtext.NormaliseText()
 
@@ -856,14 +857,12 @@ class TextCleaner:
     def _replace_html(self, text):
         reversible = self._replace_reversible(
             text,
-            constants.HTML_REGEX,
+            self._html_regex,
             'HTML',
         )
         if reversible is not None:
             return reversible
-        return self.ProcessContacts.replace_html(
-            text, replace_with=lambda m: self._emit('HTML', m.group(), self.cfg.replace_with_html),
-        )
+        return self._html_regex.sub(lambda m: self._emit('HTML', m.group(), self.cfg.replace_with_html), text)
 
     def _replace_urls(self, text):
         reversible = self._replace_reversible(

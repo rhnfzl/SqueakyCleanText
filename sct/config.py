@@ -386,6 +386,8 @@ class TextCleanerConfig:
     date_month_name_slash_year: bool = True
     # ISO codes of the built-in month data dates use (en nl de es fr pt it th); None = all
     date_builtin_month_languages: Optional[Tuple[str, ...]] = None
+    # HTML rule reads only tag shapes (<b>, </a>, <br/>, <!-- -->); False = 0.8.0 "<.*?>" (eats "<a@b.com>")
+    html_tag_strict: bool = True
 
     def __post_init__(self):
         if self.synthetic_reference_date is not None:
@@ -781,6 +783,7 @@ def _config_from_module_globals() -> TextCleanerConfig:
         keep_json_braces=getattr(m, 'KEEP_JSON_BRACES', True),
         date_month_name_slash_year=getattr(m, 'DATE_MONTH_NAME_SLASH_YEAR', True),
         date_builtin_month_languages=getattr(m, 'DATE_BUILTIN_MONTH_LANGUAGES', None),
+        html_tag_strict=getattr(m, 'HTML_TAG_STRICT', True),
         check_replace_currency_symbols=m.CHECK_REPLACE_CURRENCY_SYMBOLS,
         check_ner_process=m.CHECK_NER_PROCESS,
         check_remove_isolated_letters=m.CHECK_REMOVE_ISOLATED_LETTERS,
@@ -902,6 +905,7 @@ BRACKET_CONTENT_MAX_WORDS = 3
 KEEP_JSON_BRACES = True
 DATE_MONTH_NAME_SLASH_YEAR = True
 DATE_BUILTIN_MONTH_LANGUAGES = None
+HTML_TAG_STRICT = True
 GLINER_ONNX = False
 LANGUAGE = None
 
