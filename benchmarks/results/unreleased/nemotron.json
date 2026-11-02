@@ -1,0 +1,1082 @@
+{
+ "configs": {
+  "default": {
+   "by_position": {
+    "0-1000": {
+     "gold": 1350,
+     "gold_found": 1202,
+     "recall": 0.8904
+    },
+    "1000-2000": {
+     "gold": 158,
+     "gold_found": 145,
+     "recall": 0.9177
+    },
+    "2000-3000": {
+     "gold": 35,
+     "gold_found": 34,
+     "recall": 0.9714
+    },
+    "3000-4000": {
+     "gold": 8,
+     "gold_found": 7,
+     "recall": 0.875
+    },
+    "4000-5000": {
+     "gold": 2,
+     "gold_found": 2,
+     "recall": 1.0
+    }
+   },
+   "chars": 279456,
+   "documents": 300,
+   "gold_spans": 1553,
+   "leak": {
+    "by_label": {
+     "DATE": {
+      "full": 6,
+      "full_leak_rate": 0.0211,
+      "leak_rate": 0.0211,
+      "partial": 0,
+      "total": 285
+     },
+     "EMAIL": {
+      "full": 1,
+      "full_leak_rate": 0.0062,
+      "leak_rate": 0.0745,
+      "partial": 11,
+      "total": 161
+     },
+     "IP": {
+      "full": 0,
+      "full_leak_rate": 0.0,
+      "leak_rate": 0.0,
+      "partial": 0,
+      "total": 25
+     },
+     "LOCATION": {
+      "full": 0,
+      "full_leak_rate": 0.0,
+      "leak_rate": 0.0341,
+      "partial": 9,
+      "total": 264
+     },
+     "NUMBER": {
+      "full": 0,
+      "full_leak_rate": 0.0,
+      "leak_rate": 0.0667,
+      "partial": 9,
+      "total": 135
+     },
+     "ORGANISATION": {
+      "full": 0,
+      "full_leak_rate": 0.0,
+      "leak_rate": 0.0963,
+      "partial": 13,
+      "total": 135
+     },
+     "PERSON": {
+      "full": 7,
+      "full_leak_rate": 0.02,
+      "leak_rate": 0.0229,
+      "partial": 1,
+      "total": 350
+     },
+     "PHONE": {
+      "full": 0,
+      "full_leak_rate": 0.0,
+      "leak_rate": 0.0,
+      "partial": 0,
+      "total": 104
+     },
+     "URL": {
+      "full": 0,
+      "full_leak_rate": 0.0,
+      "leak_rate": 0.5,
+      "partial": 47,
+      "total": 94
+     }
+    },
+    "by_language": {
+     "en": {
+      "full": 8,
+      "full_leak_rate": 0.0063,
+      "leak_rate": 0.0773,
+      "partial": 90,
+      "total": 1268
+     }
+    },
+    "overall": {
+     "full": 8,
+     "full_leak_rate": 0.0063,
+     "leak_rate": 0.0773,
+     "partial": 90,
+     "total": 1268
+    }
+   },
+   "out_of_scope_gold_spans": 1047,
+   "partial": {
+    "by_label": {
+     "DATE": {
+      "f1": 0.9365,
+      "gold": 285,
+      "gold_found": 258,
+      "gold_masked": 274,
+      "masked_recall": 0.9614,
+      "precision": 0.97,
+      "pred": 267,
+      "pred_correct": 259,
+      "recall": 0.9053
+     },
+     "EMAIL": {
+      "f1": 0.9938,
+      "gold": 161,
+      "gold_found": 159,
+      "gold_masked": 159,
+      "masked_recall": 0.9876,
+      "precision": 1.0,
+      "pred": 160,
+      "pred_correct": 160,
+      "recall": 0.9876
+     },
+     "IP": {
+      "f1": 1.0,
+      "gold": 25,
+      "gold_found": 25,
+      "gold_masked": 25,
+      "masked_recall": 1.0,
+      "precision": 1.0,
+      "pred": 25,
+      "pred_correct": 25,
+      "recall": 1.0
+     },
+     "LOCATION": {
+      "f1": 0.929,
+      "gold": 264,
+      "gold_found": 240,
+      "gold_masked": 250,
+      "masked_recall": 0.947,
+      "precision": 0.9498,
+      "pred": 259,
+      "pred_correct": 246,
+      "recall": 0.9091
+     },
+     "NUMBER": {
+      "f1": 0.2092,
+      "gold": 135,
+      "gold_found": 67,
+      "gold_masked": 135,
+      "masked_recall": 1.0,
+      "precision": 0.1325,
+      "pred": 898,
+      "pred_correct": 119,
+      "recall": 0.4963
+     },
+     "ORGANISATION": {
+      "f1": 0.8201,
+      "gold": 135,
+      "gold_found": 121,
+      "gold_masked": 121,
+      "masked_recall": 0.8963,
+      "precision": 0.7558,
+      "pred": 172,
+      "pred_correct": 130,
+      "recall": 0.8963
+     },
+     "PERSON": {
+      "f1": 0.9534,
+      "gold": 350,
+      "gold_found": 326,
+      "gold_masked": 332,
+      "masked_recall": 0.9486,
+      "precision": 0.9765,
+      "pred": 341,
+      "pred_correct": 333,
+      "recall": 0.9314
+     },
+     "PHONE": {
+      "f1": 0.5835,
+      "gold": 104,
+      "gold_found": 101,
+      "gold_masked": 103,
+      "masked_recall": 0.9904,
+      "precision": 0.417,
+      "pred": 247,
+      "pred_correct": 103,
+      "recall": 0.9712
+     },
+     "URL": {
+      "f1": 0.9894,
+      "gold": 94,
+      "gold_found": 93,
+      "gold_masked": 93,
+      "masked_recall": 0.9894,
+      "precision": 0.9894,
+      "pred": 94,
+      "pred_correct": 93,
+      "recall": 0.9894
+     }
+    },
+    "by_language": {
+     "en": {
+      "f1": 0.7155,
+      "gold": 1553,
+      "gold_found": 1390,
+      "gold_masked": 1492,
+      "masked_recall": 0.9607,
+      "precision": 0.596,
+      "pred": 2463,
+      "pred_correct": 1468,
+      "recall": 0.895
+     }
+    },
+    "overall": {
+     "f1": 0.7155,
+     "gold": 1553,
+     "gold_found": 1390,
+     "gold_masked": 1492,
+     "masked_recall": 0.9607,
+     "precision": 0.596,
+     "pred": 2463,
+     "pred_correct": 1468,
+     "recall": 0.895
+    }
+   },
+   "strict": {
+    "by_label": {
+     "DATE": {
+      "f1": 0.9130434782608695,
+      "false_negatives": 33,
+      "false_positives": 15,
+      "precision": 0.9438202247191011,
+      "recall": 0.8842105263157894,
+      "true_positives": 252
+     },
+     "EMAIL": {
+      "f1": 0.9906542056074766,
+      "false_negatives": 2,
+      "false_positives": 1,
+      "precision": 0.99375,
+      "recall": 0.9875776397515528,
+      "true_positives": 159
+     },
+     "IP": {
+      "f1": 1.0,
+      "false_negatives": 0,
+      "false_positives": 0,
+      "precision": 1.0,
+      "recall": 1.0,
+      "true_positives": 25
+     },
+     "LOCATION": {
+      "f1": 0.7151051625239006,
+      "false_negatives": 77,
+      "false_positives": 72,
+      "precision": 0.722007722007722,
+      "recall": 0.7083333333333334,
+      "true_positives": 187
+     },
+     "NUMBER": {
+      "f1": 0.038722168441432725,
+      "false_negatives": 115,
+      "false_positives": 878,
+      "precision": 0.022271714922048998,
+      "recall": 0.14814814814814814,
+      "true_positives": 20
+     },
+     "ORGANISATION": {
+      "f1": 0.7752442996742671,
+      "false_negatives": 16,
+      "false_positives": 53,
+      "precision": 0.6918604651162791,
+      "recall": 0.8814814814814815,
+      "true_positives": 119
+     },
+     "PERSON": {
+      "f1": 0.9406657018813314,
+      "false_negatives": 25,
+      "false_positives": 16,
+      "precision": 0.9530791788856305,
+      "recall": 0.9285714285714286,
+      "true_positives": 325
+     },
+     "PHONE": {
+      "f1": 0.5698005698005698,
+      "false_negatives": 4,
+      "false_positives": 147,
+      "precision": 0.4048582995951417,
+      "recall": 0.9615384615384616,
+      "true_positives": 100
+     },
+     "URL": {
+      "f1": 0.9893617021276596,
+      "false_negatives": 1,
+      "false_positives": 1,
+      "precision": 0.9893617021276596,
+      "recall": 0.9893617021276596,
+      "true_positives": 93
+     }
+    },
+    "by_language": {
+     "en": {
+      "f1": 0.6374501992031872,
+      "false_negatives": 273,
+      "false_positives": 1183,
+      "precision": 0.5196914332115307,
+      "recall": 0.824211204121056,
+      "true_positives": 1280
+     }
+    },
+    "overall": {
+     "f1": 0.6374501992031872,
+     "false_negatives": 273,
+     "false_positives": 1183,
+     "precision": 0.5196914332115307,
+     "recall": 0.824211204121056,
+     "true_positives": 1280
+    }
+   },
+   "time": {
+    "chars": 279456,
+    "chars_per_second": 6217.8,
+    "docs_per_second": 6.675,
+    "documents": 300,
+    "seconds": 44.945
+   }
+  },
+  "training": {
+   "by_position": {
+    "0-1000": {
+     "gold": 1350,
+     "gold_found": 969,
+     "recall": 0.7178
+    },
+    "1000-2000": {
+     "gold": 158,
+     "gold_found": 119,
+     "recall": 0.7532
+    },
+    "2000-3000": {
+     "gold": 35,
+     "gold_found": 23,
+     "recall": 0.6571
+    },
+    "3000-4000": {
+     "gold": 8,
+     "gold_found": 0,
+     "recall": 0.0
+    },
+    "4000-5000": {
+     "gold": 2,
+     "gold_found": 2,
+     "recall": 1.0
+    }
+   },
+   "chars": 279456,
+   "documents": 300,
+   "gold_spans": 1553,
+   "leak": {
+    "by_label": {
+     "DATE": {
+      "full": 268,
+      "full_leak_rate": 0.9404,
+      "leak_rate": 0.9404,
+      "partial": 0,
+      "total": 285
+     },
+     "EMAIL": {
+      "full": 1,
+      "full_leak_rate": 0.0062,
+      "leak_rate": 0.0559,
+      "partial": 8,
+      "total": 161
+     },
+     "IP": {
+      "full": 0,
+      "full_leak_rate": 0.0,
+      "leak_rate": 0.0,
+      "partial": 0,
+      "total": 25
+     },
+     "LOCATION": {
+      "full": 1,
+      "full_leak_rate": 0.0038,
+      "leak_rate": 0.0265,
+      "partial": 6,
+      "total": 264
+     },
+     "NUMBER": {
+      "full": 43,
+      "full_leak_rate": 0.3185,
+      "leak_rate": 0.4593,
+      "partial": 19,
+      "total": 135
+     },
+     "ORGANISATION": {
+      "full": 0,
+      "full_leak_rate": 0.0,
+      "leak_rate": 0.0963,
+      "partial": 13,
+      "total": 135
+     },
+     "PERSON": {
+      "full": 6,
+      "full_leak_rate": 0.0171,
+      "leak_rate": 0.02,
+      "partial": 1,
+      "total": 350
+     },
+     "PHONE": {
+      "full": 1,
+      "full_leak_rate": 0.0096,
+      "leak_rate": 0.0192,
+      "partial": 1,
+      "total": 104
+     },
+     "URL": {
+      "full": 0,
+      "full_leak_rate": 0.0,
+      "leak_rate": 0.5106,
+      "partial": 48,
+      "total": 94
+     }
+    },
+    "by_language": {
+     "en": {
+      "full": 52,
+      "full_leak_rate": 0.041,
+      "leak_rate": 0.1167,
+      "partial": 96,
+      "total": 1268
+     }
+    },
+    "overall": {
+     "full": 52,
+     "full_leak_rate": 0.041,
+     "leak_rate": 0.1167,
+     "partial": 96,
+     "total": 1268
+    }
+   },
+   "out_of_scope_gold_spans": 1047,
+   "partial": {
+    "by_label": {
+     "DATE": {
+      "f1": 0.0,
+      "gold": 285,
+      "gold_found": 0,
+      "gold_masked": 17,
+      "masked_recall": 0.0596,
+      "precision": 0.0,
+      "pred": 0,
+      "pred_correct": 0,
+      "recall": 0.0
+     },
+     "EMAIL": {
+      "f1": 0.9969,
+      "gold": 161,
+      "gold_found": 160,
+      "gold_masked": 160,
+      "masked_recall": 0.9938,
+      "precision": 1.0,
+      "pred": 160,
+      "pred_correct": 160,
+      "recall": 0.9938
+     },
+     "IP": {
+      "f1": 1.0,
+      "gold": 25,
+      "gold_found": 25,
+      "gold_masked": 25,
+      "masked_recall": 1.0,
+      "precision": 1.0,
+      "pred": 25,
+      "pred_correct": 25,
+      "recall": 1.0
+     },
+     "LOCATION": {
+      "f1": 0.9678,
+      "gold": 264,
+      "gold_found": 256,
+      "gold_masked": 260,
+      "masked_recall": 0.9848,
+      "precision": 0.9659,
+      "pred": 264,
+      "pred_correct": 255,
+      "recall": 0.9697
+     },
+     "NUMBER": {
+      "f1": 0.0434,
+      "gold": 135,
+      "gold_found": 3,
+      "gold_masked": 92,
+      "masked_recall": 0.6815,
+      "precision": 1.0,
+      "pred": 3,
+      "pred_correct": 3,
+      "recall": 0.0222
+     },
+     "ORGANISATION": {
+      "f1": 0.8312,
+      "gold": 135,
+      "gold_found": 133,
+      "gold_masked": 133,
+      "masked_recall": 0.9852,
+      "precision": 0.7189,
+      "pred": 185,
+      "pred_correct": 133,
+      "recall": 0.9852
+     },
+     "PERSON": {
+      "f1": 0.9826,
+      "gold": 350,
+      "gold_found": 339,
+      "gold_masked": 344,
+      "masked_recall": 0.9829,
+      "precision": 0.9971,
+      "pred": 340,
+      "pred_correct": 339,
+      "recall": 0.9686
+     },
+     "PHONE": {
+      "f1": 0.5869,
+      "gold": 104,
+      "gold_found": 103,
+      "gold_masked": 103,
+      "masked_recall": 0.9904,
+      "precision": 0.417,
+      "pred": 247,
+      "pred_correct": 103,
+      "recall": 0.9904
+     },
+     "URL": {
+      "f1": 1.0,
+      "gold": 94,
+      "gold_found": 94,
+      "gold_masked": 94,
+      "masked_recall": 1.0,
+      "precision": 1.0,
+      "pred": 94,
+      "pred_correct": 94,
+      "recall": 1.0
+     }
+    },
+    "by_language": {
+     "en": {
+      "f1": 0.775,
+      "gold": 1553,
+      "gold_found": 1113,
+      "gold_masked": 1228,
+      "masked_recall": 0.7907,
+      "precision": 0.8437,
+      "pred": 1318,
+      "pred_correct": 1112,
+      "recall": 0.7167
+     }
+    },
+    "overall": {
+     "f1": 0.775,
+     "gold": 1553,
+     "gold_found": 1113,
+     "gold_masked": 1228,
+     "masked_recall": 0.7907,
+     "precision": 0.8437,
+     "pred": 1318,
+     "pred_correct": 1112,
+     "recall": 0.7167
+    }
+   },
+   "strict": {
+    "by_label": {
+     "DATE": {
+      "f1": 0.0,
+      "false_negatives": 285,
+      "false_positives": 0,
+      "precision": 0.0,
+      "recall": 0.0,
+      "true_positives": 0
+     },
+     "EMAIL": {
+      "f1": 0.9968847352024921,
+      "false_negatives": 1,
+      "false_positives": 0,
+      "precision": 1.0,
+      "recall": 0.9937888198757764,
+      "true_positives": 160
+     },
+     "IP": {
+      "f1": 1.0,
+      "false_negatives": 0,
+      "false_positives": 0,
+      "precision": 1.0,
+      "recall": 1.0,
+      "true_positives": 25
+     },
+     "LOCATION": {
+      "f1": 0.7613636363636364,
+      "false_negatives": 63,
+      "false_positives": 63,
+      "precision": 0.7613636363636364,
+      "recall": 0.7613636363636364,
+      "true_positives": 201
+     },
+     "NUMBER": {
+      "f1": 0.04347826086956522,
+      "false_negatives": 132,
+      "false_positives": 0,
+      "precision": 1.0,
+      "recall": 0.022222222222222223,
+      "true_positives": 3
+     },
+     "ORGANISATION": {
+      "f1": 0.8250000000000001,
+      "false_negatives": 3,
+      "false_positives": 53,
+      "precision": 0.7135135135135136,
+      "recall": 0.9777777777777777,
+      "true_positives": 132
+     },
+     "PERSON": {
+      "f1": 0.9797101449275363,
+      "false_negatives": 12,
+      "false_positives": 2,
+      "precision": 0.9941176470588236,
+      "recall": 0.9657142857142857,
+      "true_positives": 338
+     },
+     "PHONE": {
+      "f1": 0.5811965811965812,
+      "false_negatives": 2,
+      "false_positives": 145,
+      "precision": 0.41295546558704455,
+      "recall": 0.9807692307692307,
+      "true_positives": 102
+     },
+     "URL": {
+      "f1": 1.0,
+      "false_negatives": 0,
+      "false_positives": 0,
+      "precision": 1.0,
+      "recall": 1.0,
+      "true_positives": 94
+     }
+    },
+    "by_language": {
+     "en": {
+      "f1": 0.7349355625217695,
+      "false_negatives": 498,
+      "false_positives": 263,
+      "precision": 0.8004552352048558,
+      "recall": 0.6793303283966516,
+      "true_positives": 1055
+     }
+    },
+    "overall": {
+     "f1": 0.7349355625217695,
+     "false_negatives": 498,
+     "false_positives": 263,
+     "precision": 0.8004552352048558,
+     "recall": 0.6793303283966516,
+     "true_positives": 1055
+    }
+   },
+   "time": {
+    "chars": 279456,
+    "chars_per_second": 5976.7,
+    "docs_per_second": 6.416,
+    "documents": 300,
+    "seconds": 46.758
+   }
+  }
+ },
+ "dataset": {
+  "licence": "CC-BY-4.0",
+  "name": "nemotron",
+  "publish": "scores-and-ids",
+  "revision": "b70ffaf5ff39e079776134c5bf4381f00a9fd1ed",
+  "source": "nvidia/Nemotron-PII"
+ },
+ "documents": 300,
+ "languages": [
+  "en"
+ ],
+ "load_seconds": 8.6,
+ "n_per_language": 300,
+ "run": {
+  "command": "python -m benchmarks.run --suite pii long clean --threads 16 --workers 2 --seed 13 --configs default training --out benchmarks/results/unreleased",
+  "configs": [
+   "default",
+   "training"
+  ],
+  "device": "cpu",
+  "environment": {
+   "cpu_model": "AMD Ryzen Threadripper PRO 7985WX 64-Cores",
+   "cpus_usable": 32,
+   "git_commit": null,
+   "git_dirty": null,
+   "gpus": [
+    "NVIDIA GeForce RTX 4090, 24564 MiB, 17869 MiB, 560.35.05",
+    "NVIDIA GeForce RTX 4090, 24564 MiB, 19167 MiB, 560.35.05",
+    "NVIDIA GeForce RTX 4090, 24564 MiB, 18981 MiB, 560.35.05",
+    "NVIDIA GeForce RTX 4090, 24564 MiB, 16502 MiB, 560.35.05"
+   ],
+   "logical_cpus": 128,
+   "machine": "x86_64",
+   "onnxruntime_providers": [
+    "AzureExecutionProvider",
+    "CPUExecutionProvider"
+   ],
+   "packages": {
+    "SqueakyCleanText": "0.8.0",
+    "emoji": "2.16.0",
+    "ftfy": "6.3.1",
+    "huggingface-hub": "2.4.0",
+    "lingua-language-detector": "2.2.0",
+    "numpy": "2.5.4",
+    "onnxruntime": "1.31.1",
+    "presidio_anonymizer": "2.2.366",
+    "pyarrow": "26.0.0",
+    "regex": "2026.9.29",
+    "tokenizers": "0.23.3"
+   },
+   "platform": "Linux-6.11.0-26-generic-x86_64-with-glibc2.39",
+   "python": "3.12.3"
+  },
+  "gpu_mem_gb": null,
+  "models": {
+   "ner_backend": "onnx",
+   "ner_model_revisions": {
+    "DUTCH": "381e34ba4c222bc221e9fd02832f52a179ed840d",
+    "ENGLISH": "2c10955af9538d6ff8a68316c5dbfcd0b968761e",
+    "GERMAN": "fe4aecfa6dc376244ef37da37e6df3b1b0911d71",
+    "MULTILINGUAL": "74191432b21c956b5b04b4778c0e92e569b1f80d",
+    "SPANISH": "ef52a7f08172203c763d51fe36660d36985bb388"
+   },
+   "ner_models": {
+    "DUTCH": "rhnfzl/xlm-roberta-large-conll02-dutch-onnx",
+    "ENGLISH": "rhnfzl/xlm-roberta-large-conll03-english-onnx",
+    "GERMAN": "rhnfzl/xlm-roberta-large-conll03-german-onnx",
+    "MULTILINGUAL": "rhnfzl/wikineural-multilingual-ner-onnx",
+    "SPANISH": "rhnfzl/xlm-roberta-large-conll02-spanish-onnx"
+   }
+  },
+  "n": null,
+  "scoring_overrides": {
+   "check_to_ascii_unicode": false,
+   "replacement_mode": "reversible"
+  },
+  "sct_version": "0.8.0",
+  "seed": 13,
+  "suites": [
+   "pii",
+   "long",
+   "clean"
+  ],
+  "threads": 16,
+  "workers": 2
+ },
+ "sample_ids": [
+  "fda2247e8d3b4bed9d29b52ef073d3ca:us",
+  "375faf47097540d0a1c3e45908b7c596:us",
+  "898c62ae43624ec4baa0f1419494585f:us",
+  "92f390a47220446f94fc3cd0ebd0e6c4:us",
+  "858802ed1dd743f7bf5bd6fe8a0c25c2:us",
+  "381bb880e7334112a56c672b83f4a9f3:us",
+  "b3185efa2dbb4913bc3a1b89fac1aaf9:us",
+  "c97e423809d844f68bb8d7db28a3dd93:us",
+  "28da0d71dd6e4b38bc034cd0f59127de:us",
+  "2ee2452cea6c487eb61718d97f74bb1e:us",
+  "2a26bb9446e04715b764e72cd3b3a314:us",
+  "eed3f082c94c418bb533aaf5198fe54a:us",
+  "b2c8723ca9a64d8f8040f3b8c1d1e579:us",
+  "da8f10ddbf124aba9cca07550598f671:us",
+  "0129ab082ac24c3294b1f16effa1abec:us",
+  "29d4b5e817454c17a88f40071035b793:us",
+  "1e9cce22a61a42cb81c6b48ce4a16703:us",
+  "0576e51d98854824a58ec31bdd4f8f5a:us",
+  "095ad4ab458546919879a37d182592ba:us",
+  "21f711034c904f17a637a9db62248c84:us",
+  "3a36b625e938410d8a4eb9d0ba4e0b64:us",
+  "bfd9e2ad51eb411f820eb6204f011384:us",
+  "99094cd61c084aba819efaa785766e80:us",
+  "f406ccef392e45cab4cfa2e2fa8264d1:us",
+  "daf9395c920345cd83f62658af1b5b0d:us",
+  "46ff9e7118a5400597efc0733b93e29b:us",
+  "00b70cc85e7d4e1681201d49c661f69b:us",
+  "834547b31a884a4cb0c3030e6a009bb2:us",
+  "8321e0e30690412fa939059b8d033da5:us",
+  "6d9f33c9807141b5abb4420ec56f406e:us",
+  "bdb48f745e304699b311fd7710917f35:us",
+  "d355e9957c504adf941dd507d08bb01d:us",
+  "b877d08eb33e4a598c9f75302b957f4d:us",
+  "281f048e0df842dc90679f9e4a4c7f9e:us",
+  "9cae9ab4cd6e41b6885621231d6736b9:us",
+  "b7e41d8d59af441d8a3658b7ed975e09:us",
+  "0f0c9910fb0448178286206c43f01c28:us",
+  "7a8d1e92eee1412fa3d6c48409e87c5b:us",
+  "3637acac828a456f8a52fb87be2bd78b:us",
+  "4727ab94d5fd4c7fa9b6bd998a452cf1:us",
+  "11070ca7c6ec4d0888d9756fb71d8234:us",
+  "4972400bd3c6444a8c9740a9a7edcb3d:us",
+  "65ea10a07aae40d78548e01b65edcb76:us",
+  "d1cdfdedb33e4deab72b8436276de6af:us",
+  "ea9e9d75f0484375b56b0bbc2a8f3d8a:us",
+  "4bbc407cce55493fadb2d459772fdf6a:us",
+  "1a5a40a250ee4310932b4314436393af:us",
+  "9af4b42849414977a8f2411490e673e6:us",
+  "e5834206236948a28b3f119648a9484f:us",
+  "7ef41465080443b38e8a81cdd6facd15:us",
+  "8befbe5c78eb41779572d37cf9df2558:us",
+  "7ba45befc44a48e8a2c080411e2f49b8:us",
+  "d12c22a949c347fd91e28a58986fb2f7:us",
+  "8bdb56222806406882b3c437167cb701:us",
+  "3b0fd762d90d480cbd08804654c4486d:us",
+  "67ac6cd1f83d47949d92706f2ca91ec3:us",
+  "3f360b8eed7f40efbc95fc0428aa8d3f:us",
+  "d95dbee98be84bacae66868e7f645b1d:us",
+  "c15fc9534fd6471f906dfa1413ec5725:us",
+  "ea1a5fc2c7b94b07930ae15d68168788:us",
+  "2bd75a01258a40be86c45d46e764b07b:us",
+  "06db0993e53b4aff97bb6edaae020b3d:us",
+  "b74cbb251ae841b081b04d6c6f8b81b4:us",
+  "65e2a42ca8034f34abb287b9e5223ef3:us",
+  "e34defd4b25e429d84946c68cfbdbf2a:us",
+  "c7c7e6caf1334910ab2733f0241d870f:us",
+  "d05f57e11dc6448d8605a85a38a63ef2:us",
+  "99feee75784649f4a4cc6b679f57f246:us",
+  "0958bd7271b2450e865d179bde268002:us",
+  "c3e299a59ffd4e55b667b11e67238aa9:us",
+  "483ebd57d5db419f90c1d720c0c55591:us",
+  "11bfd9d6715c470695d800f0c75b2a00:us",
+  "50fa95c66a744c46af88683009cb339c:us",
+  "46eec4f68be9438bb2079e5f328c489d:us",
+  "bc70191704bb48d28f863d31ebd9ac3e:us",
+  "8eb017e5a0f6439cbaef530bd5dd7a27:us",
+  "03f444fd98a34d5d93db4d1f388c26cd:us",
+  "bd857223abdd47588249a56a97afd8e8:us",
+  "5d99ff07fc784afd911c6e2c3754c79e:us",
+  "c51c922f43aa4ab1a940627f1cde77a2:us",
+  "9891992739e647dfbd2d2c4c9af95fbb:us",
+  "8f4011038a214a2fb10dd3e989a544e4:us",
+  "18d5c2d9303d4fd6ae5f6f03c432a03a:us",
+  "5e4fa3f7942d4089b77887315b266391:us",
+  "467949fccb704ecda4a2887ce3b06c0e:us",
+  "6f4955bade2a44a1bf334d544e878735:us",
+  "2098ee1e097a480ca5cf94dd9e0bf3bd:us",
+  "6237b3e99d184bd6ae6f024cbe1b64bc:us",
+  "d5a5fe2bd3154ab19eba30846b09ee23:us",
+  "d706d87a91e642d58465cc87f0a57dc1:us",
+  "c7f0e50da0e349bebb7405b446259924:us",
+  "a9a5239a1cb249f19528394e5c7e906a:us",
+  "49dfc8c1fd144f029df183ca25325a6c:us",
+  "d09aca7ae11d43619518cf02dd6b8aa9:us",
+  "c6963af13ca94a37a62536448c09a6d5:us",
+  "79605060924541499812013d2e9771ce:us",
+  "395bf3b464fb455a8af92bb40b3d18b4:us",
+  "39be1bf86067474e9cfd08d7085d7370:us",
+  "80432c85d3ba492ca7ed38d134afc71c:us",
+  "cb628ee1158e439d95460a8a1caf7af7:us",
+  "05992fed68ee4f63b70920d7ef514a9e:us",
+  "b8aea9e3b5e5499f86a06a74f6a685fc:us",
+  "5258e1e6a6474e74b1c908cf1c6a9689:us",
+  "bcda35f5a9bc482fb0d48e68a349b022:us",
+  "90c9299c601945ce99f8e6ee4b87dfa0:us",
+  "0db287150c404afda445df2762ae01c8:us",
+  "6a4906b2f33c42e7b5d6cd4f88511966:us",
+  "ec82e4dbf15e434ea0f156db134ccc6b:us",
+  "75d1e82d761a4c4b98757e18d9d284b2:us",
+  "1c84dec327064d8589f8f776e20dbcd4:us",
+  "439863b4803048cb90463d3d558e8e1c:us",
+  "e2f6e5484e3b45289112b0b435fcab2a:us",
+  "df1e1c9357834004b84545e58ddd354d:us",
+  "e071131277dd46d18a2755219881891b:us",
+  "546ffcd7440048dc975c50cd1ba04f5c:us",
+  "a6a5c1fa09934b52a5d9e660169ceda9:us",
+  "740b699f0493467d9008f55e8c3bc2b5:us",
+  "9f4ddb892e7c441a950d57a850b456be:us",
+  "43a2cdf344014ac1a8471337a9f41fbe:us",
+  "06530fe034374e04b39f2098dd80d4ae:us",
+  "0dc23705c33a422dbd0cf054d91c93ce:us",
+  "22b3eb0ceb544882a707d0ce6b25f927:us",
+  "6702a444c6c94c659ec4a09733e64d38:us",
+  "cf284b574e5a497aa520387315389b2c:us",
+  "2e1167e9af6a4517b889d27b50907373:us",
+  "292eb1b3390d441ab4fa9518f04ba2ab:us",
+  "77e3e8b2d66b434080f8c56e4b4a9698:us",
+  "efe9563461ba46508a20dc0c41bafe13:us",
+  "99d3dde467794d52b401f19b626a4a92:us",
+  "96f17806ead14cefb276400aabcf942b:us",
+  "7d7fef8a4f5040f1823ce191f11bfa63:us",
+  "48946f301e464074901cf3d739487cd0:us",
+  "da9af28a963d4c2cb61db8e3ec93c488:us",
+  "1de8db7140c94cac95682a01388cff01:us",
+  "68ac55d991c641b8be51650999131235:us",
+  "542586d6e5c84d0c9a36bf23cc5162ae:us",
+  "965156602f0444b5a6a73cccf369c2a4:us",
+  "ca950756ee4a4aa5b19d79a9da5702e8:us",
+  "487a8a49515447149607b042158dbaeb:us",
+  "ad747bd6409e46e5a03ac3b3a4c98ed9:us",
+  "6defcfea78cb4c1eb4075c0fca1d7aae:us",
+  "c4f8b5c47a164f379a1256b7cf16ef31:us",
+  "ba8e859f86fe45638a781c897e9d5147:us",
+  "eb64af5e5d3245dbabbd187259d372b7:us",
+  "b02afbe1d01346f288c9e78cbccc0e48:us",
+  "053c89695b3f4b64abbeff4efb7aa245:us",
+  "6e768e3630e84f4884c3f27dc86d8c58:us",
+  "4aa5b4c0bedd40dc8cc93a313bd7c636:us",
+  "7b4a75d79e6a49bbae3ec225ff4abe2d:us",
+  "2760ca9e8a5e4931813333a08e41f370:us",
+  "04615f6c82a3476c9ae42b06628a74cc:us",
+  "8556790fa7d7475a86248397959ac420:us",
+  "0a8178817f2d438285db9d0ffc44259c:us",
+  "a3f52ba2757d4736ac7cf3347c3b1c87:us",
+  "1e42095f58e540888469ea15c14f605b:us",
+  "91f4292bb70c4bab9c6433c36c497e6f:us",
+  "3e50ebd6fc8d4df3a2b827c4525cc80c:intl",
+  "fbed108c87644785a0cb0c97c51db101:intl",
+  "9680e307c95a4893be254f04a1d5dcf5:intl",
+  "0a9e4ddbb23d48a8a9036c42d27c050f:intl",
+  "ea6a7b8741b341438d63f2487ef96855:intl",
+  "621bb78b75c34c7e9e502b1f3c076012:intl",
+  "7eed85e89ae845a2bd1e21378bb79c59:intl",
+  "24fb56c147434f88894980af76c13c76:intl",
+  "720c5a6fc44d414a8b0d04932a08d6a8:intl",
+  "603c3b6166a44f068bbf55b9ee1e5ef3:intl",
+  "3fd1c6de80e04002b8c571bee756d61e:intl",
+  "bb344ec151d045a6aa178f1bb07e972a:intl",
+  "2aa9130f4ff24de19955456eba9606ba:intl",
+  "2e9a58d94cea4189a5984606c49a0079:intl",
+  "ffdede0aef1e4025bff4bcfa63011788:intl",
+  "37ec8d49093c44ce9dbc11dc24fc5c2b:intl",
+  "ece7df2a9a594e31b0598564d4f2edd0:intl",
+  "70748c9fc7c24cc7871066dd170289b8:intl",
+  "e681a36ba7ef4ac7a47add57655686ee:intl",
+  "aee477962f79415a95bcffa6f0601266:intl",
+  "b19721f01ad64c668f81924c0c75d3b8:intl",
+  "d4e814958ad24771b7bea39cfc4cac59:intl",
+  "5b1b16b25a5c4e74800b2f20138f086b:intl",
+  "8ad4ee4df28d495b97182f0ee5484437:intl",
+  "1d49b283865c480f8f7a51af73edd2d3:intl",
+  "e65125eca66341e59c8e12d067b8936e:intl",
+  "377d7d95a45e49a4a17e6d2c592b0995:intl",
+  "aea3e04c84d74bdba6a7f2c8753ce5ff:intl",
+  "eb0b15fd26bc4451840f97a5a5c34d20:intl",
+  "a3df2df286504a249ec52a3d16462ec4:intl",
+  "3579a0538ded4813a1f5221892577f57:intl",
+  "b6d44b95bb714500b23520393276266f:intl",
+  "5a39d931d01849bc94ae1c4f00716cc0:intl",
+  "424ced3637254377b609167d5027812d:intl",
+  "fe7cd7e9e92e49b79c389106fa6c1610:intl",
+  "d1427885f76547bca95c0ede03e92807:intl",
+  "ea2b67ca9eae4d4bbd6bc85755104b82:intl",
+  "d7564023b6934fb1a74cd6f41cf7b4c8:intl",
+  "dc9cdee22af940ba960d7f992b5894ef:intl",
+  "ff86f72cb46c4c5db48fc6d8f6efba29:intl",
+  "310c46e045964e628cf4188892339487:intl",
+  "8cd9dfd9d038476c8de81fb01803520b:intl",
+  "c0312fe5bd154e19ab3dd7020ad6c672:intl",
+  "7701b97470e54c4eb7c50dd81f84b69d:intl",
+  "20313dd36ff24867bb7b610b801898cc:intl",
+  "95df0fc4d4b84417b3140b240d2f84ab:intl",
+  "dc8eb0f7dbbb4af69177506beefd51e2:intl",
+  "c94df7af0119473bb3aef70e4b9d3e2f:intl",
+  "ac461360adfe41308df7d14ac71844d2:intl",
+  "acb01a888b7e4f6abc4a5db607c3c496:intl",
+  "55f65356d5fd4c74b106d7290dd65c0c:intl",
+  "0db014d7ee124d5097050ceaa3a65728:intl",
+  "cf108ae8fd344b4aae4535e6efbc0cb1:intl",
+  "60b5f9fc096c43fd861f57302c560d26:intl",
+  "1ac5219129a94aaa801371afcdde42fe:intl",
+  "952799e88d40409ba7a8a4037ea14dd0:intl",
+  "cda28ff822eb4e25a53641729bdee3cc:intl",
+  "b57175c10177489db0b73d95dc1bbfeb:intl",
+  "e1c38bcee94449afbf2a018841d72194:intl",
+  "64f98763e3ee4345b3e3a667b17740b5:intl",
+  "ee398bedd0fe4aa588f56b758c1c2699:intl",
+  "e660f0c438a94fdba52f34495cfd65d1:intl",
+  "60f70b28804e41008e9df8f7ad05ecca:intl",
+  "4fd0787dc49b4ddb8ce68ac2c817f53f:intl",
+  "6a77aaa1914d46a98b12728b9eb3976c:intl",
+  "42b6e5a62efb46e2a3e7b78d6f6ab944:intl",
+  "8d9ea195d6b848a09db3621a0880b071:intl",
+  "55ceb096b17c4447a250d4d428f7cc80:intl",
+  "fe0c04802b694bfd82af747597f9c4d3:intl",
+  "229e9bc64e7f46c5af61e3cfcd781324:intl",
+  "f492db08c2754c0baf41fedd9239039b:intl",
+  "0474f6edbd8e428b9baf21cd5bb512b1:intl",
+  "5542501b258e48a2b93d18bb4b13554d:intl",
+  "da801cbc54b2456088f241cc2caa7613:intl",
+  "bc076755936840dab461646720d3e112:intl",
+  "6793624cbab34923a423bde12e7a02a3:intl",
+  "391f1db7b75c484ab2e7668c233653aa:intl",
+  "6555b87ee8674d71bff9d0d206686f5a:intl",
+  "263082d45ad4401ca72d92f03b322c4e:intl",
+  "4075d4a0a048423db777f7b19d9e0811:intl",
+  "5f2f70c10fd0475fbc75c9ffa5106e23:intl",
+  "eadd399a807641b8b3facbf41e6b434f:intl",
+  "157d9a787f8b47fcbb976356b84dfef6:intl",
+  "a6b2910ad1a64e7996a5afe19419e3a7:intl",
+  "d35c1c322b3942efa04fd9cbb87af8c9:intl",
+  "5837a52cd067454489dc2130c8635048:intl",
+  "1a7dce06326f405490cb3bb89c0cb5f1:intl",
+  "0440e3ea3a8d4241819eeeba80ad0886:intl",
+  "e250c65db0394eebb969eebe23ea24d8:intl",
+  "34fef6d5a61848f7b299626c021112e8:intl",
+  "52731bd41ca3486ca9b4d60f29c8f0b9:intl",
+  "f871bb196edb41eeb14cc3492e898394:intl",
+  "fa8185589129440eb9707fc351f159b5:intl",
+  "c4cf8a89100647b49f72554d7927fe22:intl",
+  "ccebadd36b68442c89a8f910f94f0655:intl",
+  "02e3fd715e2f4b70a1b892b9c17a8a7d:intl",
+  "95db23f3bb4548c28008d2f72979ba30:intl",
+  "a802d9d0084a470189c36803d04486dd:intl",
+  "c7541b4889714f699783ef94e00bfef7:intl",
+  "8304eab632124e338de04f7c31797448:intl",
+  "8b6e0bf7c908415882e679a0e2061af5:intl",
+  "777c0deb1a9a4c91af70f114022dae4c:intl",
+  "60b0e959d95344ff82c1d1e5c12917e5:intl",
+  "d43ccfa8a1b6450d8a4e4444a5fdc0ac:intl",
+  "d67cacfc9a21418791c3fc066a485a04:intl",
+  "65b66b2cbd5a4f3eac852a57f334c1d2:intl",
+  "4fbc4ca8bdf844e9b578b24c03f2db47:intl",
+  "eb2736afb84a481da543d19885d5859c:intl",
+  "2f3d3ccc694c462da0bd29d7de4eb38d:intl",
+  "52f9a8d5b2ea4acfbae31a4b1838d751:intl",
+  "cf02f1ccdde5431aac43db282d22002f:intl",
+  "30597ce3321c4943a03e75cfc703c409:intl",
+  "5e439ccca4244b40ac173dd16cde5e3e:intl",
+  "a11052fab4114a48a89b3bc49afaa812:intl",
+  "2a1bfe3d81274c0abce72a8aa6a46fd3:intl",
+  "2baedaa953a54c3ea560be90dcb921c7:intl",
+  "715dcedb4c234aef9f5dde3ac45ff12e:intl",
+  "7ffd3ce086ec4acf92a15ee9888599d7:intl",
+  "8897412ffac34e778371d0550b5a281e:intl",
+  "2ee18ce35344489399e5c78cb3638d48:intl",
+  "55e0b7e49806470f97524d99928f86cc:intl",
+  "2e1f6b392b094d26b2e8f285d0f6e4eb:intl",
+  "5c7f97eceed84c1284b450b7012ea3da:intl",
+  "2e5a9fc932e74f828d645993b4ad9e6f:intl",
+  "23062dfc68c04b2a981c0a686bba390a:intl",
+  "9209067f805048fd8b7408384413e1ce:intl",
+  "51a58857505644828902ebcb3c761aee:intl",
+  "d6e7eae3155a45e18b16232276ce29eb:intl",
+  "7c989c8cf0e147939abf289381f8b11d:intl",
+  "bc85b0ec91734f78a2336c96da378e42:intl",
+  "cbf39133e74d45299192cbe7bc096782:intl",
+  "b876497834904d01be6a00328ab0bf8e:intl",
+  "a3edccb31e9a478695d815b153844a5c:intl",
+  "0f798c6841b2439ca361cea3b60a9e94:intl",
+  "3aa0a1645cf1487d9d933fb4f4696342:intl",
+  "f353c3138d0744bfa531d5b19716532d:intl",
+  "723964b106aa40dca92cbf982872cb59:intl",
+  "404f52e84c564fd983098da08538d027:intl",
+  "ebbeade8f80f4ef39d597d59e83bcd8d:intl",
+  "753380ea33554974a1fc37a0559280db:intl",
+  "ed4586e453dc4e02bb33be20b6b49a0e:intl",
+  "52fea54bcdb94643ac38ea5dd18f395a:intl",
+  "15cfa510f6be4920b540cc96c2dfb07c:intl",
+  "89b9542a0b1445a5b102a06b6b0963b6:intl"
+ ],
+ "seed": 13,
+ "suite": "pii"
+}
