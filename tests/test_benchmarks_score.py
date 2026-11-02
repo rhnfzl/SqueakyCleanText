@@ -234,3 +234,22 @@ def test_leak_by_language_excludes_dates_like_overall():
     assert result["leak"]["overall"]["leak_rate"] == 0.0
     assert result["leak"]["by_language"]["en"] == result["leak"]["overall"]
     assert result["leak"]["by_label"]["DATE"]["full"] == 1
+
+
+def test_leak_keeps_brahmic_vowel_signs_in_words():
+    # \w alone splits these words at vowel signs into 1-2 char pieces, so no partial leak was ever seen.
+    assert leak("राजेश कुमार", "मिलिए <PERSON_0> कुमार से") == "partial"
+    assert leak("ரமேஷ் குமார்", "<PERSON_0> குமார்") == "partial"
+    assert leak("राजेश कुमार", "मिलिए <PERSON_0> से") is None
+
+
+def test_masked_recall_counts_any_type_overlap():
+    text = "Call 0612345678 now"
+    rec = record(text, [span(5, 15, "ID")])
+    result = score_pii([rec], {"d1": [span(5, 15, "PHONE")]}, {"d1": "Call <PHONE_0> now"},
+                       {"ID": "NUMBER", "TEL": "PHONE"})
+    overall = result["partial"]["overall"]
+    assert overall["recall"] == 0.0  # typed: PHONE is not NUMBER
+    assert overall["gold_masked"] == 1 and overall["masked_recall"] == 1.0
+    assert result["partial"]["by_label"]["NUMBER"]["masked_recall"] == 1.0
+    assert result["partial"]["by_language"]["en"]["masked_recall"] == 1.0

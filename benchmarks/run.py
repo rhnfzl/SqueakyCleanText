@@ -157,28 +157,30 @@ def summary(out: Path) -> str:
              f"{env.get('cpus_usable') or env.get('logical_cpus')} CPUs, GPUs: {', '.join(env.get('gpus', [])) or 'none'}.",
              f"Device `{run.get('device')}`, ONNX threads {run.get('threads')}, workers {run.get('workers')}, "
              f"seed {run.get('seed')}. Command: `{run.get('command')}`", "",
-             "Percentages. Strict = exact span + type. Partial = overlap + type. Leak = gold PII value "
-             "(or a 4+ char word of it) still in the output; lower is better.", ""]
+             "Percentages. Strict = exact span + type. Partial = overlap + type. Masked R = overlap, any type. "
+             "Leak = gold PII value (or a 4+ char word of it) still in the output; lower is better.", ""]
     results = {p.stem: json.loads(p.read_text(encoding="utf-8")) for p in sorted(out.glob("*.json")) if p.stem != "run"}
     pii = {k: v for k, v in results.items() if v.get("suite") in ("pii", "long") and "configs" in v}
     if pii:
-        lines += ["## PII", "", "| dataset | config | docs | strict F1 | partial P | partial R | leak | docs/s |",
-                  "|---|---|---|---|---|---|---|---|"]
+        lines += ["## PII", "", "| dataset | config | docs | strict F1 | partial P | partial R | masked R | leak | docs/s |",
+                  "|---|---|---|---|---|---|---|---|---|"]
         for name, res in pii.items():
             for config, c in res["configs"].items():
                 lines.append(f"| {name} | {config} | {c['documents']} | {_pct(c['strict']['overall']['f1'])} | "
                              f"{_pct(c['partial']['overall']['precision'])} | {_pct(c['partial']['overall']['recall'])} | "
+                             f"{_pct(c['partial']['overall'].get('masked_recall'))} | "
                              f"{_pct(c['leak']['overall']['leak_rate'])} | {c['time']['docs_per_second']} |")
         for name, res in pii.items():
             config = next(iter(res["configs"]))
             c = res["configs"][config]
             lines += ["", f"### {name} ({config}): by type and language", "",
-                      "| | gold | partial R | partial P | strict F1 | leak |", "|---|---|---|---|---|---|"]
+                      "| | gold | partial R | masked R | partial P | strict F1 | leak |", "|---|---|---|---|---|---|---|"]
             for group in ("by_label", "by_language"):
                 for key, m in c["partial"][group].items():
                     strict = c["strict"][group].get(key, {})
                     leak = c["leak"][group].get(key, {})
-                    lines.append(f"| {key} | {m['gold']} | {_pct(m['recall'])} | {_pct(m['precision'])} | "
+                    lines.append(f"| {key} | {m['gold']} | {_pct(m['recall'])} | {_pct(m.get('masked_recall'))} | "
+                                 f"{_pct(m['precision'])} | "
                                  f"{_pct(strict.get('f1'))} | {_pct(leak.get('leak_rate'))} |")
             if "masking_recall" in c:
                 mr = c["masking_recall"]

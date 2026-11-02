@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+### Benchmarks
+
+- Scorer: the partial-leak check now splits values into runs of letters, digits and
+  combining marks (`[\w\p{M}]+`). Python `\w` stops at vowel signs, so Devanagari, Tamil
+  and Kannada words broke into 1-2 character pieces under the 4-character floor and a
+  partial leak in those scripts was never counted. Leak rates for Brahmic-script data go up
+  (benchmark section 14 measured multiconer 19.0 -> 25.8, naamapadam 16.2 -> 22.2); this is
+  a scoring fix, SCT output is unchanged. Thai (no spaces) is still undercounted.
+- Scorer: new type-agnostic `masked_recall` (with `gold_masked`) next to partial recall,
+  overall, per type and per language, for every PII dataset; a gold span counts when any
+  prediction overlaps it whatever its type. The summary gains a "masked R" column.
+
 ### Performance
 
 - The email step now runs a cheap pre-check (`constants.EMAIL_GATE`: `@` or a bracketed `at`)
