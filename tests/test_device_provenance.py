@@ -1,4 +1,4 @@
-"""GPU device choice (ner_device, cuda_device_id, ONNX CUDA options) and model provenance."""
+"""GPU device choice (ner_device incl. Apple mps, cuda_device_id, ONNX CUDA options) and model provenance."""
 
 import pickle
 import re
@@ -144,3 +144,68 @@ def test_device_config_defaults_globals_and_pickle(monkeypatch):
         frozen.onnx_cuda_provider_options["x"] = 2
     assert pickle.loads(pickle.dumps(frozen)) == frozen  # noqa: S301 - trusted round trip
     assert dict(legacy.onnx_cuda_provider_options) == {"gpu_mem_limit": 8}
+
+
+# --- Apple GPU ('mps'): torch and GLiNER only; ONNX stays on CPU ---
+
+def _fake_torch_loader(monkeypatch):
+    seen = []
+
+    class Tok:
+        max_len_single_sentence = 510
+
+    def fake_load(model_name, device='cpu', **kwargs):
+        seen.append(device)
+        return object(), Tok()
+
+    monkeypatch.setattr("sct.utils.torch_pipeline.load_torch_ner_model", fake_load)
+    return seen
+
+
+@pytest.mark.parametrize("available, device", [(True, "mps"), (False, "cpu")])
+def test_mps_moves_torch_or_falls_back_to_cpu(monkeypatch, available, device):
+    monkeypatch.setattr(ner_module, "_mps_available", lambda: available)
+    seen = _fake_torch_loader(monkeypatch)
+    ner = GeneralNER(device="mps", ner_backend="torch",
+                     torch_model_names={"ENGLISH": "a", "MULTILINGUAL": "b"})
+    assert seen == [device, device]
+    assert [m["provider"] for m in ner.models_for("ENGLISH")] == [device, device]
+
+
+def test_mps_keeps_onnx_on_cpu(spy_sessions, monkeypatch):
+    monkeypatch.setattr(ner_module, "_mps_available", lambda: True)
+    result = TextCleaner(cfg=_cfg(ner_device="mps")).process(TEXT)
+    assert all(providers == [CPU] for providers in spy_sessions["requested"])
+    assert {m["provider"] for m in result.metadata["provenance"]["models"]} == {CPU}
+    assert "mps_fallback" not in result.metadata["warnings"]
+
+
+def test_mps_fallback_warning(monkeypatch):
+    monkeypatch.setattr(ner_module, "_mps_available", lambda: False)
+    cleaner = TextCleaner(cfg=_cfg(ner_device="mps"))
+    cleaner.GeneralNER._provenance["ENGLISH"]["provider"] = "cpu"  # a torch model that fell back
+    assert "mps_fallback" in cleaner.process(TEXT).metadata["warnings"]
+    assert TextCleanerConfig(check_ner_process=False, ner_device="mps").ner_device == "mps"
+
+
+@pytest.mark.skipif(
+    __import__("platform").system() != "Darwin" or __import__("platform").machine() != "arm64",
+    reason="Apple silicon only",
+)
+def test_real_torch_model_on_mps_matches_cpu():
+    torch = pytest.importorskip("torch")
+    pytest.importorskip("transformers")
+    if not torch.backends.mps.is_available():
+        pytest.skip("torch has no MPS backend")
+    from tests.conftest import TEST_TORCH_NER_MODELS
+    outs = {}
+    for device in ("cpu", "mps"):
+        cleaner = TextCleaner(cfg=TextCleanerConfig(
+            ner_backend="torch", torch_ner_models=TEST_TORCH_NER_MODELS, language="en",
+            check_statistical_model_processing=False, ner_device=device,
+        ))
+        result = cleaner.process(TEXT)
+        outs[device] = result.text if hasattr(result, "text") else result[0]
+        assert {m["provider"] for m in result.metadata["provenance"]["models"]} == {device}
+        assert "mps_fallback" not in result.metadata["warnings"]
+    assert outs["mps"] == outs["cpu"]

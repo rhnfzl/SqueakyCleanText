@@ -309,7 +309,7 @@ class TextCleanerConfig:
     detect_all_languages: bool = True  # False = 0.7 detector over supported_languages only
     language_confidence_warning: float = 0.0  # below this confidence, warn language_low_confidence; 0.5 = early 0.8.0
     check_decode_unicode_escapes: bool = True  # False keeps literal \n, \u00e9 escapes (code, JSON)
-    ner_device: Optional[str] = None  # None = auto (CUDA when available), 'cpu', 'cuda'
+    ner_device: Optional[str] = None  # None = auto (CUDA when available), 'cpu', 'cuda', 'mps'
     cuda_device_id: int = 0  # GPU index for ONNX, torch and GLiNER when on CUDA
     onnx_cuda_provider_options: Optional[Mapping[str, Any]] = None  # extra CUDAExecutionProvider options
     # process_json keys: 'pii' = regex PII steps only (NER tags lone words like 'message' out of context),
@@ -505,8 +505,8 @@ class TextCleanerConfig:
                 raise ValueError(f"{name} must be None or >= 1, got {value}")
         if self.ner_chunk_overlap < 0:
             raise ValueError(f"ner_chunk_overlap must be >= 0, got {self.ner_chunk_overlap}")
-        if self.ner_device not in (None, 'cpu', 'cuda'):
-            raise ValueError(f"ner_device must be None, 'cpu' or 'cuda', got {self.ner_device!r}")
+        if self.ner_device not in (None, 'cpu', 'cuda', 'mps'):
+            raise ValueError(f"ner_device must be None, 'cpu', 'cuda' or 'mps', got {self.ner_device!r}")
         if self.cuda_device_id < 0:
             raise ValueError(f"cuda_device_id must be >= 0, got {self.cuda_device_id}")
         if self.onnx_cuda_provider_options is not None:

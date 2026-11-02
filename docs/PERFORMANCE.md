@@ -45,7 +45,7 @@ If CUDA cannot be loaded, ONNX Runtime runs on CPU. SCT logs a warning
 every result. `metadata['provenance']['models']` names the provider each model ran on.
 
 Pick the GPU with `cuda_device_id` (default 0) and force a device with `ner_device`
-(`None` auto, `"cpu"`, `"cuda"`). `onnx_cuda_provider_options` passes extra
+(`None` auto, `"cpu"`, `"cuda"`, or `"mps"` for the Apple GPU, see below). `onnx_cuda_provider_options` passes extra
 `CUDAExecutionProvider` options, for example `{"gpu_mem_limit": 8 << 30}`.
 
 | Setup | Workload | 0.7.1 | 0.8.0 | GPU memory (0.8.0 peak) |
@@ -62,6 +62,34 @@ With the full multilingual ensemble, batch sizes above 8 gave no gain and used m
 
 GPU memory: the full default ensemble needs about 12 to 16 GB of free GPU memory. An
 English-only setup needs about 3 to 5 GB.
+
+## Apple silicon (M-series)
+
+Opt in with `ner_device="mps"`. It moves the torch NER models (`ner_backend="torch"`) and
+GLiNER in torch mode to the Apple GPU through PyTorch MPS. Install torch (`squeakycleantext[torch]`
+or the `gliner` extra). ONNX models and GLiClass stay on CPU. Auto (`ner_device=None`) never picks
+the Apple GPU: on a Mac it stays on CPU.
+
+If torch has no MPS backend, SCT logs a warning ("NER runs on CPU: Apple GPU (mps) was
+requested") and adds `mps_fallback` to `metadata['warnings']`; `metadata['provenance']['models']`
+then shows `cpu` as the provider. Set `PYTORCH_ENABLE_MPS_FALLBACK=1` if a model uses an
+operator MPS does not support.
+
+Measured on an M4 Max, GLiNER, 500 synthetic docs, `process_batch` (docs/s):
+
+| Run pair (same machine load) | CPU | MPS | Speed-up |
+|---|---|---|---|
+| First run | 12.9 | 21.1 | 1.64x |
+| Quiet repeat | 13.3 | 21.4 | 1.61x |
+| Busy repeat (indexing running) | 3.9-4.1 | 10.3-10.9 | about 2.6x |
+
+Output was identical on all 500 docs (largest score gap 2.1e-6). Peak memory was 1.8 GB on MPS
+against 6.4 GB on CPU. Single-doc `process` gains only 1.16x, and the first call adds about 1.2 s
+of GPU warm-up, so MPS pays off on batches.
+
+ONNX on Apple GPU (CoreML) is not supported. It gave the same output but was not reliably faster
+(0.6x to 1.6x CPU, median about 1.0x), its first use compiled for 35 minutes and wrote 82 GB of
+cache, a cached load still took 30-46 s, and XLM-R-large crashed the process.
 
 ## Known limits
 

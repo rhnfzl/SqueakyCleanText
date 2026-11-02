@@ -113,6 +113,14 @@ def _snap_word_edges(text, start, end, ratio, same_script):
     return new_start, new_end
 
 
+def _mps_available() -> bool:
+    try:
+        import torch  # noqa: S404
+        return bool(torch.backends.mps.is_available())
+    except Exception:  # torch missing or built without MPS
+        return False
+
+
 class GeneralNER:
     """NER processor with lazy model loading, multi-backend support, and ensemble voting.
 
@@ -163,7 +171,7 @@ class GeneralNER:
 
         Args:
             cache_dir: Optional directory for caching models
-            device: Device for inference ('cuda' or 'cpu'). Auto-detects if None.
+            device: Device for inference ('cuda', 'mps' or 'cpu'). Auto-detects if None.
             model_names: Language-keyed dict of ONNX model repo IDs (preferred),
                 or positional list for backward compat. Uses DEFAULT_NER_MODELS if None.
             ner_backend: Backend selection ('onnx', 'torch', 'gliner',
@@ -237,6 +245,10 @@ class GeneralNER:
             self.device = 'cpu'
         # Torch and GLiNER take an indexed device string; ONNX gets the index as a provider option.
         self._torch_device = f"cuda:{cuda_device_id}" if self.device == 'cuda' else self.device
+        # 'mps' (Apple GPU) moves torch and GLiNER only; ONNX models stay on CPU.
+        if self.device == 'mps' and not _mps_available():
+            logger.warning("NER runs on CPU: Apple GPU (mps) was requested but torch has no MPS backend")
+            self._torch_device = 'cpu'
         logger.info("Using device: %s (backend: %s)", self._torch_device, ner_backend)
 
         self._engine = None

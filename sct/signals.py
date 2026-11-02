@@ -15,7 +15,7 @@ PUBLIC_VIEW_KEYS: tuple[str, ...] = (
 PII_REGEX_TYPES = frozenset({"EMAIL", "URL", "IP", "PHONE", "IP_ADDRESS", "PHONE_NUMBER", "IBAN", "CARD", "ID"})
 WARNING_CODES = frozenset({
     "language_unknown", "language_fallback", "language_low_confidence",
-    "ner_fallback_models", "ner_off", "cuda_fallback", "empty_input",
+    "ner_fallback_models", "ner_off", "cuda_fallback", "mps_fallback", "empty_input",
 })
 
 
