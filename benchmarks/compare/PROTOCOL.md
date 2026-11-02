@@ -5,9 +5,12 @@ the first test run is logged at the end of this file with its reason. It follows
 fairness rules in `sct-integration-research/research/benchmark/codex-fair-comparison.md`;
 section 20 maps each rule to where it is handled, or why it is not.
 
-Code: `split.py` (dev/test), `entries.py` (the comparison units and label maps). Scoring
-reuses `benchmarks/score.py` and loaders reuse `benchmarks/datasets/`. Adapters and the
-runner are the next step (one venv per entry).
+Code: `split.py` (dev/test), `entries.py` (comparison units, label maps, run registry,
+contamination flags), `envs/<entry>.txt` (pinned installs, one uv venv per entry),
+`adapters/` (the adapter contract in `_protocol.py`, one script per tool), `runner.py`
+(venvs, offset check, supervised runs, scoring, bundle), `scorer.py` (the measures below, on
+top of `benchmarks/score.py`), `speed.py` (section 16). Loaders reuse `benchmarks/datasets/`.
+Adapters written so far: SCT (`sct-default`, `sct-gliner`) and the test-only `dummy`.
 
 ## 1. Datasets and splits
 
@@ -170,8 +173,8 @@ before dev runs. Tool labels not in the map are out of scope: dropped before sco
   into their union, keep both when types differ.
 - Strict: exact span + type, one-to-one (multiset match, `sct.evaluation.evaluate_pii`).
 - Partial: overlap of at least one character, same type, one-to-one: greedy matching by
-  largest overlap, then earliest start. (Note: current `score.py` partial is many-to-one;
-  the one-to-one variant is added in the scoring step and both are reported.)
+  largest overlap, then earliest start (`scorer.py`). The many-to-one partial of
+  `score.py` is reported next to it.
 - Character level: per-character P/R/F1 over in-scope gold characters, type-agnostic, plus
   F2 (recall-weighted), as in PIIMB and the OPF-42 paper.
 
@@ -291,8 +294,9 @@ core), 754 GB RAM, 4x RTX 4090 shared with a vLLM server (16.5-19 GB in use per 
 - Measures, in randomised entry order: cold start (new process, cached weights, import +
   load + first prediction); warm batch-1 latency (median, p95 after 20 warmup docs, GPU
   synchronised); throughput at common batch 8 (docs/s, chars/s); best-batch throughput
-  (entry's own optimum, separately labelled). Peak RSS (psutil sampler, 50 ms) and peak
-  VRAM (`torch.cuda.max_memory_allocated` + `nvidia-smi` sampler for ONNX). Install size:
+  (entry's own optimum, separately labelled). Peak RSS (the adapter process's own `getrusage`
+  peak, exact, no sampler) and peak VRAM (`nvidia-smi` compute-apps polled every 0.2 s for the
+  adapter's PID only, plus `torch.cuda.max_memory_allocated` when torch is used). Install size:
   fresh venv `du -sh` + model cache size.
 - Speed set: FineWeb-2 speed sample (`speed` suite docs), 3 repeats, median.
 
@@ -359,8 +363,8 @@ summary.
 | 4 | three coverage views | 4 | defined (`supports` in `entries.py`) |
 | 5 | over-masking | 8 | defined; downstream utility only as chrF (no downstream task model) |
 | 6 | threshold curves | 10 | defined |
-| 7 | offsets and matching | 6 | defined; one-to-one partial to add in scoring step |
-| 8 | leak definitions | 7 | defined; three new measures to add in scoring step |
+| 7 | offsets and matching | 6 | implemented (`scorer.py`, offset fixtures in `runner.py`) |
+| 8 | leak definitions | 7 | implemented (`scorer.doc_stats`) |
 | 9 | detection vs pipeline | 9 | two tracks |
 | 10 | annotation audit | 18 | partial: flags done, blind audit planned, limited to languages a reviewer reads |
 | 11 | aggregation and quotas | 13 | defined |
@@ -378,6 +382,35 @@ Not doable as written: rule 5's "downstream utility" beyond chrF (no downstream 
 scope); rule 10's fluent review for all ~40 languages (only the languages a reviewer reads);
 rule 2 cannot be complete for OPF and the knowledgator model (training data undisclosed).
 
+## 21. Adapter contract and runner
+
+Each entry runs in its own venv (`uv venv --python 3.12` + `envs/<entry>.txt`; the full
+`uv pip freeze` goes into the bundle) as a subprocess:
+
+    <venv>/bin/python adapters/<tool>_adapter.py --input in.jsonl --output out.jsonl \
+        [--config JSON] [--batch-size N] [--speed]
+
+- input lines: `{"id", "text", "lang"}` (gold language code);
+- output lines, one per input doc, in input order, flushed per batch:
+  `{"id", "spans": [{"start", "end", "label", "score"}], "masked_text"?, "unplaced"?, "error"?, "seconds"}`;
+  code-point offsets, half-open, tool's own labels, `score` float or null; `unplaced` = detections
+  the adapter could not place in the source (scored as wrong predictions);
+- an exception becomes `error` for that doc (a failing batch is retried doc by doc); spans out
+  of range make the doc an error; `<output>.ready` is written once the model has loaded.
+
+The runner checks offsets on seven hand-made fixtures first (an entry that fails is not run),
+then supervises: per-doc timeout counted from the last line or the ready marker, one retry of
+the doc that was running, then an `error` line (`timeout`, `crash: exit N`); three docs in a row
+failing with no output at all abort the rest (`aborted`). Raw outputs (they hold dataset text)
+stay in `benchmarks/.cache/compare/`. The bundle gets, per entry x dataset part: completion,
+failure kinds, the three views (each with `compare` per-language/macro/micro, `effective`
+with failed docs unmasked, `with_date`, and the `score.py` report), the threshold curve, native
+leaks, contamination flag, sample-id hash; `summary.json` has the group aggregates (with an
+out-of-domain variant using only `-` cells) and the paired bootstrap of the baseline (SCT)
+minus each entry. Not yet built: the common chunker (section 11) and the PR/leak plots.
+
 ## Change log
 
 - 2026-11-02: protocol written; splits computed (seed 13, dev share 0.2).
+- 2026-11-02: harness built (adapter contract, runner, scorer, speed runner); no change to
+  any frozen rule. Doc leak rate uses "a letter or digit of a mention survives" as the exposure rule.

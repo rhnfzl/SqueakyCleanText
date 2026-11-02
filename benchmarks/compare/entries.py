@@ -82,3 +82,55 @@ ENTRIES = {
 
 RESERVE = ("scrubadub==2.0.1", "datatrove==0.10.1 PIIFormatter", "urchade/gliner_multi_pii-v1",
            "OpenMed/privacy-filter-multilingual-v2", "iiiorg/piiranha-v1-detect-personal-information")
+
+# Runner registry: adapter script (in ``adapters/``) and its config. The pinned install spec
+# is ``envs/<entry>.txt``; every venv uses PYTHON. ``adapter`` None = not written yet.
+PYTHON = "3.12"
+RUNS = {
+    "sct-default": {"adapter": "sct_adapter.py", "config": {"mode": "default", "language": "gold"}},
+    "sct-gliner": {"adapter": "sct_adapter.py", "config": {"mode": "gliner", "language": "gold"}},
+    **{name: {"adapter": None, "config": {}} for name in
+       ("presidio", "gliner-nvidia", "gliner2-fastino", "opf", "bardsai-v3", "datafog")},
+}
+
+# Not a comparison entry: a stdlib-only adapter for tests and smoke runs (runs in any Python).
+TEST_ENTRIES = {
+    "dummy": {
+        "package": "-", "checkpoint": "-", "revision": "-", "config": "regex e-mail + digit runs",
+        "threshold": "-", "mask": "common", "device": "cpu", "gpu_gb": 0,
+        "labels": {"EMAIL": EMAIL, "NUMBER": NUMBER}, "supports": (EMAIL, NUMBER),
+        "adapter": "dummy_adapter.py", "adapter_config": {},
+    },
+}
+
+
+def tool(name: str) -> dict:
+    """Entry + run settings: ``adapter``, ``adapter_config`` and ``requirements`` (None = current Python)."""
+    from pathlib import Path
+
+    if name in TEST_ENTRIES:
+        return {**TEST_ENTRIES[name], "requirements": None}
+    if name not in ENTRIES:
+        raise ValueError(f"unknown entry {name!r}; known: {', '.join([*ENTRIES, *TEST_ENTRIES])}")
+    run = RUNS[name]
+    return {**ENTRIES[name], "adapter": run["adapter"], "adapter_config": run["config"],
+            "requirements": Path(__file__).resolve().parent / "envs" / f"{name}.txt"}
+
+
+# PROTOCOL.md section 17, per entry: dataset -> flag ("*" = every other dataset).
+# T trained on it, E vendor evaluates on it, D SCT developed against it, U training data undisclosed, - none known.
+CONTAMINATION = {
+    "sct-default": {"*": "D", "gretel_en": "-", "argilla_pii": "-"},
+    "sct-gliner": {"*": "U, D", "gretel_en": "U", "argilla_pii": "U"},
+    "presidio": {"*": "-"},
+    "gliner-nvidia": {"*": "-", "openpii": "E", "gretel_en": "E", "nemotron": "T", "argilla_pii": "E"},
+    "gliner2-fastino": {"*": "-"},
+    "opf": {"*": "U"},
+    "bardsai-v3": {"*": "-", "openpii": "T", "gretel_en": "T", "nemotron": "T", "argilla_pii": "T-family"},
+    "datafog": {"*": "-"},
+}
+
+
+def contamination(entry: str, dataset: str) -> str:
+    flags = CONTAMINATION.get(entry, {"*": "-"})
+    return flags.get(dataset, flags["*"])

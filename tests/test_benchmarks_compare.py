@@ -70,3 +70,244 @@ def test_entries_are_complete_and_map_to_sct_types():
         assert set(entry["labels"].values()) <= set(entries.SCT_TYPES), name
         assert set(entry["supports"]) <= set(entries.SCT_TYPES), name
         assert entry["gpu_gb"] <= 5, name  # shared box: about 6 GB free per GPU
+
+
+# --- comparison harness: scorer, supervisor, runner (hand-made text and spans only) ---
+
+import json  # noqa: E402
+import sys  # noqa: E402
+from collections import Counter  # noqa: E402
+
+import pytest  # noqa: E402
+
+from benchmarks.compare import runner, scorer  # noqa: E402
+
+MAP = {"person": "PERSON", "email": "EMAIL", "date": "DATE", "ssn": "NUMBER"}
+TEXT = "Ann Lee and Bo Ek mailed ann@x.io on 2020-01-02; SSN 123-45-6789. Ann Lee again."
+#       0         1         2         3         4         5         6         7
+
+
+def span(start, end, label, score=None):
+    return {"start": start, "end": end, "label": label, "score": score}
+
+
+def gold_record(rid="d1", spans=None, lang="en", text=TEXT):
+    if spans is None:
+        spans = [span(0, 7, "person"), span(12, 17, "person"), span(25, 33, "email"),
+                 span(37, 47, "date"), span(53, 64, "ssn"), span(66, 73, "person")]
+    return {"id": rid, "lang": lang, "text": text, "spans": [{k: s[k] for k in ("start", "end", "label")} for s in spans]}
+
+
+def test_map_spans_drops_unmapped_thresholds_and_merges_same_type():
+    spans, dropped = scorer.map_spans(
+        [span(0, 3, "per", 0.9), span(2, 7, "per", 0.4), span(2, 7, "org", 0.9), span(5, 5, "per", 0.9),
+         span(10, 12, "secret", 0.9), span(20, 25, "per", 0.1)], {"per": "PERSON", "org": "ORGANISATION"}, threshold=0.2)
+    assert dropped == 1
+    assert spans == [span(0, 7, "PERSON", 0.9), span(2, 7, "ORGANISATION", 0.9)]
+
+
+def test_common_mask_merges_regions_of_any_type():
+    assert scorer.mask_text("abcdefghij", [span(1, 4, "PERSON"), span(3, 6, "EMAIL"), span(8, 9, "IP")]) == \
+        "a<PERSON>gh<IP>j"
+    assert scorer.mask_text("abc", []) == "abc"
+
+
+def test_one_to_one_partial_and_masked_recall():
+    record = gold_record()
+    one_long = [span(0, 17, "PERSON")]  # covers both names
+    c = scorer.doc_stats(record, one_long, {k: v for k, v in MAP.items() if v != "DATE"})
+    assert c["gold"] == 5 and c["pred"] == 1
+    assert c["partial_tp"] == 1  # one-to-one: a single prediction matches one gold
+    assert c["gold_masked"] == 2  # but it masks both names
+    assert c["strict_tp"] == 0
+
+
+def test_leak_measures_on_the_common_mask():
+    record = gold_record()
+    mapping = {k: v for k, v in MAP.items() if v != "DATE"}
+    preds = [span(0, 7, "PERSON"), span(25, 30, "EMAIL")]  # e-mail half masked; second "Ann Lee" missed
+    c = scorer.doc_stats(record, preds, mapping)
+    assert c["mentions"] == 5
+    assert c["exposed"] == 4  # Bo Ek, e-mail tail, SSN, second Ann Lee
+    assert c["complete_exposure"] == 3  # Bo Ek, SSN, second Ann Lee
+    assert c["alnum"] == 6 + 4 + 6 + 9 + 6 and c["alnum_survived"] == 4 + 2 + 9 + 6
+    assert c["repeated"] == 2 and c["repeated_exposed"] == 2  # both "Ann Lee" mentions: one copy unmasked
+    assert c["exact_visible"] == 4  # Bo Ek, SSN and both "Ann Lee" (the value is visible via the second copy)
+    assert c["docs_exposed"] == 1 and c["docs_with_gold"] == 1
+
+
+def test_overmasking_clean_docs_and_char_scores():
+    clean = {"id": "c", "lang": "en", "text": "nothing personal here", "spans": []}
+    c = scorer.doc_stats(clean, [span(0, 7, "PERSON")], MAP)
+    assert c["clean_docs"] == 1 and c["clean_docs_fp"] == 1 and c["nongold_masked"] == 7
+    m = scorer.metrics(c)
+    assert m["masked_recall"] is None and m["clean_doc_fp_rate"] == 1.0  # no gold: N/A, not 0
+    assert m["overmask_rate"] == round(7 / len(clean["text"]), 4)
+    record = gold_record(spans=[span(0, 7, "person")])
+    c = scorer.doc_stats(record, [span(0, 3, "PERSON"), span(75, 77, "PERSON")], MAP)
+    m = scorer.metrics(c)
+    assert (m["char_precision"], m["char_recall"]) == (0.6, round(3 / 7, 4))
+    assert m["char_f2"] == round(5 * 0.6 * (3 / 7) / (4 * 0.6 + 3 / 7), 4)
+
+
+def test_perfect_prediction_scores_one_and_chrf_one():
+    record = gold_record()
+    mapping = {k: v for k, v in MAP.items() if v != "DATE"}
+    preds = [span(s["start"], s["end"], MAP[s["label"]]) for s in record["spans"] if s["label"] != "date"]
+    m = scorer.metrics(scorer.doc_stats(record, preds, mapping))
+    assert m["strict_f1"] == m["partial_f1"] == m["masked_recall"] == m["chrf"] == 1.0
+    assert m["char_survival"] == 0.0 and m["doc_leak_rate"] == 0.0 and m["overmask_rate"] == 0.0
+
+
+def test_macro_and_micro_aggregation():
+    big = scorer.doc_stats(gold_record("a", spans=[span(0, 7, "person")]), [span(0, 7, "PERSON")], MAP)
+    small = scorer.doc_stats(gold_record("b", spans=[span(0, 7, "person"), span(12, 17, "person")]), [], MAP)
+    one = scorer.summarise([("en", big), ("en", big), ("en", big), ("de", small)])
+    assert one["by_language"]["en"]["masked_recall"] == 1.0 and one["by_language"]["de"]["masked_recall"] == 0.0
+    assert one["macro"]["masked_recall"] == 0.5
+    assert one["micro"]["masked_recall"] == 0.6  # 3 of 5 gold
+    agg = scorer.aggregate({"x": [("en", big)], "y": [("en", small), ("en", small)]})
+    assert agg["macro"]["masked_recall"] == 0.5 and agg["micro"]["masked_recall"] == 0.2
+
+
+def test_curve_and_operating_point():
+    records = [gold_record("a", spans=[span(0, 7, "person"), span(25, 33, "email")])]
+    outputs = {"a": {"id": "a", "spans": [span(0, 7, "per", 0.8), span(25, 33, "mail", 0.3), span(40, 44, "per", 0.2)]}}
+    rows = scorer.curve(records, outputs, {"per": "PERSON", "mail": "EMAIL"}, MAP)
+    by_t = {r["threshold"]: r for r in rows}
+    assert by_t[0.05]["masked_recall"] == 1.0 and by_t[0.05]["partial_precision"] == round(2 / 3, 4)
+    assert by_t[0.5]["masked_recall"] == 0.5 and by_t[0.9]["masked_recall"] == 0.0
+    assert scorer.operating_point(rows, 1.0) == 0.3 and scorer.operating_point(rows, 0.5) == 0.8
+    assert scorer.curve(records, {"a": {"id": "a", "spans": [span(0, 7, "per")]}}, {"per": "PERSON"}, MAP) == []
+
+
+def test_score_run_views_failures_and_effective_protection():
+    records = [gold_record("a"), gold_record("b")]
+    outputs = {"a": {"id": "a", "spans": [span(25, 33, "EMAIL"), span(53, 64, "NUMBER")], "seconds": 0.1},
+               "b": {"id": "b", "spans": [], "error": "timeout: no output for 1s", "seconds": None}}
+    labels = {"EMAIL": "EMAIL", "NUMBER": "NUMBER"}
+    views = scorer.views_for(("EMAIL", "NUMBER"), ("EMAIL",), ("PERSON", "EMAIL", "NUMBER", "DATE"))
+    result, per_doc = scorer.score_run(records, outputs, labels, MAP, views)
+    assert result["completion_rate"] == 0.5 and result["flag_low_completion"]
+    assert result["failure_kinds"] == {"timeout": 1}
+    sup, shared, full = (result["views"][v] for v in ("supported", "shared", "full"))
+    assert sup["compare"]["micro"]["masked_recall"] == 1.0
+    assert shared["compare"]["micro"]["gold"] == 1
+    assert full["compare"]["micro"]["masked_recall"] == 0.4  # 3 persons missed (unsupported counts as missed)
+    assert sup["effective"]["masked_recall"] == 0.5  # the failed doc counts as unmasked
+    assert full["with_date"]["gold"] == 6
+    assert "partial" in sup["pii"] and "leak" in sup["pii"]
+    assert [x[0] for x in per_doc["shared"]] == ["a", "b"]
+    assert result["curve"] == [] and result["native"] is None
+
+
+def test_paired_bootstrap_and_mcnemar():
+    good = [(f"d{i}", f"g{i}", "en", scorer.doc_stats(gold_record(f"d{i}", spans=[span(0, 7, "person")]),
+                                                        [span(0, 7, "PERSON")], MAP)) for i in range(30)]
+    bad = [(i, g, lang, scorer.doc_stats(gold_record(i, spans=[span(0, 7, "person")]), [], MAP)) for i, g, lang, _ in good]
+    same = scorer.paired_bootstrap(good, good, samples=200)
+    assert same["metrics"]["masked_recall"]["diff_ci"] == [0.0, 0.0] and not same["metrics"]["masked_recall"]["excludes_zero"]
+    diff = scorer.paired_bootstrap(good, bad, samples=200)
+    assert diff["metrics"]["masked_recall"]["diff_ci"] == [1.0, 1.0] and diff["metrics"]["masked_recall"]["excludes_zero"]
+    assert diff["doc_leak_mcnemar"]["only_b"] == 30 and diff["doc_leak_mcnemar"]["p_value"] < 1e-6
+    with pytest.raises(ValueError):
+        scorer.paired_bootstrap(good, bad[::-1], samples=10)
+    assert scorer.mcnemar([True, False], [True, False])["p_value"] == 1.0
+
+
+DUMMY = [sys.executable, str(runner.ADAPTERS / "dummy_adapter.py")]
+
+
+def dummy_cmd(config):
+    return [*DUMMY, "--config", json.dumps(config)]
+
+
+def docs(n):
+    return [{"id": f"d{i}", "lang": "en", "text": f"doc {i} mail a{i}@x.io"} for i in range(n)]
+
+
+def test_supervisor_keeps_errors_and_bad_spans(tmp_path):
+    results, info = runner.supervise(dummy_cmd({"raise": ["d1"], "bad": ["d2"]}), docs(4), tmp_path,
+                                     runner.child_env(), doc_timeout=30, start_timeout=30)
+    assert set(results) == {"d0", "d1", "d2", "d3"} and info["processes"] == 1
+    assert results["d1"]["error"].startswith("RuntimeError") and results["d1"]["spans"] == []
+    assert results["d2"]["error"].startswith("ValueError: span offsets out of range")
+    assert results["d0"]["spans"] == [span(11, 18, "EMAIL", 0.9), span(4, 5, "NUMBER", 0.6)]
+    assert not list(tmp_path.glob("in-*.jsonl"))  # inputs (dataset text) are removed
+
+
+def test_supervisor_retries_crash_then_records_timeouts(tmp_path):
+    config = {"crash_once": ["d1"], "state_dir": str(tmp_path), "crash": ["d3"], "sleep": {"d4": 5}}
+    results, info = runner.supervise(dummy_cmd(config), docs(6), tmp_path / "w", runner.child_env(),
+                                     doc_timeout=1.0, start_timeout=10, retries=1)
+    assert "error" not in results["d1"]  # crashed once, the retry worked
+    assert results["d3"]["error"] == "crash: exit 3"
+    assert results["d4"]["error"].startswith("timeout")
+    assert "error" not in results["d5"] and "error" not in results["d0"]
+    assert info["restarts"]["crash"] == 3 and info["restarts"]["timeout"] == 2
+
+
+def test_supervisor_aborts_when_the_adapter_cannot_start(tmp_path):
+    cmd = [sys.executable, "-c", "import sys; sys.exit(2)"]
+    results, info = runner.supervise(cmd, docs(10), tmp_path, runner.child_env(), doc_timeout=5, start_timeout=5)
+    assert len(results) == 10 and all("error" in r for r in results.values())
+    assert results["d9"]["error"].startswith("aborted") and info["processes"] == 2 * runner.MAX_FAILED_STREAK
+
+
+def test_offset_fixtures_pass_for_a_correct_adapter(tmp_path):
+    fixtures = [{"id": k, "lang": lang, "text": text} for k, (lang, text) in runner.OFFSET_FIXTURES.items()]
+    results, _ = runner.supervise(dummy_cmd({}), fixtures, tmp_path, runner.child_env(), 30, 30)
+    assert runner.check_offsets(results, {"EMAIL": "EMAIL"}) == {}
+    shifted = {k: {**v, "spans": [{**s, "start": s["start"] + 1} for s in v["spans"]]} for k, v in results.items()}
+    assert set(runner.check_offsets(shifted, {"EMAIL": "EMAIL"})) == set(runner.OFFSET_FIXTURES)
+
+
+def test_runner_end_to_end_with_dummy(tmp_path, monkeypatch):
+    records = [gold_record("a", spans=[span(25, 33, "email"), span(53, 64, "ssn")]),
+               gold_record("b", spans=[span(0, 7, "name")]),
+               {"id": "c", "lang": "en", "text": "no pii at all", "spans": []}]
+    monkeypatch.setattr(runner.split, "load", lambda dataset, part, n, seed: records)
+    out = tmp_path / "out"
+    runner.main(["--entries", "dummy", "--datasets", "gretel_en", "--part", "dev", "--out", str(out),
+                 "--cache", str(tmp_path / "cache"), "--doc-timeout", "30", "--start-timeout", "30"])
+    result = json.loads((out / "dummy" / "gretel_en-dev.json").read_text())
+    assert result["completion_rate"] == 1.0 and result["contamination"] == "-"
+    assert result["views"]["supported"]["compare"]["micro"]["masked_recall"] == 1.0
+    assert result["views"]["full"]["compare"]["micro"]["masked_recall"] == round(2 / 3, 4)
+    assert result["curve"] and json.loads((out / "dummy" / "offset-check.json").read_text())["passed"]
+    preds = [json.loads(line) for line in (out / "predictions" / "dummy" / "gretel_en-dev.jsonl").read_text().splitlines()]
+    assert all(set(p) == {"id", "start", "end", "label", "score"} for p in preds)
+    for path in out.rglob("*"):  # no dataset text in the result bundle
+        if path.is_file():
+            assert "no pii at all" not in path.read_text() and "Ann Lee" not in path.read_text()
+    summary = json.loads((out / "summary.json").read_text())
+    assert summary["aggregate"]["dummy"]["full"]["privacy-synthetic"]["datasets"] == ["gretel_en"]
+
+
+def test_registry_has_pinned_envs_and_contamination():
+    from benchmarks.compare import entries as reg
+
+    for name in reg.ENTRIES:
+        t = reg.tool(name)
+        assert t["requirements"].exists(), name
+        pins = [line for line in t["requirements"].read_text().splitlines() if line and not line.startswith("#")]
+        assert pins and all("==" in p or " @ https://" in p for p in pins), name
+        assert reg.contamination(name, "gretel_en") in {"-", "U", "E", "T"}
+    assert reg.tool("sct-default")["adapter"] == "sct_adapter.py" and reg.tool("dummy")["requirements"] is None
+    assert reg.contamination("gliner-nvidia", "nemotron") == "T" and reg.contamination("sct-default", "redact") == "D"
+    with pytest.raises(ValueError):
+        reg.tool("nope")
+    assert Counter(reg.contamination("opf", d) for d in ("tab", "openpii")) == Counter({"U": 2})
+
+
+def test_speed_mode_reports_cold_start_latency_throughput_and_rss(tmp_path):
+    from benchmarks.compare import speed
+
+    run = speed.measure(dummy_cmd({}), docs(30), tmp_path, runner.child_env(), batch_size=4, timeout=60, poll_vram=False)
+    assert "error" not in run and run["cold_start_seconds"] > 0
+    assert run["latency"]["docs"] == 30 and run["latency"]["p95_ms"] >= run["latency"]["median_ms"] >= 0
+    assert sorted(t["batch_size"] for t in run["throughput"]) == [4, 8]
+    assert run["done"]["peak_rss_mb"] > 1
+    summary = speed.summarise([run, run, {"error": "timeout after 1s"}])
+    assert summary["repeats"] == 3 and summary["failed"] == ["timeout after 1s"]
+    assert summary["common_batch_docs_per_second"]["median"] > 0 and len(summary["other_batch"]) == 2
