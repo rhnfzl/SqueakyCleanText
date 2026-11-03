@@ -31,7 +31,8 @@ import time
 from pathlib import Path
 
 from benchmarks.compare import entries as registry
-from benchmarks.compare.runner import CACHE, _read_lines, _write, child_env, command, ensure_env, pick_gpu
+from benchmarks.compare.runner import (CACHE, _read_lines, _write, child_env, command, ensure_env, entry_device,
+                                       pick_gpu)
 from benchmarks.datasets import get
 from benchmarks.speed import environment
 
@@ -130,11 +131,6 @@ def _spread(values: list[float]) -> dict | None:
     return {"median": round(statistics.median(values), 4), "min": min(values), "max": max(values)} if values else None
 
 
-def entry_device(claimed: str, run_device: str) -> str:
-    """Device an entry ran on: a CPU-only entry (``device`` "cpu" in entries.py) stays on cpu in a cuda run."""
-    return run_device if run_device in claimed.split("|") else "cpu"
-
-
 def summarise(runs: list[dict]) -> dict:
     ok = [r for r in runs if "error" not in r and "done" in r]
     common = [next((t for t in r.get("throughput", []) if t["common"]), {}) for r in ok]
@@ -176,13 +172,14 @@ def main(argv=None) -> None:
     pythons = dict(item.split("=", 1) for item in args.python)
     docs = [{"id": r["id"], "text": r["text"], "lang": r["lang"]} for r in get("fineweb2").load(args.n, args.seed)]
     gpu = None if args.device == "cpu" else (args.gpu or pick_gpu(args.gpu_mem_gb + 1))
-    env = child_env(args.threads, args.device, gpu, args.hf_hub_cache)
     tools = {name: registry.tool(name) for name in args.entries}
-    commands, sizes = {}, {}
+    commands, sizes, envs = {}, {}, {}
     for name, t in tools.items():
         py = Path(pythons[name]) if name in pythons else ensure_env(name, t["requirements"], args.cache / "venvs")
-        config = {**t["adapter_config"], "threads": args.threads, "device": args.device, "gpu_mem_gb": args.gpu_mem_gb}
+        device = entry_device(t["device"], args.device)
+        config = {**t["adapter_config"], "threads": args.threads, "device": device, "gpu_mem_gb": args.gpu_mem_gb}
         commands[name] = command(py, t["adapter"], config, args.cpus)
+        envs[name] = child_env(args.threads, device, gpu, args.hf_hub_cache)
         sizes[name] = dir_mb(py.parent.parent) if name not in pythons and t["requirements"] else None
     runs: dict[str, list] = {name: [] for name in tools}
     rng = random.Random(args.seed)  # noqa: S311  # run order, not crypto
@@ -191,7 +188,7 @@ def main(argv=None) -> None:
         rng.shuffle(order)
         for name in order:
             print(f"[speed] repeat {repeat + 1}/{args.repeats} {name}", file=sys.stderr, flush=True)
-            runs[name].append(measure(commands[name], docs, args.cache / name / "speed", env, args.batch_size,
+            runs[name].append(measure(commands[name], docs, args.cache / name / "speed", envs[name], args.batch_size,
                                       args.timeout, poll_vram=args.device == "cuda"))
     result = {"docs": len(docs), "chars": sum(len(d["text"]) for d in docs), "threads": args.threads, "cpus": args.cpus,
               "device": args.device, "gpu": gpu, "repeats": args.repeats, "seed": args.seed,

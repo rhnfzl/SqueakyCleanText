@@ -305,6 +305,19 @@ def test_runner_end_to_end_with_dummy(tmp_path, monkeypatch):
     assert summary["aggregate"]["dummy"]["full"]["privacy-synthetic"]["datasets"] == ["gretel_en"]
 
 
+def test_cuda_run_keeps_a_cpu_only_entry_off_the_gpu(tmp_path, monkeypatch):
+    monkeypatch.setattr(runner.split, "load", lambda dataset, part, n, seed: [gold_record("b", spans=[span(0, 7, "name")])])
+    seen = []
+    real = runner.supervise
+    monkeypatch.setattr(runner, "supervise", lambda cmd, docs, work, env, *a, **k: seen.append(env["CUDA_VISIBLE_DEVICES"])
+                        or real(cmd, docs, work, env, *a, **k))
+    out = tmp_path / "out"
+    runner.main(["--entries", "dummy", "--datasets", "gretel_en", "--part", "dev", "--out", str(out), "--device", "cuda",
+                 "--gpu", "3", "--cache", str(tmp_path / "cache"), "--doc-timeout", "30", "--start-timeout", "30"])
+    assert json.loads((out / "dummy" / "gretel_en-dev.json").read_text())["adapter_config"]["device"] == "cpu"
+    assert seen and set(seen) == {""}
+
+
 def test_registry_has_pinned_envs_and_contamination():
     from benchmarks.compare import entries as reg
 

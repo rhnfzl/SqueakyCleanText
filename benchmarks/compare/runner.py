@@ -131,6 +131,11 @@ def child_env(threads: int | None = None, device: str = "cpu", gpu: str | None =
     return env
 
 
+def entry_device(claimed: str, run_device: str) -> str:
+    """Device an entry runs on: a CPU-only entry (``device`` "cpu" in entries.py) stays on cpu in a cuda run."""
+    return run_device if run_device in claimed.split("|") else "cpu"
+
+
 def command(py: Path, adapter: str, config: dict, cpus: str | None = None) -> list[str]:
     cmd = [str(py), str(ADAPTERS / adapter), "--config", json.dumps(config)]
     if cpus:
@@ -414,7 +419,6 @@ def main(argv=None) -> None:
         if t["adapter"] is None:
             raise SystemExit(f"entry {name!r} has no adapter yet")
     gpu = None if args.device == "cpu" else (args.gpu or pick_gpu(args.gpu_mem_gb + 1))
-    env = child_env(args.threads, args.device, gpu, args.hf_hub_cache)
     # The shared view is the types every comparison entry of the round supports, whichever entries this run
     # scores, so a partial run (SCT alone with --no-recover) has the same shared view as the full one. A run
     # on round-1 datasets only keeps round 1's eight entries, so round-1 scores do not move with round 2.
@@ -431,9 +435,11 @@ def main(argv=None) -> None:
     records_by_dataset = {}
     for name, t in tools.items():
         py = Path(pythons[name]) if name in pythons else ensure_env(name, t["requirements"], args.cache / "venvs")
-        config = {**t["adapter_config"], "threads": args.threads, "device": args.device,
+        device = entry_device(t["device"], args.device)  # a CPU-only entry gets no GPU (no idle CUDA context)
+        config = {**t["adapter_config"], "threads": args.threads, "device": device,
                   "gpu_mem_gb": args.gpu_mem_gb, **overrides.get(name, {})}
         cmd = command(py, t["adapter"], config, args.cpus)
+        env = child_env(args.threads, device, gpu, args.hf_hub_cache)
         (args.out / "envs").mkdir(parents=True, exist_ok=True)
         frozen = freeze(py)
         (args.out / "envs" / f"{name}.freeze.txt").write_text(frozen)
