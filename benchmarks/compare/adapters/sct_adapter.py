@@ -1,11 +1,13 @@
-"""SCT adapter: entries ``sct-default`` and ``sct-gliner`` (``{"mode": "gliner"}`` -> ``ner_mode='pii'``).
+"""SCT adapter: entries ``sct-default``, ``sct-gliner`` (``{"mode": "gliner"}`` -> ``ner_mode='pii'``),
+``sct-training`` (``{"preset": "training"}``) and ``sct-gliner-nvidia`` (gliner mode, ``gliner_model`` override).
 
 Spans come from reversible mode, as in ``benchmarks.run``: each ``<TYPE_n>`` placeholder is
 mapped back to the source span it replaced. ``masked_text`` is SCT's own output (the native
 pipeline track). SCT gives no per-span score, so ``score`` is None; its operating point is
 moved with ``overrides`` (``ner_confidence_threshold``, ``gliner_threshold``).
 
-Config: ``mode`` (default|gliner), ``language`` (``gold``: one cleaner per gold language, pinned;
+Config: ``mode`` (default|gliner), ``preset`` (a ``sct.presets`` name, applied under the scoring settings),
+``language`` (``gold``: one cleaner per gold language, pinned;
 ``auto``: SCT's own detection), ``threads``, ``workers`` (process_batch concurrency),
 ``device`` (cpu|cuda), ``gpu_mem_gb``, ``overrides`` (extra TextCleanerConfig fields).
 """
@@ -16,7 +18,7 @@ from pathlib import Path
 # Repo root goes AFTER site-packages: the venv's pinned sct wins over the checkout's sources.
 sys.path.append(str(Path(__file__).resolve().parents[3]))
 
-from _protocol import serve  # noqa: E402
+from _protocol import cap_gpu, serve  # noqa: E402
 
 SCORING = {"replacement_mode": "reversible", "check_to_ascii_unicode": False}
 
@@ -72,12 +74,22 @@ def load(config: dict):
     from scripts.benchmark_release import predicted_spans
 
     base = dict(SCORING)
+    if config.get("preset"):
+        from sct.presets import PRESETS
+
+        base = {**PRESETS[config["preset"]], **SCORING}
     if config.get("mode", "default") == "gliner":
         base["ner_mode"] = "pii"
+        cap_gpu(config)  # GLiNER runs on torch: the ONNX gpu_mem_limit below does not reach it
     if config.get("threads"):
         base["onnx_intra_op_threads"] = int(config["threads"])
     if config.get("device"):
         base["ner_device"] = config["device"]
+    if config.get("device") == "cuda":
+        import onnxruntime
+
+        if hasattr(onnxruntime, "preload_dlls"):  # CUDA 12 / cuDNN from the pip nvidia-* wheels (onnxruntime-gpu[cuda,cudnn])
+            onnxruntime.preload_dlls()
     if config.get("device") == "cuda" and config.get("gpu_mem_gb"):
         base["onnx_cuda_provider_options"] = {"gpu_mem_limit": int(config["gpu_mem_gb"] * 2**30)}
     base.update(config.get("overrides", {}))

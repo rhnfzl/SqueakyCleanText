@@ -13,7 +13,8 @@ For each repeat, entries run in a seeded random order, each in a fresh process o
   adapter's own ``getrusage`` peak is kept too but on Linux it carries the parent's peak over
   fork + exec, so it never reads below the runner's size; peak VRAM: ``nvidia-smi`` polled for the
   adapter's PID only (never other users' processes), plus torch's own peak when torch is used;
-- install size: the venv on disk (models are in the HF cache, shared, not counted).
+- install size: the venv on disk (models are in the HF cache, shared, not counted);
+- device per entry: the run's device, or cpu for an entry that only runs on CPU (``entries.py`` ``device``).
 
 Median over repeats with min and max. CPU pinning and thread caps as in the runner.
 """
@@ -127,6 +128,11 @@ def _spread(values: list[float]) -> dict | None:
     return {"median": round(statistics.median(values), 4), "min": min(values), "max": max(values)} if values else None
 
 
+def entry_device(claimed: str, run_device: str) -> str:
+    """Device an entry ran on: a CPU-only entry (``device`` "cpu" in entries.py) stays on cpu in a cuda run."""
+    return run_device if run_device in claimed.split("|") else "cpu"
+
+
 def summarise(runs: list[dict]) -> dict:
     ok = [r for r in runs if "error" not in r and "done" in r]
     common = [next((t for t in r.get("throughput", []) if t["common"]), {}) for r in ok]
@@ -187,7 +193,8 @@ def main(argv=None) -> None:
     result = {"docs": len(docs), "chars": sum(len(d["text"]) for d in docs), "threads": args.threads, "cpus": args.cpus,
               "device": args.device, "gpu": gpu, "repeats": args.repeats, "seed": args.seed,
               "environment": environment(),
-              "entries": {name: {**summarise(runs[name]), "install_mb": sizes[name]} for name in tools}}
+              "entries": {name: {**summarise(runs[name]), "install_mb": sizes[name],
+                                 "device": entry_device(t["device"], args.device)} for name, t in tools.items()}}
     _write(args.out / "speed.json", result)
     print(args.out / "speed.json")
 

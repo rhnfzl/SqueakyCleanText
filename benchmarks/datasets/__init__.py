@@ -6,8 +6,11 @@ maps them to SCT types). Every module sets ``NAME, HF_ID, REVISION, LICENCE,
 PUBLISH, SUITE`` and ``load(n, seed)``: ``n`` docs per language (``None`` = all),
 picked with a seeded reservoir so the sample only depends on the seed and the
 pinned revision. Data is downloaded to ``benchmarks/.cache/`` (gitignored).
+A loader may set ``record["part"]`` (``dev`` / ``test``) when the dataset ships its own split;
+``compare.split`` keeps it instead of hashing.
 """
 
+import hashlib
 import importlib
 import random
 import urllib.request
@@ -19,6 +22,12 @@ MODULES = (
     "openpii", "gretel", "nemotron", "redact", "iahlt", "bayanat", "thainer",
     "thai_pii", "naamapadam", "multiconer", "stockmark", "tab", "wili", "fineweb2", "gretel_en", "argilla_pii",
 )
+# Round 2 of the tool comparison (PROTOCOL.md section 1): fresh sets, none used while SCT was developed.
+ROUND2 = (
+    "newmean", "dialogpii", "kdpii", "nus_lt", "redmadrobot", "redactionbench", "tonic", "meddeid", "greek_deid",
+    "neonredact", "pl_pii", "europii", "carmen",
+)
+MODULES = (*MODULES, *ROUND2)
 
 
 def get(name: str):
@@ -33,6 +42,29 @@ def hf_file(repo: str, path: str, revision: str) -> Path:
     from huggingface_hub import hf_hub_download
 
     return Path(hf_hub_download(repo, path, repo_type="dataset", revision=revision, cache_dir=CACHE / "hf"))
+
+
+def hf_files(repo: str, patterns: list[str], revision: str) -> Path:
+    """Download the files of a HF dataset repo matching *patterns* at a pinned revision; returns the snapshot dir."""
+    from huggingface_hub import snapshot_download
+
+    return Path(snapshot_download(repo, repo_type="dataset", revision=revision, allow_patterns=patterns,
+                                  cache_dir=CACHE / "hf"))
+
+
+def md5_checked(path: Path, md5: str) -> Path:
+    """*path*, after checking its md5 against the pinned checksum (Zenodo records pin md5)."""
+    digest = hashlib.md5(path.read_bytes()).hexdigest()  # noqa: S324  # integrity pin, not security
+    if digest != md5:
+        raise ValueError(f"{path.name}: md5 {digest} != pinned {md5}; delete it from the cache and retry")
+    return path
+
+
+def sha256_checked(path: Path, sha256: str | None) -> Path:
+    """*path*, after checking its sha256 against the pin (SHORTLIST section 3); no pin, no check."""
+    if sha256 is not None and (digest := hashlib.sha256(path.read_bytes()).hexdigest()) != sha256:
+        raise ValueError(f"{path.name}: sha256 {digest} != pinned {sha256}; delete it from the cache and retry")
+    return path
 
 
 def url_file(url: str, name: str) -> Path:
@@ -104,5 +136,10 @@ def bio_to_spans(tokens: list[str], tags: list[str], sep: str = " ") -> tuple[st
 
 
 def valid_spans(text: str, spans: list[dict]) -> list[dict]:
-    """Drop empty or out-of-bounds spans."""
-    return [s for s in spans if 0 <= s["start"] < s["end"] <= len(text)]
+    """Drop empty or out-of-bounds spans. A span may carry the source's surface ``form``: it must equal
+    ``text[start:end]``, else the offset convention is wrong (UTF-16, inclusive end) and loading stops."""
+    kept = [s for s in spans if 0 <= s["start"] < s["end"] <= len(text)]
+    bad = sum(s.get("form") is not None and text[s["start"]:s["end"]] != s["form"] for s in kept)
+    if bad:
+        raise ValueError(f"{bad} of {len(kept)} gold spans do not match their surface form: check the offset convention")
+    return [{k: v for k, v in s.items() if k != "form"} for s in kept]

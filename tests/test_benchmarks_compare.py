@@ -63,7 +63,7 @@ def test_new_datasets_registered_with_pins_and_publish_rules():
 
 
 def test_entries_are_complete_and_map_to_sct_types():
-    assert len(entries.ENTRIES) == 8 and {"sct-default", "sct-gliner"} <= set(entries.ENTRIES)
+    assert len(entries.ENTRIES) == 18 and {"sct-default", "sct-gliner"} <= set(entries.ENTRIES)  # 8 + 10 round-2
     for name, entry in entries.ENTRIES.items():
         for key in ("package", "checkpoint", "revision", "config", "threshold", "mask", "device", "gpu_gb"):
             assert key in entry, (name, key)
@@ -311,7 +311,8 @@ def test_registry_has_pinned_envs_and_contamination():
         assert t["requirements"].exists(), name
         pins = [line for line in t["requirements"].read_text().splitlines() if line and not line.startswith("#")]
         assert pins and all("==" in p or " @ https://" in p for p in pins), name
-        assert reg.contamination(name, "gretel_en") in {"-", "U", "E, T-family", "T", "D-family", "U, D-family"}
+        assert reg.contamination(name, "gretel_en") in {"-", "U", "E, T-family", "T", "D-family", "U, D-family", "E",
+                                                        "E, T-family, D-family"}, name
     assert reg.tool("sct-default")["adapter"] == "sct_adapter.py" and reg.tool("dummy")["requirements"] is None
     assert reg.contamination("gliner-nvidia", "nemotron") == "T, E-family"
     assert reg.contamination("sct-default", "redact") == "D"
@@ -615,7 +616,8 @@ def test_contamination_status_and_claimed_languages():
     assert entries.contamination("gliner-nvidia", "gretel") == "T-family, E-family"
     assert entries.contamination("sct-gliner", "gretel_en") == "U, D-family"
     assert entries.contamination("presidio", "gretel") == "-" and entries.status("presidio", "gretel") == "clean"
-    assert not [d for g in scorer.GROUPS.values() for d in g if entries.status("sct-default", d) == "clean"]
+    round1 = [d for g, members in scorer.GROUPS.items() if not g.startswith("r2-") for d in members]
+    assert not [d for d in round1 if entries.status("sct-default", d) == "clean"]
     assert entries.status("opf", "tab") == "unknown" and entries.status("sct-gliner", "gretel_en") == "excluded"
     assert entries.status("sct-gliner", "tab") == "excluded"  # U, D
     assert entries.claims("gliner-nvidia", "en") and not entries.claims("gliner-nvidia", "de")

@@ -1,0 +1,6 @@
+# sct-training: SCT with the "training" preset (same release as sct-default), ONNX NER on CUDA 12:
+# onnxruntime-gpu from PyPI is the CUDA 12 build; the [cuda,cudnn] extra brings the CUDA 12 / cuDNN 9 runtime
+# wheels (the adapter calls onnxruntime.preload_dlls()). SCT depends on the CPU onnxruntime too: the env builder
+# (runner.GPU_TWINS) removes it after install so the GPU build owns the onnxruntime module.
+SqueakyCleanText==0.8.2
+onnxruntime-gpu[cuda,cudnn]==1.31.1

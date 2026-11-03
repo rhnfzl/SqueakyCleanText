@@ -10,7 +10,7 @@ contamination flags), `envs/<entry>.txt` (pinned installs, one uv venv per entry
 `adapters/` (the adapter contract in `_protocol.py`, one script per tool), `runner.py`
 (venvs, offset check, supervised runs, scoring, bundle), `scorer.py` (the measures below, on
 top of `benchmarks/score.py`), `speed.py` (section 16). Loaders reuse `benchmarks/datasets/`.
-Adapters written so far: SCT (`sct-default`, `sct-gliner`) and the test-only `dummy`.
+Adapters: one per entry in section 2 (round 1 and round 2), plus the test-only `dummy`.
 
 ## 1. Datasets and splits
 
@@ -63,6 +63,37 @@ not privacy annotations (multiconer entities are public figures). They are repor
 separate "entity recognition" table, never pooled into the privacy headline. TAB is scored
 with its own DIRECT/QUASI masking rule (`score.masking_recall`).
 
+### Round 2 datasets
+
+Twelve open sets plus one gated set (sct-integration-research `round2-datasets/SHORTLIST.md`, pinned
+2026-11-03). None was used while SCT was developed, so SCT's cells are clean (`entries.ROUND2` flags); the
+shortlist's per-tool cells are in `entries.CONTAMINATION`. They score in their own groups
+(`r2-privacy-synthetic`, `r2-privacy-real`, `r2-untyped`), so round-1 group numbers are unchanged, and
+`tune.py` does not tune on them (round-2 default: no tuning). Same split rule (seed 13, dev share 0.2),
+except that a dataset's own split is kept: the loader sets `record["part"]` and `split.py` uses it.
+
+| dataset | source @ revision | licence, publish | split used | group key | langs | gold notes |
+|---|---|---|---|---|---|---|
+| newmean | `newmean-ai/pii-dataset` @ `062c374` | CC BY-NC 4.0, scores-only | hash over test (17,058) | id | 54 | SECRET, USERNAME out of scope |
+| dialogpii | Zenodo 20863452, zip md5 `6b034ea` | CC BY 4.0 | hash over all 3,234 dialogs | scenario:chat_number (all languages and both versions together) | 11 + `-asr` transcripts | one record per dialog, `SPEAKER: text` lines |
+| kdpii | Zenodo 10968609, md5-pinned files | CC BY 4.0 | own: `test.json` = test (4,891), `valid.json` = dev (5,011) | dialog | ko | one record per sentence; PS_ID (user name) out of scope |
+| nus_lt | `VytautoDidziojoUniversitetas/NUS-LT-PII-corpus` @ `3097156` | Open RAIL-D, scores-only | hash over `validacija` (123 real docs) | id | lt | MISC split into email / url by the gold value's shape, rest out |
+| redmadrobot | `redmadrobot-rnd/pii_benchmark` @ `f77ea83` | MIT | hash over test (2,841) | id | ru | BIO tokens aligned to the text; no ORG/DATE gold |
+| redactionbench | `RedactionBench/RedactionBench` @ `d45e9ce` | CC BY 4.0 (49 sources all rights reserved), scores-only | hash over test (200 long docs) | id | en | untyped: `mandatory` = `UNTYPED`, `contextual` out of scope |
+| tonic | `TonicAI/Privacy-Bench` @ `a79d9e8` | CC BY 4.0 | hash over the 6 human-annotated workspaces | thread / document | en | USERNAME out of scope |
+| meddeid | `stighellemans/meddeid-{english,dutch}-synthetic-benchmark` @ `288c571` / `45c601b` | CC BY 4.0 | own: all test, no dev (cards: final evaluation only) | id | en-gb, en-us, nl-be | ages and Profession out of scope; birth dates DATE |
+| greek_deid | `prorris/greek-deid-benchmark` @ `dd82ef6` | CC BY 4.0 | hash over test (500 long notes) | id | el | `gold_standard.json`; must-survive probes kept as `record["survive"]` |
+| neonredact | `neondijital/neonredact-tr-bench` @ `72e799f` | CC BY 4.0 | own: dev 100, test 300 | id | tr | the author's 7 unscored labels out of scope |
+| pl_pii | `pl-pii-bench/pl-pii-bench` @ `bef947d` | CC BY 4.0 | hash over the 7 public lanes | source document / inflected name | pl | `protection: keep` entities out of scope |
+| europii | `sinceaihq/europii-bench` @ `b407a9a` | CC BY 4.0 | own: dev 415, test 2,075 | id | 12 | hard negatives are not gold |
+| carmen | PhysioNet CARMEN-I v1.0.2 | PhysioNet licence + DUA, scores-only | not loaded: gated | - | es, ca | stub raises "needs PhysioNet access" |
+
+Untyped gold (RedactionBench) is in every view and scored by the type-agnostic measures only; strict and
+partial (typed) measures are reported as None for it. The Greek must-survive probes give
+`result["survive"]`: the share of probe values still verbatim in the common masked output (section 8).
+Dev/test sizes for the hashed sets come from `python -m benchmarks.compare.split --datasets <names>` on first
+download (not computed yet: the data was not reachable from the machine that wrote the loaders).
+
 ## 2. Comparison units
 
 An entry is a full configuration: package + version + checkpoint + revision + labels/prompts
@@ -70,8 +101,8 @@ An entry is a full configuration: package + version + checkpoint + revision + la
 
 | entry | package / version | checkpoint @ revision | GPU need |
 |---|---|---|---|
-| sct-default | SqueakyCleanText 0.8.1 | SCT default ONNX NER (xlm-r conll03/02, wikineural) @ `DEFAULT_NER_REVISIONS` | none (CPU) |
-| sct-gliner | SqueakyCleanText[gliner] 0.8.1, `ner_mode='pii'` | knowledgator/gliner-pii-base-v1.0 @ `61726e0`, PyTorch (SCT falls back: no root `model.onnx`) | none; ~1 GB if cuda |
+| sct-default | SqueakyCleanText 0.8.2 | SCT default ONNX NER (xlm-r conll03/02, wikineural) @ `DEFAULT_NER_REVISIONS` | none (CPU) |
+| sct-gliner | SqueakyCleanText[gliner] 0.8.2, `ner_mode='pii'` | knowledgator/gliner-pii-base-v1.0 @ `61726e0`, PyTorch (SCT falls back: no root `model.onnx`) | none; ~1 GB if cuda |
 | presidio | presidio-analyzer 2.2.366, spaCy 3.8.18 | en_core_web_lg 3.8.0 | none (CPU) |
 | gliner-nvidia | gliner 0.2.30 | nvidia/gliner-PII @ `bd23e8e` (570M) | ~3 GB fp16, batch <= 4; CPU fallback |
 | gliner2-fastino | gliner2 2.1.0 | fastino/gliner2-privacy-filter-PII-multi @ `1cb4166` (205M) | ~1.5-2 GB; CPU fine |
@@ -84,10 +115,30 @@ Shared components are listed so a reader knows two rows are not independent: pre
 datafog both default to regex for structured types; sct-gliner and gliner-nvidia share the
 `gliner` package but not the weights.
 
-Reserve (run if time allows, same contract): scrubadub 2.0.1 (+ scrubadub_spacy 2.0.0, own
-venv), DataTrove 0.10.1 `PIIFormatter` (EMAIL/IP only), urchade/gliner_multi_pii-v1,
-OpenMed/privacy-filter-multilingual-v2, Piiranha v1 (CC-BY-NC-ND weights: personal
-benchmarking only, no redistribution).
+Reserve (run if time allows, same contract): DataTrove 0.10.1 `PIIFormatter` (EMAIL/IP only),
+urchade/gliner_multi_pii-v1. scrubadub, OpenMed and Piiranha moved to the round-2 entries below.
+
+Round 2 entries (`entries.ROUND2_ENTRIES`, user list in sct-integration-research `compare/ROUND2-TODO.md`).
+GPU entries run in CUDA 12 venvs: torch 2.14.1+cu126 as a direct wheel from the PyTorch cu126 index (the newest
+release with a cu126 build; Linux x86_64, Python 3.12), onnxruntime-gpu from PyPI (its CUDA 12 build). Round 2
+has no tuning (default track only).
+
+| entry | package / version | checkpoint @ revision | GPU need |
+|---|---|---|---|
+| gliner-knowledgator | gliner 0.2.30 | knowledgator/gliner-pii-base-v1.0 @ `61726e0` (the sct-gliner model, standalone), card threshold 0.3 | ~1 GB |
+| piiranha | transformers 5.22.1 | iiiorg/piiranha-v1-detect-personal-information @ `255acde`, 256-token windows (CC-BY-NC-ND weights: benchmark only, never shipped) | ~1 GB |
+| llm-guard | llm-guard 0.3.16 (last release, archived) | `Anonymize` defaults: Isotonic/deberta-v3-base_finetuned_ai4privacy_v2 @ `9ea9927` + Presidio regex | ~1 GB |
+| scrubadub | scrubadub 2.0.1 + scrubadub_spacy 2.0.0 | default detectors + `SpacyEntityDetector` (en_core_web_trf 3.8.0) | none (CPU: spaCy needs `prefer_gpu` + cupy for GPU, neither is used) |
+| ai4privacy | transformers 5.22.1 | ai4privacy/llama-ai4privacy-multilingual-categorical-anonymiser-openpii @ `83ef30d` (ModernBERT) | ~1 GB |
+| openmed | transformers 5.22.1 | OpenMed/privacy-filter-multilingual-v2 @ `0d0c043` (OPF fine-tune), opf decoder at biases 0 | ~3-5 GB |
+| pii-tracer | transformers 5.22.1 (remote code) | perplexity-ai/PII-Tracer @ `d25c16f`, vendor `predict`, 4096-token truncation | ~2-3 GB |
+| presidio-full | presidio-analyzer 2.2.366 | every language pack, phone regions, every predefined pattern recognizer, ORGANIZATION kept | none (CPU) |
+| sct-training | SqueakyCleanText 0.8.2 + onnxruntime-gpu | SCT `training` preset (extra SCT row, section 3) | ~1-2 GB |
+| sct-gliner-nvidia | SqueakyCleanText[gliner] 0.8.2 | nvidia/gliner-PII @ `bd23e8e` through SCT's GLiNER backend (`gliner_model`, `ner_backend='gliner'`: PyTorch, no forced ONNX); SCT's PII prompts and threshold (tuned on knowledgator) as shipped | ~3 GB |
+
+Shared view per round (`runner.shared_view`): a run on round-1 datasets keeps round 1's eight entries
+(EMAIL, PHONE, DATE, NUMBER), so round-1 scores do not move; a run with any round-2 dataset uses every
+entry: EMAIL, PHONE, NUMBER (llm-guard, scrubadub and sct-training claim no DATE; DATE is outside totals anyway).
 
 Dropped: nothing in the shortlist top 8 fails the "offline, Linux, CPU or <= 6 GB GPU" bar.
 scrubadub and DataTrove moved to reserve to keep 8 entries (both run, both narrow). Out
@@ -163,7 +214,7 @@ language track, the 9 privacy datasets; TAB 21 docs, REDACT 175, gretel 487):
   wheels are CUDA 13.2 builds and the box's driver is CUDA 12.6, so torch entries see no GPU
   with the pinned torch; gliner-nvidia therefore runs fp32 (its fp16 is the cuda path). Test
   runs must use the same device per entry as tuning.
-- sct-gliner: SCT 0.8.1 loads knowledgator/gliner-pii-base-v1.0 with PyTorch (the repo has no
+- sct-gliner: SCT 0.8.2 loads knowledgator/gliner-pii-base-v1.0 with PyTorch (the repo has no
   root `model.onnx`; SCT logs the fallback), not ONNX.
 - Harness fix after tuning started: `sct_adapter.sct_view` mapped view chars inserted at the end
   of the doc's last token to `len(source)`, so a placeholder there crashed span placement
@@ -208,6 +259,15 @@ before dev runs. Tool labels not in the map are out of scope: dropped before sco
   before the dev run.
 - datafog: EMAIL, PHONE, IP, CREDIT_CARD/SSN/ZIP -> NUMBER, DOB -> DATE (names checked
   against the 4.9.0 wheel when the adapter is written).
+- Round 2 (frozen from each checkpoint's config at the pinned revision; each adapter's `LABELS` /
+  `OUT_OF_SCOPE` cover every type and `load` refuses a checkpoint whose types differ): name parts -> PERSON,
+  address parts (street, building number, city, county, state, GPS) -> LOCATION, postcodes and IDs /
+  accounts / cards / device and vehicle IDs -> NUMBER, DOB and DATE -> DATE; credentials, usernames,
+  crypto addresses, money, age / sex / gender / title, job and TIME out of scope. piiranha 17 types,
+  ai4privacy 20, openmed 54, pii-tracer 9 (opf's classes + `other_pii`; `secret`, `other_pii` out),
+  llm-guard its 13 default entity types (CRYPTO, UUID, CUSTOM out), scrubadub its filth types (credential,
+  twitter, skype out). gliner-knowledgator uses `GLINER_PROMPTS`; presidio-full presidio's map;
+  sct-training and sct-gliner-nvidia SCT's.
 - Gold side: the `labels.py` name-part merge (now also FIRSTNAME, MIDDLENAME, LASTNAME)
   and nested-span rules apply equally to every entry.
 
@@ -374,6 +434,11 @@ core), 754 GB RAM, 4x RTX 4090 shared with a vLLM server (16.5-19 GB in use per 
   adapter's PID only, plus `torch.cuda.max_memory_allocated` when torch is used). Install size:
   fresh venv `du -sh` + model cache size.
 - Speed set: FineWeb-2 speed sample (`speed` suite docs), 3 repeats, median.
+- GPU column (round 2 on): `speed.py --device cuda` into `<bundle>/speed-gpu/`; per entry the device it ran on
+  (`speed.entry_device`: cpu for a CPU-only entry), batch-8 docs/s and peak VRAM (nvidia-smi for the adapter's
+  PID, `speed.vram_mb`; torch's own peak when nvidia-smi has none). `report.py` shows it in the speed table and as
+  the "GPU: device, docs/s, peak VRAM" column of the headline table. Torch entries cap themselves at
+  `gpu_mem_gb` with `torch.cuda.set_per_process_memory_fraction` (`_protocol.cap_gpu`).
 
 ## 17. Model-dataset contamination matrix (rule 2)
 
@@ -401,8 +466,51 @@ derives the family flags from the direct ones, so no family flag is set by hand.
 | opf | U | U | U | U | U | U | U | U |
 | bardsai-v3 | T (openpii-1m train) | T-family | T (train split) | T (train split) | T-family (ai4privacy generator) | - | - | - |
 | datafog (regex) | - | - | - | - | - | - | - | - |
-| reserve: OpenMed multilingual v2 | T | - | T | T | T (pii-masking-200k is Argilla's source) | - | - | - |
 | reserve: urchade gliner_multi_pii-v1 | - | - | - | - | - | - | - | - |
+| gliner-knowledgator | U | U | U | U | U | U | U | U |
+| piiranha (pii-masking-400k) | T-family | - | - | - | T-family | - | - | - |
+| llm-guard (Isotonic deberta, pii-masking-200k) | T-family | - | - | - | T (Argilla's source split) | - | - | - |
+| scrubadub (rules + en_core_web_trf) | - | - | - | - | - | - | - | - |
+| ai4privacy (open-pii-masking-500k train + test) | T-family, E-family | - | - | - | T-family, E-family | - | - | - |
+| openmed (OPF base U + ai4privacy, Nemotron, Gretel, privy) | T | U, T-family | T | T | T | U | U | U |
+| pii-tracer (in-house chats + ai4privacy; evaluates ai4privacy, Nemotron, Gretel, TAB) | T-family, E-family | E-family | E | E | T-family, E-family | - | E | - |
+| presidio-full | - | - | - | - | - | - | - | - |
+| sct-training | as sct-default | | | | | | | |
+| sct-gliner-nvidia | E, D | D, T-family, E-family | E, T-family, D-family | T, D, E-family | E, D-family | D | D | D |
+
+**Round-2 datasets** (round2-datasets `SHORTLIST.md` section 2 after its U-cell pass, 2026-11-03; evidence per
+cell in `contamination-u-cells.md`). No entry has T or vendor E on a round-2 set, and SCT was not developed
+against any of them. C = clean; E3 = the dataset author or a third party published scores for the tool (not
+vendor tuning) and c* = clean by inference: both count as clean (`-` in `entries.CONTAMINATION`). An entry built
+from two shortlist rows takes the worse cell. One U remains: openai/privacy-filter x KDPII (training data
+undisclosed, KDPII public since 2024). openmed is fine-tuned from that OPF base, so under "any model in it" its
+KDPII cell is U too (SHORTLIST's OpenMed row says C because it rates only the fine-tuning data; this is the one
+deliberate difference). presidio-full takes the Presidio row (same recognizers, more spaCy packs).
+
+| entry (SHORTLIST rows) | newmean | dialogpii | kdpii | nus_lt | redmadrobot | redactionbench | tonic | meddeid | greek_deid | neonredact | pl_pii | europii | carmen |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| sct-default (SCT development (round 1); SCT ONNX (wikineural, xlm-r CoNLL)) | C | C | C | C | C | C | C | C | C | C | C | C | C |
+| sct-gliner (SCT development (round 1); knowledgator gliner-pii-base-v1.0) | C | C | C | C | C | E3 | C | c* | C | C | C | C | c* |
+| presidio (Presidio (en_core_web_lg)) | C | C | c* | C | C | C | E3 | C | C | C | E3 | E3 | C |
+| gliner-nvidia (nvidia/gliner-PII) | C | C | C | C | C | E3 | C | C | C | C | C | C | C |
+| gliner2-fastino (fastino gliner2-privacy-filter) | E3 | C | C | C | C | C | E3 | c* | C | C | C | C | C |
+| opf (openai/privacy-filter) | E3 | C | U | C | C | E3 | C | E3 | C | E3 | C | C | C |
+| bardsai-v3 (bardsai eu-pii v3) | C | C | C | C | C | C | C | c* | C | C | E3 | C | C |
+| datafog (DataFog (regex engine)) | C | c* | c* | C | C | C | C | c* | c* | C | C | c* | C |
+| gliner-knowledgator (knowledgator gliner-pii-base-v1.0) | C | C | C | C | C | E3 | C | c* | C | C | C | C | c* |
+| piiranha (iiiorg/piiranha-v1) | C | C | C | c* | C | E3 | C | C | c* | C | c* | c* | c* |
+| llm-guard (LLM Guard (default DeBERTa recognizer)) | C | c* | c* | C | C | C | C | c* | c* | C | C | c* | C |
+| scrubadub (scrubadub) | C | c* | c* | C | C | C | C | c* | c* | C | C | c* | C |
+| ai4privacy (ai4privacy multilingual model) | C | C | C | C | C | E3 | C | c* | C | C | C | c* | C |
+| openmed (OpenMed multilingual v2; openai/privacy-filter) | C | C | U | C | C | C | C | E3 | C | E3 | C | c* | C |
+| pii-tracer (perplexity-ai/PII-Tracer) | C | C | C | C | C | C | C | C | C | C | C | C | C |
+| presidio-full (Presidio (en_core_web_lg)) | C | C | c* | C | C | C | E3 | C | C | C | E3 | E3 | C |
+| sct-training (SCT development (round 1); SCT ONNX (wikineural, xlm-r CoNLL)) | C | C | C | C | C | C | C | C | C | C | C | C | C |
+| sct-gliner-nvidia (SCT development (round 1); nvidia/gliner-PII) | C | C | C | C | C | E3 | C | C | C | C | C | C | C |
+
+Training sets that are not loaded here (ai4privacy pii-masking-200k / 400k / open-pii-masking-500k / openpii-1m,
+PII-Tracer's unnamed ai4privacy sample) are members of the ai4privacy family in `entries.FAMILIES`, so the family
+rule flags openpii and argilla_pii.
 
 Notes: nvidia/gliner-PII names its base as urchade/gliner_large-v2.1 on the HF card and
 knowledgator/gliner-bi-large-v1.0 on the NIM page (conflict, recorded). bardsai removed rows
@@ -425,7 +533,8 @@ data undisclosed) or `clean` (`-`). Reported:
 2. Same-set: the datasets clean for every tool compared (`summary["same_set"]`). When there is
    none, the report says so and gives pairwise same-set tables: SCT vs each tool on the datasets
    clean for both, languages both claim, paired bootstrap (`summary["pairwise"][...]["clean"]`).
-3. Unknown cells (U: opf, the knowledgator model in sct-gliner) are shown separately, labelled
+3. Unknown cells (U: opf and the knowledgator model in sct-gliner in round 1; opf and openmed on KDPII in
+   round 2) are shown separately, labelled
    "unknown", never as clean (`own[...]["unknown"]`, `pairwise[...]["unknown"]`).
 4. Excluded cells may be shown for information only, marked: in parentheses in the per-dataset
    tables, bold in the matrix; they never enter an average that is compared.
@@ -589,3 +698,27 @@ section 17 rule views (`own`, `same_set`, `pairwise`). Not yet built: the common
   the shared-view "without" numbers were not comparable; that run was redone. (7) Audit counts in the
   bundle's `audit/`; `make_comparison.py` in the bundle writes `COMPARISON.md` (prose numbers read
   from the bundle).
+- 2026-11-03 (round 2 datasets): loaders for the 12 open round-2 sets and a CARMEN-I stub (section 1, "Round 2
+  datasets"), pinned to the shortlist revisions. `split.py` keeps a dataset's own split (`record["part"]`:
+  KDPII, NeonRedact, EuroPII; MedDeID all test). `labels.UNTYPED` for RedactionBench (typed measures None),
+  `scorer.survival` for the Greek must-survive probes, three `r2-` groups, round-2 contamination flags in
+  `entries.py`. No rule for round-1 data changed; round-1 scores are untouched.
+- 2026-11-03 (round 2 entries): ten entries added (section 2 "Round 2 entries"), label maps (section 5),
+  contamination rows (section 17), CUDA 12 venvs (torch cu126 direct wheels; onnxruntime-gpu, with
+  `runner.GPU_TWINS` removing SCT's CPU onnxruntime after the install), per-entry GPU speed column (section 16),
+  per-round shared view (`runner.shared_view`). `PRESIDIO_MODELS` / `PHONE_REGIONS` moved from `tune.py` to
+  `entries.py` (unchanged values; `tune` re-exports them). `opf_adapter` split into `load` + `make_predict`
+  (same decoding) so openmed reuses it; `gliner_nvidia_adapter` takes a `model` key and caps GPU memory. No
+  frozen round-1 rule or score changed. Not yet run: no GPU, no network for venvs in the authoring session.
+- 2026-11-03 (round 2 prep review): round-2 contamination cells match SHORTLIST section 2 after its U-cell
+  pass (one U: opf x KDPII, carried into openmed, which is built on OPF; table in section 17). Every round-2 set
+  is `scores-only` (no per-example predictions); NUS-LT and CARMEN-I set `DELETE_PREDICTIONS`, so the runner
+  removes their raw outputs after scoring. Round-2 loads stop on a gold label that is neither mapped nor in
+  `labels.DATASET_OUT_OF_SCOPE`, and on a span whose source surface form differs from `text[start:end]`; the
+  MedDeID, Greek and NeonRedact files are checked against SHORTLIST's sha256 pins. A run that mixes round-1 and
+  round-2 datasets is refused. scrubadub is a CPU entry (spaCy never moves to GPU without `prefer_gpu`);
+  sct-gliner-nvidia sets `ner_backend='gliner'` (PyTorch, no forced ONNX); llm-guard and SCT's GLiNER path
+  cap the GPU share (`cap_gpu`). Must-survive probes count occurrences.
+- 2026-11-03: round 2 compares SCT 0.8.2 (all SCT entries). The round-1 torch entries (gliner-nvidia, gliner2-fastino, opf,
+  bardsai-v3) move to torch 2.14.1+cu126 so they run on the CUDA 12.6 GPU; round 1 ran them with torch 2.15.0 (CUDA 13,
+  CPU). bardsai-v3's ONNX model still runs on the CPU onnxruntime.

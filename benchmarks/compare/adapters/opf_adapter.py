@@ -27,7 +27,7 @@ vendor's ``<LABEL>`` placeholders.
 import json
 import math
 
-from _protocol import serve
+from _protocol import cap_gpu, serve
 
 MODEL = "openai/privacy-filter"
 REVISION = "7ffa9a043d54d1be65afb281eddf0ffbe629385b"
@@ -107,25 +107,34 @@ def mask(text: str, spans: list[dict]) -> str:
     return text
 
 
+def merge_biases(biases: dict, config: dict) -> dict:
+    unknown = set(config.get("biases", {})) - set(BIAS_KEYS)
+    if unknown:
+        raise ValueError(f"unknown OPF biases: {sorted(unknown)}")
+    return {**biases, **{k: float(v) for k, v in config.get("biases", {}).items()}}
+
+
 def load(config: dict):
-    import torch
     from huggingface_hub import hf_hub_download
+
+    revision = config.get("revision", REVISION)
+    with open(hf_hub_download(MODEL, "viterbi_calibration.json", revision=revision), encoding="utf-8") as f:
+        biases = dict(json.load(f)["operating_points"]["default"]["biases"])
+    return make_predict(MODEL, revision, merge_biases(biases, config), config)[0]
+
+
+def make_predict(name: str, revision: str, biases: dict, config: dict):
+    """(predict, BIOES labels) for an OPF-architecture checkpoint (openai/privacy-filter and its fine-tunes)."""
+    import torch
     from transformers import AutoModelForTokenClassification, AutoTokenizer
 
     if config.get("threads"):
         torch.set_num_threads(int(config["threads"]))
-    revision = config.get("revision", REVISION)
     device = config.get("device") or ("cuda" if torch.cuda.is_available() else "cpu")
     n_ctx = int(config.get("n_ctx") or N_CTX)
-    with open(hf_hub_download(MODEL, "viterbi_calibration.json", revision=revision), encoding="utf-8") as f:
-        biases = dict(json.load(f)["operating_points"]["default"]["biases"])
-    unknown = set(config.get("biases", {})) - set(BIAS_KEYS)
-    if unknown:
-        raise ValueError(f"unknown OPF biases: {sorted(unknown)}")
-    biases.update({k: float(v) for k, v in config.get("biases", {}).items()})
-
-    tokenizer = AutoTokenizer.from_pretrained(MODEL, revision=revision)
-    model = AutoModelForTokenClassification.from_pretrained(MODEL, revision=revision, dtype=torch.bfloat16).to(device).eval()
+    cap_gpu(config)
+    tokenizer = AutoTokenizer.from_pretrained(name, revision=revision)
+    model = AutoModelForTokenClassification.from_pretrained(name, revision=revision, dtype=torch.bfloat16).to(device).eval()
     labels = [model.config.id2label[i] for i in range(len(model.config.id2label))]
     start, end, trans = transition_scores(labels, biases)
     pad = model.config.pad_token_id
@@ -161,7 +170,7 @@ def load(config: dict):
             out.append({"spans": spans, "masked_text": mask(text, spans)})
         return out
 
-    return predict
+    return predict, labels
 
 
 if __name__ == "__main__":

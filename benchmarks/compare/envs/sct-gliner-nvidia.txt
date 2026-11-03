@@ -1,0 +1,5 @@
+# sct-gliner-nvidia: nvidia/gliner-PII through SCT's own GLiNER backend (gliner_model override, ner_mode='pii').
+# CUDA 12 (Linux x86_64, Python 3.12): torch 2.14.1+cu126 as a direct wheel from the PyTorch cu126 index (2.14.1 is
+# the newest release built for cu126; 2.15.0 has no cu126 build). Its nvidia-* CUDA 12 runtime wheels come from PyPI.
+SqueakyCleanText[gliner]==0.8.2
+torch @ https://download-r2.pytorch.org/whl/cu126/torch-2.14.1%2Bcu126-cp312-cp312-manylinux_2_28_x86_64.whl

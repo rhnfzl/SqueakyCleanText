@@ -58,6 +58,17 @@ def check(doc: dict, result: dict) -> dict:
     return out
 
 
+def cap_gpu(config: dict) -> None:
+    """PROTOCOL section 16: cap a torch entry's share of the card at ``gpu_mem_gb`` (runner key) on cuda."""
+    if config.get("device") != "cuda" or not config.get("gpu_mem_gb"):
+        return
+    import torch
+
+    if torch.cuda.is_available():
+        total = torch.cuda.get_device_properties(0).total_memory
+        torch.cuda.set_per_process_memory_fraction(min(1.0, float(config["gpu_mem_gb"]) * 2**30 / total))
+
+
 def _sync() -> None:
     """Wait for queued GPU work so timings are real (only when the tool already imported torch)."""
     torch = sys.modules.get("torch")

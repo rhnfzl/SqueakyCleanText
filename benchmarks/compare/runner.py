@@ -25,14 +25,14 @@ from pathlib import Path
 
 from benchmarks.compare import entries as registry
 from benchmarks.compare import scorer, split
-from benchmarks.datasets import get
-from benchmarks.labels import DATASET_LABELS
+from benchmarks.datasets import ROUND2, get
+from benchmarks.labels import DATASET_LABELS, unknown_gold_labels
 from benchmarks.speed import environment
 
 HERE = Path(__file__).resolve().parent
 ADAPTERS = HERE / "adapters"
 CACHE = HERE.parent / ".cache" / "compare"
-DOC_TIMEOUT = {"tab": 600.0}  # PROTOCOL.md section 15; others use --doc-timeout
+DOC_TIMEOUT = {"tab": 600.0, "redactionbench": 600.0}  # PROTOCOL.md section 15; others use --doc-timeout
 THREAD_VARS = ("OMP_NUM_THREADS", "MKL_NUM_THREADS", "OPENBLAS_NUM_THREADS", "NUMEXPR_NUM_THREADS")
 POLL_SECONDS = 0.05
 MAX_FAILED_STREAK = 3  # docs in a row failing with no output at all: the adapter cannot start
@@ -51,8 +51,25 @@ OFFSET_FIXTURES = {
 }
 
 
+# A GPU build that ships the same import package as a CPU twin some dependency pulls in (SCT depends on
+# onnxruntime). Both would write the same module, and the last one installed wins, so after the install the
+# builder removes the CPU twin and reinstalls the pinned GPU build (no deps) when the spec pins it.
+GPU_TWINS = {"onnxruntime-gpu": "onnxruntime"}
+
+
+def gpu_twin_fixes(requirements_text: str) -> list[tuple[str, str]]:
+    """(CPU package to uninstall, pinned GPU requirement to reinstall) for each GPU_TWINS build the spec pins."""
+    lines = [line.strip() for line in requirements_text.splitlines() if line.strip() and not line.startswith("#")]
+    return [(cpu, line) for gpu, cpu in GPU_TWINS.items() for line in lines
+            if line.split("==")[0].split("[")[0].strip().lower() == gpu]
+
+
 def ensure_env(name: str, requirements: Path | None, envs_root: Path, python: str = registry.PYTHON) -> Path:
-    """Python of the entry's venv, built with uv when missing or when its spec changed."""
+    """Python of the entry's venv, built with uv when missing or when its spec changed.
+
+    CUDA builds come from the spec itself: torch as a direct cu126 wheel URL (``envs/*.txt``), onnxruntime-gpu
+    from PyPI (CUDA 12), with ``GPU_TWINS`` resolved after the install.
+    """
     if requirements is None:
         return Path(sys.executable)
     venv = envs_root / name
@@ -66,11 +83,25 @@ def ensure_env(name: str, requirements: Path | None, envs_root: Path, python: st
         raise RuntimeError("uv is needed to build entry venvs")
     subprocess.run([uv, "venv", "--clear", "--python", python, str(venv)], check=True)  # noqa: S603
     subprocess.run([uv, "pip", "install", "--python", str(py), "-r", str(requirements)], check=True)  # noqa: S603
+    for cpu, gpu in gpu_twin_fixes(requirements.read_text()):
+        subprocess.run([uv, "pip", "uninstall", "--python", str(py), cpu], check=True)  # noqa: S603
+        subprocess.run([uv, "pip", "install", "--python", str(py), "--reinstall", "--no-deps", gpu],  # noqa: S603
+                       check=True)
     freeze = subprocess.run([uv, "pip", "freeze", "--python", str(py)], check=True,  # noqa: S603
                             capture_output=True, text=True).stdout
     (venv / "freeze.txt").write_text(freeze)
     stamp.write_text(digest)
     return py
+
+
+def shared_view(datasets, tools: dict) -> tuple:
+    """Types every comparison entry of the round supports (a run of test entries only: those entries)."""
+    if set(datasets) & set(ROUND2) and set(datasets) - set(ROUND2):
+        raise ValueError("a run mixes round-1 and round-2 datasets; run each round on its own (shared view per round)")
+    pool = registry.ENTRIES if set(datasets) & set(ROUND2) else {
+        k: v for k, v in registry.ENTRIES.items() if k not in registry.ROUND2_ENTRIES}
+    compared = list(pool.values()) if set(tools) - set(registry.TEST_ENTRIES) else list(tools.values())
+    return scorer.shared_types(compared, registry.SCT_TYPES)
 
 
 def freeze(py: Path) -> str:
@@ -381,10 +412,10 @@ def main(argv=None) -> None:
             raise SystemExit(f"entry {name!r} has no adapter yet")
     gpu = None if args.device == "cpu" else (args.gpu or pick_gpu(args.gpu_mem_gb + 1))
     env = child_env(args.threads, args.device, gpu, args.hf_hub_cache)
-    # The shared view is the types every comparison entry supports, whichever entries this run scores, so a
-    # partial run (SCT alone with --no-recover) has the same shared view as the full one.
-    compared = list(registry.ENTRIES.values()) if set(tools) - set(registry.TEST_ENTRIES) else list(tools.values())
-    shared = scorer.shared_types(compared, registry.SCT_TYPES)
+    # The shared view is the types every comparison entry of the round supports, whichever entries this run
+    # scores, so a partial run (SCT alone with --no-recover) has the same shared view as the full one. A run
+    # on round-1 datasets only keeps round 1's eight entries, so round-1 scores do not move with round 2.
+    shared = shared_view(args.datasets, tools)
     run_info = {"command": " ".join(["python -m benchmarks.compare.runner", *(argv or sys.argv[1:])]),
                 "part": args.part, "track": args.track,
                 "tuned": str(args.tuned) if args.tuned else None, "n_per_language": args.n, "seed": args.seed,
@@ -418,6 +449,10 @@ def main(argv=None) -> None:
             module = get(dataset)
             if dataset not in records_by_dataset:
                 records_by_dataset[dataset] = split.load(dataset, args.part, args.n, args.seed)
+                unknown = unknown_gold_labels(dataset, records_by_dataset[dataset])
+                if unknown:  # label names and counts only
+                    raise SystemExit(f"{dataset}: gold labels neither mapped nor out of scope: {unknown}; add each to "
+                                     "labels.DATASET_LABELS or labels.DATASET_OUT_OF_SCOPE")
             records = records_by_dataset[dataset]
             raw = args.cache / name / f"{dataset}-{args.part}.jsonl"
             stamp = raw.with_suffix(".key")
@@ -442,6 +477,11 @@ def main(argv=None) -> None:
                                             curve_by_filter=t.get("curve_by_filter", True),
                                             recover=t.get("recover_dropped", False) and not args.no_recover)
             per_doc[name][dataset] = docs
+            if getattr(module, "DELETE_PREDICTIONS", False):  # licence (SHORTLIST section 3): no prediction cache kept
+                raw.unlink(missing_ok=True)
+                stamp.unlink(missing_ok=True)
+                shutil.rmtree(args.cache / name / f"{dataset}-{args.part}", ignore_errors=True)
+                process_info = {**process_info, "predictions_deleted": True}
             ids = sorted(r["id"] for r in records)
             result.update(meta, dataset={"name": dataset, "source": module.HF_ID, "revision": module.REVISION,
                                          "licence": module.LICENCE, "publish": module.PUBLISH},

@@ -13,10 +13,11 @@ Config (tuned-track knobs per PROTOCOL section 3 in caps):
   THRESHOLD ``threshold`` (default 0.5; the card's own eval used 0.3);
   PROMPT LIST ``labels``: ``common`` (GLINER_PROMPTS, default) or ``card`` (Nemotron-PII names);
   runtime only: ``device`` (cpu|cuda), ``dtype`` (default fp16 on cuda for the 6 GB GPU cap,
-  fp32 on cpu), ``threads``, ``revision``.
+  fp32 on cpu), ``threads``, ``revision``, ``gpu_mem_gb`` (torch memory cap on cuda),
+  ``model`` (another GLiNER checkpoint: ``gliner_knowledgator_adapter.py`` runs this loader).
 """
 
-from _protocol import serve
+from _protocol import cap_gpu, serve
 
 MODEL = "nvidia/gliner-PII"
 REVISION = "bd23e8ef4425fd04e34c5204ab49ffaa706eae79"
@@ -38,8 +39,10 @@ def load(config: dict):
     device = config.get("device") or "cpu"
     if config.get("threads"):
         torch.set_num_threads(int(config["threads"]))
+    cap_gpu(config)
     dtype = config.get("dtype") or ("float16" if device == "cuda" else "float32")
-    model = GLiNER.from_pretrained(MODEL, revision=config.get("revision", REVISION), map_location=device,
+    model = GLiNER.from_pretrained(config.get("model", MODEL), revision=config.get("revision", REVISION),
+                                   map_location=device,
                                    dtype=dtype)
     model.to(device)
     labels = {"common": COMMON, "card": CARD}[config.get("labels", "common")]
