@@ -6,6 +6,9 @@ from bisect import bisect_right
 from sct.sct import TextCleaner
 from sct.utils import constants, contact
 
+# The identifier number rule reads one space past its match for a currency or unit ("€ 123 45", "1234 %"),
+# so a split there would let the half without it mask an amount.
+_NUMBER_UNIT_CONTEXT = re.compile(rf"[{constants.CURRENCY_SIGNS}] (?=\d)|\d (?=[%‰{constants.CURRENCY_SIGNS}])")
 # A digit run at the end of the buffer may be a phone the next feed completes ("06 12 34").
 _PHONE_TAIL = re.compile(r"[+(]?\d[\d ()+./-]*\Z")
 # Longer than any phone the regex accepts; a longer digit tail (a number table) may still split.
@@ -106,7 +109,8 @@ class WindowedStreamingRedactor:
         if cfg.check_replace_iban_cards:  # "NL91 ABNA 0417 1643 00"
             views += [constants.IBAN_REGEX, constants.CARD_REGEX]
         if cfg.check_replace_numbers:  # a grouped number ("5 379") is one token too
-            views += [contact.numbers_regex(cfg.replace_numbers_in_words), cleaner._numbers_regex]  # "123 45"
+            views += [contact.numbers_regex(cfg.replace_numbers_in_words), cleaner._numbers_regex,  # "123 45"
+                      _NUMBER_UNIT_CONTEXT]  # the amount lookarounds read one space past a match: "€ 123 45"
         # (start, end) of view text a split must not cut: start < split < end
         protected = [
             match.span()

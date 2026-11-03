@@ -22,6 +22,25 @@ def _rule(pattern, replacement, enabled: bool) -> dict[str, Any]:
     }
 
 
+_JS_WORD = r"\p{L}\p{N}_"  # Python's Unicode \w; JavaScript's \w is ASCII even with the "u" flag
+
+
+def _unicode_word(pattern: str) -> str:
+    """Rewrite each \\w of a Python pattern as an explicit Unicode class, so "é" stays a word character in JS."""
+    out, in_class, i = [], False, 0
+    while i < len(pattern):
+        part = pattern[i:i + 2 if pattern[i] == "\\" else i + 1]
+        if part == r"\w":
+            part = _JS_WORD if in_class else f"[{_JS_WORD}]"
+        elif part == "[" and not in_class:
+            in_class = True
+        elif part == "]" and in_class:
+            in_class = False
+        out.append(part)
+        i += 2 if pattern[i] == "\\" else 1
+    return "".join(out)
+
+
 def build_browser_manifest(config: TextCleanerConfig) -> dict[str, Any]:
     """Describe portable rules and pinned ONNX assets for a browser client."""
     if config.ner_backend != "onnx":
@@ -150,7 +169,9 @@ def build_browser_manifest(config: TextCleanerConfig) -> dict[str, Any]:
                 number_regex,
                 config.replace_with_numbers,
                 config.check_replace_numbers,
-            ), **({"fold_decimal_digits": True} if config.replace_numbers_mode == "identifiers" else {})},
+            ), **({"fold_decimal_digits": True,
+                   "pattern": _unicode_word(number_regex.pattern)}
+                  if config.replace_numbers_mode == "identifiers" else {})},
             "currency": _rule(
                 constants.CURRENCY_REGEX,
                 config.replace_with_currency_symbols,

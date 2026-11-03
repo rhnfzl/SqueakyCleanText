@@ -5,7 +5,7 @@ import warnings
 import pytest
 
 from sct import TextCleaner, TextCleanerConfig
-from sct.browser import build_browser_manifest
+from sct.browser import _unicode_word, build_browser_manifest
 from sct.utils import constants, contact
 
 
@@ -170,8 +170,9 @@ def test_config_validation_and_legacy_globals(monkeypatch):
 
 def test_browser_number_rule_follows_mode():
     rule = build_browser_manifest(TextCleanerConfig())["rules"]["number"]
-    assert rule["pattern"] == constants.identifier_numbers_regex(
-        4, letter_prefix=True, two_part=True, spaced_pair=True).pattern and rule["fold_decimal_digits"]
+    assert rule["pattern"] == _unicode_word(constants.identifier_numbers_regex(
+        4, letter_prefix=True, two_part=True, spaced_pair=True).pattern) and rule["fold_decimal_digits"]
+    assert r"\w" not in rule["pattern"]
     old = build_browser_manifest(TextCleanerConfig(replace_numbers_mode="all"))["rules"]["number"]
     assert old["pattern"] == constants.NUMBERS_REGEX.pattern and "fold_decimal_digits" not in old
 
@@ -242,3 +243,40 @@ def test_id_shape_legacy_globals(monkeypatch):
         monkeypatch.setattr(config, name, False)
     cfg = config._config_from_module_globals()
     assert (cfg.numbers_letter_prefix_ids, cfg.numbers_two_part_ids, cfg.numbers_spaced_pair_ids) == (False,) * 3
+
+
+@pytest.mark.parametrize("text", ["123 45 678", "123 45-6789", "123 45\u20116789"])
+def test_spaced_pair_skips_longer_digit_runs(text):
+    regex = constants.identifier_numbers_regex(4, letter_prefix=True, two_part=True, spaced_pair=True)
+    assert regex.search(text) is None
+
+
+def test_streaming_split_keeps_currency_context_of_amount():
+    from sct.streaming import WindowedStreamingRedactor
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        cleaner = TextCleaner(cfg=TextCleanerConfig(
+            check_ner_process=False, check_detect_language=False, check_statistical_model_processing=False,
+            check_replace_phone_numbers=False, check_replace_dates=False, check_replace_years=False,
+            check_replace_currency_symbols=False))
+    text = "word " * 6 + "\u20ac 123 45 " + "tail " * 8
+    expected = cleaner.process(text).lm_text
+    assert "\u20ac 123 45" in expected
+    stream = WindowedStreamingRedactor(cleaner, max_buffer_chars=27, overlap_chars=12)
+    assert "".join(stream.feed(ch) for ch in text) + stream.finish() == expected
+
+
+def test_browser_number_rule_matches_python_next_to_non_ascii_letters():
+    import json
+    import shutil
+    import subprocess
+    node = shutil.which("node")
+    if not node:
+        pytest.skip("node not installed")
+    rule = build_browser_manifest(TextCleanerConfig())["rules"]["number"]
+    texts = ["\u00e9AB1234567", "AB1234567\u00e9", "\u00fc123 45", "\u041612345678", "x 123456 y", "zip 123 45 ok"]
+    script = ("const [p, f, t] = JSON.parse(process.argv[1]); const r = new RegExp(p, f + 'g');"
+              "console.log(JSON.stringify(t.map(s => s.replace(r, '<N>'))))")
+    argv = [node, "-e", script, json.dumps([rule["pattern"], rule["flags"], texts])]
+    out = subprocess.run(argv, capture_output=True, text=True, check=True).stdout  # noqa: S603 (fixed argv)
+    assert json.loads(out) == [contact.config_numbers_regex(TextCleanerConfig()).sub("<N>", t) for t in texts]
