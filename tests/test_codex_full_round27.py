@@ -17,7 +17,7 @@ def _cleaner(mode="placeholder", **kw):
 
 def _stream_safe(cleaner, text, secret):
     for pad in range(0, 30):
-        stream = WindowedStreamingRedactor(cleaner, max_buffer_chars=40, overlap_chars=16)
+        stream = WindowedStreamingRedactor(cleaner, max_buffer_chars=80, overlap_chars=16)  # holds the URL
         out = stream.feed("x " * pad + text) + stream.finish()
         assert secret not in out, (pad, out)
 
