@@ -336,6 +336,22 @@ def test_speed_mode_reports_cold_start_latency_throughput_and_rss(tmp_path):
     assert summary["common_batch_docs_per_second"]["median"] > 0 and len(summary["other_batch"]) == 2
 
 
+def test_speed_mode_records_a_batch_size_that_raises(tmp_path):
+    from benchmarks.compare import speed
+
+    run = speed.measure(dummy_cmd({"raise_batch": 8}), docs(30), tmp_path, runner.child_env(), batch_size=4, timeout=60,
+                        poll_vram=False)
+    assert "error" not in run and run["latency"]["docs"] == 30 and "done" in run
+    by_size = {t["batch_size"]: t for t in run["throughput"]}
+    assert by_size[4]["docs_per_second"] > 0 and by_size[8]["error"] == "RuntimeError: dummy batch too large"
+    summary = speed.summarise([run])
+    assert summary["common_batch_docs_per_second"] is None and summary["latency_median_ms"] is not None
+    assert summary["common_batch_errors"] == ["RuntimeError: dummy batch too large"]
+    crashed = speed.measure([sys.executable, "-c", "import sys; sys.exit('adapter could not start')"], docs(2), tmp_path,
+                            runner.child_env(), batch_size=1, timeout=60, poll_vram=False)
+    assert crashed["error"] == "crash: exit 1: adapter could not start"
+
+
 def _adapter_module(name):
     import importlib.util
 

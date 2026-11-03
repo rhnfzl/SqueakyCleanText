@@ -440,6 +440,9 @@ core), 754 GB RAM, 4x RTX 4090 shared with a vLLM server (16.5-19 GB in use per 
   PID, `speed.vram_mb`; torch's own peak when nvidia-smi has none). `report.py` shows it in the speed table and as
   the "GPU: device, docs/s, peak VRAM" column of the headline table. Torch entries cap themselves at
   `gpu_mem_gb` with `torch.cuda.set_per_process_memory_fraction` (`_protocol.cap_gpu`).
+- A throughput batch size that raises (CUDA OOM under the cap at batch 8 for the DeBERTa GLiNER entries in the
+  smoke run) is recorded on its line and in `common_batch_errors`; latency, cold start and VRAM stay. A crashed
+  adapter's last stderr line goes into the speed error; its full stderr stays in the cache (`speed-err.log`).
 
 ## 17. Model-dataset contamination matrix (rule 2)
 

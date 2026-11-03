@@ -68,12 +68,13 @@ def measure(cmd: list[str], docs: list[dict], work: Path, env: dict, batch_size:
             poll_vram: bool) -> dict:
     """One fresh adapter process in speed mode; returns its timing lines plus cold start and VRAM peak."""
     work.mkdir(parents=True, exist_ok=True)
-    inp, out = work / "speed-in.jsonl", work / "speed-out.jsonl"
+    inp, out, err = work / "speed-in.jsonl", work / "speed-out.jsonl", work / "speed-err.log"
     inp.write_text("".join(json.dumps(d, ensure_ascii=False) + "\n" for d in docs), encoding="utf-8")
     out.write_bytes(b"")
     started = time.perf_counter()
-    proc = subprocess.Popen([*cmd, "--input", str(inp), "--output", str(out), "--speed", "--batch-size", str(batch_size)],  # noqa: S603
-                            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, env=env)
+    with err.open("w") as errf:  # the adapter's stderr stays in the cache (it may quote doc text): only the last line is kept
+        proc = subprocess.Popen([*cmd, "--input", str(inp), "--output", str(out), "--speed",  # noqa: S603
+                                 "--batch-size", str(batch_size)], stdout=subprocess.DEVNULL, stderr=errf, env=env)
     peak = {"vram_mb": None}
     stop = threading.Event()
 
@@ -118,7 +119,8 @@ def measure(cmd: list[str], docs: list[dict], work: Path, env: dict, batch_size:
         stop.set()
         inp.unlink(missing_ok=True)
     if proc.returncode not in (0, None) and "error" not in result:
-        result["error"] = f"crash: exit {proc.returncode}"
+        last = [line for line in err.read_text(errors="replace").splitlines() if line.strip()][-1:]
+        result["error"] = f"crash: exit {proc.returncode}" + (f": {last[0].strip()[:300]}" if last else "")
     result["peak_vram_mb_nvidia_smi"] = peak["vram_mb"]
     return result
 
@@ -145,6 +147,7 @@ def summarise(runs: list[dict]) -> dict:
         "common_batch_docs_per_second": _spread([t.get("docs_per_second") for t in common]),
         "common_batch_chars_per_second": _spread([t.get("chars_per_second") for t in common]),
         "other_batch": [t for r in ok for t in r.get("throughput", []) if not t["common"]],
+        "common_batch_errors": [t["error"] for t in common if "error" in t],
         "peak_rss_mb": _spread([r["peak_rss_mb_proc"] for r in ok]),
         "peak_rss_mb_getrusage": _spread([r["done"]["peak_rss_mb"] for r in ok]),
         "peak_vram_mb": _spread([r["peak_vram_mb_nvidia_smi"] for r in ok]),
