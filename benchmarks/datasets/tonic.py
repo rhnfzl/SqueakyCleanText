@@ -21,7 +21,8 @@ WORKSPACES = ("daniel_lincoln_financial_group", "isabella_chipotle", "megan_dono
 def row_record(workspace: str, kind: str, index: int, row: dict) -> dict:
     meta = row.get("meta") or {}
     unit = meta.get("filename") if kind == "doc" else meta.get("thread_ts") or meta.get("row_id")
-    spans = [{"start": s["start"], "end": s["end"], "label": s["label"]} for s in row["ground_truth_spans"]]
+    spans = [{"start": s["start"], "end": s["end"], "label": s["label"], "form": s.get("text")}
+             for s in row["ground_truth_spans"]]
     return {"id": f"{workspace}:{kind}:{index}", "lang": "en", "text": row["text"],
             "group": f"{workspace}:{kind}:{unit if unit is not None else index}",
             "spans": valid_spans(row["text"], spans)}

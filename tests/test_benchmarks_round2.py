@@ -121,6 +121,8 @@ def test_tonic_groups_pages_of_a_document_and_slack_threads():
     msg = {"meta": {"row_id": "1.2", "thread_ts": "1.0"}, "text": "hi", "ground_truth_spans": []}
     assert row_record("w", "doc", 5, page)["group"] == "w:doc:a.docx"
     assert row_record("w", "msg", 0, msg)["group"] == "w:msg:1.0"
+    with pytest.raises(ValueError, match="surface form"):  # the span's own text pins the offset convention
+        row_record("w", "doc", 0, {**page, "ground_truth_spans": [{**span(0, 3, "NAME_GIVEN"), "text": "An"}]})
 
 
 def test_greek_survive_probes_and_untyped_gold_scoring():
