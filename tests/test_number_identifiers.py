@@ -356,9 +356,11 @@ def test_streaming_guard_is_linear_on_a_long_digit_run():
 
 
 def test_streaming_guard_lets_a_long_number_table_split():
-    # A run longer than SPACED_ID_MAX_GROUPS groups is never one ID, so the guard may split it where both halves
-    # keep more groups than that (was a BufferError: every space of the table was protected).
+    # A run masked whole may split where both halves keep more than THOUSANDS_MAX_GROUPS groups: each half is then
+    # masked whole too (was a BufferError: every space of the table was protected). Known limit: such a run comes
+    # out as several <NUMBER> tokens instead of one.
     import random
+    import re
 
     from sct.streaming import _DIGIT_GROUP_HEAD, _DIGIT_GROUP_TAIL, WindowedStreamingRedactor
     run = " ".join(map(str, range(1, 16)))  # 15 groups: the splits after group 7 and 8 are free
@@ -376,13 +378,19 @@ def test_streaming_guard_lets_a_long_number_table_split():
                 check_replace_currency_symbols=False, **overrides))
         expected = cleaner.process(text).lm_text
         stream = WindowedStreamingRedactor(cleaner, max_buffer_chars=512, overlap_chars=64)
-        assert "".join(stream.feed(text[i:i + 97]) for i in range(0, len(text), 97)) + stream.finish() == expected
+        out = "".join(stream.feed(text[i:i + 97]) for i in range(0, len(text), 97)) + stream.finish()
+        collapse = re.compile(r"<NUMBER>(?: <NUMBER>)+")
+        assert collapse.sub("<NUMBER>", out) == collapse.sub("<NUMBER>", expected)
 
 
-def test_spaced_id_run_is_bounded():
-    regex = constants.identifier_numbers_regex(4, spaced_pair=True)
-    assert regex.fullmatch("12 34 56 78 90 12")  # 6 groups: one ID
-    assert not any(" " in m.group() for m in regex.finditer("12 34 56 78 90 12 34"))  # 7: a table
+@pytest.mark.parametrize("text", ["12 34 56 78 90 12", "12 34 56 78 90 12 34", "12 34 56 78 90 12 34 56 78 90 12"])
+def test_long_spaced_id_run_masked_whole(text):
+    # Group count alone cannot tell a number table from an ID: a 7+ group run is one <NUMBER> too.
+    for keep in (True, False):
+        assert _clean(f"national ID {text} ok", **_NO_STEPS, check_replace_iban_cards=False,
+                      numbers_keep_currency_code_amounts=keep) == "national ID <NUMBER> ok"
+    assert _clean("total 1 234 567 890 123 456 x", **_NO_STEPS) == "total 1 234 567 890 123 456 x"  # an amount
+    assert _clean("ID 1 234 567 890 123 456 789 x", **_NO_STEPS) == "ID <NUMBER> x"  # past THOUSANDS_MAX_GROUPS
 
 
 @pytest.mark.parametrize("text, years_on, years_off", [
@@ -399,13 +407,45 @@ def test_spaced_date_is_never_half_masked(text, years_on, years_off):
 
 @pytest.mark.parametrize("text", [
     "pay 1250 EUR now", "pay EUR 1250 now", "pay 1250000 EUR", "EUR 12345678 due",
-    "fee GBP 123 45 678 x",  # a 4+ digit last group is still a digit run of its own, as beside "€"
-    "fee 123-45-6789 CHF x", "paid 123456/7890 USD", "EUR 12345.67890",
     "รวม ١٢٥٠٠ EUR", "कुल EUR ४५६७८९",  # other digit scripts
 ])
 def test_currency_code_amounts_kept(text):
     assert _clean(text, **_NO_STEPS) == text
     assert "<NUMBER>" in _clean(text, **_NO_STEPS, numbers_keep_currency_code_amounts=False)
+
+
+@pytest.mark.parametrize("text, expected", [
+    # Only a whole digit run is an amount beside a code; an ID shape is masked whole, never in part.
+    ("SSN 123-45-6789 USD", "SSN <NUMBER> USD"), ("USD 123-45-6789 x", "USD <NUMBER> x"),
+    ("paid 123456/7890 USD", "paid <NUMBER> USD"), ("EUR 12345.67890 x", "EUR <NUMBER> x"),
+    ("fee GBP 123 45 678 x", "fee GBP <NUMBER> x"),
+    ("pay EUR 123 45 6789 now", "pay EUR <NUMBER> now"), ("pay 6789 45 123 EUR now", "pay <NUMBER> EUR now"),
+])
+def test_currency_code_does_not_hide_id_shapes(text, expected):
+    for keep in (True, False):
+        assert _clean(text, **_NO_STEPS, numbers_keep_currency_code_amounts=keep) == expected
+
+
+def test_streaming_matches_whole_document_for_coded_and_long_runs():
+    from sct.streaming import WindowedStreamingRedactor
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        cleaner = TextCleaner(cfg=TextCleanerConfig(
+            check_ner_process=False, check_detect_language=False, check_statistical_model_processing=False,
+            check_replace_currency_symbols=False))
+    for text in ("EUR 12 2023 2023 45 123 123 tail tail tail", "\u20ac 12 2023 2023 45 123 123 tail tail tail",
+                 "national ID 12 34 56 78 90 12 34 tail tail tail"):  # up to 13 groups never split
+        expected = cleaner.process(text).lm_text
+        done = 0
+        for size in range(24, 64):
+            stream = WindowedStreamingRedactor(cleaner, max_buffer_chars=size, overlap_chars=12)
+            try:  # a buffer too small for the run raises; it never splits the run
+                out = "".join(stream.feed(ch) for ch in text) + stream.finish()
+            except BufferError:
+                continue
+            assert out == expected, size
+            done += 1
+        assert done
 
 
 @pytest.mark.parametrize("text, expected", [

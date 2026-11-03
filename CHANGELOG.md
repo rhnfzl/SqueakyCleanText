@@ -16,7 +16,8 @@ Each pattern gets a time limit (`custom_patterns_timeout`, 2 s per document), so
 
 **Fixes.** An ID whose last group looks like a year (`123-45 2020`) is now masked whole instead of only
 the year, and a very long digit run no longer slows the streaming redactor. A number next to a currency code
-(`1250 EUR`, `EUR 1250`) is kept as an amount, and long number tables stream again.
+(`1250 EUR`, `EUR 1250`) is kept as an amount, but an ID shape next to one (`123-45-6789 USD`) is still masked,
+and long number tables stream again; a spaced ID of any length is masked whole.
 
 Heads-up: output text changes for numbers and some phones. `replace_numbers_mode='all'` and
 `phone_reject_embedded=False` restore 0.8.1.
@@ -73,15 +74,23 @@ Heads-up: output text changes for numbers and some phones. `replace_numbers_mode
 - The streaming split guard for digit-group runs no longer restarts inside a long digit run: 32,000 digits
   with no separator took ~5 s per buffer, now about 1 ms.
 - New `numbers_keep_currency_code_amounts` (default `True`, legacy global `NUMBERS_KEEP_CURRENCY_CODE_AMOUNTS`):
-  in `'identifiers'` mode a number right before or after an uppercase ISO 4217 code, with at most one space
-  (`1250 EUR`, `EUR 1250`, `USD 1,250`), is an amount and stays, for every ID shape but the letter-prefix one.
+  in `'identifiers'` mode a whole digit run right before or after an uppercase ISO 4217 code, with at most one
+  space (`1250 EUR`, `EUR 1250`, `USD 1,250`), is an amount and stays. Only that amount shape: an SSN-like,
+  slash-, dot- or space-joined ID beside a code (`SSN 123-45-6789 USD`, `123456/7890 EUR`, `EUR 123 45 6789`,
+  `6789 45 123 EUR`) is masked whole, never in part (an earlier build of this release kept the first two and
+  masked only one group of the last two).
   It reuses the code set that keeps `USD1000000` out of letter-prefix IDs; `eur` and `EURO` do not count. The
   IBAN and card steps still mask `EUR NL91ABNA0417164300` and `USD 4111 1111 1111 1111`. Browser export and the
   streaming guard follow it. `False` masks these numbers as before.
-- A spaced/hyphen-joined ID run has at most 6 groups; a longer run is a number table, judged group by group
-  (before, any run with 7+ digits was one `<NUMBER>`). The streaming guard now protects only what can form one
-  ID, read after the date, IBAN/card, phone and year steps, so a 10,000-number table splits instead of raising
-  `BufferError`. A table with a currency code or year every few numbers may still need a larger buffer.
+- A spaced/hyphen-joined run of any length with 7+ digits stays one `<NUMBER>` (`national ID 12 34 56 78 90 12
+  34`; an earlier build of this release capped runs at 6 groups and left a 7-group ID visible). Thousands
+  grouping keeps an amount only up to 6 groups (`1 234 567 890 123 456`). The streaming guard reads runs after
+  the date, IBAN/card and phone steps; a run masked whole may split where both halves keep 7+ groups, so a
+  10,000-number table streams instead of raising `BufferError`, and comes out as several `<NUMBER>` tokens
+  where the whole document gives one. A run of up to 13 groups never splits; a run the rule does not mask whole
+  (beside a currency sign) is never split, so a buffer too small for it raises `BufferError`. Years no longer
+  end a run in the guard: an earlier build split `EUR 12 2023 2023 45 123 123` after `12` and masked differently
+  from the whole document.
 - A date written with spaces (`05 11 2023`) is handled as before this release: the date step has no spaced
   shape, so with years on its year is `<YEAR>`; with years off the whole run is one `<NUMBER>` (an earlier
   build of this release masked only `2023`).
