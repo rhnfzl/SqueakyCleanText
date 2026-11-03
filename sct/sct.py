@@ -1062,16 +1062,19 @@ class TextCleaner:
         return self._date_view.sub(lambda m: self._emit('DATE', m.group(), self.cfg.replace_with_dates), text)
 
     def _replace_years(self, text):
-        reversible = self._replace_reversible(
-            text,
-            constants.YEAR_REGEX,
-            'YEAR',
-        )
+        view = constants.YEAR_REGEX
+        if self.cfg.check_replace_numbers and self.cfg.replace_numbers_mode == 'identifiers':
+            # A year-like group of a multi-group ID ("123-45 2020") is left to the numbers step, which masks the
+            # whole run; masking the year alone would leave "123-45" visible. A run of years ("1999 2000 2001")
+            # stays years.
+            runs = [m.span() for m in self._numbers_regex.finditer(text) if not m.group().isdecimal()
+                    and not all(map(constants.YEAR_REGEX.fullmatch, re.split(r"\D+", m.group())))]
+            if runs:
+                view = contact.RejectView(view, lambda _, start, end: any(a <= start and end <= b for a, b in runs))
+        reversible = self._replace_reversible(text, view, 'YEAR')
         if reversible is not None:
             return reversible
-        return self.ProcessDateTime.replace_years(
-            text, replace_with=lambda m: self._emit('YEAR', m.group(), self.cfg.replace_with_years),
-        )
+        return view.sub(lambda m: self._emit('YEAR', m.group(), self.cfg.replace_with_years), text)
 
     def _replace_phone_numbers(self, text):
         phone_view = contact.PHONE_VIEW if self.cfg.fold_styled_characters else contact.PHONE_DIGIT_VIEW

@@ -330,3 +330,22 @@ def test_browser_number_rule_matches_python_next_to_non_ascii_letters():
     argv = [node, "-e", script, json.dumps([rule["pattern"], rule["flags"], texts])]
     out = subprocess.run(argv, capture_output=True, text=True, check=True).stdout  # noqa: S603 (fixed argv)
     assert json.loads(out) == [contact.config_numbers_regex(TextCleanerConfig()).sub("<N>", t) for t in texts]
+
+
+@pytest.mark.parametrize("text", ["ID 123-45 2020 here", "ID 123 45-2020 here", "ID 123-45-2020 here"])
+def test_year_group_of_an_id_run_masked_with_the_run(text):
+    # default steps: the year step runs first and must not split the run, leaving "123-45" visible
+    out = _clean(text)
+    assert out == "ID <NUMBER> here"
+    assert _clean("born in 2020 here") == "born in <YEAR> here"  # a lone year stays a year
+    assert _clean("In 1999 2000 2001 ok") == "In <YEAR> <YEAR> <YEAR> ok"  # so does a run of years
+
+
+def test_streaming_guard_is_linear_on_a_long_digit_run():
+    import time
+
+    from sct.streaming import _DIGIT_GROUP_RUN
+    start = time.perf_counter()
+    assert _DIGIT_GROUP_RUN.search("1" * 32000 + "!") is None  # was ~5 s (quadratic restarts inside the run)
+    assert time.perf_counter() - start < 0.5
+    assert _DIGIT_GROUP_RUN.search("x 123 45-6789 y").group() == "123 45-6789"

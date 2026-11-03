@@ -14,6 +14,9 @@ on the GPU, about 1.6x faster `process_batch` on an M4 Max with the same output.
 (`custom_allow_terms`) and your own labelled regex (`custom_patterns`). SCT still ships no list of its own.
 Each pattern gets a time limit (`custom_patterns_timeout`, 2 s per document), so a bad regex cannot hang a run.
 
+**Fixes.** An ID whose last group looks like a year (`123-45 2020`) is now masked whole instead of only
+the year, and a very long digit run no longer slows the streaming redactor.
+
 Heads-up: output text changes for numbers and some phones. `replace_numbers_mode='all'` and
 `phone_reject_embedded=False` restore 0.8.1.
 
@@ -62,6 +65,13 @@ Heads-up: output text changes for numbers and some phones. `replace_numbers_mode
   phone recall 0.965 -> 0.990 (0.8.1: 0.997); most lost phones were `12345-678901`-shaped and come back as
   `<NUMBER>`. `1234/5678` is now one `<NUMBER>`; a range like `12345-67890` cannot be told from an ID and is
   masked. The streaming redactors keep `123 45` and any space/hyphen-joined digit run in one window.
+- With `replace_numbers_mode='identifiers'` the year step leaves a year-like group of a multi-group ID run
+  (`123-45 2020`, `123-45-2020`) to the numbers step, which masks the whole run; before, the year was masked
+  alone and `123-45` stayed visible. A lone year (`born in 2020`) and a run of years (`1999 2000 2001`) are still
+  `<YEAR>`. The browser export keeps the old order (listed in its
+  limitations).
+- The streaming split guard for digit-group runs no longer restarts inside a long digit run: 32,000 digits
+  with no separator took ~5 s per buffer, now about 1 ms.
 
 ### User term lists
 

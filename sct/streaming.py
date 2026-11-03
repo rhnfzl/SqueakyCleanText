@@ -11,7 +11,8 @@ from sct.utils import constants, contact
 _NUMBER_UNIT_CONTEXT = re.compile(rf"[{constants.CURRENCY_SIGNS}] (?=\d)|\d (?=[%‰{constants.CURRENCY_SIGNS}])")
 # Digit groups joined by single spaces or hyphens ("123 45-6789 12%"): the identifier rule reads the whole run,
 # so a split inside it could mask a part the whole document keeps (or keep a part it masks).
-_DIGIT_GROUP_RUN = re.compile(r"\d+(?:[ \-\u2010\u2011]\d+){2,}")
+# (?<!\d): a search must not restart inside a long digit run, which made it quadratic ("1" * 16000).
+_DIGIT_GROUP_RUN = re.compile(r"(?<!\d)\d+(?:[ \-\u2010\u2011]\d+){2,}")
 # A digit run at the end of the buffer may be a phone the next feed completes ("06 12 34").
 _PHONE_TAIL = re.compile(r"[+(]?\d[\d ()+./-]*\Z")
 # Longer than any phone the regex accepts; a longer digit tail (a number table) may still split.
