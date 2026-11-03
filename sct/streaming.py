@@ -50,28 +50,48 @@ class BufferedStreamingRedactor:
         return self._cleaner.process("".join(self._chunks)).lm_text
 
 
-def _digit_group_runs(cleaner, cfg, view, phone_view):
-    """Spans a split must not cut in digit-group runs, read as the cleaner's steps see them: the date, IBAN/card
-    and phone steps run in turn before the numbers step, and a value one masks ends a run and moves where the next
-    step's matches fall. The year step is not applied: whether it masks a year in a run depends on the whole run
-    ("EUR 12 2023 2023 45" keeps it a run), so a year never ends one here. Returns those matches and the spans."""
+def _masking_steps(cleaner, cfg, phone_view):
+    """The cleaner's masking steps up to the phone step, in pipeline order (fuzzy dates and user terms aside)."""
     if cfg.phone_reject_embedded:
         phone_view = contact.RejectView(phone_view, contact.embedded_phone)
-    steps = [(cfg.check_replace_dates, cleaner._date_view),
+    steps = [(cfg.check_replace_html, cleaner._html_regex), (cfg.check_replace_urls, cleaner._url_regex),
+             (cfg.check_replace_emails, constants.EMAIL_REGEX), (cfg.check_replace_ips, contact.IP_VIEW),
+             (cfg.check_replace_dates, cleaner._date_view),
              (cfg.check_replace_iban_cards, contact.IBAN_VIEW), (cfg.check_replace_iban_cards, contact.CARD_VIEW),
+             (cfg.check_replace_identifiers, constants.IDENTIFIER_REGEX),
              (cfg.check_replace_phone_numbers, phone_view)]
-    spans = []  # each step's matches on the text it sees, which the view-wide matches may not align with
+    return [step for on, step in steps if on]
+
+
+def _step_matches(steps, view):
+    """Each step's matches on the text the steps before it leave, as the cleaner runs them: a value one masks
+    moves what the next one's lookarounds see ("490 872 276 1.2.3.4" is a phone once the IP is masked).
+    Returns those spans and that text (each match blanked to a protected key of its length, so offsets hold)."""
+    spans = []
 
     def blank(match):
         spans.append(match.span())
-        # the shape of a protected key ("\U00100000...\U00100001"), as long as the match so offsets stay the view's
         return "\U00100000" + "\U000F0000" * (len(match.group()) - 2) + "\U00100001"
-    for on, step in steps:
-        if on:
-            view = step.sub(blank, view)
-    masked_whole = {m.span() for m in cleaner._numbers_regex.finditer(view)}
-    spans += [m.span() for m in _DIGIT_GROUP_RUN.finditer(view) if m.span() not in masked_whole]
-    return spans + [m.span() for regex in (_DIGIT_GROUP_HEAD, _DIGIT_GROUP_TAIL) for m in regex.finditer(view)]
+    for step in steps:
+        view = step.sub(blank, view)
+    return spans, view
+
+
+def _steps_split_safe(steps, spans, view, cut, right_start):
+    """Whether each step match of *view* is found again in the half that holds it: a rule may read past its
+    match ("05 234 567" is a phone only when a digit follows), which a split can take away."""
+    found = set(_step_matches(steps, view[:cut])[0])
+    found |= {(a + right_start, b + right_start) for a, b in _step_matches(steps, view[right_start:])[0]}
+    return spans <= found
+
+
+def _digit_group_runs(cleaner, blanked):
+    """Spans a split must not cut in digit-group runs, read on *blanked* (the view after the masking steps): a
+    value one masks ends a run. The year step is not applied: whether it masks a year in a run depends on the
+    whole run ("EUR 12 2023 2023 45" keeps it a run), so a year never ends one here."""
+    masked_whole = {m.span() for m in cleaner._numbers_regex.finditer(blanked)}
+    spans = [m.span() for m in _DIGIT_GROUP_RUN.finditer(blanked) if m.span() not in masked_whole]
+    return spans + [m.span() for regex in (_DIGIT_GROUP_HEAD, _DIGIT_GROUP_TAIL) for m in regex.finditer(blanked)]
 
 
 def _user_rules_split_safe(cleaner, user_rules, view, cut, right_start):
@@ -160,8 +180,12 @@ class WindowedStreamingRedactor:
             for match in (regex.pattern.finditer(view.translate(regex.table))
                           if isinstance(regex, contact.DigitView) else regex.finditer(view))
         ]
+        steps = _masking_steps(cleaner, cfg, phone_view)
+        step_spans, blanked = _step_matches(steps, view)
+        protected += step_spans
+        step_spans = set(step_spans)
         if spaced_ids:
-            protected += _digit_group_runs(cleaner, cfg, view, phone_view)
+            protected += _digit_group_runs(cleaner, blanked)
         # User rules (a deny term holding a space, "Blue Sky Initiative"): their matches, and a match the buffer
         # end cuts off ("... the Blue Sky"), which the next feed completes.
         # A custom pattern past custom_patterns_timeout raises, or (on_timeout='warn') protects nothing.
@@ -197,7 +221,8 @@ class WindowedStreamingRedactor:
                     or not (separator == "" or separator.isspace()):
                 index -= 1
                 continue
-            if not _user_rules_split_safe(cleaner, user_rules, view, offset, len(view) - len(right)):
+            if not _user_rules_split_safe(cleaner, user_rules, view, offset, len(view) - len(right)) \
+                    or not _steps_split_safe(steps, step_spans, view, offset, len(view) - len(right)):
                 index -= 1
                 continue
             split_at = position

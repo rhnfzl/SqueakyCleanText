@@ -17,7 +17,8 @@ Each pattern gets a time limit (`custom_patterns_timeout`, 2 s per document), so
 **Fixes.** An ID whose last group looks like a year (`123-45 2020`) is now masked whole instead of only
 the year, and a very long digit run no longer slows the streaming redactor. A number next to a currency code
 (`1250 EUR`, `EUR 1250`) is kept as an amount, but an ID shape next to one (`123-45-6789 USD`) is still masked,
-and long number tables stream again; a spaced ID of any length is masked whole.
+and long number tables stream again; a spaced ID of any length is masked whole. The windowed streaming
+redactor no longer shows a phone that the whole text masks (`05 234 567 1`, `117 235 991 1.2.3.4`).
 
 Heads-up: output text changes for numbers and some phones. `replace_numbers_mode='all'` and
 `phone_reject_embedded=False` restore 0.8.1.
@@ -135,6 +136,10 @@ Heads-up: output text changes for numbers and some phones. `replace_numbers_mode
 - `ner_device` accepts `'mps'`. ONNX models and GLiClass stay on CPU; auto still never picks the Apple GPU.
 - If torch has no MPS backend, NER runs on CPU with a logged warning and the new `mps_fallback` code in `metadata['warnings']`; provenance shows `cpu`.
 - ONNX on CoreML was measured and left out: not reliably faster, 35 minutes and 82 GB for the first compile.
+
+### Fixes
+
+- `WindowedStreamingRedactor` only splits where every masking step up to phones (HTML, URL, email, IP, date, IBAN, card, ID, phone) finds the same matches in each half as in the whole buffer, read in the cleaner's step order (each step on the text the steps before it leave). Before, a split right after a phone whose rule reads past its match (a trunk-0 or `+` number counts its digits ahead: `05 234 567 1`, `+1 2 3 4 5 6 7 8 x`) emitted it whole, and the guard read phones and digit runs on the raw text, so a phone the cleaner finds only once an IP or card next to it is masked (`ok 490 872 276 1.2.3.4`, `4111111111111111 117 235 991`) or a number run that ends at a masked IP (`01 023 59 9 90.217.217.177`) could split and leak, even with an overlap longer than every value. Such a split now moves earlier, or the stream raises `BufferError`. A 40,000-case streaming fuzz finds no leak with an overlap longer than every value (24 before); a value longer than `overlap_chars` still unfinished at the buffer end can still split, as documented. Streaming is about 20% slower. No option: a pure leak fix.
 
 ## 0.8.1 - 2026-11-02
 
