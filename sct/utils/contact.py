@@ -124,12 +124,20 @@ def luhn_ok(value):
 IBAN_VIEW = ChecksumView(constants.IBAN_REGEX, iban_ok)
 CARD_VIEW = ChecksumView(constants.CARD_REGEX, luhn_ok)
 
-def numbers_regex(in_words=False, mode='all', min_digits=4):
+def numbers_regex(in_words=False, mode='all', min_digits=4, **id_shapes):
     """Number pattern: 'all' (every number; strict with in_words, else Latin/Greek/Cyrillic words kept) or
-    'identifiers' (whole identifier-shaped digit runs of at least *min_digits* digits)."""
+    'identifiers' (whole identifier-shaped digit runs of at least *min_digits* digits, plus the opt-in
+    *id_shapes* of constants.identifier_numbers_regex)."""
     if mode == 'identifiers':
-        return constants.identifier_numbers_regex(min_digits, in_words)
+        return constants.identifier_numbers_regex(min_digits, in_words, **id_shapes)
     return constants.NUMBERS_IN_WORDS_REGEX if in_words else constants.NUMBERS_REGEX
+
+
+def config_numbers_regex(cfg):
+    """The number pattern a TextCleanerConfig selects."""
+    return numbers_regex(cfg.replace_numbers_in_words, cfg.replace_numbers_mode, cfg.replace_numbers_min_digits,
+                         letter_prefix=cfg.numbers_letter_prefix_ids, two_part=cfg.numbers_two_part_ids,
+                         spaced_pair=cfg.numbers_spaced_pair_ids)
 
 
 def embedded_phone(text, start, end):

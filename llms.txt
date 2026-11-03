@@ -117,6 +117,9 @@ phone_reject_embedded=True          # Digit-only phone inside a longer token (ID
 check_replace_numbers=True          # Replace numbers with <NUMBER>
 replace_numbers_mode='identifiers'  # Only whole identifier-shaped digit runs (no amounts, %, times, ranges, code parts); 'all' = 0.8.1
 replace_numbers_min_digits=4        # Fewest digits for 'identifiers' mode
+numbers_letter_prefix_ids=True      # 'identifiers' mode: AB1234567 (1-3 uppercase + 6+ digits) is one <NUMBER>
+numbers_two_part_ids=True           # 'identifiers' mode: 123456/7890, 12345-678901, 12345.67890 are one <NUMBER> (not 2023-2024, 1000-3000)
+numbers_spaced_pair_ids=True        # 'identifiers' mode: '123 45' (spaced 5-digit postal code) is one <NUMBER>
 check_replace_dates=True            # Replace dates with <DATE>
 check_fuzzy_replace_dates=False     # Fuzzy misspelled month matching (requires [fuzzy])
 check_remove_stopwords=True         # Language-aware stopword removal

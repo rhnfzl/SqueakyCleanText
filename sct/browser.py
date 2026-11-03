@@ -7,7 +7,7 @@ from typing import Any
 
 from sct.config import TextCleanerConfig
 from sct.utils import constants, resources
-from sct.utils.contact import numbers_regex
+from sct.utils.contact import config_numbers_regex
 
 
 def _rule(pattern, replacement, enabled: bool) -> dict[str, Any]:
@@ -59,8 +59,7 @@ def build_browser_manifest(config: TextCleanerConfig) -> dict[str, Any]:
     month_names = resources.configured_month_names(config)
     date_regex = (constants.DATE_REGEX if month_names is None
                   else constants.build_date_regex(month_names, slash_year=config.date_month_name_slash_year))
-    number_regex = numbers_regex(config.replace_numbers_in_words, config.replace_numbers_mode,
-                                 config.replace_numbers_min_digits)
+    number_regex = config_numbers_regex(config)
     ordered = [
         ("html", html_regex, config.replace_with_html, config.check_replace_html),
         ("url", url_regex, config.replace_with_url, config.check_replace_urls),

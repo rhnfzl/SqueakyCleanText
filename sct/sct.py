@@ -1103,8 +1103,7 @@ class TextCleaner:
 
     @property
     def _numbers_regex(self):
-        return contact.numbers_regex(self.cfg.replace_numbers_in_words, self.cfg.replace_numbers_mode,
-                                     self.cfg.replace_numbers_min_digits)
+        return contact.config_numbers_regex(self.cfg)
 
     def _replace_currency_symbols(self, text):
         reversible = self._replace_reversible(

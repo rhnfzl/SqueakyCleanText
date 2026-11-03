@@ -269,23 +269,45 @@ def token_glue(in_words=False):
 _ID_NUMBER_CACHE = {}
 
 
-def identifier_numbers_regex(min_digits, in_words=False):
+def identifier_numbers_regex(min_digits, in_words=False, *, letter_prefix=False, two_part=False, spaced_pair=False):
     """A whole digit run of at least *min_digits* digits that is not part of a longer token (glued to letters,
     digits or a joiner and another token part) and not an amount, decimal, percent, time or range: those
     shapes either join their parts (1,250.00, 100-200; 14:30 has 2-digit parts) or touch a % / currency sign.
     A whole digit-only token of three or more hyphen-joined groups with *min_digits* digits in all (an SSN-like
-    123-45-6789) is one identifier too, unless it is date-shaped (2023-11-05, 05-11-23)."""
-    key = (min_digits, in_words)
+    123-45-6789) is one identifier too, unless it is date-shaped (2023-11-05, 05-11-23).
+    Opt-in whole-token shapes (format rules, independent of *min_digits*):
+    letter_prefix: 1-3 uppercase Latin letters, 6+ digits, 0-2 uppercase letters (AB1234567, X12345678Z),
+    not a currency code before digits (USD1000000).
+    two_part: two digit groups joined by "/" or a hyphen, the first 4+ digits, 7+ digits in all, an optional
+    uppercase check letter (123456/7890, 12345-678901, 123456-789K), or by "." with 4+ digits on each side
+    (12345.67890); not a year pair (2023-2024), a round range (1000-3000) or a time (1234-5678:30).
+    spaced_pair: "DDD DD" (a 5-digit postal code written 123 45)."""
+    key = (min_digits, in_words, letter_prefix, two_part, spaced_pair)
     if key not in _ID_NUMBER_CACHE:
         glue, j, unit = token_glue(in_words), PART_JOINERS, CURRENCY_SIGNS
         hyphen, end = r"[\-\u2010\u2011]", rf"(?![\d{j}])"
         date = rf"(?:\d{{1,2}}{hyphen}\d{{1,2}}{hyphen}(?:\d\d){{1,2}}|\d{{4}}{hyphen}\d{{1,2}}{hyphen}\d{{1,2}}){end}"
         grouped = rf"(?!{date})(?=\d(?:{hyphen}?\d){{{min_digits - 1}}})\d+(?:{hyphen}\d+){{2,}}"
-        _ID_NUMBER_CACHE[key] = re.compile(
-            rf"(?<![{glue}])(?<![{glue}{_LEFT_EDGE}][{j}])(?<![{unit}])(?<![{unit}] )"
+        no_unit_before, no_unit_after = rf"(?<![{unit}])(?<![{unit}] )", rf"(?! ?[%‰{unit}])"
+        shapes = [
+            rf"(?<![{glue}])(?<![{glue}{_LEFT_EDGE}][{j}]){no_unit_before}"
             rf"(?:{grouped}|\d{{{min_digits},}})"
-            rf"(?![{glue}])(?![{j}][{glue}{_RIGHT_EDGE}])(?! ?[%‰{unit}])"
-        )
+            rf"(?![{glue}])(?![{j}][{glue}{_RIGHT_EDGE}]){no_unit_after}"
+        ]
+        if letter_prefix:
+            shapes.append(rf"(?<![\w\-/.])(?!(?:{_CURRENCY_CODES})\d)[A-Z]{{1,3}}\d{{6,}}[A-Z]{{0,2}}(?!\w)")
+        if two_part:
+            slash = r"[/\-\u2010\u2011]"
+            year = r"(?:1[89]|20)\d\d"
+            shapes.append(
+                rf"(?<![\w\-/.,+]){no_unit_before}"
+                rf"(?!{year}{slash}{year}(?!\w))(?!\d*00{slash}\d*00(?!\w))"
+                rf"(?=(?:\d{slash}?){{7}})\d{{4,}}{slash}\d{{2,6}}[A-Z]?(?!\w|[\-/.,:]\d){no_unit_after}"
+            )
+            shapes.append(rf"(?<![\w\-/.,+]){no_unit_before}\d{{4,}}\.\d{{4,}}(?!\w|[\-/.,]\d){no_unit_after}")
+        if spaced_pair:
+            shapes.append(rf"(?<![\w.,:/\-])(?<!\d ){no_unit_before}\d{{3}} \d{{2}}(?!\w|[.,:]\d){no_unit_after}")
+        _ID_NUMBER_CACHE[key] = re.compile("|".join(shapes))
     return _ID_NUMBER_CACHE[key]
 
 

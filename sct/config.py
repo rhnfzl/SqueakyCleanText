@@ -427,6 +427,15 @@ class TextCleanerConfig:
     custom_patterns: Optional[Mapping[str, str]] = None
     # Whether custom_deny_terms and custom_allow_terms match case-sensitively. False: "acme" matches "ACME".
     custom_terms_case_sensitive: bool = False
+    # replace_numbers_mode='identifiers' only: whole-token ID shapes the plain digit-run rule rejects (format
+    # rules, not replace_numbers_min_digits). Each was measured on the DEV split against 0.8.1's recall.
+    # 1-3 uppercase letters, 6+ digits, 0-2 uppercase letters (AB1234567, X12345678Z); not USD1000000
+    numbers_letter_prefix_ids: bool = True
+    # Two digit groups joined by "/" or a hyphen (first 4+ digits, 7+ in all, optional check letter:
+    # 123456/7890, 12345-678901) or by "." (4+ digits each side: 12345.67890); not 2023-2024 or 1000-3000
+    numbers_two_part_ids: bool = True
+    # "DDD DD", a 5-digit postal code written with a space (123 45)
+    numbers_spaced_pair_ids: bool = True
 
     def __post_init__(self):
         if self.synthetic_reference_date is not None:
@@ -898,6 +907,9 @@ def _config_from_module_globals() -> TextCleanerConfig:
         custom_allow_terms=getattr(m, 'CUSTOM_ALLOW_TERMS', ()),
         custom_patterns=getattr(m, 'CUSTOM_PATTERNS', None),
         custom_terms_case_sensitive=getattr(m, 'CUSTOM_TERMS_CASE_SENSITIVE', False),
+        numbers_letter_prefix_ids=getattr(m, 'NUMBERS_LETTER_PREFIX_IDS', True),
+        numbers_two_part_ids=getattr(m, 'NUMBERS_TWO_PART_IDS', True),
+        numbers_spaced_pair_ids=getattr(m, 'NUMBERS_SPACED_PAIR_IDS', True),
         check_replace_currency_symbols=m.CHECK_REPLACE_CURRENCY_SYMBOLS,
         check_ner_process=m.CHECK_NER_PROCESS,
         check_remove_isolated_letters=m.CHECK_REMOVE_ISOLATED_LETTERS,
@@ -1030,6 +1042,9 @@ CUSTOM_DENY_TERMS = None
 CUSTOM_ALLOW_TERMS = ()
 CUSTOM_PATTERNS = None
 CUSTOM_TERMS_CASE_SENSITIVE = False
+NUMBERS_LETTER_PREFIX_IDS = True
+NUMBERS_TWO_PART_IDS = True
+NUMBERS_SPACED_PAIR_IDS = True
 GLINER_ONNX = False
 LANGUAGE = None
 
