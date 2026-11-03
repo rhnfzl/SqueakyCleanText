@@ -1,29 +1,16 @@
 # Changelog
 
-## Unreleased
+## 0.8.2 - 2026-11-03
 
-**Numbers stay, IDs go.** By default SCT masks only ID-shaped numbers (`Order 4711`, `#12345`) and keeps prices,
-percentages, times, ranges and short numbers (the old rule caused 62-68% of false masks on the benchmark DEV
-split). Grouped IDs such as `123-45-6789` are still masked. Digits inside a code (`ID9876543210`) and bare
-dates or timestamps (`20231105123456`) are no longer taken for phones.
+**Smarter numbers, your own rules, safer streaming.**
 
-**Apple GPU for torch and GLiNER.** Set `ner_device="mps"` on an Apple silicon Mac to run torch NER and GLiNER
-on the GPU, about 1.6x faster `process_batch` on an M4 Max with the same output.
+- **Numbers stay, IDs go:** prices, percents, times and short numbers are kept; ID-shaped numbers (`Order 4711`, `123-45-6789`) are still masked. On the benchmark DEV split precision rises from 0.68 to 0.81 with recall at 0.94.
+- **Amounts with a currency code stay** (`1250 EUR`), and codes or dates are no longer taken for phones.
+- **Your own term lists:** words to always mask, words to never mask, and your own regex, each with a time limit.
+- **Apple GPU:** `ner_device="mps"` runs NER about 1.6x faster on Apple silicon.
+- **Safer streaming:** the windowed redactor no longer shows a phone that whole-text cleaning masks.
 
-**Your own term lists.** Pass terms to always mask (`custom_deny_terms`), terms to never mask
-(`custom_allow_terms`) and your own labelled regex (`custom_patterns`). SCT still ships no list of its own.
-Each pattern gets a time limit (`custom_patterns_timeout`, 2 s per document), so a bad regex cannot hang a run.
-
-**Fixes.** An ID whose last group looks like a year (`123-45 2020`) is now masked whole instead of only
-the year, and a very long digit run no longer slows the streaming redactor. A number next to a currency code
-(`1250 EUR`, `EUR 1250`) is kept as an amount, but an ID shape next to one (`123-45-6789 USD`) is still masked,
-and long number tables stream again; a spaced ID of any length is masked whole. The windowed streaming
-redactor no longer shows a phone that the whole text masks (`05 234 567 1`, `117 235 991 1.2.3.4`), also next to
-your own terms or a fuzzy date; it keeps one feed within `max_buffer_chars`, adds no spaces the whole text does
-not have, and refuses `custom_allow_terms` (use `BufferedStreamingRedactor`).
-
-Heads-up: output text changes for numbers and some phones. `replace_numbers_mode='all'` and
-`phone_reject_embedded=False` restore 0.8.1.
+Heads-up: output text changes for numbers and some phones. `replace_numbers_mode='all'` and `phone_reject_embedded=False` restore 0.8.1.
 
 ### Number and phone masking
 

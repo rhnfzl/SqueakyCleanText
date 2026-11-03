@@ -227,7 +227,7 @@ Language detection covers 75 languages. Full NER models cover English, Dutch, Ge
 - **Offsets are post-regex.** Finding offsets point into the text after the regex step, not into the raw input.
 <!-- --8<-- [end:limits] -->
 
-Detailed known limits of 0.8.1: [docs/limits.md](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/limits.md).
+Detailed known limits of 0.8.2: [docs/limits.md](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/limits.md).
 
 ## Documentation
 
