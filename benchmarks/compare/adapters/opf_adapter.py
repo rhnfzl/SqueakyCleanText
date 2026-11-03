@@ -18,7 +18,8 @@ attention's full T x T scores do not fit a 4096-token window under the 5 GB ``gp
 eager agree on 99.99% of token argmaxes (bf16 rounding); CPU keeps eager.
 
 Config (default track = ``{}``): ``device`` (cpu|cuda, default cuda when available),
-``threads``, ``n_ctx`` (window tokens, default 4096), ``attn`` (attention implementation). Tuned-track knob (PROTOCOL section 3,
+``threads``, ``n_ctx`` (window tokens, default 4096), ``attn`` (attention implementation).
+Tuned-track knob (PROTOCOL section 3,
 "OPF's documented decoder-bias preset"): ``biases`` = {bias name: float}, merged over the
 calibration file; keys as in ``BIAS_KEYS``. ``revision`` pins the checkpoint.
 
