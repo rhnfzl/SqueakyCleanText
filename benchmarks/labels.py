@@ -162,8 +162,9 @@ DATASET_OUT_OF_SCOPE: dict[str, frozenset] = {
     "dialogpii": frozenset({"PERSON_SOCIAL_RELATION", "PROFESSION", "QUANTITY", "PRODUCT", "DATETIME_AGE", "MISC"}),
     "kdpii": frozenset({"PS_ID", "OGG_RELIGION", "CV_POSITION", "CV_SEX", "CV_MILITARY_CAMP", "QT_AGE", "QT_LENGTH",
                         "QT_WEIGHT", "QT_GRADE", "FD_MAJOR", "TM_BLOOD_TYPE"}),
-    # the card's 8 sensitive categories are not named in verify.md: the first load names any that occur
-    "nus_lt": frozenset({"MISC", "TIME", "DURATION", "VALUE", "AGE", "OCC", "EDU", "NAT"}),
+    # the card's 8 sensitive categories (named by the first real load) have no SCT type either
+    "nus_lt": frozenset({"MISC", "TIME", "DURATION", "VALUE", "AGE", "OCC", "EDU", "NAT",
+                         "GENDER", "SEX", "ETH", "FAM", "MAR", "HEALTH", "REL", "POL"}),
     "redmadrobot": frozenset(),
     "redactionbench": frozenset({"contextual"}),
     "tonic": frozenset({"USERNAME"}),
