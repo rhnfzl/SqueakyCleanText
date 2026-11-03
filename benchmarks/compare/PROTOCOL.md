@@ -124,6 +124,10 @@ token, its per-span F1 is 0.926.
 - Tuning happens once, configs are frozen in `configs/tuned.json` (with the dev scores that
   chose them; `runner.py --tuned configs/tuned.json` applies them), then test runs happen once.
   A rerun of test needs a logged reason.
+- The tuned track chose one configuration per entry on the dev parts of all nine privacy sets
+  (every entry, SCT included), so it carries tuning exposure to every privacy set's dev part. Where
+  a comparison has a clean cell, the **default** track is the primary result and tuned is shown
+  second.
 
 How it ran (`tune.py`, grid in `tune.GRID`, all on the dev part, 100 docs per language, gold
 language track, the 9 privacy datasets; TAB 21 docs, REDACT 175, gretel 487):
@@ -305,7 +309,10 @@ is scored on the whole doc anyway.
   = no claim: regex tools and SCT's multilingual default). Round 1: nvidia/gliner-PII en;
   bardsai-v3 the 24 official EU languages; gliner2-fastino en fr es de it pt nl; opf en ("primarily
   English"); presidio en (only `en_core_web_lg` is loaded, both tracks); sct-gliner en (the
-  knowledgator model card; SCT's regex layer is language-agnostic). A code is matched on its base
+  knowledgator/gliner-pii-base-v1.0 card metadata at 61726e0 lists `language: [en]`; its
+  `multilingual` tag is a topic tag, not a language tag). sct-default claims every language (SCT
+  claims multilingual NER through its WikiNEural fallback), so SCT is held to every language;
+  datafog (regex) makes no claim and is scored on every language too. A code is matched on its base
   (`pt_br` -> pt, `ar-mixed_en` -> ar). Every headline and pairwise score uses only the documents in
   languages the entry (both entries, for a pair) claims; scores in other languages are reported
   apart as "outside claimed languages" and are never shown or counted as plain losses
@@ -326,7 +333,9 @@ is scored on the whole doc anyway.
 - Per-language quota: 300 test docs per language per dataset (fewer where the test part is
   smaller: REDACT 27-40 per language, TAB 106).
 - Headline and same-set averages follow section 17's rule (clean cells only) and section 12's
-  claimed-language rule.
+  claimed-language rule. Per-dataset tables also use only the docs in each entry's claimed
+  languages (`report.claimed_macro`); a cell with no such doc is `°`, and the out-of-claim values
+  are a separate table.
 
 ## 14. Uncertainty (rule 12)
 
@@ -368,21 +377,29 @@ core), 754 GB RAM, 4x RTX 4090 shared with a vLLM server (16.5-19 GB in use per 
 
 ## 17. Model-dataset contamination matrix (rule 2)
 
-T = trained on that dataset's train split (or the same generator family), E = the vendor
-reports evaluating on it (tuning exposure possible), D = SCT was developed or tuned against
-it in earlier benchmark rounds, U = training data undisclosed, `-` = none known. None of
-these prove overlap with our test records. Sources: model cards at the pinned revisions,
-checked 2026-11-02.
+T = trained on that dataset's train split, E = the vendor reports evaluating on it (tuning
+exposure possible), D = SCT was developed or tuned against it in earlier benchmark rounds,
+U = training data undisclosed, `-` = none known; `X-family` = X on another dataset of the same
+generator family. None of these prove overlap with our test records. Sources: model cards at
+the pinned revisions, checked 2026-11-02 (families checked 2026-11-03).
+
+**Generator families (`entries.FAMILIES`, applied to every entry, SCT included).** Gretel:
+gretel finance and gretel_en (Gretel Navigator) and nemotron (NeMo Data Designer, Navigator's
+successor after NVIDIA took over Gretel; the gretel_en and Nemotron-PII cards both carry the
+`datadesigner` tag, and Nemotron-PII cites the Gretel PII set). ai4privacy: openpii and
+argilla_pii (a slice of the ai4privacy-200k train split). thai_pii and bayanat have their own
+rule-based generators; TAB, REDACT and the NER sets are not generated. `entries.contamination`
+derives the family flags from the direct ones, so no family flag is set by hand.
 
 | entry | openpii | gretel fin | gretel_en | nemotron | argilla_pii | redact | tab | others (iahlt, bayanat, thai*, naamapadam, multiconer, stockmark) |
 |---|---|---|---|---|---|---|---|---|
-| sct-default (regex + CoNLL/WikiNEuRal NER) | D | D | - | D | - | D | D | D |
-| sct-gliner (knowledgator gliner-pii-base) | U, D | U, D | U | U, D | U | U, D | U, D | U, D |
+| sct-default (regex + CoNLL/WikiNEuRal NER) | D | D | D-family | D | D-family | D | D | D |
+| sct-gliner (knowledgator gliner-pii-base) | U, D | U, D | U, D-family | U, D | U, D-family | U, D | U, D | U, D |
 | presidio (en_core_web_lg, OntoNotes 5) | - | - | - | - | - | - | - | - |
-| gliner-nvidia | E (AI4Privacy, set unnamed) | - | E | T (Nemotron-PII train) | E | - | - | - |
+| gliner-nvidia | E (AI4Privacy, set unnamed) | T-family, E-family | E, T-family | T (Nemotron-PII train), E-family | E | - | - | - |
 | gliner2-fastino (own 4,910 synthetic docs) | - | - | - | - | - | - | - | - |
 | opf | U | U | U | U | U | U | U | U |
-| bardsai-v3 | T (openpii-1m train) | - | T (train split) | T (train split) | T-family (ai4privacy generator) | - | - | - |
+| bardsai-v3 | T (openpii-1m train) | T-family | T (train split) | T (train split) | T-family (ai4privacy generator) | - | - | - |
 | datafog (regex) | - | - | - | - | - | - | - | - |
 | reserve: OpenMed multilingual v2 | T | - | T | T | T (pii-masking-200k is Argilla's source) | - | - | - |
 | reserve: urchade gliner_multi_pii-v1 | - | - | - | - | - | - | - | - |
@@ -391,9 +408,11 @@ Notes: nvidia/gliner-PII names its base as urchade/gliner_large-v2.1 on the HF c
 knowledgator/gliner-bi-large-v1.0 on the NIM page (conflict, recorded). bardsai removed rows
 that appear in the PIIMB test sets, not ours. Argilla is a slice of the ai4privacy-200k
 TRAIN split, so any model trained on that split may have seen the exact records. SCT's D
-marks are the datasets used in SCT's earlier benchmark rounds; `gretel_en` and
-`argilla_pii` were added after SCT 0.8.1 and are held out for SCT (no tuning on them,
-dev included, until this comparison is published).
+marks are the datasets used in SCT's earlier benchmark rounds. `gretel_en` and `argilla_pii`
+were added after SCT 0.8.1, so SCT's code was not developed on them, but they are not held
+out: the tuned track (section 3) chose one configuration per entry, SCT included, on the dev
+parts of all nine privacy sets, gretel_en and argilla_pii among them; and under the family rule
+they are D-family for SCT (gretel finance and openpii are D).
 
 **Contamination rule (decision 21, permanent, every round, SCT included).** If a tool, or any
 model inside it, was trained on a dataset or its family (T), or was developed or tuned against it
@@ -411,8 +430,9 @@ data undisclosed) or `clean` (`-`). Reported:
 4. Excluded cells may be shown for information only, marked: in parentheses in the per-dataset
    tables, bold in the matrix; they never enter an average that is compared.
 
-SCT is held to the same rule: its D cells are excluded, so in round 1 its clean cells are only
-gretel_en and argilla_pii. Round 2 needs fresh datasets that no entry (SCT included) has seen.
+SCT is held to the same rule: its D and D-family cells are excluded, so in round 1 SCT (both
+entries) has no clean cell, and round 1 cannot rank SCT; opf has none either (U everywhere).
+Round 2 needs fresh datasets that no entry (SCT included) and no generator family of them has seen.
 
 ## 18. Annotation audit (rule 10)
 
@@ -545,6 +565,27 @@ section 17 rule views (`own`, `same_set`, `pairwise`). Not yet built: the common
   come from placeholders found in its output, so a source copy whose placeholder a later cleaning
   step removed (the link text of `[a@b.se](mailto:a@b.se)`, repeated names merged into one
   placeholder) was scored as leaked though no character of it is visible. A copy of a value SCT
-  masked elsewhere in the doc now counts as masked when neither the value nor any 3+ char word of
+  masked elsewhere in the doc now counts as masked when neither the value nor any 4+ char word (`LEAK_MIN_CHARS`; this entry first said 3+, corrected below) of
   it is in SCT's output and the copy is a whole token. `runner.py --no-recover` gives the round-1
   mapping; both are reported. Both tracks rescored from the ec0fae9 raw outputs (no inference).
+- 2026-11-03 (families, recovery audit): independent check of the rules pass. (1) Generator
+  families (`entries.FAMILIES`): a T, E or D flag reaches every dataset of its family, for every
+  entry alike; gretel_en and argilla_pii become D-family for SCT, gretel finance T-family for
+  bardsai-v3 (and T-family, E-family for gliner-nvidia), nemotron E-family for gliner-nvidia.
+  SCT and sct-gliner have no clean cell left. (2) The "held out, dev included" sentence on
+  gretel_en / argilla_pii was wrong (the tuned track used every privacy dev part); default is now the
+  primary track where a clean cell exists. (3) Per-dataset tables on claimed languages only.
+  (4) Recovery rule (`scorer.dropped_copies`): the earlier text said "3+ char word"; the code used
+  `leak`'s `LEAK_MIN_CHARS` = 4. Now: a value qualifies only when `leak` finds neither it nor any 4+
+  char word of it, and `scorer.traces` finds nothing: no 2+ char word of it (case-, accent- and
+  NFKD-folded) is a whole word of the output, and its separator-free folded form is not inside the
+  separator-free folded output. The first audit (`audit_recover.py`, seeded 50 copies per set, rule
+  without the folding) found such traces (separator-free form inside a longer token) in a few
+  sampled copies per set, so the folded checks joined the rule. (5) Claimed languages: sct-gliner en
+  from the card's language tag; sct-default every language. Both tracks rescored from the ec0fae9 raw
+  outputs (no inference).
+  (6) `runner.py`: the shared view is the types every comparison entry supports, whichever entries
+  a run scores; the `--no-recover` run (SCT alone) had used SCT's own 9 types as its shared view, so
+  the shared-view "without" numbers were not comparable; that run was redone. (7) Audit counts in the
+  bundle's `audit/`; `make_comparison.py` in the bundle writes `COMPARISON.md` (prose numbers read
+  from the bundle).

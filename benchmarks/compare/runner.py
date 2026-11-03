@@ -381,8 +381,10 @@ def main(argv=None) -> None:
             raise SystemExit(f"entry {name!r} has no adapter yet")
     gpu = None if args.device == "cpu" else (args.gpu or pick_gpu(args.gpu_mem_gb + 1))
     env = child_env(args.threads, args.device, gpu, args.hf_hub_cache)
-    shared = scorer.shared_types([t for n, t in tools.items() if n not in registry.TEST_ENTRIES] or list(tools.values()),
-                                 registry.SCT_TYPES)
+    # The shared view is the types every comparison entry supports, whichever entries this run scores, so a
+    # partial run (SCT alone with --no-recover) has the same shared view as the full one.
+    compared = list(registry.ENTRIES.values()) if set(tools) - set(registry.TEST_ENTRIES) else list(tools.values())
+    shared = scorer.shared_types(compared, registry.SCT_TYPES)
     run_info = {"command": " ".join(["python -m benchmarks.compare.runner", *(argv or sys.argv[1:])]),
                 "part": args.part, "track": args.track,
                 "tuned": str(args.tuned) if args.tuned else None, "n_per_language": args.n, "seed": args.seed,

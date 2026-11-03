@@ -63,15 +63,30 @@ def paired_table(summary: dict, metric: str = "masked_recall", baseline: str = "
     return out
 
 
-def _mark(value, entry: str, dataset: str) -> str:
+def _mark(value, entry: str, dataset: str, without=False) -> str:
+    """Decision 21 marker; *without* (the SCT score without recovered copies) is labelled next to it."""
+    text = _fmt(value) + ("" if without is False else f"; w/o recovery {_fmt(without)}")
     status = registry.status(entry, dataset)
-    return f"({_fmt(value)})" if status == "excluded" else _fmt(value) + ("?" if status == "unknown" else "")
+    return f"({text})" if status == "excluded" else text + ("?" if status == "unknown" else "")
 
 
-def dataset_table(track_dir: Path, entries, view: str = "full", metric: str = "masked_f2") -> list[str]:
-    """Per dataset (rows, group order) x entry: the dataset's language macro on completed docs.
+def claimed_macro(compare: dict, entry: str, metric: str, inside: bool = True):
+    """Language macro of *metric* over the dataset's languages inside (or outside) the entry's claim.
 
-    Decision 21 markers: ``(x)`` = excluded cell (T/E/D, information only), ``x?`` = unknown training data.
+    ``False`` when the dataset has no doc in those languages (not the same as an N/A score).
+    """
+    langs = [m for lang, m in compare["by_language"].items() if registry.claims(entry, lang) == inside]
+    return scorer.macro(langs).get(metric) if langs else False
+
+
+def dataset_table(track_dir: Path, entries, view: str = "full", metric: str = "masked_f2", inside: bool = True,
+                  without_dir: Path | None = None) -> list[str]:
+    """Per dataset (rows, group order) x entry: the language macro on completed docs, claimed languages only.
+
+    ``inside=False`` gives the same on the languages outside each entry's claim. Decision 21 markers:
+    ``(x)`` = excluded cell (T/E/D, information only), ``x?`` = unknown training data; ``°`` = no doc of the
+    dataset in the entry's claimed languages (``-`` in the outside table: none outside). Entries scored in
+    *without_dir* too (SCT without recovered copies) show both values, labelled.
     """
     entries = list(entries)
     out = [f"| dataset | {' | '.join(entries)} |", "|---|" + "---|" * len(entries)]
@@ -79,8 +94,13 @@ def dataset_table(track_dir: Path, entries, view: str = "full", metric: str = "m
         files = [track_dir / e / f"{dataset}-test.json" for e in entries]
         if not all(f.exists() for f in files):
             continue
-        cells = [_mark(json.loads(f.read_text())["views"][view]["compare"]["macro"].get(metric), e, dataset)
-                 for f, e in zip(files, entries, strict=True)]
+        cells = []
+        for f, e in zip(files, entries, strict=True):
+            value = claimed_macro(json.loads(f.read_text())["views"][view]["compare"], e, metric, inside)
+            other = without_dir / e / f"{dataset}-test.json" if without_dir else None
+            without = (claimed_macro(json.loads(other.read_text())["views"][view]["compare"], e, metric, inside)
+                       if other and other.exists() else False)
+            cells.append(("°" if inside else "-") if value is False else _mark(value, e, dataset, without))
         out.append(f"| {dataset} | {' | '.join(cells)} |")
     return out
 
@@ -114,7 +134,9 @@ HEAD = (("masked_recall", "mR"), ("masked_precision", "mP"), ("strict_f1", "stri
 
 def claimed(entry: str) -> str:
     langs = registry.CLAIMED_LANGUAGES.get(entry)
-    return "no claim (all)" if langs is None else "24 EU" if langs == registry.EU24 else " ".join(langs)
+    if langs is None:
+        return "all (multilingual claim)" if entry.startswith("sct") else "all (regex, no language claim)"
+    return "24 EU" if langs == registry.EU24 else " ".join(langs)
 
 
 def _speed(bundle: Path, entry: str) -> tuple[str, str]:
@@ -133,11 +155,12 @@ def _point(agg: dict | None, metric: str = "masked_recall") -> str:
     return "-" if not agg else f"{_fmt(agg['macro'].get(metric))} ({len(agg['datasets'])})"
 
 
-def own_table(summary: dict, bundle: Path, view: str, group: str) -> list[str]:
+def own_table(summary: dict, bundle: Path, view: str, group: str, without: dict | None = None) -> list[str]:
     """Headline (decision 21): each entry on its own clean datasets, claimed languages, 95% bootstrap CI.
 
     Beside it, for information: clean sets outside the claimed languages, unknown-training-data sets
     (claimed languages), and excluded (T/E/D) sets, each as masked recall (number of datasets).
+    *without* (the ``norecover`` summary): its entries' numbers are added next to each one, labelled.
     """
     head = ("| entry | clean sets with claimed-language docs (all clean sets) | "
             + " | ".join(f"{n} [95% CI]" for _, n in HEAD)
@@ -148,16 +171,25 @@ def own_table(summary: dict, bundle: Path, view: str, group: str) -> list[str]:
         cell = views.get(view, {}).get(group)
         if cell is None:
             continue
+        wo = (without or {}).get("own", {}).get(entry, {}).get(view, {}).get(group) if without else None
+
+        def info(get, cell=cell, wo=wo):
+            text = _point(get(cell))
+            return text + (f"; w/o recovery {_point(get(wo))}" if wo is not None and text != "-" else "")
+
         clean = cell.get("clean") or {}
         ci = clean.get("ci", {})
-        cells = [f"{ci[k]['value']:.3f} [{ci[k]['ci'][0]:.3f}, {ci[k]['ci'][1]:.3f}]" if k in ci else "-" for k, _ in HEAD]
+        ci_wo = ((wo or {}).get("clean") or {}).get("ci", {})
+        cells = [(f"{ci[k]['value']:.3f} [{ci[k]['ci'][0]:.3f}, {ci[k]['ci'][1]:.3f}]"
+                  + (f"; w/o recovery {ci_wo[k]['value']:.3f}" if k in ci_wo else "")) if k in ci else "-" for k, _ in HEAD]
         docs, rss = _speed(bundle, entry)
-        excluded = (cell.get("excluded") or {}).get("claimed")
+        excluded = info(lambda c: ((c or {}).get("excluded") or {}).get("claimed"))
         used = (clean.get("claimed") or {}).get("datasets", [])
         rows.append((ci.get("masked_recall", {}).get("value") or -1,
                      f"| {entry} | {', '.join(used) or 'none'} ({len(clean.get('datasets', []))}) | " + " | ".join(cells)
-                     + f" | {_point(clean.get('outside_claim'))} | {_point((cell.get('unknown') or {}).get('claimed'))}"
-                     + f" | {'(' + _point(excluded) + ')' if excluded else '-'} | {docs} | {rss}"
+                     + f" | {info(lambda c: ((c or {}).get('clean') or {}).get('outside_claim'))}"
+                     + f" | {info(lambda c: ((c or {}).get('unknown') or {}).get('claimed'))}"
+                     + f" | {'(' + excluded + ')' if excluded != '-' else '-'} | {docs} | {rss}"
                      + f" | {claimed(entry)} | {LICENCES.get(entry, '?')} |"))
     return [head, "|" + "---|" * (len(HEAD) + 9), *(row for _, row in sorted(rows, reverse=True))]
 
@@ -176,7 +208,6 @@ def pairwise_table(summary: dict, view: str, group: str, kind: str = "clean", ba
             continue
         r = summary.get("pairwise", {}).get(entry, {}).get(view, {}).get(group, {}).get(kind)
         if r is None:
-            rows.append((-1, f"| {entry} | none | " + " | ".join("-" for _ in HEAD) + " | - | - |"))
             continue
         m = r["metrics"]
         cells = []
@@ -189,7 +220,11 @@ def pairwise_table(summary: dict, view: str, group: str, kind: str = "clean", ba
         sct = [_fmt(m.get(k, {}).get("a")) for k in ("masked_recall", "masked_precision")]
         rows.append((m.get("masked_recall", {}).get("b") or 0,
                      f"| {entry} | {', '.join(r['datasets'])} | " + " | ".join(cells) + f" | {' | '.join(sct)} |"))
-    return out + [row for _, row in sorted(rows, reverse=True)]
+    if not rows:
+        return [f"No dataset in this group is {kind} for both {baseline} and any other entry (languages both claim)."]
+    missing = [e for e in summary.get("own", {}) if e != baseline and not any(f"| {e} |" in row for _, row in rows)]
+    return out + [row for _, row in sorted(rows, reverse=True)] + (
+        ["", f"No {kind} dataset in common with {baseline}: {', '.join(missing)}."] if missing else [])
 
 
 def same_set_table(summary: dict, view: str, group: str, pool: str) -> list[str]:
@@ -246,7 +281,8 @@ def contamination_table(entries) -> list[str]:
 def recovery_table(bundle: Path, track: str, view: str = "full", metric: str = "masked_recall") -> list[str]:
     """SCT with and without ``scorer.recover_dropped`` (``norecover/<track>``: ``runner.py --no-recover``).
 
-    Per SCT entry x dataset: *metric* (completed docs, language macro) and the copies recovered; excluded
+    Per SCT entry x dataset: *metric* and doc leak (completed docs, language macro over the entry's claimed
+    languages; ``°`` = none of the dataset's docs is in them) and the copies recovered (all docs); excluded
     cells in parentheses, unknown with ``?``, as everywhere.
     """
     other = bundle / "norecover" / track
@@ -260,10 +296,33 @@ def recovery_table(bundle: Path, track: str, view: str = "full", metric: str = "
             if not all(f.exists() for f in files):
                 continue
             new, old = (json.loads(f.read_text()) for f in files)
-            m = [r["views"][view]["compare"]["macro"] for r in (new, old)]
-            out.append(f"| {entry_dir.name} | {dataset} | {_mark(m[0].get(metric), entry_dir.name, dataset)} | "
-                       f"{_mark(m[1].get(metric), entry_dir.name, dataset)} | {_fmt(m[0].get('doc_leak_rate'))} | "
-                       f"{_fmt(m[1].get('doc_leak_rate'))} | {new.get('recovered_dropped_copies')} |")
+            e = entry_dir.name
+            m = [{k: claimed_macro(r["views"][view]["compare"], e, k) for k in (metric, "doc_leak_rate")}
+                 for r in (new, old)]
+            vals = [["°" if x[k] is False else (_mark(x[k], e, dataset) if k == metric else _fmt(x[k]))
+                     for x in m] for k in (metric, "doc_leak_rate")]
+            out.append(f"| {e} | {dataset} | {' | '.join(vals[0] + vals[1])} | {new.get('recovered_dropped_copies')} |")
+    return out
+
+
+def audit_table(bundle: Path, track: str) -> list[str]:
+    """``audit/<track>.json`` (``audit_recover.py``, final rule) beside ``audit/<track>-first-pass.json``
+    (the rule before ``scorer.traces`` joined it): counts only."""
+    path, first = bundle / "audit" / f"{track}.json", bundle / "audit" / f"{track}-first-pass.json"
+    if not path.exists():
+        return []
+    final = json.loads(path.read_text())["entries"]
+    before = json.loads(first.read_text())["entries"] if first.exists() else {}
+    out = ["| entry | dataset | first pass: recovered | sampled | traces found | final rule: recovered | sampled | passed "
+           "| sampled on gold |", "|---|---|---|---|---|---|---|---|---|"]
+    for entry, by_dataset in final.items():
+        for dataset in (d for group in scorer.GROUPS.values() for d in group):
+            b, a = by_dataset.get(dataset), before.get(entry, {}).get(dataset)
+            if not b or not (b["recovered"] or (a and a["recovered"])):
+                continue
+            first_cells = [a["recovered"], a["sampled"], a["sampled"] - a["passed"]] if a else ["-"] * 3
+            out.append(f"| {entry} | {dataset} | " + " | ".join(map(str, [*first_cells, b["recovered"], b["sampled"],
+                                                                          b["passed"], b["on_gold"]])) + " |")
     return out
 
 
@@ -274,12 +333,15 @@ def tables(bundle: Path) -> str:
         if not path.exists():
             continue
         summary = json.loads(path.read_text())
+        wo_path = bundle / "norecover" / track / "summary.json"
+        without = json.loads(wo_path.read_text()) if wo_path.exists() else None
+        wo_dir = bundle / "norecover" / track if without else None
         for view in ("full", "shared"):
             for group in scorer.GROUPS:
                 if not any(group in v.get(view, {}) for v in summary.get("own", {}).values()):
                     continue
                 lines += ["", f"## {track} track, {view} view, {group}: each entry on its own clean sets, claimed languages",
-                          "", *own_table(summary, bundle, view, group)]
+                          "", *own_table(summary, bundle, view, group, without)]
                 for pool in ("all", "others"):
                     lines += ["", f"### same-set ({'every entry' if pool == 'all' else 'non-SCT entries with clean sets'})",
                               "", *same_set_table(summary, view, group, pool)]
@@ -291,14 +353,20 @@ def tables(bundle: Path) -> str:
                 lines += ["", f"## {track} track, per language, full view, masked recall, {group}, {status} sets "
                           "(° = outside the entry's claimed languages)", "",
                           *language_table(bundle / track, summary["aggregate"], group, status=status)]
-        lines += ["", f"## {track} track, per dataset, full view, masked F2 (completed docs; (x) = excluded, "
-                  "information only; x? = unknown training data)", "",
-                  *dataset_table(bundle / track, summary["aggregate"])]
+        lines += ["", f"## {track} track, per dataset, full view, masked F2, claimed languages only (completed docs; "
+                  "(x) = excluded, information only; x? = unknown training data; ° = no doc in a claimed language)", "",
+                  *dataset_table(bundle / track, summary["aggregate"], without_dir=wo_dir)]
+        lines += ["", f"### {track} track, per dataset, outside claimed languages (information only, not a loss; "
+                  "- = every doc is in a claimed language)", "",
+                  *dataset_table(bundle / track, summary["aggregate"], inside=False, without_dir=wo_dir)]
         lines += ["", f"## {track} track, completion", "", *completion_table(bundle / track, summary["aggregate"])]
         lines += ["", f"## {track} track, paired bootstrap vs baseline per dataset", "", *paired_table(summary)]
         recovery = recovery_table(bundle, track)
         if recovery:
             lines += ["", f"## {track} track, SCT with and without recovered dropped copies (full view)", "", *recovery]
+        audit = audit_table(bundle, track)
+        if audit:
+            lines += ["", f"### {track} track, audit of the recovered copies (seeded sample, counts only)", "", *audit]
     lines += ["", "## contamination (bold = excluded, italic = unknown, plain = clean)", "",
               *contamination_table(registry.ENTRIES)]
     for name in ("speed-16t", "speed-16t-rss", "speed-1t"):

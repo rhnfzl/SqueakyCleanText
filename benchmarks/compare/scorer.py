@@ -37,12 +37,13 @@ None (N/A), never 0.
 """
 
 import math
+import unicodedata
 from collections import Counter, defaultdict
 
 import numpy as np
 
 from benchmarks.labels import DATE, normalise_gold
-from benchmarks.score import leak, masking_recall, overlaps, prepare, score_pii
+from benchmarks.score import LEAK_WORD, PLACEHOLDER, leak, masking_recall, overlaps, prepare, score_pii
 
 THRESHOLDS = tuple(round(0.05 * i, 2) for i in range(1, 20))
 CHRF_ORDER = 6
@@ -86,19 +87,39 @@ def merge_same_type(spans: list[dict]) -> list[dict]:
     return sorted(merged, key=lambda s: (s["start"], s["end"]))
 
 
-def recover_dropped(text: str, masked_text: str, spans: list[dict]) -> tuple[list[dict], int]:
-    """Add the source copies of a masked value that the tool's own output no longer holds anywhere.
+def fold(text: str) -> str:
+    """NFKD, combining marks dropped, casefolded; placeholders removed (their names are not leaks)."""
+    text = unicodedata.normalize("NFKD", PLACEHOLDER.sub("\0", text))
+    return "".join(c for c in text if not unicodedata.combining(c)).casefold()
 
-    SCT spans come from placeholders found in its output; a placeholder a later cleaning step removed
-    (the link text of ``[a@b.se](mailto:a@b.se)`` becomes ``<EMAIL_0>`` and is then dropped) leaves its
-    source copy unmapped, so the copy scored as leaked although no character of it is visible. A copy is
-    added only when neither the value nor any 3+ char word of it is in the output (``leak`` finds nothing,
-    so no copy can still be visible, even in part) and it is a whole token (no letter or digit glued on).
-    Returns the merged spans and the number of copies added.
+
+def compact(text: str) -> str:
+    """``fold`` with every non-alphanumeric char removed (separators, spaces, punctuation)."""
+    return "".join(c for c in fold(text) if c.isalnum())
+
+
+def traces(value: str, output: str) -> dict:
+    """Visible traces of *value* in *output* beyond ``leak``: ``compact`` (its 4+ char compact form inside the
+    compact output) and ``word`` (any 2+ char word of it, folded, as a whole word of the folded output)."""
+    words = set(LEAK_WORD.findall(fold(output)))
+    key = compact(value)
+    return {"compact": len(key) >= 4 and key in compact(output),
+            "word": any(len(w) >= 2 and w in words for w in LEAK_WORD.findall(fold(value)))}
+
+
+def dropped_copies(text: str, masked_text: str, spans: list[dict]) -> list[dict]:
+    """Source copies of a masked value that the tool's own output no longer holds anywhere (see ``recover_dropped``).
+
+    A value qualifies only when it has >= 4 non-space chars, ``leak`` finds neither it (whitespace as in the
+    source or collapsed) nor any of its words of ``LEAK_MIN_CHARS`` (4)+ chars in the output, and ``traces``
+    finds nothing: no word of it of 2+ chars is a whole word of the output and its compact form is not in the
+    compact output (both case-, accent- and NFKD-folded). Each whole-token copy (no letter or digit glued on)
+    not already fully covered is returned once.
     """
     extra = []
-    for value, label in {(text[s["start"]:s["end"]], s["label"]) for s in spans}:
-        if len(value.strip()) < 4 or leak(value, masked_text) or leak(" ".join(value.split()), masked_text):
+    for value, label in sorted({(text[s["start"]:s["end"]], s["label"]) for s in spans}):
+        if (len(value.strip()) < 4 or leak(value, masked_text) or leak(" ".join(value.split()), masked_text)
+                or any(traces(value, masked_text).values())):
             continue
         at = text.find(value)
         while at >= 0:
@@ -106,11 +127,23 @@ def recover_dropped(text: str, masked_text: str, spans: list[dict]) -> tuple[lis
             if not (at and text[at - 1].isalnum()) and not (end < len(text) and text[end].isalnum()):
                 extra.append({"start": at, "end": end, "label": label, "score": None})
             at = text.find(value, at + 1)
-    if not extra:
-        return spans, 0
     before = covered(len(text), spans)
-    added = sum(1 for e in extra if not all(before[e["start"]:e["end"]]))
-    return merge_same_type(spans + extra), added
+    return [e for e in extra if not all(before[e["start"]:e["end"]])]
+
+
+def recover_dropped(text: str, masked_text: str, spans: list[dict]) -> tuple[list[dict], int]:
+    """Add the source copies of a masked value that the tool's own output no longer holds anywhere.
+
+    SCT spans come from placeholders found in its output; a placeholder a later cleaning step removed
+    (the link text of ``[a@b.se](mailto:a@b.se)`` becomes ``<EMAIL_0>`` and is then dropped) leaves its
+    source copy unmapped, so the copy scored as leaked although no character of it is visible. A copy is
+    added only when no trace of the value is visible (``dropped_copies``: any 2+ char word of it in the
+    output, case- and accent-insensitive, or its separator-free form inside the output, blocks it) and it
+    is a whole token. Returns the merged spans and the number
+    of copies added.
+    """
+    extra = dropped_copies(text, masked_text, spans)
+    return (merge_same_type(spans + extra), len(extra)) if extra else (spans, 0)
 
 
 def covered(length: int, spans: list[dict]) -> bytearray:

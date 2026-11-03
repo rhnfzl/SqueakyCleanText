@@ -169,8 +169,9 @@ def tool(name: str, track: str = "native") -> dict:
             "requirements": Path(__file__).resolve().parent / "envs" / f"{name}.txt"}
 
 
-# PROTOCOL.md section 17, per entry: dataset -> flag ("*" = every other dataset).
+# PROTOCOL.md section 17, per entry: dataset -> direct flag ("*" = every other dataset).
 # T trained on it, E vendor evaluates on it, D SCT developed against it, U training data undisclosed, - none known.
+# Family flags are not listed here: ``contamination`` derives them from FAMILIES for every entry alike.
 CONTAMINATION = {
     "sct-default": {"*": "D", "gretel_en": "-", "argilla_pii": "-"},
     "sct-gliner": {"*": "U, D", "gretel_en": "U", "argilla_pii": "U"},
@@ -178,14 +179,28 @@ CONTAMINATION = {
     "gliner-nvidia": {"*": "-", "openpii": "E", "gretel_en": "E", "nemotron": "T", "argilla_pii": "E"},
     "gliner2-fastino": {"*": "-"},
     "opf": {"*": "U"},
-    "bardsai-v3": {"*": "-", "openpii": "T", "gretel_en": "T", "nemotron": "T", "argilla_pii": "T-family"},
+    "bardsai-v3": {"*": "-", "openpii": "T", "gretel_en": "T", "nemotron": "T"},
     "datafog": {"*": "-"},
 }
+# Generator families (decision 21: a dataset AND its family). A T, E or D flag on one member puts
+# "<flag>-family" on the others. Gretel: gretel finance and gretel_en (Gretel Navigator) and nemotron
+# (NeMo Data Designer, Navigator's successor after NVIDIA took over Gretel; the gretel_en and Nemotron-PII
+# cards both carry the datadesigner tag). ai4privacy: openpii and argilla_pii (a slice of ai4privacy-200k).
+FAMILIES = (("gretel", "gretel_en", "nemotron"), ("openpii", "argilla_pii"))
+
+
+def _flags(entry: str, dataset: str) -> list[str]:
+    flags = CONTAMINATION.get(entry, {"*": "-"})
+    return [f.strip() for f in flags.get(dataset, flags["*"]).split(",") if f.strip() not in ("", "-")]
 
 
 def contamination(entry: str, dataset: str) -> str:
-    flags = CONTAMINATION.get(entry, {"*": "-"})
-    return flags.get(dataset, flags["*"])
+    """Direct flags of the cell, then ``<X>-family`` for each T/E/D on another member of its family."""
+    own = _flags(entry, dataset)
+    family = [f"{x}-family" for x in "TED"
+              if x not in own and any(x in _flags(entry, d) for fam in FAMILIES if dataset in fam
+                                      for d in fam if d != dataset)]
+    return ", ".join(own + family) or "-"
 
 
 def status(entry: str, dataset: str) -> str:
@@ -196,12 +211,15 @@ def status(entry: str, dataset: str) -> str:
     return "excluded" if flags & {"T", "E", "D"} else "unknown" if "U" in flags else "clean"
 
 
-# PROTOCOL.md section 12, rule 2: languages each entry claims (model card language tags; None = no
-# language claim: regex, or SCT's multilingual default). Scores outside the claim are reported apart.
+# PROTOCOL.md section 12, rule 2: languages each entry claims (model card language tags at the pinned
+# revision; None = every language: datafog's regexes, and sct-default, which claims multilingual NER through
+# its WikiNEural fallback, so SCT is held to every language). Scores outside the claim are reported apart.
 EU24 = ("bg", "cs", "da", "de", "el", "en", "es", "et", "fi", "fr", "ga", "hr", "hu", "it", "lt", "lv", "mt", "nl",
         "pl", "pt", "ro", "sk", "sl", "sv")
 CLAIMED_LANGUAGES = {
-    "sct-default": None, "sct-gliner": ("en",),  # knowledgator/gliner-pii-base-v1.0 card: en
+    "sct-default": None,
+    "sct-gliner": ("en",),  # knowledgator/gliner-pii-base-v1.0 @61726e0 card metadata language: [en] (its
+    # "multilingual" is a free topic tag, not a language tag)
     "presidio": ("en",),  # en_core_web_lg only, in both tracks
     "gliner-nvidia": ("en",), "gliner2-fastino": ("en", "fr", "es", "de", "it", "pt", "nl"),
     "opf": ("en",),  # "primarily English"

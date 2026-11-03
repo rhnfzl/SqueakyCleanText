@@ -311,9 +311,10 @@ def test_registry_has_pinned_envs_and_contamination():
         assert t["requirements"].exists(), name
         pins = [line for line in t["requirements"].read_text().splitlines() if line and not line.startswith("#")]
         assert pins and all("==" in p or " @ https://" in p for p in pins), name
-        assert reg.contamination(name, "gretel_en") in {"-", "U", "E", "T"}
+        assert reg.contamination(name, "gretel_en") in {"-", "U", "E, T-family", "T", "D-family", "U, D-family"}
     assert reg.tool("sct-default")["adapter"] == "sct_adapter.py" and reg.tool("dummy")["requirements"] is None
-    assert reg.contamination("gliner-nvidia", "nemotron") == "T" and reg.contamination("sct-default", "redact") == "D"
+    assert reg.contamination("gliner-nvidia", "nemotron") == "T, E-family"
+    assert reg.contamination("sct-default", "redact") == "D"
     with pytest.raises(ValueError):
         reg.tool("nope")
     assert Counter(reg.contamination("opf", d) for d in ("tab", "openpii")) == Counter({"U": 2})
@@ -567,7 +568,8 @@ def test_report_tables_from_a_tiny_bundle(tmp_path):
     (tmp_path / "tuned" / "x" / "tab-test.json").write_text(json.dumps(
         {"documents": 10, "completed": 9, "flag_low_completion": True, "completion_rate": 0.9,
          "dataset": {"name": "tab"}, "views": {"full": {"compare": {"macro": {"masked_f2": 0.5},
-                                                            "by_language": {"en": {"masked_recall": 0.6}}}}}}))
+                                                            "by_language": {"en": {"masked_recall": 0.6,
+                                                                                        "masked_f2": 0.5}}}}}}))
     (tmp_path / "tuned" / "x" / "offset-check.json").write_text("{}")
     out = report.tables(tmp_path)
     assert "| x | 10 | 1 | tab 0.900 |" in out
@@ -606,8 +608,15 @@ def test_contamination_status_and_claimed_languages():
     assert entries.status("bardsai-v3", "argilla_pii") == "excluded"  # T-family
     assert entries.status("gliner-nvidia", "gretel_en") == "excluded"  # E
     assert entries.status("sct-default", "openpii") == "excluded"  # D: SCT is held to the same rule
-    assert entries.status("sct-default", "gretel_en") == "clean"
-    assert entries.status("opf", "tab") == "unknown" and entries.status("sct-gliner", "gretel_en") == "unknown"
+    # family rule, every entry alike: a flag on one member of a generator family reaches the others
+    assert entries.contamination("sct-default", "gretel_en") == "D-family"  # Gretel family (gretel finance D)
+    assert entries.contamination("sct-default", "argilla_pii") == "D-family"  # ai4privacy family (openpii D)
+    assert entries.contamination("bardsai-v3", "gretel") == "T-family"  # it trained on gretel_en
+    assert entries.contamination("gliner-nvidia", "gretel") == "T-family, E-family"
+    assert entries.contamination("sct-gliner", "gretel_en") == "U, D-family"
+    assert entries.contamination("presidio", "gretel") == "-" and entries.status("presidio", "gretel") == "clean"
+    assert not [d for g in scorer.GROUPS.values() for d in g if entries.status("sct-default", d) == "clean"]
+    assert entries.status("opf", "tab") == "unknown" and entries.status("sct-gliner", "gretel_en") == "excluded"
     assert entries.status("sct-gliner", "tab") == "excluded"  # U, D
     assert entries.claims("gliner-nvidia", "en") and not entries.claims("gliner-nvidia", "de")
     assert entries.claims("bardsai-v3", "pt_eu") and not entries.claims("bardsai-v3", "ja")
@@ -620,6 +629,11 @@ def test_recover_dropped_copies_only_when_no_copy_is_visible():
     spans, added = scorer.recover_dropped(text, "E-post: (mailto:<EMAIL_1>) and <EMAIL_2>", placed)
     assert added == 2 and [(s["start"], s["end"]) for s in spans] == [(9, 17), (26, 34), (40, 48)]
     assert scorer.recover_dropped(text, "E-post: (mailto:<EMAIL_1>) and ann@x.io", placed) == (placed, 0)
+    # any visible word of 2+ chars of the value (case-insensitive, whole word) blocks it, even under 4 chars
+    name = "Ann Li paid. Ann Li left."
+    assert scorer.recover_dropped(name, "<PERSON_0> paid. LI left.", [span(0, 6, "PERSON")])[1] == 0
+    assert scorer.recover_dropped(name, "<PERSON_0> paid. left.", [span(0, 6, "PERSON")])[1] == 1
+    assert scorer.recover_dropped(name, "<PERSON_0> paid. Liam left.", [span(0, 6, "PERSON")])[1] == 1  # not a word
     glued = "ann@x.io and xann@x.io"  # a copy inside a longer token is not a copy
     assert scorer.recover_dropped(glued, "<EMAIL_0> and x<EMAIL_1>", [span(0, 8, "EMAIL")])[1] == 0
     records = [gold_record("a", text=text, spans=[span(9, 17, "email"), span(26, 34, "email"), span(40, 48, "email")])]
@@ -631,7 +645,11 @@ def test_recover_dropped_copies_only_when_no_copy_is_visible():
     assert fixed["views"]["full"]["compare"]["micro"]["masked_recall"] == 1.0 and fixed["recovered_dropped_copies"] == 2
 
 
-def test_rule_views_clean_cells_claims_same_set_and_pairwise():
+def test_rule_views_clean_cells_claims_same_set_and_pairwise(monkeypatch):
+    # no families, and one set clean for SCT, so every branch of the rule views is exercised
+    monkeypatch.setattr(entries, "FAMILIES", ())
+    monkeypatch.setitem(entries.CONTAMINATION, "sct-default", {"*": "D", "gretel_en": "-"})
+
     def docs(prefix, langs, hit):
         return [(f"{prefix}{i}", f"{prefix}{i}", lang, scorer.doc_stats(
             gold_record(f"{prefix}{i}", spans=[span(0, 7, "person")]), [span(0, 7, "PERSON")] if hit else [], MAP))
@@ -672,3 +690,51 @@ def test_pairwise_and_own_tables(tmp_path):
     assert own[2].startswith("| x | none (1) | 0.800 [0.700, 0.900] |")
     assert own[3].startswith("| sct-default | none (0) | - |") and "((0.950 (1))" not in own[3] and "(0.950 (1))" in own[3]
     assert report.same_set_table({}, "full", "privacy-real", "all")[0].startswith("No dataset")
+    empty = report.pairwise_table({"own": {"sct-default": {}, "x": {}}}, "full", "privacy-real")
+    assert empty == ["No dataset in this group is clean for both sct-default and any other entry (languages both claim)."]
+
+
+def test_audit_recover_flags_folded_traces():
+    from benchmarks.compare import audit_recover
+
+    assert scorer.traces("José Ruiz", "<PERSON_0> met JOSE today") == {"compact": False, "word": True}
+    assert scorer.traces("555-1234", "call 5551234") == {"compact": True, "word": False}
+    assert scorer.traces("ann@x.io", "<EMAIL_0>") == {"compact": False, "word": False}
+    # the rule blocks both traces: a folded word, or the separator-free form inside another token
+    assert scorer.recover_dropped("José R. and José R.", "<PERSON_0> and jose", [span(0, 7, "PERSON")])[1] == 0
+    assert scorer.recover_dropped("Polis and Polis", "<ORG_0> and polisvoorwaarden", [span(0, 5, "ORG")])[1] == 0
+    record = gold_record("a", text="[ann@x.io](mailto:ann@x.io)", spans=[span(1, 9, "email"), span(18, 26, "email")])
+    outputs = {"a": {"id": "a", "spans": [span(18, 26, "EMAIL")], "masked_text": "(mailto:<EMAIL_1>)"}}
+    counts, rows = audit_recover.audit([record], outputs, {"EMAIL": "EMAIL"})
+    assert counts == {"recovered": 1, "sampled": 1, "passed": 1, "failed_compact": 0, "failed_word": 0, "on_gold": 1}
+
+
+def test_dataset_table_scores_claimed_languages_and_labels_without_recovery(tmp_path):
+    from benchmarks.compare import report
+
+    def write(root, entry, by_language):
+        path = root / entry / "tab-test.json"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps({"views": {"full": {"compare": {"by_language": by_language}}}}))
+
+    write(tmp_path / "t", "gliner-nvidia", {"en": {"masked_f2": 0.8}, "de": {"masked_f2": 0.2}})
+    write(tmp_path / "t", "bardsai-v3", {"ja": {"masked_f2": 0.4}})
+    write(tmp_path / "t", "sct-default", {"en": {"masked_f2": 0.9}, "ja": {"masked_f2": 0.7}})
+    write(tmp_path / "w", "sct-default", {"en": {"masked_f2": 0.5}, "ja": {"masked_f2": 0.5}})
+    entries_ = ("gliner-nvidia", "bardsai-v3", "sct-default")
+    inside = report.dataset_table(tmp_path / "t", entries_, without_dir=tmp_path / "w")
+    assert inside[2] == "| tab | 0.800 | ° | (0.800; w/o recovery 0.500) |"  # en only for nvidia; SCT claims all
+    outside = report.dataset_table(tmp_path / "t", entries_, inside=False)
+    assert outside[2] == "| tab | 0.200 | 0.400 | - |"
+
+
+def test_audit_table_reads_both_passes(tmp_path):
+    from benchmarks.compare import report
+
+    (tmp_path / "audit").mkdir()
+    c = {"recovered": 9, "sampled": 5, "passed": 4, "failed_compact": 1, "failed_word": 0, "on_gold": 2}
+    (tmp_path / "audit" / "default-first-pass.json").write_text(json.dumps({"entries": {"sct-default": {"tab": c}}}))
+    (tmp_path / "audit" / "default.json").write_text(json.dumps(
+        {"entries": {"sct-default": {"tab": {**c, "recovered": 8, "passed": 5, "failed_compact": 0}}}}))
+    assert report.audit_table(tmp_path, "default")[2] == "| sct-default | tab | 9 | 5 | 1 | 8 | 5 | 5 | 2 |"
+    assert report.audit_table(tmp_path, "tuned") == []
