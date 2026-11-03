@@ -43,6 +43,31 @@ stored = json.dumps(anon_map.to_dict())
 ```
 
 
+## User term lists
+
+SCT never ships a word list, but you can pass your own. Every mode uses them: placeholder, reversible,
+synthetic, `process_batch`, the streaming redactors and `process_json`.
+
+```python
+cfg = TextCleanerConfig(
+    custom_deny_terms={'PROJECT': ('Blue Sky', '蓝天计划')},   # always masked as <PROJECT>
+    custom_patterns={'EMPLOYEE_ID': r'EMP-\d{6}'},            # your own regex, masked as <EMPLOYEE_ID>
+    custom_allow_terms=('support@acme.com',),                 # never masked
+)
+TextCleaner(cfg).process("Blue Sky: ask support@acme.com or bob@x.com, EMP-123456").lm_text
+# -> "<PROJECT>: ask support@acme.com or <EMAIL>, <EMPLOYEE_ID>"
+```
+
+- Order: deny terms, then your patterns, then the built-in regex steps and NER; allow terms are applied last
+  and win over everything, also over your own deny terms and patterns.
+- Placeholder mode writes `<LABEL>`; reversible mode writes `<LABEL_0>` and records the original in the map,
+  so `deanonymize` restores it; synthetic mode writes a Faker value when the label has one (`PERSON`, `CITY`,
+  `EMAIL`, ...; see `FAKER_GENERATORS` in `sct/utils/synthetic.py`) and `<LABEL>` otherwise.
+- `metadata['regex_counts']` and `signals` count each label (count and characters, never values); user labels
+  count as PII in `signals['pii_types']`.
+- Whole-word and case rules: see `custom_deny_terms` and `custom_terms_case_sensitive` in
+  [CONFIG.md](CONFIG.md). The browser manifest does not export these lists (server-side only).
+
 ## Document Classification (GLiClass)
 
 Classify documents before processing using zero-shot classification with [GLiClass](https://github.com/Knowledgator/GLiClass):

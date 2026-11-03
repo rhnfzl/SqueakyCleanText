@@ -45,7 +45,7 @@ def test_kept_private_ip_is_not_counted():
 
 
 def test_each_step_type_counted():
-    text = "<b>x</b> https://a.example/p 2024-01-15 in 1999 call +1-202-555-0147 pay $ 42"
+    text = "<b>x</b> https://a.example/p 2024-01-15 in 1999 call +1-202-555-0147 pay $ 42 ref 4711"
     counts = _cleaner(check_replace_dates=True).process(text).metadata["regex_counts"]
 
     assert counts["HTML"] == {"count": 2, "chars": 7}
@@ -53,7 +53,7 @@ def test_each_step_type_counted():
     assert counts["DATE"] == {"count": 1, "chars": 10}
     assert counts["YEAR"] == {"count": 1, "chars": 4}
     assert counts["PHONE"]["count"] == 1
-    assert counts["NUMBER"] == {"count": 1, "chars": 2}
+    assert counts["NUMBER"] == {"count": 1, "chars": 4}  # "$ 42" is an amount, "4711" an ID
     assert counts["CURRENCY"] == {"count": 1, "chars": 1}
 
 

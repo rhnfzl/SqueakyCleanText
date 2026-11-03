@@ -320,7 +320,7 @@ def test_numbers_in_spaced_script_words_kept_by_default(text):
 
 
 def test_numbers_in_words_flag_replaces_glued_digits():
-    out = _cleaner(replace_numbers_in_words=True).process("GPT4 and mp3").lm_text
+    out = _cleaner(replace_numbers_in_words=True, replace_numbers_mode="all").process("GPT4 and mp3").lm_text
     assert out == "GPT<NUMBER> and mp<NUMBER>"
 
 

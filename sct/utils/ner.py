@@ -166,7 +166,8 @@ class GeneralNER:
                  ner_propagate_masked: bool = True,
                  ner_propagate_min_score: Optional[float] = None,
                  ner_merge_location_gap: int = 0,
-                 ner_snap_word_edges: bool = True):
+                 ner_snap_word_edges: bool = True,
+                 allow_regex=None):
         """Initialize NER processor.
 
         Args:
@@ -199,6 +200,7 @@ class GeneralNER:
             ner_snap_word_edges: Move a span edge that falls inside a word (letters and marks,
                 not wide CJK) out to the word edge, any backend, within the
                 ner_subword_widen cap and script rule; False = 0.8.0 spans.
+            allow_regex: Compiled custom_allow_terms; a span equal to or inside a match is kept as text.
         """
         _LIVE_NER.add(self)
         self._ner_backend = ner_backend
@@ -211,6 +213,7 @@ class GeneralNER:
         self._ner_propagate_min_score = ner_propagate_min_score
         self._ner_merge_location_gap = ner_merge_location_gap
         self._ner_snap_word_edges = ner_snap_word_edges
+        self._allow_regex = allow_regex
         self._replacement_mode = replacement_mode
         self._synthetic_replacer = synthetic_replacer
         self._regex_markers = tuple(regex_markers)
@@ -803,6 +806,7 @@ class GeneralNER:
             if types is None:
                 types = _presidio_type_map({})
             # then aliases (PER/LOC/ORG) to canonical names, as the other backends do
+            analyzer_results = self._drop_allowed(text, analyzer_results, lambda r: (r.start, r.end))
             for result in analyzer_results:
                 entity_type = types.get(result.entity_type, result.entity_type)
                 result.entity_type = ENTITY_TYPE_MAP.get(entity_type, entity_type)
@@ -1166,6 +1170,7 @@ class GeneralNER:
         if self._ner_merge_location_gap:
             ensemble_results = self._merge_location_gaps(
                 text, ensemble_results, markers, self._ner_merge_location_gap)
+        ensemble_results = self._drop_allowed(text, ensemble_results, lambda item: (item['start'], item['end']))
         if not ensemble_results:
             return NERProcessingResult(text=text, findings=())
         entities = tuple(self._entity(item) for item in ensemble_results)
@@ -1183,6 +1188,15 @@ class GeneralNER:
             for entity in entities
         )
         return NERProcessingResult(text=result.text, findings=findings)
+
+    def _drop_allowed(self, text, items, span):
+        """*items* without those equal to or inside a custom_allow_terms occurrence (applied last)."""
+        allow = getattr(self, '_allow_regex', None)
+        if allow is None or not items:
+            return items
+        allowed = [m.span() for m in allow.finditer(text)]
+        return [item for item in items
+                if not any(a <= span(item)[0] and span(item)[1] <= b for a, b in allowed)]
 
     @staticmethod
     def _merge_location_gaps(text, spans, markers, max_gap):

@@ -12,7 +12,9 @@ Legacy API (backward compatible):
     cleaner = TextCleaner()
 """
 
+import re
 import sys
+from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import date
 from types import MappingProxyType
@@ -398,6 +400,42 @@ class TextCleanerConfig:
     # . , ; : ! ? ' end a URL path or query unless more URL text follows ("https://x.com/a. Next");
     # False = 0.8.0, where the URL takes the sentence's full stop or comma
     url_trailing_punct_outside: bool = True
+    # check_replace_numbers: 'identifiers' masks only whole digit runs of an identifier shape (not glued to
+    # letters, digits or joined parts such as INV-2023-107683, which stays untouched; not an amount, decimal,
+    # percent, time or range); 'all' = 0.8.1, every number. On the DEV split of the external benchmark the
+    # 'all' rule caused 62-68% of SCT's false masks.
+    replace_numbers_mode: str = 'identifiers'
+    # Fewest digits an identifier-shaped number needs. 4: on DEV (9 datasets, 4,298 docs, years/dates off,
+    # phone_reject_embedded on) 4 digits gave F2 0.881 / recall 0.893 / precision 0.856, the best F2 of 4-7;
+    # 7 digits gave 0.869 / precision 0.865. Shorter runs (ages, counts, list numbers) are left as they are.
+    replace_numbers_min_digits: int = 4
+    # Drop a digit-only phone match glued to a Latin/Greek/Cyrillic letter or "_", directly or across a joiner
+    # (ID9876543210, ref-0612345678), or that is a yyyymmdd date or yyyymmddhhmm[ss] timestamp (20231105123456); formatted and
+    # international phones are not touched. On DEV:
+    # precision +0.02, recall -0.01. False = 0.8.1
+    phone_reject_embedded: bool = True
+    # User term lists (SCT ships none; the user decides the words). Empty by default.
+    # {LABEL: (term, ...)}: always mask these terms as <LABEL>, as whole words (no letter, mark or digit of a
+    # spaced script glued to them; an edge in CJK/Thai is a word edge). Runs before the built-in regex steps.
+    custom_deny_terms: Optional[Mapping[str, Tuple[str, ...]]] = None
+    # Never mask these terms: a regex or NER detection equal to or inside an occurrence is kept as text.
+    # Applied last, so it also wins over custom_deny_terms and custom_patterns.
+    custom_allow_terms: Tuple[str, ...] = ()
+    # {LABEL: regex}: mask every match as <LABEL> (the third-party ``regex`` module, compiled once). Runs
+    # with custom_deny_terms, before the built-in steps. A pattern that can match "" is rejected; a pattern
+    # with nested repeats can backtrack for a long time (ReDoS), so only pass patterns you trust.
+    custom_patterns: Optional[Mapping[str, str]] = None
+    # Whether custom_deny_terms and custom_allow_terms match case-sensitively. False: "acme" matches "ACME".
+    custom_terms_case_sensitive: bool = False
+    # replace_numbers_mode='identifiers' only: whole-token ID shapes the plain digit-run rule rejects (format
+    # rules, not replace_numbers_min_digits). Each was measured on the DEV split against 0.8.1's recall.
+    # 1-3 uppercase letters, 6+ digits, 0-2 uppercase letters (AB1234567, X12345678Z); not USD1000000
+    numbers_letter_prefix_ids: bool = True
+    # Two digit groups joined by "/" or a hyphen (first 4+ digits, 7+ in all, optional check letter:
+    # 123456/7890, 12345-678901) or by "." (4+ digits each side: 12345.67890); not 2023-2024 or 1000-3000
+    numbers_two_part_ids: bool = True
+    # "DDD DD", a 5-digit postal code written with a space (123 45)
+    numbers_spaced_pair_ids: bool = True
 
     def __post_init__(self):
         if self.synthetic_reference_date is not None:
@@ -518,6 +556,11 @@ class TextCleanerConfig:
                 raise ValueError(f"{name} must be None or in [0, 1], got {value}")
         if self.ner_ensemble_vote not in ('max', 'mean'):
             raise ValueError(f"ner_ensemble_vote must be 'max' or 'mean', got {self.ner_ensemble_vote!r}")
+        if self.replace_numbers_mode not in ('identifiers', 'all'):
+            raise ValueError(f"replace_numbers_mode must be 'identifiers' or 'all', got {self.replace_numbers_mode!r}")
+        if isinstance(self.replace_numbers_min_digits, bool) or not isinstance(self.replace_numbers_min_digits, int) \
+                or self.replace_numbers_min_digits < 1:
+            raise ValueError(f"replace_numbers_min_digits must be an int >= 1, got {self.replace_numbers_min_digits!r}")
         if self.ner_merge_location_gap < 0:
             raise ValueError(f"ner_merge_location_gap must be >= 0, got {self.ner_merge_location_gap}")
         if self.ner_propagate_min_score is not None and not 0.0 <= self.ner_propagate_min_score <= 1.0:
@@ -676,6 +719,8 @@ class TextCleanerConfig:
             object.__setattr__(self, 'custom_month_names',
                                MappingProxyType(resolved_mn))
 
+        _validate_user_terms(self)
+
         # Compute supported_languages: union of all sources
         langs = set(DEFAULT_LANGUAGES)
         langs.update(self.extra_languages)
@@ -734,6 +779,62 @@ class TextCleanerConfig:
             object.__setattr__(self, key, value)
         if self.ner_mode == 'pii' and self.gliner_label_map is None:
             object.__setattr__(self, 'gliner_label_map', _PII_MAPS[self.legacy_type_names])
+
+
+_USER_LABEL = re.compile(r'[A-Z][A-Z0-9_]*')
+
+
+def _user_terms(name, terms):
+    if isinstance(terms, (str, bytes)) or not isinstance(terms, Iterable):
+        raise ValueError(f"{name} must be a tuple of strings, got {terms!r}")
+    terms = tuple(terms)
+    for term in terms:
+        if not isinstance(term, str) or not term.strip():
+            raise ValueError(f"{name} terms must be non-empty strings, got {term!r}")
+    return terms
+
+
+def _user_label(name, label):
+    if not isinstance(label, str) or not _USER_LABEL.fullmatch(label):
+        raise ValueError(f"{name} labels must be upper case (A-Z, 0-9, _; starting with a letter), "
+                         f"such as 'PROJECT', got {label!r}")
+
+
+def _validate_user_terms(cfg):
+    """Validate and freeze custom_deny_terms, custom_allow_terms and custom_patterns."""
+    import regex
+    if not isinstance(cfg.custom_terms_case_sensitive, bool):
+        raise ValueError(f"custom_terms_case_sensitive must be a bool, got {cfg.custom_terms_case_sensitive!r}")
+    object.__setattr__(cfg, 'custom_allow_terms', _user_terms('custom_allow_terms', cfg.custom_allow_terms or ()))
+    if cfg.custom_deny_terms is not None:
+        if not isinstance(cfg.custom_deny_terms, Mapping):
+            raise ValueError(f"custom_deny_terms must be a mapping {{LABEL: (term, ...)}}, got {cfg.custom_deny_terms!r}")
+        deny, seen = {}, {}
+        for label, terms in cfg.custom_deny_terms.items():
+            _user_label('custom_deny_terms', label)
+            deny[label] = _user_terms(f'custom_deny_terms[{label!r}]', terms)
+            if not deny[label]:
+                raise ValueError(f"custom_deny_terms[{label!r}] has no terms; drop the label or add a term")
+            for term in deny[label]:
+                key = term if cfg.custom_terms_case_sensitive else term.casefold()
+                if seen.setdefault(key, label) != label:
+                    raise ValueError(f"custom_deny_terms: {term!r} is listed under both {seen[key]!r} and {label!r}")
+        object.__setattr__(cfg, 'custom_deny_terms', MappingProxyType(deny))
+    if cfg.custom_patterns is not None:
+        if not isinstance(cfg.custom_patterns, Mapping):
+            raise ValueError(f"custom_patterns must be a mapping {{LABEL: regex}}, got {cfg.custom_patterns!r}")
+        for label, pattern in cfg.custom_patterns.items():
+            _user_label('custom_patterns', label)
+            if not isinstance(pattern, str) or not pattern:
+                raise ValueError(f"custom_patterns[{label!r}] must be a non-empty regex string, got {pattern!r}")
+            try:
+                compiled = regex.compile(pattern)
+            except regex.error as error:
+                raise ValueError(f"custom_patterns[{label!r}] is not a valid regex: {error}") from None
+            # shortcut: probes a few texts for an empty match, not every text; the step also skips empty matches.
+            if any(m.group() == '' for probe in ('', ' ', 'a', '0', 'a b', 'A-1.') for m in compiled.finditer(probe)):
+                raise ValueError(f"custom_patterns[{label!r}] can match the empty string: {pattern!r}")
+        object.__setattr__(cfg, 'custom_patterns', MappingProxyType(dict(cfg.custom_patterns)))
 
 
 def _config_from_module_globals() -> TextCleanerConfig:
@@ -799,6 +900,16 @@ def _config_from_module_globals() -> TextCleanerConfig:
         ner_merge_location_gap=getattr(m, 'NER_MERGE_LOCATION_GAP', 0),
         ner_snap_word_edges=getattr(m, 'NER_SNAP_WORD_EDGES', True),
         url_trailing_punct_outside=getattr(m, 'URL_TRAILING_PUNCT_OUTSIDE', True),
+        replace_numbers_mode=getattr(m, 'REPLACE_NUMBERS_MODE', 'identifiers'),
+        replace_numbers_min_digits=getattr(m, 'REPLACE_NUMBERS_MIN_DIGITS', 4),
+        phone_reject_embedded=getattr(m, 'PHONE_REJECT_EMBEDDED', True),
+        custom_deny_terms=getattr(m, 'CUSTOM_DENY_TERMS', None),
+        custom_allow_terms=getattr(m, 'CUSTOM_ALLOW_TERMS', ()),
+        custom_patterns=getattr(m, 'CUSTOM_PATTERNS', None),
+        custom_terms_case_sensitive=getattr(m, 'CUSTOM_TERMS_CASE_SENSITIVE', False),
+        numbers_letter_prefix_ids=getattr(m, 'NUMBERS_LETTER_PREFIX_IDS', True),
+        numbers_two_part_ids=getattr(m, 'NUMBERS_TWO_PART_IDS', True),
+        numbers_spaced_pair_ids=getattr(m, 'NUMBERS_SPACED_PAIR_IDS', True),
         check_replace_currency_symbols=m.CHECK_REPLACE_CURRENCY_SYMBOLS,
         check_ner_process=m.CHECK_NER_PROCESS,
         check_remove_isolated_letters=m.CHECK_REMOVE_ISOLATED_LETTERS,
@@ -924,6 +1035,16 @@ HTML_TAG_STRICT = True
 NER_MERGE_LOCATION_GAP = 0
 NER_SNAP_WORD_EDGES = True
 URL_TRAILING_PUNCT_OUTSIDE = True
+REPLACE_NUMBERS_MODE = 'identifiers'
+REPLACE_NUMBERS_MIN_DIGITS = 4
+PHONE_REJECT_EMBEDDED = True
+CUSTOM_DENY_TERMS = None
+CUSTOM_ALLOW_TERMS = ()
+CUSTOM_PATTERNS = None
+CUSTOM_TERMS_CASE_SENSITIVE = False
+NUMBERS_LETTER_PREFIX_IDS = True
+NUMBERS_TWO_PART_IDS = True
+NUMBERS_SPACED_PAIR_IDS = True
 GLINER_ONNX = False
 LANGUAGE = None
 

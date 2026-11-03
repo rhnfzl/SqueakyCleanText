@@ -249,6 +249,85 @@ NUMBERS_REGEX = re.compile(
 # Strict mode (replace_numbers_in_words=True): only an adjacent digit blocks a match.
 NUMBERS_IN_WORDS_REGEX = re.compile(rf"(?<![\d_,.]){_NUMBER_BODY}(?![\d_])")
 
+# replace_numbers_mode='identifiers' and phone_reject_embedded: what makes a digit run part of a longer token.
+# Joiners build one token from parts (INV-2023-107683, 2023/11, 1.5, 1,250, a_1, 100–200). ":", "=" and "#"
+# are left out: they introduce a value ("ID:12345678", "id=12345678", "#12345"), so that value stays maskable.
+PART_JOINERS = r"\-\u2010-\u2015/+*._|,"
+# A placeholder edge joined to the digits counts as a token part too ("<YEAR>", or the cleaner's protected
+# \U00100000..\U00100001 key for an emitted value), so "INV-<YEAR>-107683" keeps its tail instead of a
+# second, partial mask.
+_LEFT_EDGE, _RIGHT_EDGE = ">\U00100001", "<\U00100000"
+CURRENCY_SIGNS = ''.join(ch for ch in map(chr, range(0x110000)) if unicodedata.category(ch) == 'Sc')
+
+
+def token_glue(in_words=False):
+    """Characters that glue to a digit run: digits, "_", and (unless in_words) Latin/Greek/Cyrillic letters.
+    Letters of unspaced scripts (CJK, Thai) do not glue, as for NUMBERS_REGEX: 金额50000元 is a whole number."""
+    return r"\d_" if in_words else rf"\d_{_SPACED_LETTERS}"
+
+
+_ID_NUMBER_CACHE = {}
+
+
+def identifier_numbers_regex(min_digits, in_words=False, *, letter_prefix=False, two_part=False, spaced_pair=False):
+    """A whole digit run of at least *min_digits* digits that is not part of a longer token (glued to letters,
+    digits or a joiner and another token part) and not an amount, decimal, percent, time or range: those
+    shapes either join their parts (1,250.00, 100-200; 14:30 has 2-digit parts) or touch a % / currency sign.
+    A whole digit-only token of three or more hyphen-joined groups with *min_digits* digits in all (an SSN-like
+    123-45-6789) is one identifier too, unless it is date-shaped (2023-11-05, 05-11-23).
+    Opt-in whole-token shapes (format rules, independent of *min_digits*):
+    letter_prefix: 1-3 uppercase Latin letters, 6+ digits, 0-2 uppercase letters (AB1234567, X12345678Z),
+    not a currency code before digits (USD1000000).
+    two_part: two digit groups joined by "/" or a hyphen, the first 4+ digits, 7+ digits in all, an optional
+    uppercase check letter (123456/7890, 12345-678901, 123456-789K), or by "." with 4+ digits on each side
+    (12345.67890); not a year pair (2023-2024), a round range (1000-3000) or a time (1234-5678:30).
+    spaced_pair: "DDD DD" (a 5-digit postal code written 123 45), and a run of 3+ space-separated digit groups
+    with 7+ digits (123 45 6789, 123 45 678) as one identifier, unless thousands-grouped (1 234 567)."""
+    key = (min_digits, in_words, letter_prefix, two_part, spaced_pair)
+    if key not in _ID_NUMBER_CACHE:
+        glue, j, unit = token_glue(in_words), PART_JOINERS, CURRENCY_SIGNS
+        hyphen, end = r"[\-\u2010\u2011]", rf"(?![\d{j}])"
+        date = rf"(?:\d{{1,2}}{hyphen}\d{{1,2}}{hyphen}(?:\d\d){{1,2}}|\d{{4}}{hyphen}\d{{1,2}}{hyphen}\d{{1,2}}){end}"
+        grouped = rf"(?!{date})(?=\d(?:{hyphen}?\d){{{min_digits - 1}}})\d+(?:{hyphen}\d+){{2,}}"
+        no_unit_before, no_unit_after = rf"(?<![{unit}])(?<![{unit}] )", rf"(?! ?[%‰{unit}])"
+        shapes = [
+            rf"(?<![{glue}])(?<![{glue}{_LEFT_EDGE}][{j}]){no_unit_before}"
+            rf"(?:{grouped}|\d{{{min_digits},}})"
+            rf"(?![{glue}])(?![{j}][{glue}{_RIGHT_EDGE}]){no_unit_after}"
+        ]
+        if letter_prefix:
+            shapes.append(rf"(?<![\w\-/.])(?!(?:{_CURRENCY_CODES})\d)[A-Z]{{1,3}}\d{{6,}}[A-Z]{{0,2}}(?!\w)")
+        if two_part:
+            slash = r"[/\-\u2010\u2011]"
+            year = r"(?:1[89]|20)\d\d"
+            shapes.append(
+                rf"(?<![\w\-/.,+]){no_unit_before}"
+                rf"(?!{year}{slash}{year}(?!\w))(?!\d*00{slash}\d*00(?!\w))"
+                rf"(?=(?:\d{slash}?){{7}})\d{{4,}}{slash}\d{{2,6}}[A-Z]?(?!\w|[\-/.,:]\d){no_unit_after}"
+            )
+            shapes.append(rf"(?<![\w\-/.,+]){no_unit_before}\d{{4,}}\.\d{{4,}}(?!\w|[\-/.,]\d){no_unit_after}")
+        if spaced_pair:
+            # 3+ space-separated digit groups with 7+ digits (an ID or SSN written 123 45 6789) are one
+            # identifier, unless thousands-grouped (1 234 567, an amount); the 2-group form is a postal code.
+            tail = rf"(?!\w|[.,: \-‐‑]\d){no_unit_after}"
+            shapes.append(rf"(?<![\w.,:/\-])(?<!\d ){no_unit_before}(?!\d{{1,3}}(?: \d{{3}})+{tail})"
+                          rf"(?=(?:\d ?){{7}})\d{{1,4}}(?: \d{{2,4}}){{2,}}{tail}")
+            shapes.append(rf"(?<![\w.,:/\-])(?<!\d ){no_unit_before}\d{{3}} \d{{2}}{tail}")
+        _ID_NUMBER_CACHE[key] = re.compile("|".join(shapes))
+    return _ID_NUMBER_CACHE[key]
+
+
+# phone_reject_embedded: a digit-only phone match with a letter or "_" on either side, directly or across a
+# joiner, or one that is a yyyymmdd date or a yyyymmddhhmm[ss] timestamp (20231105123456), not a phone. A
+# date with other digits after it (2023010123) can be a real phone, so only these exact shapes are rejected.
+# Digits across a joiner do not count: in "06-12345678" the phone regex takes only "12345678", and rejecting
+# it would leave the whole phone visible.
+_PHONE_GLUE = rf"_{_SPACED_LETTERS}"
+PHONE_EMBEDDED_LEFT = re.compile(rf"(?:[{_PHONE_GLUE}]|[{_PHONE_GLUE}{_LEFT_EDGE}][{PART_JOINERS}])\Z")
+PHONE_EMBEDDED_RIGHT = re.compile(rf"[{_PHONE_GLUE}]|[{PART_JOINERS}][{_PHONE_GLUE}{_RIGHT_EDGE}]")
+YYYYMMDD_STAMP = re.compile(
+    r"(?:19|20)\d\d(?:0[1-9]|1[0-2])(?:0[1-9]|[12]\d|3[01])(?:(?:[01]\d|2[0-3])[0-5]\d(?:[0-5]\d)?)?")
+
 LINEBREAK_REGEX = re.compile(r"((\r\n)|[\n\v])+")
 TWO_LINEBREAK_REGEX = re.compile(r"((\r\n)|[\n\v])+((\r\n)|[\n\v])+")
 MULTI_WHITESPACE_TO_ONE_REGEX = re.compile(r"\s+")
@@ -639,3 +718,22 @@ CHUNK_DELIMITERS = (
     re.compile(r'(?<=[;:,\u2014\u2026])\s+'), # Clause separators (; : , em-dash, ellipsis)
     re.compile(r'\s+'),                        # Any whitespace (word boundaries)
 )
+
+
+# User term lists (custom_deny_terms, custom_allow_terms): a term is a whole word where no letter, mark or
+# digit of a spaced script touches it. A term edge in a script written without spaces (CJK, Thai) is a word
+# edge already, and letters of those scripts never glue (金额ACME元 holds the term ACME).
+_TERM_GLUE = rf'[[\p{{L}}\p{{M}}\p{{N}}]--[{_SPACELESS}]]'
+
+
+def terms_regex(terms, case_sensitive=False, labels=None):
+    """One regex for *terms* as whole words (longest first, so an overlap keeps the longer term). With
+    *labels* ({term: LABEL}) each term is a group named by its label, so ``match.lastgroup`` is the label
+    (a case variant such as "İ" for "i" need not equal the term after casefold)."""
+    parts = []
+    for term in sorted(set(terms), key=len, reverse=True):
+        left = '' if _SPACELESS_CHAR.match(term[0]) else rf'(?<!{_TERM_GLUE})'
+        right = '' if _SPACELESS_CHAR.match(term[-1]) else rf'(?!{_TERM_GLUE})'
+        body = regex.escape(term) if labels is None else f'(?P<{labels[term]}>{regex.escape(term)})'
+        parts.append(left + body + right)
+    return regex.compile('|'.join(parts), regex.V1 | (0 if case_sensitive else regex.IGNORECASE))

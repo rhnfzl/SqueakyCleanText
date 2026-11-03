@@ -2,7 +2,95 @@
 
 ## Unreleased
 
-**Apple GPU for torch and GLiNER.** Set `ner_device="mps"` on an Apple silicon Mac to run torch NER and GLiNER on the GPU, about 1.6x faster `process_batch` on an M4 Max with the same output.
+**Numbers stay, IDs go.** By default SCT masks only ID-shaped numbers (`Order 4711`, `#12345`) and keeps prices,
+percentages, times, ranges and short numbers (the old rule caused 62-68% of false masks on the benchmark DEV
+split). Grouped IDs such as `123-45-6789` are still masked. Digits inside a code (`ID9876543210`) and bare
+dates or timestamps (`20231105123456`) are no longer taken for phones.
+
+**Apple GPU for torch and GLiNER.** Set `ner_device="mps"` on an Apple silicon Mac to run torch NER and GLiNER
+on the GPU, about 1.6x faster `process_batch` on an M4 Max with the same output.
+
+**Your own term lists.** Pass terms to always mask (`custom_deny_terms`), terms to never mask
+(`custom_allow_terms`) and your own labelled regex (`custom_patterns`). SCT still ships no list of its own.
+
+Heads-up: output text changes for numbers and some phones. `replace_numbers_mode='all'` and
+`phone_reject_embedded=False` restore 0.8.1.
+
+### Number and phone masking
+
+- New `replace_numbers_mode` (default `'identifiers'`, legacy global `REPLACE_NUMBERS_MODE`): `<NUMBER>` only for
+  whole digit runs of an identifier shape. Kept as written: amounts and decimals (`1,250.00`, `12.5`), numbers
+  beside `%`, `‰` or a currency sign, times and ranges (`14:30`, `1000-3000`), and digits that are part of a
+  longer token (glued to a Latin/Greek/Cyrillic letter, digit or `_`, or joined by `- / + * . _ | ,` or a dash
+  to one). `:` `=` `#` do not join, so `ID:98765`, `id=98765` and `#12345` are still masked. Digits of every
+  script count (Arabic-Indic, Devanagari, full-width); letters of unspaced scripts do not glue (`金额50000元`).
+  `'all'` = 0.8.1. `check_replace_numbers` stays the on/off switch.
+- A whole digit-only token of three or more hyphen-joined groups with at least `replace_numbers_min_digits`
+  digits in all is one `<NUMBER>` (`SSN: 123-45-6789`, `1234-56-78-90`), so grouped IDs do not leak.
+  Date-shaped tokens (`2023-11-05`, `05-11-23`) and two-part ranges (`100-200`) are kept.
+- New `replace_numbers_min_digits` (default `4`, legacy global `REPLACE_NUMBERS_MIN_DIGITS`). Chosen on DEV only
+  (9 datasets, 4,298 docs, macro): 4 digits gave F2 0.881 / recall 0.893 / precision 0.856 with years and dates
+  off and the phone rule below, the best F2 of 4 to 7 (7 digits: F2 0.869, precision 0.865). The 0.8.1 default
+  scored F2 0.850 / recall 0.944 / precision 0.680 on the same docs. Not yet confirmed on the test split.
+- Code fragments: `INV-2023-107683` no longer gets a partial `INV-<YEAR><NUMBER>`. The number step leaves the
+  code whole; the year step still takes `2023` when years are on (`INV-<YEAR>-107683`; the `training` preset
+  has years off and keeps the code as written).
+- New `phone_reject_embedded` (default `True`, legacy global `PHONE_REJECT_EMBEDDED`): a digit-only phone match
+  glued to a Latin/Greek/Cyrillic letter or `_`, directly or across a joiner (`ID9876543210`,
+  `ref-0612345678`), or that is exactly a yyyymmdd date or a yyyymmddhhmm[ss] timestamp (`20231105123456`) is
+  left as it is. A phone that only starts like a date (`2023010123`) is still a phone. Digits across a joiner do not count, so
+  `06-12345678` keeps its 0.8.1 `06-<PHONE>`.
+  Formatted and international phones, `Tel:0612345678` and phones glued to unspaced scripts (`电话9876543210`)
+  are unchanged; `Tel0612345678` (glued to a Latin word) is no longer masked. DEV: precision +0.02, recall
+  -0.01. `False` = 0.8.1.
+- Both rules reach the plain, reversible and synthetic modes, `process_batch` and the streaming redactors. The
+  browser manifest exports the new number pattern (with `fold_decimal_digits`); `phone_reject_embedded` is
+  server-side and listed under the manifest's limitations. The `training` preset and the adapters keep numbers
+  off as before. `ProcessContacts.replace_numbers` / `replace_phone_numbers` keep the 0.8.1 patterns.
+- Not measured: the joiner set differs from the DEV simulation (`:` `=` `#` removed, `,` and dashes added,
+  grouped numbers such as `1 234 567` kept); a rerun of the benchmark will show the exact numbers.
+- Three ID shapes the plain digit-run rule rejected are masked again in `'identifiers'` mode, each a new field
+  with a legacy global (default `True`): `numbers_letter_prefix_ids` (`AB1234567`, `X12345678Z`: 1-3 uppercase
+  letters, 6+ digits, 0-2 uppercase letters; not `USD1000000`), `numbers_two_part_ids` (`123456/7890`,
+  `12345-678901`, `123456-789K`, `12345.67890`; not year pairs `2023-2024`, round ranges `1000-3000`, times,
+  `%` or currency) and `numbers_spaced_pair_ids` (`123 45`, a spaced 5-digit postal code, and spaced IDs with 3+ groups and 7+ digits such as `123 45 6789`; thousands-grouped amounts like `1 234 567` stay). Format rules only.
+  DEV (9 datasets, language macro, NER threshold 0.8): F2 0.888 -> 0.901, recall 0.919 -> 0.937, precision
+  0.814 -> 0.811, over-mask 0.029 -> 0.033. Pooled gold ID/number recall 0.633 -> 0.791 (0.8.1: 0.809) and
+  phone recall 0.965 -> 0.990 (0.8.1: 0.997); most lost phones were `12345-678901`-shaped and come back as
+  `<NUMBER>`. `1234/5678` is now one `<NUMBER>`; a range like `12345-67890` cannot be told from an ID and is
+  masked. The streaming redactors keep `123 45` in one window.
+
+### User term lists
+
+- New `custom_deny_terms` (`{LABEL: (term, ...)}`), `custom_allow_terms` (`(term, ...)`), `custom_patterns`
+  (`{LABEL: regex}`) and `custom_terms_case_sensitive` (default `False`), each with a legacy global
+  (`CUSTOM_DENY_TERMS`, `CUSTOM_ALLOW_TERMS`, `CUSTOM_PATTERNS`, `CUSTOM_TERMS_CASE_SENSITIVE`). All empty by
+  default, so output does not change.
+- Terms match as whole words, Unicode-aware: no letter, mark or digit of a spaced script may touch them; in CJK
+  and Thai the term edge is the word edge. Deny terms and patterns run before the built-in regex steps; allow
+  terms are applied last to regex and NER detections (also to your own deny terms and patterns). A regex value
+  that also appears outside an allowed term is masked everywhere.
+- Every replacement mode (`<LABEL>`, reversible `<LABEL_0>` restored by `deanonymize`, synthetic Faker value
+  for labels Faker knows, else `<LABEL>`), `process_batch`, both streaming redactors (the windowed split guard
+  will not cut a term), `process_json`, `regex_counts` and `signals` (user labels count as PII; values never
+  appear).
+- Clear `ValueError`s at config time: label not upper case, a string instead of a tuple of terms, empty
+  terms, one term under two labels, an invalid regex, a regex that can match the empty string. Patterns use
+  the `regex` module; nested repeats can backtrack for a long time, so pass only patterns you trust.
+- Terms are normalised like the text before matching (`check_fix_bad_unicode`, `check_to_ascii_unicode`,
+  `check_remove_emoji`), so an NFD `José` or full-width `ＡＣＭＥ` term still matches. A Unicode case variant
+  (`İ` for `i`) gets its term's label. An allowed term inside a longer detection (an email `bob@Acme.com`) no
+  longer hides that detection. When a pattern match holds an earlier deny term (`Ann` in `.+ secret`), the
+  reversible map keeps the source text, so `deanonymize` restores `Ann secret`. The allow check runs once per
+  value with a binary search, so long documents stay fast. A `custom_deny_terms` label with no terms raises
+  `ValueError`.
+- The windowed streaming redactor does not split a deny term or pattern match that the buffer end cuts off
+  (a phrase fed one character at a time), nor a pattern match from the context it reads (a lookbehind such
+  as `(?<=account )\d{6}`). A pattern that can grow across a whole line (`.+ secret`) may then need
+  `BufferedStreamingRedactor`.
+- Server-side only: the browser manifest lists them under its limitations. Benchmarks never use them.
+
+### Apple GPU
 
 - `ner_device` accepts `'mps'`. ONNX models and GLiClass stay on CPU; auto still never picks the Apple GPU.
 - If torch has no MPS backend, NER runs on CPU with a logged warning and the new `mps_fallback` code in `metadata['warnings']`; provenance shows `cpu`.

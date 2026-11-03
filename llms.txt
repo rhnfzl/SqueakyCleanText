@@ -113,6 +113,13 @@ check_decode_unicode_escapes=True   # With check_fix_bad_unicode: decode literal
 check_replace_emails=True           # Replace emails with <EMAIL>
 check_replace_ips=True              # Replace IPv4/IPv6 with <IP> (replace_ips_public_only=False)
 check_replace_phone_numbers=True    # Replace phones with <PHONE>
+phone_reject_embedded=True          # Digit-only phone inside a longer token (ID9876543210) or a bare yyyymmdd date/timestamp is not a phone; False = 0.8.1
+check_replace_numbers=True          # Replace numbers with <NUMBER>
+replace_numbers_mode='identifiers'  # Only whole identifier-shaped digit runs (no amounts, %, times, ranges, code parts); 'all' = 0.8.1
+replace_numbers_min_digits=4        # Fewest digits for 'identifiers' mode
+numbers_letter_prefix_ids=True      # 'identifiers' mode: AB1234567 (1-3 uppercase + 6+ digits) is one <NUMBER>
+numbers_two_part_ids=True           # 'identifiers' mode: 123456/7890, 12345-678901, 12345.67890 are one <NUMBER> (not 2023-2024, 1000-3000)
+numbers_spaced_pair_ids=True        # 'identifiers' mode: '123 45' (spaced postal code) and spaced IDs '123 45 6789' (3+ groups, 7+ digits) are one <NUMBER>; '1 234 567' stays
 check_replace_dates=True            # Replace dates with <DATE>
 check_fuzzy_replace_dates=False     # Fuzzy misspelled month matching (requires [fuzzy])
 check_remove_stopwords=True         # Language-aware stopword removal
@@ -147,6 +154,10 @@ gliclass_labels=()                  # Classification labels: ('email', 'code', '
 language=None                       # Pin ('en', 'hi': any Lingua language), restrict (('en','nl')), or None for auto-detect. Accepts Lingua names, ISO 639-1/639-3.
 extra_languages=()                  # Add languages: 'FRENCH', 'fr', 'PORTUGUESE', 'pt', etc.
 custom_stopwords=None               # {LANG: frozenset({...})}
+custom_deny_terms=None              # {LABEL: ('term', ...)}: always mask as <LABEL> (whole word, Unicode-aware); runs before built-in regex
+custom_allow_terms=()               # ('term', ...): never mask (regex and NER), applied last
+custom_patterns=None                # {LABEL: r'regex'} (regex module): mask matches as <LABEL>; empty-matching patterns rejected
+custom_terms_case_sensitive=False   # Case rule for deny/allow terms
 custom_pipeline_steps=()            # Tuple of (text: str) -> str callables
 ```
 

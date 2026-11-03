@@ -6,6 +6,9 @@ from bisect import bisect_right
 from sct.sct import TextCleaner
 from sct.utils import constants, contact
 
+# The identifier number rule reads one space past its match for a currency or unit ("€ 123 45", "1234 %"),
+# so a split there would let the half without it mask an amount.
+_NUMBER_UNIT_CONTEXT = re.compile(rf"[{constants.CURRENCY_SIGNS}] (?=\d)|\d (?=[%‰{constants.CURRENCY_SIGNS}])")
 # A digit run at the end of the buffer may be a phone the next feed completes ("06 12 34").
 _PHONE_TAIL = re.compile(r"[+(]?\d[\d ()+./-]*\Z")
 # Longer than any phone the regex accepts; a longer digit tail (a number table) may still split.
@@ -33,6 +36,18 @@ class BufferedStreamingRedactor:
             raise RuntimeError("Stream is already finished")
         self._finished = True
         return self._cleaner.process("".join(self._chunks)).lm_text
+
+
+def _user_rules_split_safe(user_rules, view, cut, right_start):
+    """Whether each user-rule match of *view* is found again in the half that holds it: a custom pattern
+    may read context outside its match ("(?<=account )\\d{6}"), which a split can take away."""
+    for pattern, spans in user_rules:
+        found = {m.span() for m in pattern.finditer(view[:cut])}
+        found |= {(a + right_start, b + right_start)
+                  for a, b in (m.span() for m in pattern.finditer(view[right_start:], partial=True))}
+        if not spans <= found:
+            return False
+    return True
 
 
 class WindowedStreamingRedactor:
@@ -94,7 +109,8 @@ class WindowedStreamingRedactor:
         if cfg.check_replace_iban_cards:  # "NL91 ABNA 0417 1643 00"
             views += [constants.IBAN_REGEX, constants.CARD_REGEX]
         if cfg.check_replace_numbers:  # a grouped number ("5 379") is one token too
-            views.append(contact.numbers_regex(cfg.replace_numbers_in_words))
+            views += [contact.numbers_regex(cfg.replace_numbers_in_words), cleaner._numbers_regex,  # "123 45"
+                      _NUMBER_UNIT_CONTEXT]  # the amount lookarounds read one space past a match: "€ 123 45"
         # (start, end) of view text a split must not cut: start < split < end
         protected = [
             match.span()
@@ -102,6 +118,11 @@ class WindowedStreamingRedactor:
             for match in (regex.pattern.finditer(view.translate(regex.table))
                           if isinstance(regex, contact.DigitView) else regex.finditer(view))
         ]
+        # User rules (a deny term holding a space, "Blue Sky Initiative"): their matches, and a match the buffer
+        # end cuts off ("... the Blue Sky"), which the next feed completes.
+        user_rules = [(pattern, {m.span() for m in pattern.finditer(view, partial=True)})
+                      for pattern, _ in cleaner._user_rules]
+        protected += [span for _, spans in user_rules for span in spans]
         phone_digits = view.translate(phone_view.table)
         tail = _PHONE_TAIL.search(phone_digits, max(0, len(phone_digits) - _PHONE_TAIL_MAX))
         if tail:
@@ -129,6 +150,9 @@ class WindowedStreamingRedactor:
             separator = view[offset:len(view) - len(right)]
             if len(view) - offset - len(right) not in (0, 1) or not view.endswith(right) \
                     or not (separator == "" or separator.isspace()):
+                index -= 1
+                continue
+            if not _user_rules_split_safe(user_rules, view, offset, len(view) - len(right)):
                 index -= 1
                 continue
             split_at = position

@@ -31,6 +31,8 @@ One call runs these stages. Each one is a config field with a safe default, so y
    - tags such as `<PERSON>` (default),
    - realistic fake values (`synthetic`), or
    - reversible placeholders `<PERSON_0>` plus a map you store apart.
+
+   SCT ships no word lists; pass your own terms to always mask (`custom_deny_terms`), never mask (`custom_allow_terms`), or your own labelled regex (`custom_patterns`).
 4. **Score and document.** Every result has value-free `signals`. Turn them into `sct_*` columns (language, PII share, warnings; optional quality score and MinHash for near-duplicate removal) and a data card with `sct-report` ([docs/SCORE.md](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/SCORE.md)).
 5. **Scale.** `process_batch` runs documents in threads and batches the NER calls, on CPU (ONNX Runtime, no PyTorch needed) or an NVIDIA GPU. Adapters for Hugging Face `datasets`, DataTrove, LangChain, Haystack and MCP.
 
@@ -96,7 +98,7 @@ if __name__ == "__main__":
     # -> Call <PERSON> on <PHONE>. ['PERSON', 'PHONE']
 ```
 
-**Full cleanup for classic ML.** The default config (`TextCleaner()`) also replaces numbers, dates and HTML, and `stat_text` gives a lower-cased version without stopwords and punctuation:
+**Full cleanup for classic ML.** The default config (`TextCleaner()`) also replaces ID-shaped numbers, dates and HTML, and `stat_text` gives a lower-cased version without stopwords and punctuation:
 
 ```python
 from sct import TextCleaner

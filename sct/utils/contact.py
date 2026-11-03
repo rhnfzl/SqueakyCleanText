@@ -124,9 +124,42 @@ def luhn_ok(value):
 IBAN_VIEW = ChecksumView(constants.IBAN_REGEX, iban_ok)
 CARD_VIEW = ChecksumView(constants.CARD_REGEX, luhn_ok)
 
-def numbers_regex(in_words=False):
-    """Number pattern: strict (any glued letter) or default (Latin/Greek/Cyrillic words kept)."""
+def numbers_regex(in_words=False, mode='all', min_digits=4, **id_shapes):
+    """Number pattern: 'all' (every number; strict with in_words, else Latin/Greek/Cyrillic words kept) or
+    'identifiers' (whole identifier-shaped digit runs of at least *min_digits* digits, plus the opt-in
+    *id_shapes* of constants.identifier_numbers_regex)."""
+    if mode == 'identifiers':
+        return constants.identifier_numbers_regex(min_digits, in_words, **id_shapes)
     return constants.NUMBERS_IN_WORDS_REGEX if in_words else constants.NUMBERS_REGEX
+
+
+def config_numbers_regex(cfg):
+    """The number pattern a TextCleanerConfig selects."""
+    return numbers_regex(cfg.replace_numbers_in_words, cfg.replace_numbers_mode, cfg.replace_numbers_min_digits,
+                         letter_prefix=cfg.numbers_letter_prefix_ids, two_part=cfg.numbers_two_part_ids,
+                         spaced_pair=cfg.numbers_spaced_pair_ids)
+
+
+def embedded_phone(text, start, end):
+    """True when text[start:end] is a bare digit-only phone match inside a longer token, or one that starts
+    is a yyyymmdd date or yyyymmddhhmm[ss] timestamp (phone_reject_embedded)."""
+    value = text[start:end]
+    if not value.isdecimal():
+        return False
+    return bool(constants.YYYYMMDD_STAMP.fullmatch(value.translate(_DIGIT_VIEW))
+                or constants.PHONE_EMBEDDED_LEFT.search(text[max(0, start - 2):start])
+                or constants.PHONE_EMBEDDED_RIGHT.match(text, end))
+
+
+class RejectView:
+    """*view* matches, except those *reject(text, start, end)* holds for: they stay as they are."""
+
+    def __init__(self, view, reject):
+        self.view, self.reject = view, reject
+
+    def sub(self, repl, text):
+        return self.view.sub(
+            lambda m: m.group() if self.reject(text, m.start(), m.end()) else repl(m), text)
 
 
 def is_replaceable_ip(candidate, public_only=False):
