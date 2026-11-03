@@ -81,7 +81,8 @@ How to read the tables:
   over-mask = masked characters outside every gold span / all non-gold characters.
 - Own tables: the entry on its own clean datasets, only docs in its claimed languages, with a 95%
   bootstrap CI (1,000 resamples of templates/docs within each dataset, seed 13). Beside it, for
-  information: mR on clean sets outside the claimed languages, on unknown (U) sets, and (in
+  information: mR on clean sets outside the claimed languages, on unknown (U) sets inside and outside
+  the claimed languages, and (in
   brackets) on excluded sets, each with the number of datasets. SCT's excluded numbers carry
   "w/o recovery": the same number without `scorer.recover_dropped`.
 - Full view = all 9 SCT types (a type the tool does not support counts as missed). Shared view =
@@ -94,55 +95,55 @@ How to read the tables:
 
 ### Full view (all 9 types), privacy-synthetic
 
-| entry | clean sets with claimed-language docs (all clean sets) | mR [95% CI] | mP [95% CI] | strict F1 [95% CI] | doc leak [95% CI] | over-mask [95% CI] | mR clean, outside claimed langs | mR unknown (U) sets | (mR excluded sets, info only) | docs/s CPU | peak RAM | claimed languages | licence |
-|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| gliner2-fastino | argilla_pii, gretel, gretel_en, nemotron, openpii (7) | 0.872 [0.861, 0.882] | 0.746 [0.727, 0.765] | 0.702 [0.688, 0.717] | 0.335 [0.315, 0.355] | 0.036 [0.033, 0.040] | 0.849 (4) | - | - | 0.52 | 6,832 MB | en fr es de it pt nl | Apache-2.0 |
-| presidio | argilla_pii, gretel, gretel_en, nemotron, openpii (7) | 0.762 [0.742, 0.781] | 0.803 [0.773, 0.838] | 0.540 [0.521, 0.559] | 0.608 [0.584, 0.633] | 0.023 [0.019, 0.029] | 0.605 (4) | - | - | 27 | 826 MB | en | MIT |
-| datafog | argilla_pii, bayanat, gretel, gretel_en, nemotron, openpii, thai_pii (7) | 0.337 [0.325, 0.348] | 0.854 [0.833, 0.878] | 0.342 [0.328, 0.355] | 0.919 [0.908, 0.929] | 0.009 [0.007, 0.010] | - | - | - | 1,787 | 30 MB | all (regex, no language claim) | MIT |
-| sct-gliner | none (0) | - | - | - | - | - | - | - | (0.930 (5); w/o recovery 0.914 (5)) | 0.53 | 6,414 MB | en | MIT + Apache-2.0 model |
-| sct-default | none (0) | - | - | - | - | - | - | - | (0.934 (7); w/o recovery 0.926 (7)) | 1.50 | 7,692 MB | all (multilingual claim) | MIT |
-| opf | none (0) | - | - | - | - | - | - | 0.722 (5) | - | 0.29 | 26,113 MB | en | Apache-2.0 |
-| gliner-nvidia | none (2) | - | - | - | - | - | 0.563 (2) | - | (0.889 (5)) | 0.15 | 25,732 MB | en | Apache-2.0 + NVIDIA Open Model |
-| bardsai-v3 | none (2) | - | - | - | - | - | 0.895 (2) | - | (0.919 (5)) | 2.52 | 1,738 MB | 24 EU | Apache-2.0 |
+| entry | clean sets with claimed-language docs (all clean sets) | mR [95% CI] | mP [95% CI] | strict F1 [95% CI] | doc leak [95% CI] | over-mask [95% CI] | mR clean, outside claimed langs | mR unknown (U) sets | mR U sets, outside claimed langs | (mR excluded sets, info only) | docs/s CPU | peak RAM | claimed languages | licence |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| gliner2-fastino | argilla_pii, gretel, gretel_en, nemotron, openpii (7) | 0.872 [0.861, 0.882] | 0.746 [0.727, 0.765] | 0.702 [0.688, 0.717] | 0.335 [0.315, 0.355] | 0.036 [0.033, 0.040] | 0.849 (4) | - | - | - | 0.52 | 6,832 MB | en fr es de it pt nl | Apache-2.0 |
+| presidio | argilla_pii, gretel, gretel_en, nemotron, openpii (7) | 0.762 [0.742, 0.781] | 0.803 [0.773, 0.838] | 0.540 [0.521, 0.559] | 0.608 [0.584, 0.633] | 0.023 [0.019, 0.029] | 0.605 (4) | - | - | - | 27 | 826 MB | en | MIT |
+| datafog | argilla_pii, bayanat, gretel, gretel_en, nemotron, openpii, thai_pii (7) | 0.337 [0.325, 0.348] | 0.854 [0.833, 0.878] | 0.342 [0.328, 0.355] | 0.919 [0.908, 0.929] | 0.009 [0.007, 0.010] | - | - | - | - | 1,787 | 30 MB | all (regex, no language claim) | MIT |
+| sct-gliner | none (0) | - | - | - | - | - | - | - | - | (0.930 (5); w/o recovery 0.914 (5)) | 0.53 | 6,414 MB | en | MIT + Apache-2.0 model |
+| sct-default | none (0) | - | - | - | - | - | - | - | - | (0.934 (7); w/o recovery 0.926 (7)) | 1.50 | 7,692 MB | all (multilingual claim) | MIT |
+| opf | none (0) | - | - | - | - | - | - | 0.722 (5) | 0.767 (4) | - | 0.29 | 26,113 MB | en | Apache-2.0 |
+| gliner-nvidia | none (2) | - | - | - | - | - | 0.563 (2) | - | - | (0.889 (5)) | 0.15 | 25,732 MB | en | Apache-2.0 + NVIDIA Open Model |
+| bardsai-v3 | none (2) | - | - | - | - | - | 0.895 (2) | - | - | (0.919 (5)) | 2.52 | 1,738 MB | 24 EU | Apache-2.0 |
 
 ### Full view (all 9 types), privacy-real (TAB, REDACT)
 
-| entry | clean sets with claimed-language docs (all clean sets) | mR [95% CI] | mP [95% CI] | strict F1 [95% CI] | doc leak [95% CI] | over-mask [95% CI] | mR clean, outside claimed langs | mR unknown (U) sets | (mR excluded sets, info only) | docs/s CPU | peak RAM | claimed languages | licence |
-|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| gliner2-fastino | redact, tab (2) | 0.880 [0.858, 0.900] | 0.590 [0.570, 0.611] | 0.544 [0.526, 0.562] | 0.865 [0.839, 0.890] | 0.056 [0.053, 0.059] | 0.849 (1) | - | - | 0.52 | 6,832 MB | en fr es de it pt nl | Apache-2.0 |
-| bardsai-v3 | redact, tab (2) | 0.739 [0.714, 0.764] | 0.817 [0.804, 0.831] | 0.512 [0.495, 0.529] | 0.830 [0.806, 0.852] | 0.022 [0.020, 0.024] | 0.804 (1) | - | - | 2.52 | 1,738 MB | 24 EU | Apache-2.0 |
-| presidio | redact, tab (2) | 0.612 [0.576, 0.648] | 0.651 [0.605, 0.697] | 0.319 [0.285, 0.349] | 0.922 [0.850, 0.984] | 0.045 [0.034, 0.057] | 0.620 (1) | - | - | 27 | 826 MB | en | MIT |
-| gliner-nvidia | redact, tab (2) | 0.391 [0.335, 0.462] | 0.793 [0.752, 0.828] | 0.288 [0.245, 0.333] | 0.953 [0.891, 1.000] | 0.016 [0.012, 0.022] | 0.544 (1) | - | - | 0.15 | 25,732 MB | en | Apache-2.0 + NVIDIA Open Model |
-| datafog | redact, tab (2) | 0.161 [0.144, 0.182] | 0.765 [0.751, 0.790] | 0.155 [0.147, 0.162] | 0.997 [0.994, 1.000] | 0.008 [0.007, 0.009] | - | - | - | 1,787 | 30 MB | all (regex, no language claim) | MIT |
-| sct-gliner | none (0) | - | - | - | - | - | - | - | (0.770 (2); w/o recovery 0.737 (2)) | 0.53 | 6,414 MB | en | MIT + Apache-2.0 model |
-| sct-default | none (0) | - | - | - | - | - | - | - | (0.956 (2); w/o recovery 0.932 (2)) | 1.50 | 7,692 MB | all (multilingual claim) | MIT |
-| opf | none (0) | - | - | - | - | - | - | 0.458 (2) | - | 0.29 | 26,113 MB | en | Apache-2.0 |
+| entry | clean sets with claimed-language docs (all clean sets) | mR [95% CI] | mP [95% CI] | strict F1 [95% CI] | doc leak [95% CI] | over-mask [95% CI] | mR clean, outside claimed langs | mR unknown (U) sets | mR U sets, outside claimed langs | (mR excluded sets, info only) | docs/s CPU | peak RAM | claimed languages | licence |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| gliner2-fastino | redact, tab (2) | 0.880 [0.858, 0.900] | 0.590 [0.570, 0.611] | 0.544 [0.526, 0.562] | 0.865 [0.839, 0.890] | 0.056 [0.053, 0.059] | 0.849 (1) | - | - | - | 0.52 | 6,832 MB | en fr es de it pt nl | Apache-2.0 |
+| bardsai-v3 | redact, tab (2) | 0.739 [0.714, 0.764] | 0.817 [0.804, 0.831] | 0.512 [0.495, 0.529] | 0.830 [0.806, 0.852] | 0.022 [0.020, 0.024] | 0.804 (1) | - | - | - | 2.52 | 1,738 MB | 24 EU | Apache-2.0 |
+| presidio | redact, tab (2) | 0.612 [0.576, 0.648] | 0.651 [0.605, 0.697] | 0.319 [0.285, 0.349] | 0.922 [0.850, 0.984] | 0.045 [0.034, 0.057] | 0.620 (1) | - | - | - | 27 | 826 MB | en | MIT |
+| gliner-nvidia | redact, tab (2) | 0.391 [0.335, 0.462] | 0.793 [0.752, 0.828] | 0.288 [0.245, 0.333] | 0.953 [0.891, 1.000] | 0.016 [0.012, 0.022] | 0.544 (1) | - | - | - | 0.15 | 25,732 MB | en | Apache-2.0 + NVIDIA Open Model |
+| datafog | redact, tab (2) | 0.161 [0.144, 0.182] | 0.765 [0.751, 0.790] | 0.155 [0.147, 0.162] | 0.997 [0.994, 1.000] | 0.008 [0.007, 0.009] | - | - | - | - | 1,787 | 30 MB | all (regex, no language claim) | MIT |
+| sct-gliner | none (0) | - | - | - | - | - | - | - | - | (0.770 (2); w/o recovery 0.737 (2)) | 0.53 | 6,414 MB | en | MIT + Apache-2.0 model |
+| sct-default | none (0) | - | - | - | - | - | - | - | - | (0.956 (2); w/o recovery 0.932 (2)) | 1.50 | 7,692 MB | all (multilingual claim) | MIT |
+| opf | none (0) | - | - | - | - | - | - | 0.458 (2) | 0.728 (1) | - | 0.29 | 26,113 MB | en | Apache-2.0 |
 
 ### Shared view (EMAIL, PHONE, NUMBER), privacy-synthetic
 
-| entry | clean sets with claimed-language docs (all clean sets) | mR [95% CI] | mP [95% CI] | strict F1 [95% CI] | doc leak [95% CI] | over-mask [95% CI] | mR clean, outside claimed langs | mR unknown (U) sets | (mR excluded sets, info only) | docs/s CPU | peak RAM | claimed languages | licence |
-|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| gliner2-fastino | argilla_pii, gretel, gretel_en, nemotron, openpii (7) | 0.917 [0.902, 0.930] | 0.528 [0.504, 0.553] | 0.827 [0.793, 0.858] | 0.147 [0.129, 0.166] | 0.036 [0.033, 0.040] | 0.904 (4) | - | - | 0.52 | 6,832 MB | en fr es de it pt nl | Apache-2.0 |
-| presidio | argilla_pii, gretel, gretel_en, nemotron, openpii (7) | 0.854 [0.831, 0.873] | 0.682 [0.650, 0.721] | 0.698 [0.656, 0.752] | 0.318 [0.289, 0.349] | 0.023 [0.019, 0.029] | 0.821 (4) | - | - | 27 | 826 MB | en | MIT |
-| datafog | argilla_pii, bayanat, gretel, gretel_en, nemotron, openpii, thai_pii (7) | 0.678 [0.656, 0.700] | 0.828 [0.808, 0.852] | 0.597 [0.572, 0.623] | 0.507 [0.482, 0.532] | 0.009 [0.007, 0.010] | - | - | - | 1,787 | 30 MB | all (regex, no language claim) | MIT |
-| sct-gliner | none (0) | - | - | - | - | - | - | - | (0.946 (5); w/o recovery 0.928 (5)) | 0.53 | 6,414 MB | en | MIT + Apache-2.0 model |
-| sct-default | none (0) | - | - | - | - | - | - | - | (0.961 (7); w/o recovery 0.949 (7)) | 1.50 | 7,692 MB | all (multilingual claim) | MIT |
-| opf | none (0) | - | - | - | - | - | - | 0.877 (5) | - | 0.29 | 26,113 MB | en | Apache-2.0 |
-| gliner-nvidia | none (2) | - | - | - | - | - | 0.722 (2) | - | (0.901 (5)) | 0.15 | 25,732 MB | en | Apache-2.0 + NVIDIA Open Model |
-| bardsai-v3 | none (2) | - | - | - | - | - | 0.985 (2) | - | (0.978 (5)) | 2.52 | 1,738 MB | 24 EU | Apache-2.0 |
+| entry | clean sets with claimed-language docs (all clean sets) | mR [95% CI] | mP [95% CI] | strict F1 [95% CI] | doc leak [95% CI] | over-mask [95% CI] | mR clean, outside claimed langs | mR unknown (U) sets | mR U sets, outside claimed langs | (mR excluded sets, info only) | docs/s CPU | peak RAM | claimed languages | licence |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| gliner2-fastino | argilla_pii, gretel, gretel_en, nemotron, openpii (7) | 0.917 [0.902, 0.930] | 0.528 [0.504, 0.553] | 0.827 [0.793, 0.858] | 0.147 [0.129, 0.166] | 0.036 [0.033, 0.040] | 0.904 (4) | - | - | - | 0.52 | 6,832 MB | en fr es de it pt nl | Apache-2.0 |
+| presidio | argilla_pii, gretel, gretel_en, nemotron, openpii (7) | 0.854 [0.831, 0.873] | 0.682 [0.650, 0.721] | 0.698 [0.656, 0.752] | 0.318 [0.289, 0.349] | 0.023 [0.019, 0.029] | 0.821 (4) | - | - | - | 27 | 826 MB | en | MIT |
+| datafog | argilla_pii, bayanat, gretel, gretel_en, nemotron, openpii, thai_pii (7) | 0.678 [0.656, 0.700] | 0.828 [0.808, 0.852] | 0.597 [0.572, 0.623] | 0.507 [0.482, 0.532] | 0.009 [0.007, 0.010] | - | - | - | - | 1,787 | 30 MB | all (regex, no language claim) | MIT |
+| sct-gliner | none (0) | - | - | - | - | - | - | - | - | (0.946 (5); w/o recovery 0.928 (5)) | 0.53 | 6,414 MB | en | MIT + Apache-2.0 model |
+| sct-default | none (0) | - | - | - | - | - | - | - | - | (0.961 (7); w/o recovery 0.949 (7)) | 1.50 | 7,692 MB | all (multilingual claim) | MIT |
+| opf | none (0) | - | - | - | - | - | - | 0.877 (5) | 0.917 (4) | - | 0.29 | 26,113 MB | en | Apache-2.0 |
+| gliner-nvidia | none (2) | - | - | - | - | - | 0.722 (2) | - | - | (0.901 (5)) | 0.15 | 25,732 MB | en | Apache-2.0 + NVIDIA Open Model |
+| bardsai-v3 | none (2) | - | - | - | - | - | 0.985 (2) | - | - | (0.978 (5)) | 2.52 | 1,738 MB | 24 EU | Apache-2.0 |
 
 ### Shared view (EMAIL, PHONE, NUMBER), privacy-real (TAB, REDACT)
 
-| entry | clean sets with claimed-language docs (all clean sets) | mR [95% CI] | mP [95% CI] | strict F1 [95% CI] | doc leak [95% CI] | over-mask [95% CI] | mR clean, outside claimed langs | mR unknown (U) sets | (mR excluded sets, info only) | docs/s CPU | peak RAM | claimed languages | licence |
-|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| datafog | redact, tab (2) | 0.768 [0.648, 0.846] | 0.750 [0.736, 0.775] | 0.351 [0.341, 0.360] | 0.812 [0.795, 0.830] | 0.008 [0.007, 0.009] | - | - | - | 1,787 | 30 MB | all (regex, no language claim) | MIT |
-| gliner2-fastino | redact, tab (2) | 0.495 [0.467, 0.524] | 0.166 [0.149, 0.186] | 0.452 [0.429, 0.475] | 0.600 [0.574, 0.625] | 0.056 [0.053, 0.059] | 0.916 (1) | - | - | 0.52 | 6,832 MB | en fr es de it pt nl | Apache-2.0 |
-| bardsai-v3 | redact, tab (2) | 0.472 [0.464, 0.479] | 0.198 [0.180, 0.220] | 0.433 [0.421, 0.447] | 0.621 [0.601, 0.643] | 0.022 [0.020, 0.024] | 0.864 (1) | - | - | 2.52 | 1,738 MB | 24 EU | Apache-2.0 |
-| presidio | redact, tab (2) | 0.466 [0.429, 0.498] | 0.155 [0.112, 0.204] | 0.290 [0.234, 0.354] | 0.714 [0.625, 0.803] | 0.045 [0.034, 0.057] | 0.852 (1) | - | - | 27 | 826 MB | en | MIT |
-| gliner-nvidia | redact, tab (2) | 0.398 [0.311, 0.520] | 0.457 [0.397, 0.516] | 0.515 [0.423, 0.642] | 0.480 [0.380, 0.587] | 0.016 [0.012, 0.022] | 0.570 (1) | - | - | 0.15 | 25,732 MB | en | Apache-2.0 + NVIDIA Open Model |
-| sct-gliner | none (0) | - | - | - | - | - | - | - | (0.986 (2); w/o recovery 0.986 (2)) | 0.53 | 6,414 MB | en | MIT + Apache-2.0 model |
-| sct-default | none (0) | - | - | - | - | - | - | - | (0.985 (2); w/o recovery 0.982 (2)) | 1.50 | 7,692 MB | all (multilingual claim) | MIT |
-| opf | none (0) | - | - | - | - | - | - | 0.452 (2) | - | 0.29 | 26,113 MB | en | Apache-2.0 |
+| entry | clean sets with claimed-language docs (all clean sets) | mR [95% CI] | mP [95% CI] | strict F1 [95% CI] | doc leak [95% CI] | over-mask [95% CI] | mR clean, outside claimed langs | mR unknown (U) sets | mR U sets, outside claimed langs | (mR excluded sets, info only) | docs/s CPU | peak RAM | claimed languages | licence |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| datafog | redact, tab (2) | 0.768 [0.648, 0.846] | 0.750 [0.736, 0.775] | 0.351 [0.341, 0.360] | 0.812 [0.795, 0.830] | 0.008 [0.007, 0.009] | - | - | - | - | 1,787 | 30 MB | all (regex, no language claim) | MIT |
+| gliner2-fastino | redact, tab (2) | 0.495 [0.467, 0.524] | 0.166 [0.149, 0.186] | 0.452 [0.429, 0.475] | 0.600 [0.574, 0.625] | 0.056 [0.053, 0.059] | 0.916 (1) | - | - | - | 0.52 | 6,832 MB | en fr es de it pt nl | Apache-2.0 |
+| bardsai-v3 | redact, tab (2) | 0.472 [0.464, 0.479] | 0.198 [0.180, 0.220] | 0.433 [0.421, 0.447] | 0.621 [0.601, 0.643] | 0.022 [0.020, 0.024] | 0.864 (1) | - | - | - | 2.52 | 1,738 MB | 24 EU | Apache-2.0 |
+| presidio | redact, tab (2) | 0.466 [0.429, 0.498] | 0.155 [0.112, 0.204] | 0.290 [0.234, 0.354] | 0.714 [0.625, 0.803] | 0.045 [0.034, 0.057] | 0.852 (1) | - | - | - | 27 | 826 MB | en | MIT |
+| gliner-nvidia | redact, tab (2) | 0.398 [0.311, 0.520] | 0.457 [0.397, 0.516] | 0.515 [0.423, 0.642] | 0.480 [0.380, 0.587] | 0.016 [0.012, 0.022] | 0.570 (1) | - | - | - | 0.15 | 25,732 MB | en | Apache-2.0 + NVIDIA Open Model |
+| sct-gliner | none (0) | - | - | - | - | - | - | - | - | (0.986 (2); w/o recovery 0.986 (2)) | 0.53 | 6,414 MB | en | MIT + Apache-2.0 model |
+| sct-default | none (0) | - | - | - | - | - | - | - | - | (0.985 (2); w/o recovery 0.982 (2)) | 1.50 | 7,692 MB | all (multilingual claim) | MIT |
+| opf | none (0) | - | - | - | - | - | - | 0.452 (2) | 0.926 (1) | - | 0.29 | 26,113 MB | en | Apache-2.0 |
 
 The NER group is in `TABLES.md`: no model entry claims any NER language (ar, th, bn, hi, ta, zh,
 ja), so only datafog (no claim) has an in-claim NER score there; SCT's NER cells are D.
@@ -184,29 +185,29 @@ was chosen on the dev parts of all nine privacy sets.
 
 ### Full view, privacy-synthetic
 
-| entry | clean sets with claimed-language docs (all clean sets) | mR [95% CI] | mP [95% CI] | strict F1 [95% CI] | doc leak [95% CI] | over-mask [95% CI] | mR clean, outside claimed langs | mR unknown (U) sets | (mR excluded sets, info only) | docs/s CPU | peak RAM | claimed languages | licence |
-|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| gliner2-fastino | argilla_pii, gretel, gretel_en, nemotron, openpii (7) | 0.897 [0.886, 0.907] | 0.702 [0.682, 0.721] | 0.680 [0.665, 0.696] | 0.285 [0.265, 0.304] | 0.046 [0.042, 0.050] | 0.880 (4) | - | - | 0.52 | 6,832 MB | en fr es de it pt nl | Apache-2.0 |
-| presidio | argilla_pii, gretel, gretel_en, nemotron, openpii (7) | 0.762 [0.742, 0.781] | 0.803 [0.773, 0.838] | 0.540 [0.521, 0.559] | 0.608 [0.584, 0.633] | 0.023 [0.019, 0.029] | 0.605 (4) | - | - | 27 | 826 MB | en | MIT |
-| datafog | argilla_pii, bayanat, gretel, gretel_en, nemotron, openpii, thai_pii (7) | 0.337 [0.325, 0.348] | 0.854 [0.833, 0.878] | 0.342 [0.328, 0.355] | 0.919 [0.908, 0.929] | 0.009 [0.007, 0.010] | - | - | - | 1,787 | 30 MB | all (regex, no language claim) | MIT |
-| sct-gliner | none (0) | - | - | - | - | - | - | - | (0.944 (5); w/o recovery 0.923 (5)) | 0.53 | 6,414 MB | en | MIT + Apache-2.0 model |
-| sct-default | none (0) | - | - | - | - | - | - | - | (0.935 (7); w/o recovery 0.927 (7)) | 1.50 | 7,692 MB | all (multilingual claim) | MIT |
-| opf | none (0) | - | - | - | - | - | - | 0.761 (5) | - | 0.29 | 26,113 MB | en | Apache-2.0 |
-| gliner-nvidia | none (2) | - | - | - | - | - | 0.779 (2) | - | (0.931 (5)) | 0.15 | 25,732 MB | en | Apache-2.0 + NVIDIA Open Model |
-| bardsai-v3 | none (2) | - | - | - | - | - | 0.895 (2) | - | (0.919 (5)) | 2.52 | 1,738 MB | 24 EU | Apache-2.0 |
+| entry | clean sets with claimed-language docs (all clean sets) | mR [95% CI] | mP [95% CI] | strict F1 [95% CI] | doc leak [95% CI] | over-mask [95% CI] | mR clean, outside claimed langs | mR unknown (U) sets | mR U sets, outside claimed langs | (mR excluded sets, info only) | docs/s CPU | peak RAM | claimed languages | licence |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| gliner2-fastino | argilla_pii, gretel, gretel_en, nemotron, openpii (7) | 0.897 [0.886, 0.907] | 0.702 [0.682, 0.721] | 0.680 [0.665, 0.696] | 0.285 [0.265, 0.304] | 0.046 [0.042, 0.050] | 0.880 (4) | - | - | - | 0.52 | 6,832 MB | en fr es de it pt nl | Apache-2.0 |
+| presidio | argilla_pii, gretel, gretel_en, nemotron, openpii (7) | 0.762 [0.742, 0.781] | 0.803 [0.773, 0.838] | 0.540 [0.521, 0.559] | 0.608 [0.584, 0.633] | 0.023 [0.019, 0.029] | 0.605 (4) | - | - | - | 27 | 826 MB | en | MIT |
+| datafog | argilla_pii, bayanat, gretel, gretel_en, nemotron, openpii, thai_pii (7) | 0.337 [0.325, 0.348] | 0.854 [0.833, 0.878] | 0.342 [0.328, 0.355] | 0.919 [0.908, 0.929] | 0.009 [0.007, 0.010] | - | - | - | - | 1,787 | 30 MB | all (regex, no language claim) | MIT |
+| sct-gliner | none (0) | - | - | - | - | - | - | - | - | (0.944 (5); w/o recovery 0.923 (5)) | 0.53 | 6,414 MB | en | MIT + Apache-2.0 model |
+| sct-default | none (0) | - | - | - | - | - | - | - | - | (0.935 (7); w/o recovery 0.927 (7)) | 1.50 | 7,692 MB | all (multilingual claim) | MIT |
+| opf | none (0) | - | - | - | - | - | - | 0.761 (5) | 0.823 (4) | - | 0.29 | 26,113 MB | en | Apache-2.0 |
+| gliner-nvidia | none (2) | - | - | - | - | - | 0.779 (2) | - | - | (0.931 (5)) | 0.15 | 25,732 MB | en | Apache-2.0 + NVIDIA Open Model |
+| bardsai-v3 | none (2) | - | - | - | - | - | 0.895 (2) | - | - | (0.919 (5)) | 2.52 | 1,738 MB | 24 EU | Apache-2.0 |
 
 ### Full view, privacy-real
 
-| entry | clean sets with claimed-language docs (all clean sets) | mR [95% CI] | mP [95% CI] | strict F1 [95% CI] | doc leak [95% CI] | over-mask [95% CI] | mR clean, outside claimed langs | mR unknown (U) sets | (mR excluded sets, info only) | docs/s CPU | peak RAM | claimed languages | licence |
-|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| gliner2-fastino | redact, tab (2) | 0.904 [0.884, 0.922] | 0.542 [0.522, 0.562] | 0.516 [0.499, 0.534] | 0.833 [0.807, 0.858] | 0.071 [0.068, 0.075] | 0.884 (1) | - | - | 0.52 | 6,832 MB | en fr es de it pt nl | Apache-2.0 |
-| bardsai-v3 | redact, tab (2) | 0.739 [0.714, 0.764] | 0.817 [0.804, 0.831] | 0.512 [0.495, 0.529] | 0.830 [0.806, 0.852] | 0.022 [0.020, 0.024] | 0.804 (1) | - | - | 2.52 | 1,738 MB | 24 EU | Apache-2.0 |
-| presidio | redact, tab (2) | 0.612 [0.576, 0.648] | 0.651 [0.605, 0.697] | 0.319 [0.285, 0.349] | 0.922 [0.850, 0.984] | 0.045 [0.034, 0.057] | 0.620 (1) | - | - | 27 | 826 MB | en | MIT |
-| gliner-nvidia | redact, tab (2) | 0.439 [0.382, 0.506] | 0.821 [0.783, 0.856] | 0.164 [0.134, 0.198] | 0.969 [0.922, 1.000] | 0.017 [0.012, 0.023] | 0.600 (1) | - | - | 0.15 | 25,732 MB | en | Apache-2.0 + NVIDIA Open Model |
-| datafog | redact, tab (2) | 0.161 [0.144, 0.182] | 0.765 [0.751, 0.790] | 0.155 [0.147, 0.162] | 0.997 [0.994, 1.000] | 0.008 [0.007, 0.009] | - | - | - | 1,787 | 30 MB | all (regex, no language claim) | MIT |
-| sct-gliner | none (0) | - | - | - | - | - | - | - | (0.839 (2); w/o recovery 0.799 (2)) | 0.53 | 6,414 MB | en | MIT + Apache-2.0 model |
-| sct-default | none (0) | - | - | - | - | - | - | - | (0.958 (2); w/o recovery 0.933 (2)) | 1.50 | 7,692 MB | all (multilingual claim) | MIT |
-| opf | none (0) | - | - | - | - | - | - | 0.523 (2) | - | 0.29 | 26,113 MB | en | Apache-2.0 |
+| entry | clean sets with claimed-language docs (all clean sets) | mR [95% CI] | mP [95% CI] | strict F1 [95% CI] | doc leak [95% CI] | over-mask [95% CI] | mR clean, outside claimed langs | mR unknown (U) sets | mR U sets, outside claimed langs | (mR excluded sets, info only) | docs/s CPU | peak RAM | claimed languages | licence |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| gliner2-fastino | redact, tab (2) | 0.904 [0.884, 0.922] | 0.542 [0.522, 0.562] | 0.516 [0.499, 0.534] | 0.833 [0.807, 0.858] | 0.071 [0.068, 0.075] | 0.884 (1) | - | - | - | 0.52 | 6,832 MB | en fr es de it pt nl | Apache-2.0 |
+| bardsai-v3 | redact, tab (2) | 0.739 [0.714, 0.764] | 0.817 [0.804, 0.831] | 0.512 [0.495, 0.529] | 0.830 [0.806, 0.852] | 0.022 [0.020, 0.024] | 0.804 (1) | - | - | - | 2.52 | 1,738 MB | 24 EU | Apache-2.0 |
+| presidio | redact, tab (2) | 0.612 [0.576, 0.648] | 0.651 [0.605, 0.697] | 0.319 [0.285, 0.349] | 0.922 [0.850, 0.984] | 0.045 [0.034, 0.057] | 0.620 (1) | - | - | - | 27 | 826 MB | en | MIT |
+| gliner-nvidia | redact, tab (2) | 0.439 [0.382, 0.506] | 0.821 [0.783, 0.856] | 0.164 [0.134, 0.198] | 0.969 [0.922, 1.000] | 0.017 [0.012, 0.023] | 0.600 (1) | - | - | - | 0.15 | 25,732 MB | en | Apache-2.0 + NVIDIA Open Model |
+| datafog | redact, tab (2) | 0.161 [0.144, 0.182] | 0.765 [0.751, 0.790] | 0.155 [0.147, 0.162] | 0.997 [0.994, 1.000] | 0.008 [0.007, 0.009] | - | - | - | - | 1,787 | 30 MB | all (regex, no language claim) | MIT |
+| sct-gliner | none (0) | - | - | - | - | - | - | - | - | (0.839 (2); w/o recovery 0.799 (2)) | 0.53 | 6,414 MB | en | MIT + Apache-2.0 model |
+| sct-default | none (0) | - | - | - | - | - | - | - | - | (0.958 (2); w/o recovery 0.933 (2)) | 1.50 | 7,692 MB | all (multilingual claim) | MIT |
+| opf | none (0) | - | - | - | - | - | - | 0.523 (2) | 0.799 (1) | - | 0.29 | 26,113 MB | en | Apache-2.0 |
 
 ### Same-set, tuned, full view, privacy-real
 
@@ -222,39 +223,40 @@ Datasets: redact, tab (clean for all: tab, redact); only docs in languages every
 
 Privacy-synthetic: No dataset in this group is clean for every one of: presidio, gliner-nvidia, gliner2-fastino, bardsai-v3, datafog (in languages all of them claim).
 
-## SCT: information only, with and without the recovery rule
+## SCT: excluded cells, with and without the recovery rule
 
 Every SCT cell is excluded (D or D-family; sct-gliner also U), so nothing here is a comparison.
 Per SCT entry and dataset, full view, claimed languages (sct-gliner: en; `°` = no en doc), masked
-recall and doc leak with and without `scorer.recover_dropped`, and the copies it recovered.
+recall and doc leak with and without `scorer.recover_dropped` (excluded cells in parentheses in
+every number column), and the copies it recovered.
 
 ### default track
 
 | entry | dataset | masked_recall with | without | doc leak with | without | copies recovered |
 |---|---|---|---|---|---|---|
-| sct-default | openpii | (0.903) | (0.903) | 0.473 | 0.474 | 14 |
-| sct-default | gretel | (0.744) | (0.706) | 0.658 | 0.698 | 873 |
-| sct-default | gretel_en | (0.980) | (0.980) | 0.270 | 0.270 | 0 |
-| sct-default | nemotron | (0.973) | (0.956) | 0.201 | 0.239 | 34 |
-| sct-default | argilla_pii | (0.967) | (0.967) | 0.057 | 0.057 | 0 |
-| sct-default | thai_pii | (0.975) | (0.975) | 0.782 | 0.782 | 0 |
-| sct-default | bayanat | (0.995) | (0.995) | 0.050 | 0.050 | 0 |
-| sct-default | tab | (0.946) | (0.935) | 1.000 | 1.000 | 189 |
-| sct-default | redact | (0.966) | (0.928) | 0.612 | 0.656 | 2350 |
-| sct-default | iahlt | (0.937) | (0.937) | 0.295 | 0.295 | 0 |
-| sct-default | thainer | (0.877) | (0.877) | 0.498 | 0.498 | 0 |
-| sct-default | naamapadam | (0.701) | (0.700) | 0.432 | 0.432 | 2 |
-| sct-default | multiconer | (0.819) | (0.819) | 0.310 | 0.310 | 0 |
-| sct-default | stockmark | (0.908) | (0.908) | 0.282 | 0.282 | 0 |
-| sct-gliner | openpii | (0.840) | (0.840) | 0.599 | 0.599 | 64 |
-| sct-gliner | gretel | (0.886) | (0.818) | 0.712 | 0.763 | 1833 |
-| sct-gliner | gretel_en | (0.983) | (0.983) | 0.274 | 0.274 | 0 |
-| sct-gliner | nemotron | (0.967) | (0.953) | 0.285 | 0.306 | 50 |
-| sct-gliner | argilla_pii | (0.975) | (0.975) | 0.131 | 0.131 | 0 |
+| sct-default | openpii | (0.903) | (0.903) | (0.473) | (0.474) | 14 |
+| sct-default | gretel | (0.744) | (0.706) | (0.658) | (0.698) | 873 |
+| sct-default | gretel_en | (0.980) | (0.980) | (0.270) | (0.270) | 0 |
+| sct-default | nemotron | (0.973) | (0.956) | (0.201) | (0.239) | 34 |
+| sct-default | argilla_pii | (0.967) | (0.967) | (0.057) | (0.057) | 0 |
+| sct-default | thai_pii | (0.975) | (0.975) | (0.782) | (0.782) | 0 |
+| sct-default | bayanat | (0.995) | (0.995) | (0.050) | (0.050) | 0 |
+| sct-default | tab | (0.946) | (0.935) | (1.000) | (1.000) | 189 |
+| sct-default | redact | (0.966) | (0.928) | (0.612) | (0.656) | 2350 |
+| sct-default | iahlt | (0.937) | (0.937) | (0.295) | (0.295) | 0 |
+| sct-default | thainer | (0.877) | (0.877) | (0.498) | (0.498) | 0 |
+| sct-default | naamapadam | (0.701) | (0.700) | (0.432) | (0.432) | 2 |
+| sct-default | multiconer | (0.819) | (0.819) | (0.310) | (0.310) | 0 |
+| sct-default | stockmark | (0.908) | (0.908) | (0.282) | (0.282) | 0 |
+| sct-gliner | openpii | (0.840) | (0.840) | (0.599) | (0.599) | 64 |
+| sct-gliner | gretel | (0.886) | (0.818) | (0.712) | (0.763) | 1833 |
+| sct-gliner | gretel_en | (0.983) | (0.983) | (0.274) | (0.274) | 0 |
+| sct-gliner | nemotron | (0.967) | (0.953) | (0.285) | (0.306) | 50 |
+| sct-gliner | argilla_pii | (0.975) | (0.975) | (0.131) | (0.131) | 0 |
 | sct-gliner | thai_pii | ° | ° | ° | ° | 0 |
 | sct-gliner | bayanat | ° | ° | ° | ° | 0 |
-| sct-gliner | tab | (0.579) | (0.565) | 1.000 | 1.000 | 164 |
-| sct-gliner | redact | (0.961) | (0.909) | 0.906 | 0.938 | 2855 |
+| sct-gliner | tab | (0.579) | (0.565) | (1.000) | (1.000) | 164 |
+| sct-gliner | redact | (0.961) | (0.909) | (0.906) | (0.938) | 2855 |
 | sct-gliner | iahlt | ° | ° | ° | ° | 13 |
 | sct-gliner | thainer | ° | ° | ° | ° | 0 |
 | sct-gliner | naamapadam | ° | ° | ° | ° | 0 |
@@ -265,29 +267,29 @@ recall and doc leak with and without `scorer.recover_dropped`, and the copies it
 
 | entry | dataset | masked_recall with | without | doc leak with | without | copies recovered |
 |---|---|---|---|---|---|---|
-| sct-default | openpii | (0.907) | (0.907) | 0.462 | 0.463 | 18 |
-| sct-default | gretel | (0.745) | (0.707) | 0.647 | 0.690 | 899 |
-| sct-default | gretel_en | (0.978) | (0.978) | 0.266 | 0.266 | 0 |
-| sct-default | nemotron | (0.973) | (0.956) | 0.197 | 0.236 | 33 |
-| sct-default | argilla_pii | (0.967) | (0.967) | 0.057 | 0.057 | 0 |
-| sct-default | thai_pii | (0.977) | (0.977) | 0.782 | 0.782 | 0 |
-| sct-default | bayanat | (0.995) | (0.995) | 0.050 | 0.050 | 0 |
-| sct-default | tab | (0.947) | (0.935) | 1.000 | 1.000 | 198 |
-| sct-default | redact | (0.968) | (0.930) | 0.597 | 0.647 | 2379 |
-| sct-default | iahlt | (0.937) | (0.937) | 0.291 | 0.291 | 0 |
-| sct-default | thainer | (0.882) | (0.882) | 0.490 | 0.490 | 0 |
-| sct-default | naamapadam | (0.712) | (0.711) | 0.411 | 0.411 | 2 |
-| sct-default | multiconer | (0.829) | (0.829) | 0.296 | 0.296 | 0 |
-| sct-default | stockmark | (0.917) | (0.917) | 0.267 | 0.267 | 0 |
-| sct-gliner | openpii | (0.857) | (0.857) | 0.566 | 0.566 | 153 |
-| sct-gliner | gretel | (0.912) | (0.834) | 0.588 | 0.685 | 3055 |
-| sct-gliner | gretel_en | (0.983) | (0.983) | 0.239 | 0.239 | 1 |
-| sct-gliner | nemotron | (0.981) | (0.958) | 0.222 | 0.271 | 105 |
-| sct-gliner | argilla_pii | (0.985) | (0.985) | 0.102 | 0.102 | 0 |
+| sct-default | openpii | (0.907) | (0.907) | (0.462) | (0.463) | 18 |
+| sct-default | gretel | (0.745) | (0.707) | (0.647) | (0.690) | 899 |
+| sct-default | gretel_en | (0.978) | (0.978) | (0.266) | (0.266) | 0 |
+| sct-default | nemotron | (0.973) | (0.956) | (0.197) | (0.236) | 33 |
+| sct-default | argilla_pii | (0.967) | (0.967) | (0.057) | (0.057) | 0 |
+| sct-default | thai_pii | (0.977) | (0.977) | (0.782) | (0.782) | 0 |
+| sct-default | bayanat | (0.995) | (0.995) | (0.050) | (0.050) | 0 |
+| sct-default | tab | (0.947) | (0.935) | (1.000) | (1.000) | 198 |
+| sct-default | redact | (0.968) | (0.930) | (0.597) | (0.647) | 2379 |
+| sct-default | iahlt | (0.937) | (0.937) | (0.291) | (0.291) | 0 |
+| sct-default | thainer | (0.882) | (0.882) | (0.490) | (0.490) | 0 |
+| sct-default | naamapadam | (0.712) | (0.711) | (0.411) | (0.411) | 2 |
+| sct-default | multiconer | (0.829) | (0.829) | (0.296) | (0.296) | 0 |
+| sct-default | stockmark | (0.917) | (0.917) | (0.267) | (0.267) | 0 |
+| sct-gliner | openpii | (0.857) | (0.857) | (0.566) | (0.566) | 153 |
+| sct-gliner | gretel | (0.912) | (0.834) | (0.588) | (0.685) | 3055 |
+| sct-gliner | gretel_en | (0.983) | (0.983) | (0.239) | (0.239) | 1 |
+| sct-gliner | nemotron | (0.981) | (0.958) | (0.222) | (0.271) | 105 |
+| sct-gliner | argilla_pii | (0.985) | (0.985) | (0.102) | (0.102) | 0 |
 | sct-gliner | thai_pii | ° | ° | ° | ° | 0 |
 | sct-gliner | bayanat | ° | ° | ° | ° | 0 |
-| sct-gliner | tab | (0.706) | (0.684) | 1.000 | 1.000 | 786 |
-| sct-gliner | redact | (0.973) | (0.915) | 0.875 | 0.906 | 3725 |
+| sct-gliner | tab | (0.706) | (0.684) | (1.000) | (1.000) | 786 |
+| sct-gliner | redact | (0.973) | (0.915) | (0.875) | (0.906) | 3725 |
 | sct-gliner | iahlt | ° | ° | ° | ° | 33 |
 | sct-gliner | thainer | ° | ° | ° | ° | 0 |
 | sct-gliner | naamapadam | ° | ° | ° | ° | 0 |

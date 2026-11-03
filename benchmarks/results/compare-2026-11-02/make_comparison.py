@@ -159,7 +159,8 @@ emit("How to read the tables:", "",
      "  over-mask = masked characters outside every gold span / all non-gold characters.",
      "- Own tables: the entry on its own clean datasets, only docs in its claimed languages, with a 95%",
      "  bootstrap CI (1,000 resamples of templates/docs within each dataset, seed 13). Beside it, for",
-     "  information: mR on clean sets outside the claimed languages, on unknown (U) sets, and (in",
+     "  information: mR on clean sets outside the claimed languages, on unknown (U) sets inside and outside",
+     "  the claimed languages, and (in",
      "  brackets) on excluded sets, each with the number of datasets. SCT's excluded numbers carry",
      "  \"w/o recovery\": the same number without `scorer.recover_dropped`.",
      "- Full view = all 9 SCT types (a type the tool does not support counts as missed). Shared view =",
@@ -194,10 +195,11 @@ emit("### Same-set, tuned, full view, privacy-real")
 table(same("tuned", "full", "privacy-real"))
 emit("Privacy-synthetic: " + same("tuned", "full", "privacy-synthetic")[0], "")
 
-emit("## SCT: information only, with and without the recovery rule", "",
+emit("## SCT: excluded cells, with and without the recovery rule", "",
      "Every SCT cell is excluded (D or D-family; sct-gliner also U), so nothing here is a comparison.",
      "Per SCT entry and dataset, full view, claimed languages (sct-gliner: en; `°` = no en doc), masked",
-     "recall and doc leak with and without `scorer.recover_dropped`, and the copies it recovered.", "")
+     "recall and doc leak with and without `scorer.recover_dropped` (excluded cells in parentheses in",
+     "every number column), and the copies it recovered.", "")
 for track in ("default", "tuned"):
     emit(f"### {track} track")
     table(report.recovery_table(bundle, track))

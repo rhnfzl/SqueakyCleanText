@@ -40,29 +40,6 @@ def completion_table(track_dir: Path, entries) -> list[str]:
     return out
 
 
-def paired_table(summary: dict, metric: str = "masked_recall", baseline: str = "sct-default") -> list[str]:
-    """Per entry: datasets clean for both sides where the baseline is significantly better / worse / not different.
-
-    Datasets excluded or unknown for either side (decision 21) are only counted, not compared.
-    """
-    out = [f"| entry | baseline better | entry better | no difference | not compared (excluded / unknown) "
-           f"({metric}, shared view, all languages) |", "|---|---|---|---|---|"]
-    for entry, by_dataset in summary.get("paired", {}).items():
-        better, worse, tie, skipped = [], [], [], []
-        for dataset, res in sorted(by_dataset.items()):
-            if {registry.status(entry, dataset), registry.status(baseline, dataset)} != {"clean"}:
-                skipped.append(dataset)
-                continue
-            m = res["metrics"].get(metric)
-            if m is None or not m["excludes_zero"]:
-                tie.append(dataset)
-                continue
-            diff = m["a"] - m["b"]
-            (better if (diff < 0 if metric in LOWER_IS_BETTER else diff > 0) else worse).append(dataset)
-        out.append(f"| {entry} | {', '.join(better) or '-'} | {', '.join(worse) or '-'} | {len(tie)} | {len(skipped)} |")
-    return out
-
-
 def _mark(value, entry: str, dataset: str, without=False) -> str:
     """Decision 21 marker; *without* (the SCT score without recovered copies) is labelled next to it."""
     text = _fmt(value) + ("" if without is False else f"; w/o recovery {_fmt(without)}")
@@ -164,7 +141,8 @@ def own_table(summary: dict, bundle: Path, view: str, group: str, without: dict 
     """
     head = ("| entry | clean sets with claimed-language docs (all clean sets) | "
             + " | ".join(f"{n} [95% CI]" for _, n in HEAD)
-            + " | mR clean, outside claimed langs | mR unknown (U) sets | (mR excluded sets, info only) | docs/s CPU"
+            + " | mR clean, outside claimed langs | mR unknown (U) sets | mR U sets, outside claimed langs"
+            " | (mR excluded sets, info only) | docs/s CPU"
             " | peak RAM | claimed languages | licence |")
     rows = []
     for entry, views in summary.get("own", {}).items():
@@ -189,9 +167,10 @@ def own_table(summary: dict, bundle: Path, view: str, group: str, without: dict 
                      f"| {entry} | {', '.join(used) or 'none'} ({len(clean.get('datasets', []))}) | " + " | ".join(cells)
                      + f" | {info(lambda c: ((c or {}).get('clean') or {}).get('outside_claim'))}"
                      + f" | {info(lambda c: ((c or {}).get('unknown') or {}).get('claimed'))}"
+                     + f" | {info(lambda c: ((c or {}).get('unknown') or {}).get('outside_claim'))}"
                      + f" | {'(' + excluded + ')' if excluded != '-' else '-'} | {docs} | {rss}"
                      + f" | {claimed(entry)} | {LICENCES.get(entry, '?')} |"))
-    return [head, "|" + "---|" * (len(HEAD) + 9), *(row for _, row in sorted(rows, reverse=True))]
+    return [head, "|" + "---|" * (len(HEAD) + 10), *(row for _, row in sorted(rows, reverse=True))]
 
 
 def pairwise_table(summary: dict, view: str, group: str, kind: str = "clean", baseline: str = "sct-default") -> list[str]:
@@ -299,7 +278,7 @@ def recovery_table(bundle: Path, track: str, view: str = "full", metric: str = "
             e = entry_dir.name
             m = [{k: claimed_macro(r["views"][view]["compare"], e, k) for k in (metric, "doc_leak_rate")}
                  for r in (new, old)]
-            vals = [["°" if x[k] is False else (_mark(x[k], e, dataset) if k == metric else _fmt(x[k]))
+            vals = [["°" if x[k] is False else _mark(x[k], e, dataset)
                      for x in m] for k in (metric, "doc_leak_rate")]
             out.append(f"| {e} | {dataset} | {' | '.join(vals[0] + vals[1])} | {new.get('recovered_dropped_copies')} |")
     return out
@@ -360,7 +339,6 @@ def tables(bundle: Path) -> str:
                   "- = every doc is in a claimed language)", "",
                   *dataset_table(bundle / track, summary["aggregate"], inside=False, without_dir=wo_dir)]
         lines += ["", f"## {track} track, completion", "", *completion_table(bundle / track, summary["aggregate"])]
-        lines += ["", f"## {track} track, paired bootstrap vs baseline per dataset", "", *paired_table(summary)]
         recovery = recovery_table(bundle, track)
         if recovery:
             lines += ["", f"## {track} track, SCT with and without recovered dropped copies (full view)", "", *recovery]

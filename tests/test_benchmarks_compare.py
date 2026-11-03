@@ -573,7 +573,7 @@ def test_report_tables_from_a_tiny_bundle(tmp_path):
     (tmp_path / "tuned" / "x" / "offset-check.json").write_text("{}")
     out = report.tables(tmp_path)
     assert "| x | 10 | 1 | tab 0.900 |" in out
-    assert "| x | - | - | 0 | 1 |" in out  # tab is excluded (D) for the baseline: counted, not compared
+    assert "paired bootstrap vs baseline" not in out  # every set excluded/unknown for SCT: section dropped
     assert "| tab | 0.500 |" in out
     assert "| en | tab | 0.600 |" in out
 
