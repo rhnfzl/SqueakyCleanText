@@ -278,6 +278,8 @@ def test_offset_check_separates_detection_errors_from_offset_bugs():
     assert check([]) == (False, True)  # missed: detection error
     assert check([(start + 2, end + 2)]) == (True, False)  # misplaced: offset bug
     assert check([(start, end - 1)]) == (True, False)  # cut short: offset bug
+    assert check([(start, start + 3)]) == (False, True)  # stops at the e-mail's own ".": partial detection
+    assert check([(start + 1, start + 3)]) == (True, False)  # does not start on the e-mail: offset bug
     assert "latin-combining" in runner.check_offsets({}, labels)[0]  # no output at all
 
 

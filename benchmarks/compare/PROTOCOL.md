@@ -613,8 +613,9 @@ Each entry runs in its own venv (`uv venv --python 3.12` + `envs/<entry>.txt`; t
   of range make the doc an error; `<output>.ready` is written once the model has loaded.
 
 The runner checks offsets on seven hand-made fixtures first (an entry with a misplaced e-mail span
-is not run; a missed e-mail or a span that covers it plus extra text is a detection error, recorded
-in `offset-check.json` but not a skip),
+is not run; a missed e-mail, a span that covers it plus extra text, or a span that starts on it and stops
+at its own `.` or `@` (the model tagged only the first subwords; a shifted or inclusive-end span cannot land
+there) is a detection error, recorded in `offset-check.json` but not a skip),
 then supervises: per-doc timeout counted from the last line or the ready marker, one retry of
 the doc that was running, then an `error` line (`timeout`, `crash: exit N`); three docs in a row
 failing with no output at all abort the rest (`aborted`). Raw outputs (they hold dataset text)

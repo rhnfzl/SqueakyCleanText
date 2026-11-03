@@ -256,8 +256,10 @@ def check_offsets(results: dict[str, dict], labels: dict[str, str]) -> tuple[dic
     """(offset problems, detection errors): fixture name -> reason, for fixtures not returned exactly.
 
     An error line or an EMAIL span that cuts into the e-mail is an offset problem (the entry is
-    skipped). No overlapping EMAIL span, or one that covers the whole e-mail plus extra text, is
-    the model's detection error: recorded, not a skip.
+    skipped). No overlapping EMAIL span, one that covers the whole e-mail plus extra text, or one
+    that starts on the e-mail and stops at its own ``.`` / ``@`` (a model tagging only the first
+    subwords; a shifted or inclusive-end span cannot land there) is the model's detection error:
+    recorded, not a skip.
     """
     problems, misses = {}, {}
     for name, (_, text) in OFFSET_FIXTURES.items():
@@ -273,7 +275,7 @@ def check_offsets(results: dict[str, dict], labels: dict[str, str]) -> tuple[dic
             got = [(s["start"], s["end"], s["label"]) for s in line.get("spans", ())]
             reason = f"want EMAIL {(start, end)}, got {got}"
             overlapping = [(a, b) for a, b in emails if a < end and b > start]
-            if all(a <= start and b >= end for a, b in overlapping):
+            if all((a <= start and b >= end) or (a == start and b < end and text[b] in ".@") for a, b in overlapping):
                 misses[name] = reason
             else:
                 problems[name] = reason
