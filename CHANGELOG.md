@@ -18,7 +18,9 @@ Each pattern gets a time limit (`custom_patterns_timeout`, 2 s per document), so
 the year, and a very long digit run no longer slows the streaming redactor. A number next to a currency code
 (`1250 EUR`, `EUR 1250`) is kept as an amount, but an ID shape next to one (`123-45-6789 USD`) is still masked,
 and long number tables stream again; a spaced ID of any length is masked whole. The windowed streaming
-redactor no longer shows a phone that the whole text masks (`05 234 567 1`, `117 235 991 1.2.3.4`).
+redactor no longer shows a phone that the whole text masks (`05 234 567 1`, `117 235 991 1.2.3.4`), also next to
+your own terms or a fuzzy date; it keeps one feed within `max_buffer_chars`, adds no spaces the whole text does
+not have, and refuses `custom_allow_terms` (use `BufferedStreamingRedactor`).
 
 Heads-up: output text changes for numbers and some phones. `replace_numbers_mode='all'` and
 `phone_reject_embedded=False` restore 0.8.1.
@@ -108,7 +110,7 @@ Heads-up: output text changes for numbers and some phones. `replace_numbers_mode
   that also appears outside an allowed term is masked everywhere.
 - Every replacement mode (`<LABEL>`, reversible `<LABEL_0>` restored by `deanonymize`, synthetic Faker value
   for labels Faker knows, else `<LABEL>`), `process_batch`, both streaming redactors (the windowed split guard
-  will not cut a term), `process_json`, `regex_counts` and `signals` (user labels count as PII; values never
+  will not cut a term; it refuses allow terms, see Fixes), `process_json`, `regex_counts` and `signals` (user labels count as PII; values never
   appear).
 - Clear `ValueError`s at config time: label not upper case, a string instead of a tuple of terms, empty
   terms, one term under two labels, an invalid regex, a regex that can match the empty string.
@@ -139,6 +141,7 @@ Heads-up: output text changes for numbers and some phones. `replace_numbers_mode
 
 ### Fixes
 
+- `WindowedStreamingRedactor`: the split guard also runs `custom_deny_terms`, `custom_patterns` and fuzzy dates in the cleaner's step order, and never cuts a digit run near the overlap, so a phone they make visible (`117 235 991 12345` with a `12345` pattern, `117 235 991 15 Janury 1990`) no longer leaks. One `feed()` now splits until the buffer fits `max_buffer_chars` (before, one large feed kept everything after its first split; it now raises `BufferError` when no safe split exists). With whitespace normalised, a window that holds only whitespace adds no space (`hello` + 100 spaces + `world` streamed as `hello     world`). With `custom_allow_terms` set it raises `ValueError`: an allowed value is kept only if every occurrence in the document is allowed, which an emitted window cannot know. No option: pure leak and bound fixes; allow terms are new in this release.
 - `WindowedStreamingRedactor` only splits where every masking step up to phones (HTML, URL, email, IP, date, IBAN, card, ID, phone) finds the same matches in each half as in the whole buffer, read in the cleaner's step order (each step on the text the steps before it leave). Before, a split right after a phone whose rule reads past its match (a trunk-0 or `+` number counts its digits ahead: `05 234 567 1`, `+1 2 3 4 5 6 7 8 x`) emitted it whole, and the guard read phones and digit runs on the raw text, so a phone the cleaner finds only once an IP or card next to it is masked (`ok 490 872 276 1.2.3.4`, `4111111111111111 117 235 991`) or a number run that ends at a masked IP (`01 023 59 9 90.217.217.177`) could split and leak, even with an overlap longer than every value. Such a split now moves earlier, or the stream raises `BufferError`. A 40,000-case streaming fuzz finds no leak with an overlap longer than every value (24 before); a value longer than `overlap_chars` still unfinished at the buffer end can still split, as documented. Streaming is about 20% slower. No option: a pure leak fix.
 
 ## 0.8.1 - 2026-11-02

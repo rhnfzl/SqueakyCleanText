@@ -27,7 +27,7 @@ sct-mcp
 ```
 
 `BufferedStreamingRedactor` holds a full document for cross-chunk NER safety.
-`WindowedStreamingRedactor` provides bounded latency for contact tokens.
+`WindowedStreamingRedactor` provides bounded latency for contact tokens. It refuses `custom_allow_terms` (`ValueError`): whether an allowed value is kept depends on the whole document.
 When its buffer passes `max_buffer_chars` (default 4096) and has no safe whitespace split, it raises
 `BufferError`. Raise `max_buffer_chars` or use `BufferedStreamingRedactor` for such input.
 It never splits a window inside an email, phone, URL, IP (or a date or number when those steps are on): it reads the

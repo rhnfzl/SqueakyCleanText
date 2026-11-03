@@ -107,3 +107,51 @@ def test_seeded_fuzz_overlap_longer_than_every_value(seed):
         def tokens(s):
             return set(_TOKEN.findall(_TAG.sub(" ", s)))
         assert tokens(out) <= tokens(whole), (text, buf, overlap, out, whole)
+
+
+def _user_cleaner(**kw):
+    return TextCleaner(cfg=preset_config("training", check_ner_process=False, check_detect_language=False, **kw))
+
+
+@pytest.mark.parametrize("kw, text", [
+    # a user rule or fuzzy date masked before phones makes "117 235 991" a phone (no digits follow it)
+    ({"custom_patterns": {"SECRET": r"12345"}}, "ok 117 235 991 12345 ok tail tail"),
+    ({"custom_patterns": {"SECRET": r"12345"}}, "ok 12345 117 235 991 ok tail tail"),
+    ({"custom_deny_terms": {"SECRET": ("12345",)}}, "ok 117 235 991 12345 ok tail tail"),
+    ({"check_fuzzy_replace_dates": True, "language": "ENGLISH"}, "ok 117 235 991 15 Janury 1990 ok tail tail"),
+])
+def test_user_rules_and_fuzzy_dates_before_phones_do_not_leak(kw, text):
+    cleaner = _user_cleaner(**kw)
+    whole = cleaner.process(text).lm_text.split()
+    assert "<PHONE>" in whole
+    for chunks in ([1], [3]):
+        for buf in range(16, len(text) + 2):
+            for overlap in range(14, buf):  # longer than every value (the fuzzy date is 14)
+                out = _stream(cleaner, text, buf, overlap, chunks)
+                assert out is None or out.split() == whole, (buf, overlap, chunks, out)
+
+
+def test_allow_terms_refused():
+    """Whether an allowed value is kept depends on every occurrence in the document: a window cannot know."""
+    cleaner = _user_cleaner(custom_allow_terms=("safe 117 235 991",))
+    with pytest.raises(ValueError, match="custom_allow_terms"):
+        WindowedStreamingRedactor(cleaner, max_buffer_chars=32, overlap_chars=16)
+
+
+def test_one_feed_keeps_the_buffer_bounded():
+    cleaner = _cleaner("training")
+    redactor = WindowedStreamingRedactor(cleaner, max_buffer_chars=40, overlap_chars=16)
+    with pytest.raises(BufferError):
+        redactor.feed("hello " + "x" * 10000)
+    text = " ".join(["note ok tail"] * 200)
+    redactor = WindowedStreamingRedactor(cleaner, max_buffer_chars=40, overlap_chars=16)
+    out = redactor.feed(text)
+    assert len(redactor._buffer) <= 40
+    assert (out + redactor.finish()).split() == cleaner.process(text).lm_text.split()
+
+
+@pytest.mark.parametrize("text", ["hello " + " " * 100 + "world", " " * 60 + "hello", "hello" + " " * 60])
+def test_whitespace_only_windows_add_no_space(text):
+    cleaner = _cleaner("sct")
+    for chunks in ([1], [7]):
+        assert _stream(cleaner, text, 24, 8, chunks) == cleaner.process(text).lm_text

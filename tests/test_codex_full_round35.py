@@ -24,7 +24,7 @@ from sct.streaming import WindowedStreamingRedactor
 def test_url_with_final_host_dot_is_whole(url):
     cleaner = TextCleaner(TextCleanerConfig(check_ner_process=False))
     text = f"Open {url} now."
-    stream = WindowedStreamingRedactor(cleaner, max_buffer_chars=32, overlap_chars=16)
+    stream = WindowedStreamingRedactor(cleaner, max_buffer_chars=64, overlap_chars=60)  # holds the URL
     outputs = [cleaner.process(text).lm_text, cleaner.process_batch([text])[0].lm_text,
                stream.feed(text) + stream.finish()]
     assert outputs == ["Open <URL> now."] * 3
