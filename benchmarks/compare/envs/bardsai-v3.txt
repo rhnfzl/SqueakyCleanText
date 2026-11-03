@@ -1,0 +1,5 @@
+# bardsai-v3: INT8 ONNX model + its bundled pii_detector.py (revision pinned in the adapter).
+# The bundled decoder imports torch even on the ONNX path (model card: "Requires transformers and torch").
+transformers==5.22.1
+onnxruntime==1.31.1
+torch==2.15.0

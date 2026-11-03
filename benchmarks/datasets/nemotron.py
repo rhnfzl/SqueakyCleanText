@@ -20,8 +20,8 @@ def load(n: int | None, seed: int) -> list[dict]:
     import pyarrow.parquet as pq
 
     table = pq.read_table(hf_file(HF_ID, "data/test-00000-of-00001.parquet", REVISION),
-                          columns=["uid", "locale", "text", "spans"])
-    rows = ({"id": f"{r['uid']}:{r['locale']}", "lang": "en", "text": r["text"],
+                          columns=["uid", "locale", "document_type", "text", "spans"])
+    rows = ({"id": f"{r['uid']}:{r['locale']}", "lang": "en", "text": r["text"], "group": r["document_type"],
              "spans": valid_spans(r["text"], [{"start": s["start"], "end": s["end"], "label": s["label"]}
                                               for s in ast.literal_eval(r["spans"])])}
             for r in table.to_pylist())

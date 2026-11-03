@@ -63,14 +63,16 @@ def _nfkc_view(text: str) -> tuple[str, list[int]]:
     return "".join(pieces), offsets
 
 
-def predicted_spans(source: str, output: str, originals: dict[str, str]) -> list[EntitySpan]:
+def predicted_spans(source: str, output: str, originals: dict[str, str],
+                    view: tuple[str, list[int]] | None = None) -> list[EntitySpan]:
     """Map each ``<TAG_n>`` placeholder in output order to the source span it replaced.
 
     SCT may have folded the text (full-width to ASCII) before replacing it, so the
     search runs on the NFKC form of the source and the found range is mapped back
-    to source offsets.
+    to source offsets. *view* replaces that NFKC view with another ``(text, source offset
+    of each char + [len(source)])`` pair, e.g. one that also decodes entities as SCT does.
     """
-    view, offsets = _nfkc_view(source)
+    view, offsets = view or _nfkc_view(source)
     output = unicodedata.normalize("NFKC", output)
     spans, cursor, previous_end = [], 0, 0
     for match in PLACEHOLDER_REGEX.finditer(output):

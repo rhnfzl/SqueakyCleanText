@@ -110,6 +110,8 @@ by default, so `default` keeps emoji on purpose.
 | naamapadam | pii | ai4bharat/naamapadam (hi, bn, ta test) | 9d4f21a | CC0-1.0 per card, CC-BY-NC-4.0 in loader | scores + ids |
 | multiconer | pii | MultiCoNER/multiconer_v2 (hi, bn, zh test) | 4be2d62 | CC-BY-4.0 | scores + ids |
 | stockmark | pii | stockmark/ner-wikipedia-dataset (all) | d6c4d48 | CC-BY-SA-3.0 | scores + ids |
+| gretel_en | pii | gretelai/gretel-pii-masking-en-v1 (test) | e06eb14 | Apache-2.0 | scores + ids |
+| argilla_pii | pii | argilla/textcat-tokencat-pii-per-domain (all; 1% of ai4privacy/pii-masking-200k train) | 683954a | none on repo; Ai4Privacy licence upstream | scores only |
 | tab | long | NorskRegnesentral/text-anonymization-benchmark (GitHub, test) | 558e09e | MIT | scores + ids |
 | wili | lid | MartinThoma/wili_2018 (test) | 12c3a51 | ODbL-1.0 | scores + ids |
 | fineweb2 | speed, clean | HuggingFaceFW/fineweb-2 (test splits) | af9c133 | ODC-By-1.0 + CommonCrawl terms | scores + ids |
@@ -119,10 +121,61 @@ Notes:
 - gretel gold comes from an LLM plus GLiNER, so its precision is a lower bound.
 - multiconer entities are public figures and works, not real PII.
 - REDACT is gated: aggregate scores only, never text or ids.
+- gretel_en gold has no offsets: spans are every exact occurrence of each entity string.
+- argilla_pii has no licence of its own and comes from Ai4Privacy data: aggregate scores only.
+- Tool comparisons (dev/test splits, protocol): see `compare/PROTOCOL.md` and
+  "Compare SCT with other tools" below.
 
 Not run yet: bigcode-pii, PIILO and FLORES+ (no access), Wojood (not available),
 WikiANN and papluca (unclear licence; secondary), Universal NER (no hi/bn/ta/th),
 HPLT v2 (second speed domain; FineWeb-2 covers speed for now).
+
+## Compare SCT with other tools
+
+`benchmarks/compare/` runs SCT and other PII tools under one protocol (`compare/PROTOCOL.md`:
+splits, tracks, views, leak rules, bootstrap, contamination). Latest bundle and write-up:
+`results/compare-2026-11-02/` (`COMPARISON.md`, `TABLES.md`). Each entry runs in its own uv
+venv from `compare/envs/<entry>.txt`, as a subprocess through `compare/adapters/<tool>_adapter.py`.
+Raw outputs hold dataset text and stay in `benchmarks/.cache/` (never committed).
+
+Rerun (Linux box, CPU, 16 cores per job; one job per entry and track, then one merge):
+
+    # 1. tuned track only: dev grid per entry, then freeze one config each (skip to reuse configs/tuned.json)
+    python -m benchmarks.compare.tune run --entries <entry> --root R -- --cpus 0-15 --threads 16
+    python -m benchmarks.compare.tune select --root R --out benchmarks/compare/configs/tuned.json
+    # 2. test runs, per entry and track (add --tuned benchmarks/compare/configs/tuned.json for tuned)
+    python -m benchmarks.compare.runner --entries <entry> --datasets gretel_en argilla_pii openpii gretel \
+        nemotron redact tab bayanat thai_pii iahlt thainer naamapadam multiconer stockmark \
+        --part test --n 300 --out results/test/parts/<track>/<entry> --cache benchmarks/.cache/compare-<entry>-<track> \
+        --cpus 0-15 --threads 16 --reuse
+    # 3. merge: all entries, one cache dir with a symlink per entry, rescored with --reuse (no inference);
+    #    writes summary.json: per-dataset paired bootstraps vs SCT and the PROTOCOL.md section 17 rule views
+    #    (own clean cells, same-set, pairwise; claimed languages only); --no-recover = SCT without
+    #    recovered dropped copies, into <bundle>/norecover/<track> for the with/without table
+    python -m benchmarks.compare.runner --entries <all> --datasets <all> --part test --n 300 \
+        --out results/test/<track> --cache <merged cache> --threads 16 --reuse --skip-offset-check [--tuned ...]
+    # 4. speed, then tables
+    python -m benchmarks.compare.speed --entries <all> --cpus 0-15 --threads 16 --out <bundle>/speed-16t
+    python -m benchmarks.compare.report <bundle> > <bundle>/TABLES.md
+    # 5. audit of SCT's recovered copies (counts only; --notes only for sets whose text may be kept privately)
+    python -m benchmarks.compare.audit_recover --cache <merged cache> --datasets <all> --out audit-<track>.json
+
+Copy only the JSON results (no `predictions/` of `scores-only` sets, no raw outputs) into
+`results/compare-<date>/`. A rerun of the test part needs a logged reason in PROTOCOL.md.
+
+Add a tool:
+
+1. `compare/envs/<entry>.txt`: exact pins (package versions; model revision goes in `entries.py`).
+2. `compare/adapters/<entry_with_underscores>_adapter.py`: implement the contract in
+   `adapters/_protocol.py` (code-point offsets, tool's own labels, score or null, one output line
+   per input line). The runner's offset fixtures must pass before any run.
+3. `compare/entries.py`: add the entry to `ENTRIES` (package, checkpoint, revision, threshold,
+   `labels` map to SCT types, `supports`), to `RUNS`, to `GOLD_TRACK` if it takes a language, and
+   its direct training/evaluation exposure to `CONTAMINATION` (from the model card; T/E/D cells are excluded,
+   U is reported as unknown; family flags come from `FAMILIES`, never by hand) and its claimed languages to `CLAIMED_LANGUAGES` (model card language tags).
+4. `compare/tune.py`: its `GRID` (at most 12 candidates, only the changes PROTOCOL.md section 3 allows).
+5. `compare/report.py`: its licence in `LICENCES`.
+6. Smoke-run on dev: `python -m benchmarks.compare.runner --entries <entry> --datasets gretel_en --part dev --n 5 --out benchmarks/.cache/smoke`.
 
 ## Rules
 

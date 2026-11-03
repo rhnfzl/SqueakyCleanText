@@ -24,7 +24,7 @@ from scripts.benchmark_release import predicted_spans
 ROOT = Path(__file__).resolve().parent
 SUITES = {
     "pii": ("openpii", "gretel", "nemotron", "redact", "iahlt", "bayanat", "thainer", "thai_pii",
-            "naamapadam", "multiconer", "stockmark"),
+            "naamapadam", "multiconer", "stockmark", "gretel_en", "argilla_pii"),
     "long": ("tab",),
     "lid": ("wili",),
     "speed": ("fineweb2",),
