@@ -120,7 +120,8 @@ urchade/gliner_multi_pii-v1. scrubadub, OpenMed and Piiranha moved to the round-
 
 Round 2 entries (`entries.ROUND2_ENTRIES`, user list in sct-integration-research `compare/ROUND2-TODO.md`).
 GPU entries run in CUDA 12 venvs: torch 2.14.1+cu126 as a direct wheel from the PyTorch cu126 index (the newest
-release with a cu126 build; Linux x86_64, Python 3.12), onnxruntime-gpu from PyPI (its CUDA 12 build). Round 2
+release with a cu126 build; Linux x86_64, Python 3.12), onnxruntime-gpu 1.29.0 as a direct wheel from ORT's CUDA 12
+feed (PyPI's onnxruntime-gpu is the CUDA 13 build since 1.27). Round 2
 has no tuning (default track only).
 
 | entry | package / version | checkpoint @ revision | GPU need |
@@ -722,3 +723,7 @@ section 17 rule views (`own`, `same_set`, `pairwise`). Not yet built: the common
 - 2026-11-03: round 2 compares SCT 0.8.2 (all SCT entries). The round-1 torch entries (gliner-nvidia, gliner2-fastino, opf,
   bardsai-v3) move to torch 2.14.1+cu126 so they run on the CUDA 12.6 GPU; round 1 ran them with torch 2.15.0 (CUDA 13,
   CPU). bardsai-v3's ONNX model still runs on the CPU onnxruntime.
+- 2026-11-03 (round 2 envs): every env resolves for Linux x86_64 / Python 3.12 with CUDA 12 nvidia-* wheels only.
+  sct-gliner also moves to torch 2.14.1+cu126 (it resolved PyPI's CUDA 13 torch 2.15.0). sct-training takes
+  onnxruntime-gpu 1.29.0 from ORT's CUDA 12 feed: PyPI's 1.27+ builds (1.31.1 included) are CUDA 13.
+  `runner.gpu_twin_fixes` also matches `name @ url` pins.

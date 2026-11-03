@@ -16,6 +16,7 @@ import argparse
 import hashlib
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -61,14 +62,14 @@ def gpu_twin_fixes(requirements_text: str) -> list[tuple[str, str]]:
     """(CPU package to uninstall, pinned GPU requirement to reinstall) for each GPU_TWINS build the spec pins."""
     lines = [line.strip() for line in requirements_text.splitlines() if line.strip() and not line.startswith("#")]
     return [(cpu, line) for gpu, cpu in GPU_TWINS.items() for line in lines
-            if line.split("==")[0].split("[")[0].strip().lower() == gpu]
+            if re.split(r"[\[=@ ]", line, maxsplit=1)[0].lower() == gpu]  # name==ver, name[extra]==ver, name @ url
 
 
 def ensure_env(name: str, requirements: Path | None, envs_root: Path, python: str = registry.PYTHON) -> Path:
     """Python of the entry's venv, built with uv when missing or when its spec changed.
 
-    CUDA builds come from the spec itself: torch as a direct cu126 wheel URL (``envs/*.txt``), onnxruntime-gpu
-    from PyPI (CUDA 12), with ``GPU_TWINS`` resolved after the install.
+    CUDA builds come from the spec itself as direct CUDA 12 wheel URLs (``envs/*.txt``): torch from the PyTorch
+    cu126 index, onnxruntime-gpu from ORT's CUDA 12 feed, with ``GPU_TWINS`` resolved after the install.
     """
     if requirements is None:
         return Path(sys.executable)

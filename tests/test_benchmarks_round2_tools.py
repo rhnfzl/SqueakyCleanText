@@ -60,14 +60,15 @@ def test_round2_entries_are_registered_with_runs_envs_and_rules():
 
 
 def test_round2_gpu_envs_are_cuda12():
-    for name in NEW:
+    for name in entries.ENTRIES:  # round-1 entries too: round 2 runs them on CUDA 12 as well
         spec = entries.tool(name)["requirements"].read_text()
         pins = [line for line in spec.splitlines() if line and not line.startswith("#")]
         torch_pins = [p for p in pins if p.startswith("torch")]
         assert all("/whl/cu126/torch-2.14.1%2Bcu126-cp312" in p for p in torch_pins), name  # never PyPI's CUDA 13 torch
         if "cuda" in entries.ENTRIES[name]["device"] and name != "sct-training":
             assert torch_pins, name
-    assert "onnxruntime-gpu[cuda,cudnn]==" in entries.tool("sct-training")["requirements"].read_text()
+    ort = entries.tool("sct-training")["requirements"].read_text()
+    assert "onnxruntime-gpu[cuda,cudnn] @ " in ort and "/onnxruntime-gpu/1.29/" in ort  # PyPI's 1.27+ is CUDA 13
     assert entries.ENTRIES["presidio-full"]["device"] == "cpu"
 
 
@@ -76,6 +77,9 @@ def test_env_builder_swaps_the_cpu_twin_for_the_gpu_build(tmp_path, monkeypatch)
     spec.write_text("# c\nSqueakyCleanText==0.8.1\nonnxruntime-gpu[cuda,cudnn]==1.31.1\n")
     assert runner.gpu_twin_fixes(spec.read_text()) == [("onnxruntime", "onnxruntime-gpu[cuda,cudnn]==1.31.1")]
     assert runner.gpu_twin_fixes("onnxruntime==1.31.1\n") == []
+    url = "onnxruntime-gpu[cuda,cudnn] @ https://example.org/onnxruntime_gpu-1.29.0-cp312-cp312-manylinux_2_28_x86_64.whl"
+    assert runner.gpu_twin_fixes(url) == [("onnxruntime", url)]
+    assert runner.gpu_twin_fixes(url.replace("[cuda,cudnn]", "")) == [("onnxruntime", url.replace("[cuda,cudnn]", ""))]
     calls = []
     monkeypatch.setattr(runner.shutil, "which", lambda name: "uv")
     monkeypatch.setattr(runner.subprocess, "run", lambda cmd, **kw: calls.append(cmd) or types.SimpleNamespace(stdout=""))
