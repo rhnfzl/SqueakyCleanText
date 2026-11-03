@@ -267,9 +267,17 @@ def token_glue(in_words=False):
 
 
 _ID_NUMBER_CACHE = {}
+# A date written as a spaced/hyphen-joined digit run (05 11 2023, 2023 11-05): the year step keeps masking its
+# year rather than leaving it to the run's <NUMBER>, as before (the date step has no spaced date).
+SPACED_DATE_REGEX = re.compile(
+    r"\d{1,2}[ \-\u2010\u2011]\d{1,2}[ \-\u2010\u2011](?:\d\d){1,2}|\d{4}[ \-\u2010\u2011]\d{1,2}[ \-\u2010\u2011]\d{1,2}")
+# Most groups a spaced/hyphen-joined ID run may have (1234 56-78-90 has 4); a longer run is a number table, not
+# one ID, and the streaming guard may split it.
+SPACED_ID_MAX_GROUPS = 6
 
 
-def identifier_numbers_regex(min_digits, in_words=False, *, letter_prefix=False, two_part=False, spaced_pair=False):
+def identifier_numbers_regex(min_digits, in_words=False, *, letter_prefix=False, two_part=False, spaced_pair=False,
+                             keep_currency_code=False):
     """A whole digit run of at least *min_digits* digits that is not part of a longer token (glued to letters,
     digits or a joiner and another token part) and not an amount, decimal, percent, time or range: those
     shapes either join their parts (1,250.00, 100-200; 14:30 has 2-digit parts) or touch a % / currency sign.
@@ -281,17 +289,23 @@ def identifier_numbers_regex(min_digits, in_words=False, *, letter_prefix=False,
     two_part: two digit groups joined by "/" or a hyphen, the first 4+ digits, 7+ digits in all, an optional
     uppercase check letter (123456/7890, 12345-678901, 123456-789K), or by "." with 4+ digits on each side
     (12345.67890); not a year pair (2023-2024), a round range (1000-3000) or a time (1234-5678:30).
-    spaced_pair: "DDD DD" (a 5-digit postal code written 123 45), and a run of 3+ digit groups joined by spaces
+    spaced_pair: "DDD DD" (a 5-digit postal code written 123 45), and a run of 3-6 digit groups joined by spaces
     and/or hyphens (at least one space) with 7+ digits (123 45 6789, 123 45-6789, 1234 56-78-90) as one
-    identifier, unless date-shaped (05 11 2023, 2023 11 05), thousands-grouped (1 234 567) or beside a decimal,
-    % or currency sign."""
-    key = (min_digits, in_words, letter_prefix, two_part, spaced_pair)
+    identifier (a date-shaped run, 05 11 2023, too: the date step has no spaced date), unless
+    thousands-grouped (1 234 567) or beside a decimal, % or currency sign.
+    keep_currency_code: a number right before or after an uppercase ISO 4217 code (_CURRENCY_CODES), with at most
+    one space between ("1250 EUR", "EUR 1250"), is an amount for every shape but letter_prefix (its own rule)."""
+    key = (min_digits, in_words, letter_prefix, two_part, spaced_pair, keep_currency_code)
     if key not in _ID_NUMBER_CACHE:
         glue, j, unit = token_glue(in_words), PART_JOINERS, CURRENCY_SIGNS
         hyphen, end = r"[\-\u2010\u2011]", rf"(?![\d{j}])"
         date = rf"(?:\d{{1,2}}{hyphen}\d{{1,2}}{hyphen}(?:\d\d){{1,2}}|\d{{4}}{hyphen}\d{{1,2}}{hyphen}\d{{1,2}}){end}"
         grouped = rf"(?!{date})(?=\d(?:{hyphen}?\d){{{min_digits - 1}}})\d+(?:{hyphen}\d+){{2,}}"
         no_unit_before, no_unit_after = rf"(?<![{unit}])(?<![{unit}] )", rf"(?! ?[%‰{unit}])"
+        if keep_currency_code:  # uppercase codes only, not inside a Latin/Greek/Cyrillic word ("PEUR", "EURO")
+            code = rf"(?:{_CURRENCY_CODES})"
+            no_unit_before += rf"(?<!(?<![{_SPACED_LETTERS}]){code})(?<!(?<![{_SPACED_LETTERS}]){code} )"
+            no_unit_after += rf"(?! ?{code}(?![{_SPACED_LETTERS}]))"
         shapes = [
             rf"(?<![{glue}])(?<![{glue}{_LEFT_EDGE}][{j}]){no_unit_before}"
             rf"(?:{grouped}|\d{{{min_digits},}})"
@@ -311,14 +325,13 @@ def identifier_numbers_regex(min_digits, in_words=False, *, letter_prefix=False,
         if spaced_pair:
             # A run of 3+ digit groups joined by spaces and/or hyphens with at least one space and 7+ digits
             # (an ID or SSN written 123 45 6789, 123 45-6789, 1234 56-78-90) is one identifier, unless
-            # date-shaped (05 11 2023, 2023 11-05) or thousands-grouped (1 234 567, an amount); an all-hyphen
-            # run is the grouped rule's. It goes first, so no other shape takes part of the run.
+            # thousands-grouped (1 234 567, an amount); an all-hyphen run is the grouped rule's. It goes first,
+            # so no other shape takes part of the run.
             sep = r"[ \-\u2010\u2011]"
             tail = rf"(?!\w|[.,:]\d|{sep}\d){no_unit_after}"
-            spaced_date = rf"(?:\d{{1,2}}{sep}\d{{1,2}}{sep}(?:\d\d){{1,2}}|\d{{4}}{sep}\d{{1,2}}{sep}\d{{1,2}}){tail}"
             shapes.insert(0, rf"(?<![\w.,:/\-\u2010\u2011])(?<!\d ){no_unit_before}"
-                             rf"(?!{spaced_date})(?!\d{{1,3}}(?: \d{{3}})+{tail})(?=\d+(?:{sep}\d+)*? \d)"
-                             rf"(?=(?:\d{sep}?){{7}})\d+(?:{sep}\d+){{2,}}{tail}")
+                             rf"(?!\d{{1,3}}(?: \d{{3}})+{tail})(?=\d+(?:{sep}\d+)*? \d)"
+                             rf"(?=(?:\d{sep}?){{7}})\d+(?:{sep}\d+){{2,{SPACED_ID_MAX_GROUPS - 1}}}{tail}")
             # "DDD DD", a 5-digit postal code
             shapes.append(rf"(?<![\w.,:/\-])(?<!\d ){no_unit_before}\d{{3}} \d{{2}}{tail}")
         _ID_NUMBER_CACHE[key] = re.compile("|".join(shapes))

@@ -443,6 +443,9 @@ class TextCleanerConfig:
     # On a timeout: 'raise' a CustomPatternTimeout (names the label, never the text), or 'warn': log it, add
     # 'custom_pattern_timeout' to metadata['warnings'] and process that document without the pattern.
     custom_patterns_on_timeout: str = 'raise'
+    # replace_numbers_mode='identifiers' only: a number right before or after an uppercase ISO 4217 code, with at
+    # most one space ("1250 EUR", "EUR 1250", "USD 1,250"), is an amount and stays. False: masked like any ID
+    numbers_keep_currency_code_amounts: bool = True
 
     def __post_init__(self):
         if self.synthetic_reference_date is not None:
@@ -925,6 +928,7 @@ def _config_from_module_globals() -> TextCleanerConfig:
         numbers_spaced_pair_ids=getattr(m, 'NUMBERS_SPACED_PAIR_IDS', True),
         custom_patterns_timeout=getattr(m, 'CUSTOM_PATTERNS_TIMEOUT', 2.0),
         custom_patterns_on_timeout=getattr(m, 'CUSTOM_PATTERNS_ON_TIMEOUT', 'raise'),
+        numbers_keep_currency_code_amounts=getattr(m, 'NUMBERS_KEEP_CURRENCY_CODE_AMOUNTS', True),
         check_replace_currency_symbols=m.CHECK_REPLACE_CURRENCY_SYMBOLS,
         check_ner_process=m.CHECK_NER_PROCESS,
         check_remove_isolated_letters=m.CHECK_REMOVE_ISOLATED_LETTERS,
@@ -1062,6 +1066,7 @@ NUMBERS_TWO_PART_IDS = True
 NUMBERS_SPACED_PAIR_IDS = True
 CUSTOM_PATTERNS_TIMEOUT = 2.0
 CUSTOM_PATTERNS_ON_TIMEOUT = 'raise'
+NUMBERS_KEEP_CURRENCY_CODE_AMOUNTS = True
 GLINER_ONNX = False
 LANGUAGE = None
 

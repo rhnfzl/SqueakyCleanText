@@ -15,7 +15,8 @@ on the GPU, about 1.6x faster `process_batch` on an M4 Max with the same output.
 Each pattern gets a time limit (`custom_patterns_timeout`, 2 s per document), so a bad regex cannot hang a run.
 
 **Fixes.** An ID whose last group looks like a year (`123-45 2020`) is now masked whole instead of only
-the year, and a very long digit run no longer slows the streaming redactor.
+the year, and a very long digit run no longer slows the streaming redactor. A number next to a currency code
+(`1250 EUR`, `EUR 1250`) is kept as an amount, and long number tables stream again.
 
 Heads-up: output text changes for numbers and some phones. `replace_numbers_mode='all'` and
 `phone_reject_embedded=False` restore 0.8.1.
@@ -57,9 +58,8 @@ Heads-up: output text changes for numbers and some phones. `replace_numbers_mode
   with a legacy global (default `True`): `numbers_letter_prefix_ids` (`AB1234567`, `X12345678Z`: 1-3 uppercase
   letters, 6+ digits, 0-2 uppercase letters; not `USD1000000`), `numbers_two_part_ids` (`123456/7890`,
   `12345-678901`, `123456-789K`, `12345.67890`; not year pairs `2023-2024`, round ranges `1000-3000`, times,
-  `%` or currency) and `numbers_spaced_pair_ids` (`123 45`, a spaced 5-digit postal code, and spaced IDs with 3+ groups and 7+ digits such as `123 45 6789`, also when spaces and hyphens mix (`123 45-6789`,
-  `1234 56-78-90`), always masked whole; date-shaped runs (`05 11 2023`) and thousands-grouped amounts like
-  `1 234 567` stay). Format rules only.
+  `%` or currency) and `numbers_spaced_pair_ids` (`123 45`, a spaced 5-digit postal code, and spaced IDs with 3-6 groups and 7+ digits such as `123 45 6789`, also when spaces and hyphens mix (`123 45-6789`,
+  `1234 56-78-90`), always masked whole; thousands-grouped amounts like `1 234 567` stay). Format rules only.
   DEV (9 datasets, language macro, NER threshold 0.8): F2 0.888 -> 0.901, recall 0.919 -> 0.937, precision
   0.814 -> 0.811, over-mask 0.029 -> 0.033. Pooled gold ID/number recall 0.633 -> 0.791 (0.8.1: 0.809) and
   phone recall 0.965 -> 0.990 (0.8.1: 0.997); most lost phones were `12345-678901`-shaped and come back as
@@ -72,6 +72,19 @@ Heads-up: output text changes for numbers and some phones. `replace_numbers_mode
   limitations).
 - The streaming split guard for digit-group runs no longer restarts inside a long digit run: 32,000 digits
   with no separator took ~5 s per buffer, now about 1 ms.
+- New `numbers_keep_currency_code_amounts` (default `True`, legacy global `NUMBERS_KEEP_CURRENCY_CODE_AMOUNTS`):
+  in `'identifiers'` mode a number right before or after an uppercase ISO 4217 code, with at most one space
+  (`1250 EUR`, `EUR 1250`, `USD 1,250`), is an amount and stays, for every ID shape but the letter-prefix one.
+  It reuses the code set that keeps `USD1000000` out of letter-prefix IDs; `eur` and `EURO` do not count. The
+  IBAN and card steps still mask `EUR NL91ABNA0417164300` and `USD 4111 1111 1111 1111`. Browser export and the
+  streaming guard follow it. `False` masks these numbers as before.
+- A spaced/hyphen-joined ID run has at most 6 groups; a longer run is a number table, judged group by group
+  (before, any run with 7+ digits was one `<NUMBER>`). The streaming guard now protects only what can form one
+  ID, read after the date, IBAN/card, phone and year steps, so a 10,000-number table splits instead of raising
+  `BufferError`. A table with a currency code or year every few numbers may still need a larger buffer.
+- A date written with spaces (`05 11 2023`) is handled as before this release: the date step has no spaced
+  shape, so with years on its year is `<YEAR>`; with years off the whole run is one `<NUMBER>` (an earlier
+  build of this release masked only `2023`).
 
 ### User term lists
 

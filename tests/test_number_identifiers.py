@@ -171,7 +171,8 @@ def test_config_validation_and_legacy_globals(monkeypatch):
 def test_browser_number_rule_follows_mode():
     rule = build_browser_manifest(TextCleanerConfig())["rules"]["number"]
     assert rule["pattern"] == _unicode_word(constants.identifier_numbers_regex(
-        4, letter_prefix=True, two_part=True, spaced_pair=True).pattern) and rule["fold_decimal_digits"]
+        4, letter_prefix=True, two_part=True, spaced_pair=True, keep_currency_code=True).pattern) \
+        and rule["fold_decimal_digits"]
     assert r"\w" not in rule["pattern"]
     old = build_browser_manifest(TextCleanerConfig(replace_numbers_mode="all"))["rules"]["number"]
     assert old["pattern"] == constants.NUMBERS_REGEX.pattern and "fold_decimal_digits" not in old
@@ -250,7 +251,8 @@ _MIXED_RUNS = ["123 45-6789", "123 45\u20116789", "123-45 6789", "1234 56-78-90"
 
 @pytest.mark.parametrize("text", _MIXED_RUNS)
 def test_spaced_pair_masks_mixed_runs_whole(text):
-    regex = constants.identifier_numbers_regex(4, letter_prefix=True, two_part=True, spaced_pair=True)
+    regex = constants.identifier_numbers_regex(4, letter_prefix=True, two_part=True, spaced_pair=True,
+                                               keep_currency_code=True)
     assert [m.group() for m in regex.finditer(text)] == [text]
     out = _clean(f"SSN {text} ok", **_NO_STEPS)
     assert out == "SSN <NUMBER> ok" and not any(ch.isdigit() for ch in out)  # no part of the run left
@@ -258,7 +260,7 @@ def test_spaced_pair_masks_mixed_runs_whole(text):
 
 
 @pytest.mark.parametrize("text", [
-    "2023-11-05", "05 11 2023", "2023 11 05", "2023 11-05",  # date-shaped
+    "2023-11-05",  # date-shaped (an all-hyphen run; a spaced date is one run, see test_spaced_date_*)
     "1 234 567", "12 345 678",  # thousands-grouped
     "123 45-6789%", "\u20ac 123 45-6789", "123 45-6789 \u20ac", "123 45-6789.5", "123 45-6789,5",  # amounts
 ])
@@ -344,8 +346,122 @@ def test_year_group_of_an_id_run_masked_with_the_run(text):
 def test_streaming_guard_is_linear_on_a_long_digit_run():
     import time
 
-    from sct.streaming import _DIGIT_GROUP_RUN
+    from sct.streaming import _DIGIT_GROUP_HEAD, _DIGIT_GROUP_TAIL
     start = time.perf_counter()
-    assert _DIGIT_GROUP_RUN.search("1" * 32000 + "!") is None  # was ~5 s (quadratic restarts inside the run)
+    for regex in (_DIGIT_GROUP_HEAD, _DIGIT_GROUP_TAIL):  # was ~5 s (quadratic restarts inside the run)
+        assert regex.search("1" * 32000 + "!") is None
+        assert regex.search(" ".join(["1" * 3000] * 40) + "!")
+        assert regex.search("x 123 45-6789 y").group() == "123 45-6789"
     assert time.perf_counter() - start < 0.5
-    assert _DIGIT_GROUP_RUN.search("x 123 45-6789 y").group() == "123 45-6789"
+
+
+def test_streaming_guard_lets_a_long_number_table_split():
+    # A run longer than SPACED_ID_MAX_GROUPS groups is never one ID, so the guard may split it where both halves
+    # keep more groups than that (was a BufferError: every space of the table was protected).
+    import random
+
+    from sct.streaming import _DIGIT_GROUP_HEAD, _DIGIT_GROUP_TAIL, WindowedStreamingRedactor
+    run = " ".join(map(str, range(1, 16)))  # 15 groups: the splits after group 7 and 8 are free
+    spans = [m.span() for regex in (_DIGIT_GROUP_HEAD, _DIGIT_GROUP_TAIL) for m in regex.finditer(run)]
+    free = [i for i, ch in enumerate(run) if ch == " " and not any(a < i < b for a, b in spans)]
+    assert [run[:i].count(" ") + 1 for i in free] == [7, 8]
+    rnd = random.Random(7)  # noqa: S311 (test data)
+    text = "table " + " ".join(str(rnd.randrange(1, 100000)) for _ in range(10000)) + " end"
+    for overrides in ({}, {"check_replace_years": False, "check_replace_dates": False},
+                      {"check_replace_iban_cards": False, "check_replace_phone_numbers": False}):
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            cleaner = TextCleaner(cfg=TextCleanerConfig(
+                check_ner_process=False, check_detect_language=False, check_statistical_model_processing=False,
+                check_replace_currency_symbols=False, **overrides))
+        expected = cleaner.process(text).lm_text
+        stream = WindowedStreamingRedactor(cleaner, max_buffer_chars=512, overlap_chars=64)
+        assert "".join(stream.feed(text[i:i + 97]) for i in range(0, len(text), 97)) + stream.finish() == expected
+
+
+def test_spaced_id_run_is_bounded():
+    regex = constants.identifier_numbers_regex(4, spaced_pair=True)
+    assert regex.fullmatch("12 34 56 78 90 12")  # 6 groups: one ID
+    assert not any(" " in m.group() for m in regex.finditer("12 34 56 78 90 12 34"))  # 7: a table
+
+
+@pytest.mark.parametrize("text, years_on, years_off", [
+    # The date step never had a spaced date (as before this change): with years on the year is masked, with years
+    # off the run is one <NUMBER>, never only its year.
+    ("born 05 11 2023 ok", "born 05 11 <YEAR> ok", "born <NUMBER> ok"),
+    ("born 2023 11 05 ok", "born <YEAR> 11 05 ok", "born <NUMBER> ok"),
+    ("born 05-11-2023 ok", "born <DATE> ok", "born <DATE> ok"),
+])
+def test_spaced_date_is_never_half_masked(text, years_on, years_off):
+    assert _clean(text) == years_on
+    assert _clean(text, check_replace_years=False) == years_off
+
+
+@pytest.mark.parametrize("text", [
+    "pay 1250 EUR now", "pay EUR 1250 now", "pay 1250000 EUR", "EUR 12345678 due",
+    "fee GBP 123 45 678 x",  # a 4+ digit last group is still a digit run of its own, as beside "€"
+    "fee 123-45-6789 CHF x", "paid 123456/7890 USD", "EUR 12345.67890",
+    "รวม ١٢٥٠٠ EUR", "कुल EUR ४५६७८९",  # other digit scripts
+])
+def test_currency_code_amounts_kept(text):
+    assert _clean(text, **_NO_STEPS) == text
+    assert "<NUMBER>" in _clean(text, **_NO_STEPS, numbers_keep_currency_code_amounts=False)
+
+
+@pytest.mark.parametrize("text, expected", [
+    ("eur 12345678 x", "eur <NUMBER> x"),  # codes are uppercase only
+    ("EURO 12345678 x", "EURO <NUMBER> x"),  # not a code: part of a word
+    ("ref 12345678 EUROPE", "ref <NUMBER> EUROPE"),
+    ("PEUR 12345678 x", "PEUR <NUMBER> x"),
+    ("EUR  12345678 x", "EUR  <NUMBER> x"),  # at most one space
+    ("EUR AB1234567 x", "EUR <NUMBER> x"),  # a letter-prefix ID keeps its own rule
+])
+def test_currency_code_rule_edges(text, expected):
+    assert _clean("pay USD 1,250 now", **_NO_STEPS) == "pay USD 1,250 now"  # a thousands amount, either way
+    assert _clean(text, **_NO_STEPS, check_normalize_whitespace=False) == expected
+
+
+def test_currency_code_does_not_hide_iban_or_card():
+    out = _clean("EUR NL91ABNA0417164300 and USD 4111 1111 1111 1111 and EUR 4111111111111111 x")
+    assert out == "EUR <IBAN> and USD <CARD> and EUR <CARD> x"
+
+
+def test_currency_code_legacy_global_and_streaming(monkeypatch):
+    from sct import config
+    from sct.streaming import WindowedStreamingRedactor
+    assert config._config_from_module_globals().numbers_keep_currency_code_amounts is True
+    monkeypatch.setattr(config, "NUMBERS_KEEP_CURRENCY_CODE_AMOUNTS", False)
+    assert config._config_from_module_globals().numbers_keep_currency_code_amounts is False
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        cleaner = TextCleaner(cfg=TextCleanerConfig(
+            check_ner_process=False, check_detect_language=False, check_statistical_model_processing=False,
+            check_replace_currency_symbols=False, **_NO_STEPS))
+    text = "word " * 6 + "EUR 1234567 and 7654321 USD " + "tail " * 8
+    expected = cleaner.process(text).lm_text
+    assert "EUR 1234567" in expected and "7654321 USD" in expected
+    for size in range(24, 48, 3):
+        stream = WindowedStreamingRedactor(cleaner, max_buffer_chars=size, overlap_chars=12)
+        assert "".join(stream.feed(ch) for ch in text) + stream.finish() == expected
+
+
+def test_browser_currency_code_rule_matches_python():
+    import json
+    import shutil
+    import subprocess
+    node = shutil.which("node")
+    if not node:
+        pytest.skip("node not installed")
+    texts = ["pay 1250 EUR", "EUR 12345678 x", "USD 123 45 6789", "eur 12345678", "EURO 12345678", "PEUR 12345678",
+             "\u00e9EUR 12345678", "12345678 EUROPE", "EUR \u0661\u0662\u0663\u0664\u0665", "EUR AB1234567"]
+    for flag in (True, False):
+        cfg = TextCleanerConfig(numbers_keep_currency_code_amounts=flag)
+        rule = build_browser_manifest(cfg)["rules"]["number"]
+        script = ("const [p, f, t] = JSON.parse(process.argv[1]); const r = new RegExp(p, f + 'g');"
+                  "console.log(JSON.stringify(t.map(s => s.replace(/[\u0660-\u0669]/g, d => "
+                  "String(d.charCodeAt(0) - 0x660)).replace(r, '<N>'))))")
+        argv = [node, "-e", script, json.dumps([rule["pattern"], rule["flags"], texts])]
+        out = subprocess.run(argv, capture_output=True, text=True, check=True).stdout  # noqa: S603 (fixed argv)
+        python = contact.config_numbers_regex(cfg)
+        assert json.loads(out) == [python.sub("<N>", t.translate({c: 48 + c - 0x660 for c in range(0x660, 0x66A)}))
+                                   for t in texts]

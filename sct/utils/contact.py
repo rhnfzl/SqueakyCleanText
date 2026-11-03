@@ -137,7 +137,8 @@ def config_numbers_regex(cfg):
     """The number pattern a TextCleanerConfig selects."""
     return numbers_regex(cfg.replace_numbers_in_words, cfg.replace_numbers_mode, cfg.replace_numbers_min_digits,
                          letter_prefix=cfg.numbers_letter_prefix_ids, two_part=cfg.numbers_two_part_ids,
-                         spaced_pair=cfg.numbers_spaced_pair_ids)
+                         spaced_pair=cfg.numbers_spaced_pair_ids,
+                         keep_currency_code=cfg.numbers_keep_currency_code_amounts)
 
 
 def embedded_phone(text, start, end):
