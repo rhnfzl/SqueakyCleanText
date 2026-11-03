@@ -683,3 +683,19 @@ CHUNK_DELIMITERS = (
     re.compile(r'(?<=[;:,\u2014\u2026])\s+'), # Clause separators (; : , em-dash, ellipsis)
     re.compile(r'\s+'),                        # Any whitespace (word boundaries)
 )
+
+
+# User term lists (custom_deny_terms, custom_allow_terms): a term is a whole word where no letter, mark or
+# digit of a spaced script touches it. A term edge in a script written without spaces (CJK, Thai) is a word
+# edge already, and letters of those scripts never glue (金额ACME元 holds the term ACME).
+_TERM_GLUE = rf'[[\p{{L}}\p{{M}}\p{{N}}]--[{_SPACELESS}]]'
+
+
+def terms_regex(terms, case_sensitive=False):
+    """One regex for *terms* as whole words (longest first, so an overlap keeps the longer term)."""
+    parts = []
+    for term in sorted(set(terms), key=len, reverse=True):
+        left = '' if _SPACELESS_CHAR.match(term[0]) else rf'(?<!{_TERM_GLUE})'
+        right = '' if _SPACELESS_CHAR.match(term[-1]) else rf'(?!{_TERM_GLUE})'
+        parts.append(left + regex.escape(term) + right)
+    return regex.compile('|'.join(parts), regex.V1 | (0 if case_sensitive else regex.IGNORECASE))

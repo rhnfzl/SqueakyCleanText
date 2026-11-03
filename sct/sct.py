@@ -11,10 +11,13 @@ from collections import Counter
 from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
+import regex
+
 from sct.config import TextCleanerConfig, GLINER_BACKENDS, _config_from_module_globals
 from sct.privacy import PrivacyPolicy, ProcessingMetrics, TokenStore
 from sct.utils import constants, contact, datetime, ner, normtext, resources, special, stopwords
 from sct.utils.anonymization_map import AnonymizationMap
+from sct.utils.synthetic import FAKER_GENERATORS
 from sct.utils.process_result import ProcessResult
 
 logger = logging.getLogger(__name__)
@@ -65,6 +68,21 @@ class TextCleaner:
             'IBAN': self.cfg.replace_with_iban, 'CARD': self.cfg.replace_with_cards,
             'ID': self.cfg.replace_with_identifiers,
         }
+        # User term lists: deny terms, then each user pattern, before the built-in steps; allow terms last.
+        self._user_rules = []
+        if self.cfg.custom_deny_terms:
+            labels = {term if self.cfg.custom_terms_case_sensitive else term.casefold(): label
+                      for label, terms in self.cfg.custom_deny_terms.items() for term in terms}
+            fold = str if self.cfg.custom_terms_case_sensitive else str.casefold
+            self._user_rules.append((constants.terms_regex(
+                [t for terms in self.cfg.custom_deny_terms.values() for t in terms],
+                self.cfg.custom_terms_case_sensitive), lambda m, labels=labels, fold=fold: labels[fold(m.group())]))
+        for label, pattern in (self.cfg.custom_patterns or {}).items():
+            self._user_rules.append((regex.compile(pattern), lambda m, label=label: label))
+        for label in [*(self.cfg.custom_deny_terms or {}), *(self.cfg.custom_patterns or {})]:
+            self._tags.setdefault(label, f'<{label}>')
+        self._allow_regex = (constants.terms_regex(self.cfg.custom_allow_terms, self.cfg.custom_terms_case_sensitive)
+                             if self.cfg.custom_allow_terms else None)
         # Markers that are not <TAG>-shaped ("EMAIL"): NER protects them like <EMAIL> (ner.regex_markers).
         self._custom_markers = tuple(sorted({
             tag for tag in self._tags.values() if tag and not ner._PLACEHOLDER_TOKEN.fullmatch(tag)}))
@@ -198,6 +216,7 @@ class TextCleaner:
                 ner_propagate_min_score=self.cfg.ner_propagate_min_score,
                 ner_merge_location_gap=self.cfg.ner_merge_location_gap,
                 ner_snap_word_edges=self.cfg.ner_snap_word_edges,
+                allow_regex=self._allow_regex,
             )
         # GLiClass document-level pre-classification (optional, lazy-loaded)
         self._gliclass: Any = None
@@ -238,6 +257,8 @@ class TextCleaner:
         self._normalise_steps = len(self._pipeline)
         if cfg.check_fix_bad_unicode:  # escaped "<b>" stays text: decoded after the view, hidden from tags
             self._pipeline.append(self._unescape_markup)
+        if self._user_rules:
+            self._pipeline.append(self._replace_user_terms)
         if cfg.check_replace_html:
             self._pipeline.append(self._replace_html)
         if cfg.check_fix_bad_unicode:  # brackets hide from the tag step only; contacts see "john<at>x.com"
@@ -431,11 +452,13 @@ class TextCleaner:
         # (marker, emitted) for each marker occurrence, recorded by _restore_protected
         self._document_context.marker_order = [] if source_markers else None
         for step in self._pipeline[self._normalise_steps:]:
+            self._document_context.step_text = current_text
             current_text = step(current_text)
 
         # Fuzzy date replacement — requires language context, called explicitly
         # to avoid thread-local; positioned between replace_dates and replace_years.
         if self.cfg.check_fuzzy_replace_dates:
+            self._document_context.step_text = current_text
             current_text = self.ProcessDateTime.fuzzy_replace_dates(
                 current_text,
                 replace_with=lambda orig: self._emit('DATE', orig, self.cfg.replace_with_dates),
@@ -445,7 +468,9 @@ class TextCleaner:
 
         # Post-fuzzy pipeline steps (phones → years → numbers → symbols → whitespace)
         for step in self._post_fuzzy_pipeline:
+            self._document_context.step_text = current_text
             current_text = step(current_text)
+        self._document_context.step_text = None
         source_markers = self._source_marker_spans(current_text, source_markers)
 
         return (current_text, language, anon_map, doc_classes, started_at, regex_counts,
@@ -668,6 +693,8 @@ class TextCleaner:
 
     def _emit(self, entity_type, original, value):
         """Count one regex replacement of *original*, then protect its *value*."""
+        if self._allowed(original):
+            return self._protect(original)
         counts = getattr(self._document_context, 'regex_counts', None)
         if counts is not None:
             entry = counts.setdefault(entity_type, {'count': 0, 'chars': 0})
@@ -682,6 +709,45 @@ class TextCleaner:
             if tag and tag != value:
                 deferred[0][key] = tag
         return key
+
+    def _allowed(self, original):
+        """Whether a detection of *original* is kept as text (custom_allow_terms): every occurrence of it in
+        the step's text lies inside an allowed term occurrence."""
+        text = getattr(self._document_context, 'step_text', None)
+        if self._allow_regex is None or not text or not original:
+            return False
+        cached = getattr(self._document_context, 'allow_spans', None)
+        if cached is None or cached[0] is not text:
+            cached = (text, [m.span() for m in self._allow_regex.finditer(text)])
+            self._document_context.allow_spans = cached
+        spans = cached[1]
+        # shortcut: position-free; a value also found outside an allowed term is masked everywhere (no leak).
+        starts, at = [], text.find(original)
+        while at >= 0:
+            starts.append(at)
+            at = text.find(original, at + len(original))
+        return bool(spans and starts) and all(
+            any(a <= s and s + len(original) <= b for a, b in spans) for s in starts)
+
+    def _replace_user_terms(self, text):
+        """custom_deny_terms, then each custom_patterns regex, as <LABEL> in every replacement mode."""
+        anon_map = getattr(self._document_context, 'anon_map', None)
+
+        def emit(match, label):
+            original = match.group()
+            if not original or self._allowed(original):
+                return self._protect(original) if original else original
+            if anon_map is not None:
+                placeholder = anon_map.next_placeholder(label)
+                anon_map.add(placeholder, original, label, match.start(), match.end())
+                return self._emit(label, original, placeholder)
+            if self._synthetic_replacer and label in FAKER_GENERATORS:
+                return self._emit(label, original, self._synthetic_replacer.get_replacement(label, original))
+            return self._emit(label, original, self._tags[label])
+        for pattern, label_of in self._user_rules:
+            self._document_context.step_text = text
+            text = pattern.sub(lambda m: emit(m, label_of(m)), text)
+        return text
 
     def _protect(self, value):
         """Hide an emitted value from later regex steps (``<EMAIL1>``, kept IPs)."""
@@ -819,7 +885,7 @@ class TextCleaner:
             return None
 
         def replace(match):
-            if keep is not None and keep(match.group()):
+            if keep is not None and keep(match.group()) or self._allowed(match.group()):
                 return self._protect(match.group())
             placeholder = anon_map.next_placeholder(entity_type)
             anon_map.add(

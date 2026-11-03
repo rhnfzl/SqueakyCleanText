@@ -13,6 +13,9 @@ PUBLIC_VIEW_KEYS: tuple[str, ...] = (
 )
 # IP_ADDRESS / PHONE_NUMBER: the names under legacy_type_names=True.
 PII_REGEX_TYPES = frozenset({"EMAIL", "URL", "IP", "PHONE", "IP_ADDRESS", "PHONE_NUMBER", "IBAN", "CARD", "ID"})
+# Regex counts that are not PII; every other key (the built-in PII types above and the user labels of
+# custom_deny_terms / custom_patterns) counts as PII.
+NON_PII_REGEX_TYPES = frozenset({"HTML", "DATE", "YEAR", "NUMBER", "CURRENCY"})
 WARNING_CODES = frozenset({
     "language_unknown", "language_fallback", "language_low_confidence",
     "ner_fallback_models", "ner_off", "cuda_fallback", "mps_fallback", "empty_input",
@@ -27,7 +30,7 @@ def public_view(result) -> dict[str, Any]:
     entity_counts = {k: dict(v) for k, v in sorted(metadata.get("entity_counts", {}).items())}
     pii_types: dict[str, int] = {}
     pii_chars = 0
-    pii_items = [(k, v) for k, v in regex_counts.items() if k in PII_REGEX_TYPES]
+    pii_items = [(k, v) for k, v in regex_counts.items() if k not in NON_PII_REGEX_TYPES]
     for name, entry in pii_items + list(entity_counts.items()):
         pii_types[name] = pii_types.get(name, 0) + entry["count"]
         pii_chars += entry["chars"]

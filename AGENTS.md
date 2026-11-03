@@ -17,6 +17,11 @@ SCT never ships a built-in word list, but users may pass their own terms through
 config options (`custom_stopwords`, `custom_month_names`, and similar): the user decides
 the words, not SCT.
 
+## Wording
+
+Never use the word "competitor" in this repo; SCT integrates other PII tools. Say "other tools" or
+"other PII detectors".
+
 ## Every behaviour is configurable
 
 Every behaviour is a safe default plus a config option (`TextCleanerConfig` field and

@@ -12,7 +12,9 @@ Legacy API (backward compatible):
     cleaner = TextCleaner()
 """
 
+import re
 import sys
+from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import date
 from types import MappingProxyType
@@ -412,6 +414,19 @@ class TextCleanerConfig:
     # international phones are not touched. On DEV:
     # precision +0.02, recall -0.01. False = 0.8.1
     phone_reject_embedded: bool = True
+    # User term lists (SCT ships none; the user decides the words). Empty by default.
+    # {LABEL: (term, ...)}: always mask these terms as <LABEL>, as whole words (no letter, mark or digit of a
+    # spaced script glued to them; an edge in CJK/Thai is a word edge). Runs before the built-in regex steps.
+    custom_deny_terms: Optional[Mapping[str, Tuple[str, ...]]] = None
+    # Never mask these terms: a regex or NER detection equal to or inside an occurrence is kept as text.
+    # Applied last, so it also wins over custom_deny_terms and custom_patterns.
+    custom_allow_terms: Tuple[str, ...] = ()
+    # {LABEL: regex}: mask every match as <LABEL> (the third-party ``regex`` module, compiled once). Runs
+    # with custom_deny_terms, before the built-in steps. A pattern that can match "" is rejected; a pattern
+    # with nested repeats can backtrack for a long time (ReDoS), so only pass patterns you trust.
+    custom_patterns: Optional[Mapping[str, str]] = None
+    # Whether custom_deny_terms and custom_allow_terms match case-sensitively. False: "acme" matches "ACME".
+    custom_terms_case_sensitive: bool = False
 
     def __post_init__(self):
         if self.synthetic_reference_date is not None:
@@ -695,6 +710,8 @@ class TextCleanerConfig:
             object.__setattr__(self, 'custom_month_names',
                                MappingProxyType(resolved_mn))
 
+        _validate_user_terms(self)
+
         # Compute supported_languages: union of all sources
         langs = set(DEFAULT_LANGUAGES)
         langs.update(self.extra_languages)
@@ -753,6 +770,60 @@ class TextCleanerConfig:
             object.__setattr__(self, key, value)
         if self.ner_mode == 'pii' and self.gliner_label_map is None:
             object.__setattr__(self, 'gliner_label_map', _PII_MAPS[self.legacy_type_names])
+
+
+_USER_LABEL = re.compile(r'[A-Z][A-Z0-9_]*')
+
+
+def _user_terms(name, terms):
+    if isinstance(terms, (str, bytes)) or not isinstance(terms, Iterable):
+        raise ValueError(f"{name} must be a tuple of strings, got {terms!r}")
+    terms = tuple(terms)
+    for term in terms:
+        if not isinstance(term, str) or not term.strip():
+            raise ValueError(f"{name} terms must be non-empty strings, got {term!r}")
+    return terms
+
+
+def _user_label(name, label):
+    if not isinstance(label, str) or not _USER_LABEL.fullmatch(label):
+        raise ValueError(f"{name} labels must be upper case (A-Z, 0-9, _; starting with a letter), "
+                         f"such as 'PROJECT', got {label!r}")
+
+
+def _validate_user_terms(cfg):
+    """Validate and freeze custom_deny_terms, custom_allow_terms and custom_patterns."""
+    import regex
+    if not isinstance(cfg.custom_terms_case_sensitive, bool):
+        raise ValueError(f"custom_terms_case_sensitive must be a bool, got {cfg.custom_terms_case_sensitive!r}")
+    object.__setattr__(cfg, 'custom_allow_terms', _user_terms('custom_allow_terms', cfg.custom_allow_terms or ()))
+    if cfg.custom_deny_terms is not None:
+        if not isinstance(cfg.custom_deny_terms, Mapping):
+            raise ValueError(f"custom_deny_terms must be a mapping {{LABEL: (term, ...)}}, got {cfg.custom_deny_terms!r}")
+        deny, seen = {}, {}
+        for label, terms in cfg.custom_deny_terms.items():
+            _user_label('custom_deny_terms', label)
+            deny[label] = _user_terms(f'custom_deny_terms[{label!r}]', terms)
+            for term in deny[label]:
+                key = term if cfg.custom_terms_case_sensitive else term.casefold()
+                if seen.setdefault(key, label) != label:
+                    raise ValueError(f"custom_deny_terms: {term!r} is listed under both {seen[key]!r} and {label!r}")
+        object.__setattr__(cfg, 'custom_deny_terms', MappingProxyType(deny))
+    if cfg.custom_patterns is not None:
+        if not isinstance(cfg.custom_patterns, Mapping):
+            raise ValueError(f"custom_patterns must be a mapping {{LABEL: regex}}, got {cfg.custom_patterns!r}")
+        for label, pattern in cfg.custom_patterns.items():
+            _user_label('custom_patterns', label)
+            if not isinstance(pattern, str) or not pattern:
+                raise ValueError(f"custom_patterns[{label!r}] must be a non-empty regex string, got {pattern!r}")
+            try:
+                compiled = regex.compile(pattern)
+            except regex.error as error:
+                raise ValueError(f"custom_patterns[{label!r}] is not a valid regex: {error}") from None
+            # shortcut: probes a few texts for an empty match, not every text; the step also skips empty matches.
+            if any(m.group() == '' for probe in ('', ' ', 'a', '0', 'a b', 'A-1.') for m in compiled.finditer(probe)):
+                raise ValueError(f"custom_patterns[{label!r}] can match the empty string: {pattern!r}")
+        object.__setattr__(cfg, 'custom_patterns', MappingProxyType(dict(cfg.custom_patterns)))
 
 
 def _config_from_module_globals() -> TextCleanerConfig:
@@ -821,6 +892,10 @@ def _config_from_module_globals() -> TextCleanerConfig:
         replace_numbers_mode=getattr(m, 'REPLACE_NUMBERS_MODE', 'identifiers'),
         replace_numbers_min_digits=getattr(m, 'REPLACE_NUMBERS_MIN_DIGITS', 4),
         phone_reject_embedded=getattr(m, 'PHONE_REJECT_EMBEDDED', True),
+        custom_deny_terms=getattr(m, 'CUSTOM_DENY_TERMS', None),
+        custom_allow_terms=getattr(m, 'CUSTOM_ALLOW_TERMS', ()),
+        custom_patterns=getattr(m, 'CUSTOM_PATTERNS', None),
+        custom_terms_case_sensitive=getattr(m, 'CUSTOM_TERMS_CASE_SENSITIVE', False),
         check_replace_currency_symbols=m.CHECK_REPLACE_CURRENCY_SYMBOLS,
         check_ner_process=m.CHECK_NER_PROCESS,
         check_remove_isolated_letters=m.CHECK_REMOVE_ISOLATED_LETTERS,
@@ -949,6 +1024,10 @@ URL_TRAILING_PUNCT_OUTSIDE = True
 REPLACE_NUMBERS_MODE = 'identifiers'
 REPLACE_NUMBERS_MIN_DIGITS = 4
 PHONE_REJECT_EMBEDDED = True
+CUSTOM_DENY_TERMS = None
+CUSTOM_ALLOW_TERMS = ()
+CUSTOM_PATTERNS = None
+CUSTOM_TERMS_CASE_SENSITIVE = False
 GLINER_ONNX = False
 LANGUAGE = None
 

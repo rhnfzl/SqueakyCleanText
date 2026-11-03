@@ -166,6 +166,7 @@ def build_browser_manifest(config: TextCleanerConfig) -> dict[str, Any]:
             "IBAN/card checksum typing and identifier tokens are server-side rules.",
             "phone_reject_embedded is a server-side rule: the browser phone rule keeps every phone match "
             "(0.8.1 behaviour).",
+            "custom_deny_terms, custom_allow_terms and custom_patterns are server-side features.",
             "Rules with fold_decimal_digits match on a copy of the text where every Unicode "
             "decimal digit (Nd, such as ٠٦ or ०६) is its ASCII digit, one code point for one, "
             "and replace the same offsets in the original text (JavaScript \\d is ASCII only).",

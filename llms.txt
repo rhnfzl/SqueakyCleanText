@@ -151,6 +151,10 @@ gliclass_labels=()                  # Classification labels: ('email', 'code', '
 language=None                       # Pin ('en', 'hi': any Lingua language), restrict (('en','nl')), or None for auto-detect. Accepts Lingua names, ISO 639-1/639-3.
 extra_languages=()                  # Add languages: 'FRENCH', 'fr', 'PORTUGUESE', 'pt', etc.
 custom_stopwords=None               # {LANG: frozenset({...})}
+custom_deny_terms=None              # {LABEL: ('term', ...)}: always mask as <LABEL> (whole word, Unicode-aware); runs before built-in regex
+custom_allow_terms=()               # ('term', ...): never mask (regex and NER), applied last
+custom_patterns=None                # {LABEL: r'regex'} (regex module): mask matches as <LABEL>; empty-matching patterns rejected
+custom_terms_case_sensitive=False   # Case rule for deny/allow terms
 custom_pipeline_steps=()            # Tuple of (text: str) -> str callables
 ```
 

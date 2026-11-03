@@ -95,6 +95,7 @@ class WindowedStreamingRedactor:
             views += [constants.IBAN_REGEX, constants.CARD_REGEX]
         if cfg.check_replace_numbers:  # a grouped number ("5 379") is one token too
             views.append(contact.numbers_regex(cfg.replace_numbers_in_words))
+        views += [pattern for pattern, _ in cleaner._user_rules]  # a deny term holding a space ("Blue Sky")
         # (start, end) of view text a split must not cut: start < split < end
         protected = [
             match.span()

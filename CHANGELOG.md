@@ -2,14 +2,15 @@
 
 ## Unreleased
 
-**Numbers stay, IDs go.** By default SCT now masks only numbers that look like an ID or account number
-(`Order 4711`, `#12345`), and keeps prices, percentages, times, ranges, decimals and short numbers as written.
-Training and RAG text keeps far more of its meaning: on the benchmark DEV split the old "mask every number"
-rule caused 62-68% of SCT's false masks. Long digit strings stuck inside a code (`ID9876543210`) or starting
-with a date (`20231105123456`) are no longer taken for phone numbers.
+**Numbers stay, IDs go.** By default SCT masks only ID-shaped numbers (`Order 4711`, `#12345`) and keeps prices,
+percentages, times, ranges and short numbers (the old rule caused 62-68% of false masks on the benchmark DEV
+split). Digits inside a code (`ID9876543210`) or starting with a date are no longer taken for phones.
 
 **Apple GPU for torch and GLiNER.** Set `ner_device="mps"` on an Apple silicon Mac to run torch NER and GLiNER
 on the GPU, about 1.6x faster `process_batch` on an M4 Max with the same output.
+
+**Your own term lists.** Pass terms to always mask (`custom_deny_terms`), terms to never mask
+(`custom_allow_terms`) and your own labelled regex (`custom_patterns`). SCT still ships no list of its own.
 
 Heads-up: output text changes for numbers and some phones. `replace_numbers_mode='all'` and
 `phone_reject_embedded=False` restore 0.8.1.
@@ -43,6 +44,25 @@ Heads-up: output text changes for numbers and some phones. `replace_numbers_mode
   off as before. `ProcessContacts.replace_numbers` / `replace_phone_numbers` keep the 0.8.1 patterns.
 - Not measured: the joiner set differs from the DEV simulation (`:` `=` `#` removed, `,` and dashes added,
   grouped numbers such as `1 234 567` kept); a rerun of the benchmark will show the exact numbers.
+
+### User term lists
+
+- New `custom_deny_terms` (`{LABEL: (term, ...)}`), `custom_allow_terms` (`(term, ...)`), `custom_patterns`
+  (`{LABEL: regex}`) and `custom_terms_case_sensitive` (default `False`), each with a legacy global
+  (`CUSTOM_DENY_TERMS`, `CUSTOM_ALLOW_TERMS`, `CUSTOM_PATTERNS`, `CUSTOM_TERMS_CASE_SENSITIVE`). All empty by
+  default, so output does not change.
+- Terms match as whole words, Unicode-aware: no letter, mark or digit of a spaced script may touch them; in CJK
+  and Thai the term edge is the word edge. Deny terms and patterns run before the built-in regex steps; allow
+  terms are applied last to regex and NER detections (also to your own deny terms and patterns). A regex value
+  that also appears outside an allowed term is masked everywhere.
+- Every replacement mode (`<LABEL>`, reversible `<LABEL_0>` restored by `deanonymize`, synthetic Faker value
+  for labels Faker knows, else `<LABEL>`), `process_batch`, both streaming redactors (the windowed split guard
+  will not cut a term), `process_json`, `regex_counts` and `signals` (user labels count as PII; values never
+  appear).
+- Clear `ValueError`s at config time: label not upper case, a string instead of a tuple of terms, empty
+  terms, one term under two labels, an invalid regex, a regex that can match the empty string. Patterns use
+  the `regex` module; nested repeats can backtrack for a long time, so pass only patterns you trust.
+- Server-side only: the browser manifest lists them under its limitations. Benchmarks never use them.
 
 ### Apple GPU
 
