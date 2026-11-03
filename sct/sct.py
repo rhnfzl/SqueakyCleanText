@@ -945,6 +945,8 @@ class TextCleaner:
 
     def _replace_phone_numbers(self, text):
         phone_view = contact.PHONE_VIEW if self.cfg.fold_styled_characters else contact.PHONE_DIGIT_VIEW
+        if self.cfg.phone_reject_embedded:
+            phone_view = contact.RejectView(phone_view, contact.embedded_phone)
         reversible = self._replace_reversible(
             text,
             phone_view,
@@ -996,21 +998,21 @@ class TextCleaner:
             text = placeholder_pattern.sub(protect, text)
             reversible = self._replace_reversible(
                 text,
-                contact.numbers_regex(self.cfg.replace_numbers_in_words),
+                self._numbers_regex,
                 'NUMBER',
             )
             for key, placeholder in protected.items():
                 reversible = reversible.replace(key, placeholder)
             return reversible
         if self._synthetic_replacer:
-            return self.ProcessContacts.replace_numbers_with_fn(
-                text, lambda orig: self._emit('NUMBER', orig, self._synthetic_replacer.get_replacement('NUMBER', orig)),
-                in_words=self.cfg.replace_numbers_in_words,
-            )
-        return self.ProcessContacts.replace_numbers_with_fn(
-            text, lambda orig: self._emit('NUMBER', orig, self.cfg.replace_with_numbers),
-            in_words=self.cfg.replace_numbers_in_words,
-        )
+            return self._numbers_regex.sub(lambda m: self._emit(
+                'NUMBER', m.group(), self._synthetic_replacer.get_replacement('NUMBER', m.group())), text)
+        return self._numbers_regex.sub(lambda m: self._emit('NUMBER', m.group(), self.cfg.replace_with_numbers), text)
+
+    @property
+    def _numbers_regex(self):
+        return contact.numbers_regex(self.cfg.replace_numbers_in_words, self.cfg.replace_numbers_mode,
+                                     self.cfg.replace_numbers_min_digits)
 
     def _replace_currency_symbols(self, text):
         reversible = self._replace_reversible(

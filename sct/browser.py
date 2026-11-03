@@ -59,6 +59,8 @@ def build_browser_manifest(config: TextCleanerConfig) -> dict[str, Any]:
     month_names = resources.configured_month_names(config)
     date_regex = (constants.DATE_REGEX if month_names is None
                   else constants.build_date_regex(month_names, slash_year=config.date_month_name_slash_year))
+    number_regex = numbers_regex(config.replace_numbers_in_words, config.replace_numbers_mode,
+                                 config.replace_numbers_min_digits)
     ordered = [
         ("html", html_regex, config.replace_with_html, config.check_replace_html),
         ("url", url_regex, config.replace_with_url, config.check_replace_urls),
@@ -68,7 +70,7 @@ def build_browser_manifest(config: TextCleanerConfig) -> dict[str, Any]:
         ("phone", constants.PHONE_REGEX, config.replace_with_phone_numbers,
          config.check_replace_phone_numbers),
         ("year", constants.YEAR_REGEX, config.replace_with_years, config.check_replace_years),
-        ("number", numbers_regex(config.replace_numbers_in_words), config.replace_with_numbers,
+        ("number", number_regex, config.replace_with_numbers,
          config.check_replace_numbers),
         ("currency", constants.CURRENCY_REGEX, config.replace_with_currency_symbols,
          config.check_replace_currency_symbols),
@@ -144,11 +146,12 @@ def build_browser_manifest(config: TextCleanerConfig) -> dict[str, Any]:
                 config.replace_with_phone_numbers,
                 config.check_replace_phone_numbers,
             ), "fold_decimal_digits": True},
-            "number": _rule(
-                numbers_regex(config.replace_numbers_in_words),
+            # identifiers mode: \d of the pattern is Unicode in Python, so the browser reads ASCII-folded digits
+            "number": {**_rule(
+                number_regex,
                 config.replace_with_numbers,
                 config.check_replace_numbers,
-            ),
+            ), **({"fold_decimal_digits": True} if config.replace_numbers_mode == "identifiers" else {})},
             "currency": _rule(
                 constants.CURRENCY_REGEX,
                 config.replace_with_currency_symbols,
@@ -161,6 +164,8 @@ def build_browser_manifest(config: TextCleanerConfig) -> dict[str, Any]:
             "Model files remain external and must keep their recorded revisions.",
             "Reversible and synthetic replacement are server-side features.",
             "IBAN/card checksum typing and identifier tokens are server-side rules.",
+            "phone_reject_embedded is a server-side rule: the browser phone rule keeps every phone match "
+            "(0.8.1 behaviour).",
             "Rules with fold_decimal_digits match on a copy of the text where every Unicode "
             "decimal digit (Nd, such as ٠٦ or ०६) is its ASCII digit, one code point for one, "
             "and replace the same offsets in the original text (JavaScript \\d is ASCII only).",

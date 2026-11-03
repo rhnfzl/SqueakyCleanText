@@ -48,7 +48,7 @@ def test_date_inside_range_and_sentence_end():
 
 
 def test_old_behaviour_reachable_by_config():
-    result = _cleaner(check_replace_dates=False).process("Signed 2023-10-01 here")
+    result = _cleaner(check_replace_dates=False, replace_numbers_mode="all").process("Signed 2023-10-01 here")
 
     assert result.lm_text == "Signed <YEAR><NUMBER><NUMBER> here"
     assert "DATE" not in result.metadata["regex_counts"]
@@ -94,7 +94,7 @@ def test_month_slash_year_dates(text, expected):
 def test_thai_month_names_come_from_custom_month_names():
     # No built-in Thai month data (no word lists); the user passes month names.
     text = "วันที่ 24 ก.พ. 2562"
-    assert _cleaner().process(text).lm_text == "วันที่ <NUMBER> ก.พ. <NUMBER>"
+    assert _cleaner().process(text).lm_text == "วันที่ 24 ก.พ. <NUMBER>"
     custom = _cleaner(custom_month_names={"th": ("ก.พ.",)}).process(text)
     assert custom.lm_text == "วันที่ <DATE>"
 
@@ -105,13 +105,13 @@ def test_dotted_month_abbreviation_is_literal():
 
 
 def test_month_slash_year_off_by_config():
-    assert _cleaner(date_month_name_slash_year=False).process("born October/55").lm_text == "born October/<NUMBER>"
+    assert _cleaner(date_month_name_slash_year=False).process("born October/55").lm_text == "born October/55"
 
 
 def test_builtin_month_languages_by_config():
     result = _cleaner(date_builtin_month_languages=("en",)).process("วันที่ 24 ก.พ. 2562, 3 maart 2020, 3 March 2020")
 
-    assert result.lm_text == "วันที่ <NUMBER> ก.พ. <NUMBER>, <NUMBER> maart <YEAR>, <DATE>"
+    assert result.lm_text == "วันที่ 24 ก.พ. <NUMBER>, 3 maart <YEAR>, <DATE>"
 
 
 def test_builtin_month_languages_rejects_unknown_code():

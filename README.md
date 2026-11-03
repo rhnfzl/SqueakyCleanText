@@ -96,7 +96,7 @@ if __name__ == "__main__":
     # -> Call <PERSON> on <PHONE>. ['PERSON', 'PHONE']
 ```
 
-**Full cleanup for classic ML.** The default config (`TextCleaner()`) also replaces numbers, dates and HTML, and `stat_text` gives a lower-cased version without stopwords and punctuation:
+**Full cleanup for classic ML.** The default config (`TextCleaner()`) also replaces ID-shaped numbers, dates and HTML, and `stat_text` gives a lower-cased version without stopwords and punctuation:
 
 ```python
 from sct import TextCleaner

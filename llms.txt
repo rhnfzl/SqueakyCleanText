@@ -113,6 +113,10 @@ check_decode_unicode_escapes=True   # With check_fix_bad_unicode: decode literal
 check_replace_emails=True           # Replace emails with <EMAIL>
 check_replace_ips=True              # Replace IPv4/IPv6 with <IP> (replace_ips_public_only=False)
 check_replace_phone_numbers=True    # Replace phones with <PHONE>
+phone_reject_embedded=True          # Digit-only phone inside a longer token (ID9876543210) or starting yyyymmdd is not a phone; False = 0.8.1
+check_replace_numbers=True          # Replace numbers with <NUMBER>
+replace_numbers_mode='identifiers'  # Only whole identifier-shaped digit runs (no amounts, %, times, ranges, code parts); 'all' = 0.8.1
+replace_numbers_min_digits=4        # Fewest digits for 'identifiers' mode
 check_replace_dates=True            # Replace dates with <DATE>
 check_fuzzy_replace_dates=False     # Fuzzy misspelled month matching (requires [fuzzy])
 check_remove_stopwords=True         # Language-aware stopword removal

@@ -2,7 +2,49 @@
 
 ## Unreleased
 
-**Apple GPU for torch and GLiNER.** Set `ner_device="mps"` on an Apple silicon Mac to run torch NER and GLiNER on the GPU, about 1.6x faster `process_batch` on an M4 Max with the same output.
+**Numbers stay, IDs go.** By default SCT now masks only numbers that look like an ID or account number
+(`Order 4711`, `#12345`), and keeps prices, percentages, times, ranges, decimals and short numbers as written.
+Training and RAG text keeps far more of its meaning: on the benchmark DEV split the old "mask every number"
+rule caused 62-68% of SCT's false masks. Long digit strings stuck inside a code (`ID9876543210`) or starting
+with a date (`20231105123456`) are no longer taken for phone numbers.
+
+**Apple GPU for torch and GLiNER.** Set `ner_device="mps"` on an Apple silicon Mac to run torch NER and GLiNER
+on the GPU, about 1.6x faster `process_batch` on an M4 Max with the same output.
+
+Heads-up: output text changes for numbers and some phones. `replace_numbers_mode='all'` and
+`phone_reject_embedded=False` restore 0.8.1.
+
+### Number and phone masking
+
+- New `replace_numbers_mode` (default `'identifiers'`, legacy global `REPLACE_NUMBERS_MODE`): `<NUMBER>` only for
+  whole digit runs of an identifier shape. Kept as written: amounts and decimals (`1,250.00`, `12.5`), numbers
+  beside `%`, `‰` or a currency sign, times and ranges (`14:30`, `1000-3000`), and digits that are part of a
+  longer token (glued to a Latin/Greek/Cyrillic letter, digit or `_`, or joined by `- / + * . _ | ,` or a dash
+  to one). `:` `=` `#` do not join, so `ID:98765`, `id=98765` and `#12345` are still masked. Digits of every
+  script count (Arabic-Indic, Devanagari, full-width); letters of unspaced scripts do not glue (`金额50000元`).
+  `'all'` = 0.8.1. `check_replace_numbers` stays the on/off switch.
+- New `replace_numbers_min_digits` (default `4`, legacy global `REPLACE_NUMBERS_MIN_DIGITS`). Chosen on DEV only
+  (9 datasets, 4,298 docs, macro): 4 digits gave F2 0.881 / recall 0.893 / precision 0.856 with years and dates
+  off and the phone rule below, the best F2 of 4 to 7 (7 digits: F2 0.869, precision 0.865). The 0.8.1 default
+  scored F2 0.850 / recall 0.944 / precision 0.680 on the same docs. Not yet confirmed on the test split.
+- Code fragments: `INV-2023-107683` no longer gets a partial `INV-<YEAR><NUMBER>`. The number step leaves the
+  code whole; the year step still takes `2023` when years are on (`INV-<YEAR>-107683`; the `training` preset
+  has years off and keeps the code as written).
+- New `phone_reject_embedded` (default `True`, legacy global `PHONE_REJECT_EMBEDDED`): a digit-only phone match
+  glued to a Latin/Greek/Cyrillic letter or `_`, directly or across a joiner (`ID9876543210`,
+  `ref-0612345678`), or starting with a yyyymmdd date is left as it is. Digits across a joiner do not count, so
+  `06-12345678` keeps its 0.8.1 `06-<PHONE>`.
+  Formatted and international phones, `Tel:0612345678` and phones glued to unspaced scripts (`电话9876543210`)
+  are unchanged; `Tel0612345678` (glued to a Latin word) is no longer masked. DEV: precision +0.02, recall
+  -0.01. `False` = 0.8.1.
+- Both rules reach the plain, reversible and synthetic modes, `process_batch` and the streaming redactors. The
+  browser manifest exports the new number pattern (with `fold_decimal_digits`); `phone_reject_embedded` is
+  server-side and listed under the manifest's limitations. The `training` preset and the adapters keep numbers
+  off as before. `ProcessContacts.replace_numbers` / `replace_phone_numbers` keep the 0.8.1 patterns.
+- Not measured: the joiner set differs from the DEV simulation (`:` `=` `#` removed, `,` and dashes added,
+  grouped numbers such as `1 234 567` kept); a rerun of the benchmark will show the exact numbers.
+
+### Apple GPU
 
 - `ner_device` accepts `'mps'`. ONNX models and GLiClass stay on CPU; auto still never picks the Apple GPU.
 - If torch has no MPS backend, NER runs on CPU with a logged warning and the new `mps_fallback` code in `metadata['warnings']`; provenance shows `cpu`.

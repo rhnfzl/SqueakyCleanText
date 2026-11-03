@@ -168,8 +168,8 @@ class TestCorePipeline:
         """Numbers replaced with placeholder token."""
         cfg = _make_cfg()
         tc = TextCleaner(cfg=cfg)
-        lm, _, _ = tc.process("There are 42 items and 3.14 ratio")
-        assert "<NUMBER>" in lm
+        lm, _, _ = tc.process("Order 4711 has 42 items and 3.14 ratio")
+        assert "<NUMBER>" in lm and "42" in lm and "3.14" in lm
 
     def test_a10_year_replacement(self):
         """Years (1900-2099) replaced with placeholder token."""

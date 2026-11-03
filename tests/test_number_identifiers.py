@@ -1,0 +1,166 @@
+"""replace_numbers_mode / replace_numbers_min_digits / phone_reject_embedded (made-up values)."""
+
+import warnings
+
+import pytest
+
+from sct import TextCleaner, TextCleanerConfig
+from sct.browser import build_browser_manifest
+from sct.utils import constants, contact
+
+
+def _clean(text, **overrides):
+    cfg = dict(
+        check_ner_process=False, check_detect_language=False, check_statistical_model_processing=False,
+        check_to_ascii_unicode=False, check_casefold=False, check_remove_punctuation=False,
+        check_remove_stopwords=False, check_remove_isolated_letters=False,
+        check_remove_isolated_special_symbols=False, check_replace_currency_symbols=False,
+    )
+    cfg.update(overrides)
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        return TextCleaner(cfg=TextCleanerConfig(**cfg)).process(text).lm_text
+
+
+@pytest.mark.parametrize("text, expected", [
+    ("Order #12345 shipped", "Order #<NUMBER> shipped"),
+    ("customer 4567 and 3456.", "customer <NUMBER> and <NUMBER>."),
+    ("id=98765 ID:98765", "id=<NUMBER> ID:<NUMBER>"),
+    ("金额50000元", "金额<NUMBER>元"),  # unspaced scripts: letters do not glue, as in 0.8.1
+    ("رقم ٤٥٦٧٨ هنا", "رقم <NUMBER> هنا"),  # Arabic-Indic digits
+    ("संख्या ४५६७८ है", "संख्या <NUMBER> है"),  # Devanagari digits
+    ("番号１２３４５です", "番号<NUMBER>です"),  # full-width digits
+])
+def test_identifier_shaped_numbers_masked(text, expected):
+    assert _clean(text) == expected
+
+
+@pytest.mark.parametrize("text", [
+    "Pay 1,250.00 or 12.5 or 1.234.567",  # amounts and decimals
+    "Rate 12345% and 12345 % and 12345‰",  # percent
+    "Cost €12345, $ 12345, 12345€ and 12345 ₹",  # currency sign beside it
+    "From 1000-3000 or 1000–3000 at 14:30",  # ranges, times
+    "age 42, 7 items, 123 pages",  # under 4 digits
+    "abc_1234567 x-55555 55555-y ID55555 55555kg 1234/5678",  # part of a longer token
+    "Version 3.12345 and 12345.6",
+])
+def test_non_identifier_numbers_kept(text):
+    # phones off: "1000-2000" is also phone-shaped and the phone step (not this rule) takes it
+    assert _clean(text, check_replace_phone_numbers=False) == text
+
+
+def test_code_fragment_is_left_untouched_not_partially_masked():
+    # Years off: the whole code stays. Years on: the year step still takes its year (unchanged), and the
+    # number step does not add a second piece ("INV-<YEAR><NUMBER>" in 0.8.1).
+    assert _clean("Invoice INV-2023-107683 paid", check_replace_years=False) == "Invoice INV-2023-107683 paid"
+    assert _clean("Invoice INV-2023-107683 paid") == "Invoice INV-<YEAR>-107683 paid"
+    assert _clean("Invoice INV-2023-107683 paid", replacement_mode="reversible") == \
+        "Invoice INV-<YEAR_0>-107683 paid"
+    assert "107683" in _clean("Invoice INV-2023-107683 paid", replacement_mode="synthetic")
+
+
+def test_min_digits():
+    assert _clean("code 12345 and 123456", replace_numbers_min_digits=6) == "code 12345 and <NUMBER>"
+    assert _clean("code 7 and 42", replace_numbers_min_digits=1) == "code <NUMBER> and <NUMBER>"
+
+
+def test_all_mode_is_081_behaviour():
+    text = "Pay 1,250.00 at 14:30 on INV-2023-107683, age 42"
+    assert _clean(text, replace_numbers_mode="all") == \
+        "Pay <NUMBER> at <NUMBER>:<NUMBER> on INV-<YEAR><NUMBER>, age <NUMBER>"
+    assert _clean("GPT4 and mp3", replace_numbers_mode="all", replace_numbers_in_words=True) == \
+        "GPT<NUMBER> and mp<NUMBER>"
+
+
+def test_in_words_lets_letters_touch_in_identifier_mode():
+    assert _clean("ID55555 x", replace_numbers_in_words=True) == "ID<NUMBER> x"
+    assert _clean("ab-55555", replace_numbers_in_words=True) == "ab-<NUMBER>"
+    assert _clean("12-55555", replace_numbers_in_words=True) == "12-55555"
+
+
+def test_check_replace_numbers_still_switches_off():
+    assert _clean("Order 12345", check_replace_numbers=False) == "Order 12345"
+
+
+def test_number_modes_in_every_replacement_mode():
+    assert _clean("Order 12345 of 12.5", replacement_mode="reversible") == "Order <NUMBER_0> of 12.5"
+    out = _clean("Order 12345 of 12.5", replacement_mode="synthetic")
+    assert "12345" not in out and out.endswith(" of 12.5")
+
+
+def test_process_batch_uses_mode():
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        cleaner = TextCleaner(cfg=TextCleanerConfig(
+            check_ner_process=False, check_detect_language=False, check_statistical_model_processing=False))
+    outs = [r.lm_text for r in cleaner.process_batch(["order 12345", "price 12.50"])]
+    assert "<number>" in outs[0].lower() and "12" in outs[1]
+
+
+@pytest.mark.parametrize("text", [
+    "ID9876543210 x",  # glued to letters
+    "ref-0612345678 x",  # joined to a token part
+    "0612345678-x2 y",
+    "ts 20231105123456 x",  # starts with a yyyymmdd date
+])
+def test_phone_reject_embedded(text):
+    assert "<PHONE>" not in _clean(text, check_replace_iban_cards=False)
+    assert "<PHONE>" in _clean(text, check_replace_iban_cards=False, phone_reject_embedded=False)
+
+
+@pytest.mark.parametrize("text", [
+    "Call 0612345678 now", "Tel:0612345678", "Ring +31 6 1234 5678", "Call 020 7946 0958",
+    "Ring 06-12345678 now",  # 0.8.1 gives 06-<PHONE>; rejecting the tail would leave the whole phone
+    "电话9876543210",  # unspaced script: still a phone
+    "رقم ٠٦١٢٣٤٥٦٧٨ هنا",  # Arabic-Indic digits
+    "फोन ९८७६५४३२१० पर",  # Devanagari digits
+])
+def test_phone_reject_embedded_keeps_real_phones(text):
+    assert "<PHONE>" in _clean(text)
+
+
+def test_embedded_phone_predicate():
+    assert contact.embedded_phone("ab0612345678", 2, 12)
+    assert not contact.embedded_phone("06 12345678", 0, 11)  # formatted: never rejected
+    assert contact.embedded_phone("١٩٩٠٠١٠١٢٣٤٥", 0, 12)  # yyyymmdd in Arabic-Indic digits
+
+
+def test_config_validation_and_legacy_globals(monkeypatch):
+    from sct import config
+    with pytest.raises(ValueError):
+        TextCleanerConfig(replace_numbers_mode="some")
+    for bad in (0, -1, True, 2.5):
+        with pytest.raises(ValueError):
+            TextCleanerConfig(replace_numbers_min_digits=bad)
+    cfg = config._config_from_module_globals()
+    assert (cfg.replace_numbers_mode, cfg.replace_numbers_min_digits, cfg.phone_reject_embedded) == \
+        ("identifiers", 4, True)
+    monkeypatch.setattr(config, "REPLACE_NUMBERS_MODE", "all")
+    monkeypatch.setattr(config, "REPLACE_NUMBERS_MIN_DIGITS", 6)
+    monkeypatch.setattr(config, "PHONE_REJECT_EMBEDDED", False)
+    cfg = config._config_from_module_globals()
+    assert (cfg.replace_numbers_mode, cfg.replace_numbers_min_digits, cfg.phone_reject_embedded) == \
+        ("all", 6, False)
+
+
+def test_browser_number_rule_follows_mode():
+    rule = build_browser_manifest(TextCleanerConfig())["rules"]["number"]
+    assert rule["pattern"] == constants.identifier_numbers_regex(4).pattern and rule["fold_decimal_digits"]
+    old = build_browser_manifest(TextCleanerConfig(replace_numbers_mode="all"))["rules"]["number"]
+    assert old["pattern"] == constants.NUMBERS_REGEX.pattern and "fold_decimal_digits" not in old
+
+
+def test_streaming_redactors_follow_number_and_phone_rules():
+    from sct.streaming import BufferedStreamingRedactor, WindowedStreamingRedactor
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        cleaner = TextCleaner(cfg=TextCleanerConfig(
+            check_ner_process=False, check_detect_language=False, check_statistical_model_processing=False,
+            check_remove_punctuation=False, check_casefold=False, check_remove_isolated_letters=False))
+    text = "order 12345 costs 12.50 and ID9876543210 stays, call 0612345678 today " * 3
+    expected = cleaner.process(text).lm_text
+    assert "<NUMBER>" in expected and "12.50" in expected and "ID9876543210" in expected and "<PHONE>" in expected
+    for stream in (BufferedStreamingRedactor(cleaner),
+                   WindowedStreamingRedactor(cleaner, max_buffer_chars=48, overlap_chars=24)):
+        out = "".join(stream.feed(text[i:i + 7]) for i in range(0, len(text), 7)) + stream.finish()
+        assert out.split() == expected.split()

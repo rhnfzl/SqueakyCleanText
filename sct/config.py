@@ -398,6 +398,20 @@ class TextCleanerConfig:
     # . , ; : ! ? ' end a URL path or query unless more URL text follows ("https://x.com/a. Next");
     # False = 0.8.0, where the URL takes the sentence's full stop or comma
     url_trailing_punct_outside: bool = True
+    # check_replace_numbers: 'identifiers' masks only whole digit runs of an identifier shape (not glued to
+    # letters, digits or joined parts such as INV-2023-107683, which stays untouched; not an amount, decimal,
+    # percent, time or range); 'all' = 0.8.1, every number. On the DEV split of the external benchmark the
+    # 'all' rule caused 62-68% of SCT's false masks.
+    replace_numbers_mode: str = 'identifiers'
+    # Fewest digits an identifier-shaped number needs. 4: on DEV (9 datasets, 4,298 docs, years/dates off,
+    # phone_reject_embedded on) 4 digits gave F2 0.881 / recall 0.893 / precision 0.856, the best F2 of 4-7;
+    # 7 digits gave 0.869 / precision 0.865. Shorter runs (ages, counts, list numbers) are left as they are.
+    replace_numbers_min_digits: int = 4
+    # Drop a digit-only phone match glued to a Latin/Greek/Cyrillic letter or "_", directly or across a joiner
+    # (ID9876543210, ref-0612345678), or starting with a yyyymmdd date (20231105123456); formatted and
+    # international phones are not touched. On DEV:
+    # precision +0.02, recall -0.01. False = 0.8.1
+    phone_reject_embedded: bool = True
 
     def __post_init__(self):
         if self.synthetic_reference_date is not None:
@@ -518,6 +532,11 @@ class TextCleanerConfig:
                 raise ValueError(f"{name} must be None or in [0, 1], got {value}")
         if self.ner_ensemble_vote not in ('max', 'mean'):
             raise ValueError(f"ner_ensemble_vote must be 'max' or 'mean', got {self.ner_ensemble_vote!r}")
+        if self.replace_numbers_mode not in ('identifiers', 'all'):
+            raise ValueError(f"replace_numbers_mode must be 'identifiers' or 'all', got {self.replace_numbers_mode!r}")
+        if isinstance(self.replace_numbers_min_digits, bool) or not isinstance(self.replace_numbers_min_digits, int) \
+                or self.replace_numbers_min_digits < 1:
+            raise ValueError(f"replace_numbers_min_digits must be an int >= 1, got {self.replace_numbers_min_digits!r}")
         if self.ner_merge_location_gap < 0:
             raise ValueError(f"ner_merge_location_gap must be >= 0, got {self.ner_merge_location_gap}")
         if self.ner_propagate_min_score is not None and not 0.0 <= self.ner_propagate_min_score <= 1.0:
@@ -799,6 +818,9 @@ def _config_from_module_globals() -> TextCleanerConfig:
         ner_merge_location_gap=getattr(m, 'NER_MERGE_LOCATION_GAP', 0),
         ner_snap_word_edges=getattr(m, 'NER_SNAP_WORD_EDGES', True),
         url_trailing_punct_outside=getattr(m, 'URL_TRAILING_PUNCT_OUTSIDE', True),
+        replace_numbers_mode=getattr(m, 'REPLACE_NUMBERS_MODE', 'identifiers'),
+        replace_numbers_min_digits=getattr(m, 'REPLACE_NUMBERS_MIN_DIGITS', 4),
+        phone_reject_embedded=getattr(m, 'PHONE_REJECT_EMBEDDED', True),
         check_replace_currency_symbols=m.CHECK_REPLACE_CURRENCY_SYMBOLS,
         check_ner_process=m.CHECK_NER_PROCESS,
         check_remove_isolated_letters=m.CHECK_REMOVE_ISOLATED_LETTERS,
@@ -924,6 +946,9 @@ HTML_TAG_STRICT = True
 NER_MERGE_LOCATION_GAP = 0
 NER_SNAP_WORD_EDGES = True
 URL_TRAILING_PUNCT_OUTSIDE = True
+REPLACE_NUMBERS_MODE = 'identifiers'
+REPLACE_NUMBERS_MIN_DIGITS = 4
+PHONE_REJECT_EMBEDDED = True
 GLINER_ONNX = False
 LANGUAGE = None
 

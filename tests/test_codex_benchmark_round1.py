@@ -39,7 +39,7 @@ def test_c1_valid_objects_still_found():
 
 
 def test_c2_json_with_replaced_number_is_kept(cleaner):
-    out = cleaner.process('Order: {"n":42,"name":"Alice"} done').lm_text
+    out = cleaner.process('Order: {"n":4242,"name":"Alice"} done').lm_text
     assert out == 'Order: {"n":<NUMBER>,"name":"Alice"} done'
 
 
@@ -71,7 +71,7 @@ def test_c6_browser_date_rule_follows_date_options():
                             check_ner_process=False)
     manifest = build_browser_manifest(cfg)
     assert not re.search(manifest["rules"]["date"]["pattern"], "Born October/55 here", re.I)
-    assert TextCleaner(cfg=cfg).process("Born October/55 here").lm_text == "Born October/<NUMBER> here"
+    assert TextCleaner(cfg=cfg).process("Born October/55 here").lm_text == "Born October/55 here"
     assert build_browser_manifest(TextCleanerConfig())["rules"]["date"]["pattern"] == constants.DATE_REGEX.pattern
 
 
@@ -79,6 +79,6 @@ def test_c7_empty_month_selection_keeps_fuzzy_dates_off():
     pytest.importorskip("rapidfuzz")
     cfg = TextCleanerConfig(date_builtin_month_languages=(), check_fuzzy_replace_dates=True,
                             check_ner_process=False)
-    assert TextCleaner(cfg=cfg).process("Born 15 January 1990 here").lm_text == "Born <NUMBER> January <YEAR> here"
+    assert TextCleaner(cfg=cfg).process("Born 15 January 1990 here").lm_text == "Born 15 January <YEAR> here"
     assert ProcessDateTime(fuzzy_vocabulary=(), fuzzy_vocabulary_by_lang={})._fuzzy_vocabulary == ()
     assert ProcessDateTime()._fuzzy_vocabulary == constants.FUZZY_MONTH_VOCABULARY

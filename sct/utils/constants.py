@@ -249,6 +249,50 @@ NUMBERS_REGEX = re.compile(
 # Strict mode (replace_numbers_in_words=True): only an adjacent digit blocks a match.
 NUMBERS_IN_WORDS_REGEX = re.compile(rf"(?<![\d_,.]){_NUMBER_BODY}(?![\d_])")
 
+# replace_numbers_mode='identifiers' and phone_reject_embedded: what makes a digit run part of a longer token.
+# Joiners build one token from parts (INV-2023-107683, 2023/11, 1.5, 1,250, a_1, 100–200). ":", "=" and "#"
+# are left out: they introduce a value ("ID:12345678", "id=12345678", "#12345"), so that value stays maskable.
+PART_JOINERS = r"\-\u2010-\u2015/+*._|,"
+# A placeholder edge joined to the digits counts as a token part too ("<YEAR>", or the cleaner's protected
+# \U00100000..\U00100001 key for an emitted value), so "INV-<YEAR>-107683" keeps its tail instead of a
+# second, partial mask.
+_LEFT_EDGE, _RIGHT_EDGE = ">\U00100001", "<\U00100000"
+CURRENCY_SIGNS = ''.join(ch for ch in map(chr, range(0x110000)) if unicodedata.category(ch) == 'Sc')
+
+
+def token_glue(in_words=False):
+    """Characters that glue to a digit run: digits, "_", and (unless in_words) Latin/Greek/Cyrillic letters.
+    Letters of unspaced scripts (CJK, Thai) do not glue, as for NUMBERS_REGEX: 金额50000元 is a whole number."""
+    return r"\d_" if in_words else rf"\d_{_SPACED_LETTERS}"
+
+
+_ID_NUMBER_CACHE = {}
+
+
+def identifier_numbers_regex(min_digits, in_words=False):
+    """A whole digit run of at least *min_digits* digits that is not part of a longer token (glued to letters,
+    digits or a joiner and another token part) and not an amount, decimal, percent, time or range: those
+    shapes either join their parts (1,250.00, 100-200; 14:30 has 2-digit parts) or touch a % / currency sign."""
+    key = (min_digits, in_words)
+    if key not in _ID_NUMBER_CACHE:
+        glue, j, unit = token_glue(in_words), PART_JOINERS, CURRENCY_SIGNS
+        _ID_NUMBER_CACHE[key] = re.compile(
+            rf"(?<![{glue}])(?<![{glue}{_LEFT_EDGE}][{j}])(?<![{unit}])(?<![{unit}] )"
+            rf"\d{{{min_digits},}}"
+            rf"(?![{glue}])(?![{j}][{glue}{_RIGHT_EDGE}])(?! ?[%‰{unit}])"
+        )
+    return _ID_NUMBER_CACHE[key]
+
+
+# phone_reject_embedded: a digit-only phone match with a letter or "_" on either side, directly or across a
+# joiner, or one that starts with a yyyymmdd date (20231105123456 is a timestamp or reference, not a phone).
+# Digits across a joiner do not count: in "06-12345678" the phone regex takes only "12345678", and rejecting
+# it would leave the whole phone visible.
+_PHONE_GLUE = rf"_{_SPACED_LETTERS}"
+PHONE_EMBEDDED_LEFT = re.compile(rf"(?:[{_PHONE_GLUE}]|[{_PHONE_GLUE}{_LEFT_EDGE}][{PART_JOINERS}])\Z")
+PHONE_EMBEDDED_RIGHT = re.compile(rf"[{_PHONE_GLUE}]|[{PART_JOINERS}][{_PHONE_GLUE}{_RIGHT_EDGE}]")
+YYYYMMDD_PREFIX = re.compile(r"(?:19|20)\d\d(?:0[1-9]|1[0-2])(?:0[1-9]|[12]\d|3[01])")
+
 LINEBREAK_REGEX = re.compile(r"((\r\n)|[\n\v])+")
 TWO_LINEBREAK_REGEX = re.compile(r"((\r\n)|[\n\v])+((\r\n)|[\n\v])+")
 MULTI_WHITESPACE_TO_ONE_REGEX = re.compile(r"\s+")
