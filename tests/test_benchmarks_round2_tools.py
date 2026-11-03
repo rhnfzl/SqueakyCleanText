@@ -214,13 +214,17 @@ def test_llm_guard_spans_follow_the_scan_steps(monkeypatch):
     class Vault:
         pass
 
+    PIPE = types.SimpleNamespace(pipeline=types.SimpleNamespace(  # DeBERTa's tokenizer ships the 1e30 "no limit"
+        tokenizer=types.SimpleNamespace(model_max_length=int(1e30)),
+        model=types.SimpleNamespace(config=types.SimpleNamespace(max_position_embeddings=512))))
+
     class Anonymize:
         def __init__(self, vault, threshold, language):
             self._entity_types = [*entries.ENTRIES["llm-guard"]["labels"], "CRYPTO", "UUID", "CUSTOM"]
             self._threshold, self._language, self._allowed_names = threshold, language, None
             self._analyzer = types.SimpleNamespace(analyze=lambda **kw: [
                 result(EMAIL[0], EMAIL[1], "EMAIL_ADDRESS", 1.0), result(6, 6, "PERSON", 0.9),
-                result(6, 13, "PERSON", 0.85)])
+                result(6, 13, "PERSON", 0.85)], registry=types.SimpleNamespace(recognizers=[types.SimpleNamespace(), PIPE]))
 
         @staticmethod
         def remove_single_quotes(text):
@@ -244,6 +248,7 @@ def test_llm_guard_spans_follow_the_scan_steps(monkeypatch):
     fake_module(monkeypatch, "llm_guard.vault", Vault=Vault)
     guard = adapter("llm_guard_adapter.py")
     predict = guard.load({})
+    assert PIPE.pipeline.tokenizer.model_max_length == 512  # so llm-guard's own chunking runs on long texts
     out = predict([{"text": TEXT}, {"text": "   "}])
     assert [(s["start"], s["end"], s["label"]) for s in out[0]["spans"]] == [(6, 13, "PERSON"), (*EMAIL, "EMAIL_ADDRESS")]
     assert "[REDACTED_EMAIL_ADDRESS_1]" in out[0]["masked_text"] and out[1] == {"spans": [], "masked_text": "   "}

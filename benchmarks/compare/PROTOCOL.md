@@ -350,6 +350,7 @@ excluded from totals:
 | opf / openmed | 128k context | vendor CPU setting on every device: 4,096-token windows, no overlap (128k does not fit ~6 GB under transformers); `flex_attention` on cuda (eager's full T x T scores hit CUDA OOM at 4,096 tokens under the 5 GB cap) |
 | bardsai-v3 | 512 | bundled detector: 512-token windows, 128 overlap (native) |
 | datafog | regex | whole doc |
+| llm-guard | DeBERTa 512 positions | llm-guard's own 600-character chunks, 40 overlap; the adapter sets the tokenizer's 1e30 "no limit" sentinel to the model's 512 so that chunking runs (else whole docs, CUDA OOM) |
 
 Common chunker: sentence-aware windows of at most the model's max tokens, 64-token overlap,
 spans in overlaps merged by union, recorded per entry. Two tracks: native (each tool's
