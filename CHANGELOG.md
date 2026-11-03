@@ -53,7 +53,7 @@ Heads-up: output text changes for numbers and some phones. `replace_numbers_mode
   with a legacy global (default `True`): `numbers_letter_prefix_ids` (`AB1234567`, `X12345678Z`: 1-3 uppercase
   letters, 6+ digits, 0-2 uppercase letters; not `USD1000000`), `numbers_two_part_ids` (`123456/7890`,
   `12345-678901`, `123456-789K`, `12345.67890`; not year pairs `2023-2024`, round ranges `1000-3000`, times,
-  `%` or currency) and `numbers_spaced_pair_ids` (`123 45`, a spaced 5-digit postal code). Format rules only.
+  `%` or currency) and `numbers_spaced_pair_ids` (`123 45`, a spaced 5-digit postal code, and spaced IDs with 3+ groups and 7+ digits such as `123 45 6789`; thousands-grouped amounts like `1 234 567` stay). Format rules only.
   DEV (9 datasets, language macro, NER threshold 0.8): F2 0.888 -> 0.901, recall 0.919 -> 0.937, precision
   0.814 -> 0.811, over-mask 0.029 -> 0.033. Pooled gold ID/number recall 0.633 -> 0.791 (0.8.1: 0.809) and
   phone recall 0.965 -> 0.990 (0.8.1: 0.997); most lost phones were `12345-678901`-shaped and come back as

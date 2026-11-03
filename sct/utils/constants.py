@@ -281,8 +281,8 @@ def identifier_numbers_regex(min_digits, in_words=False, *, letter_prefix=False,
     two_part: two digit groups joined by "/" or a hyphen, the first 4+ digits, 7+ digits in all, an optional
     uppercase check letter (123456/7890, 12345-678901, 123456-789K), or by "." with 4+ digits on each side
     (12345.67890); not a year pair (2023-2024), a round range (1000-3000) or a time (1234-5678:30).
-    spaced_pair: "DDD DD" (a 5-digit postal code written 123 45), not part of a longer digit run (123 45 678,
-    123 45-6789)."""
+    spaced_pair: "DDD DD" (a 5-digit postal code written 123 45), and a run of 3+ space-separated digit groups
+    with 7+ digits (123 45 6789, 123 45 678) as one identifier, unless thousands-grouped (1 234 567)."""
     key = (min_digits, in_words, letter_prefix, two_part, spaced_pair)
     if key not in _ID_NUMBER_CACHE:
         glue, j, unit = token_glue(in_words), PART_JOINERS, CURRENCY_SIGNS
@@ -307,8 +307,12 @@ def identifier_numbers_regex(min_digits, in_words=False, *, letter_prefix=False,
             )
             shapes.append(rf"(?<![\w\-/.,+]){no_unit_before}\d{{4,}}\.\d{{4,}}(?!\w|[\-/.,]\d){no_unit_after}")
         if spaced_pair:
-            shapes.append(rf"(?<![\w.,:/\-])(?<!\d ){no_unit_before}\d{{3}} \d{{2}}"
-                          rf"(?!\w|[.,: \-‐‑]\d){no_unit_after}")
+            # 3+ space-separated digit groups with 7+ digits (an ID or SSN written 123 45 6789) are one
+            # identifier, unless thousands-grouped (1 234 567, an amount); the 2-group form is a postal code.
+            tail = rf"(?!\w|[.,: \-‐‑]\d){no_unit_after}"
+            shapes.append(rf"(?<![\w.,:/\-])(?<!\d ){no_unit_before}(?!\d{{1,3}}(?: \d{{3}})+{tail})"
+                          rf"(?=(?:\d ?){{7}})\d{{1,4}}(?: \d{{2,4}}){{2,}}{tail}")
+            shapes.append(rf"(?<![\w.,:/\-])(?<!\d ){no_unit_before}\d{{3}} \d{{2}}{tail}")
         _ID_NUMBER_CACHE[key] = re.compile("|".join(shapes))
     return _ID_NUMBER_CACHE[key]
 

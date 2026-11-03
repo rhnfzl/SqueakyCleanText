@@ -245,10 +245,28 @@ def test_id_shape_legacy_globals(monkeypatch):
     assert (cfg.numbers_letter_prefix_ids, cfg.numbers_two_part_ids, cfg.numbers_spaced_pair_ids) == (False,) * 3
 
 
-@pytest.mark.parametrize("text", ["123 45 678", "123 45-6789", "123 45\u20116789"])
-def test_spaced_pair_skips_longer_digit_runs(text):
+@pytest.mark.parametrize("text", ["123 45-6789", "123 45\u20116789"])
+def test_spaced_pair_never_masks_part_of_a_longer_run(text):
     regex = constants.identifier_numbers_regex(4, letter_prefix=True, two_part=True, spaced_pair=True)
     assert regex.search(text) is None
+
+
+_ARABIC_SPACED_ID = "ID \u0661\u0662\u0663 \u0664\u0665 \u0666\u0667\u0668\u0669 x"
+
+
+@pytest.mark.parametrize("text", ["Ref 123 45 678 ok", "SSN 123 45 6789 ok", _ARABIC_SPACED_ID])
+def test_spaced_group_ids_masked_whole(text):
+    out = _clean(text)
+    assert out.count("<NUMBER>") == 1 and not any(ch.isdigit() for ch in out)
+
+
+@pytest.mark.parametrize("text", ["Total 1 234 567 units", "Nums 12 34 56", "Count 12 345 678 kg"])
+def test_spaced_amounts_and_short_runs_kept(text):
+    assert _clean(text) == text
+
+
+def test_spaced_group_ids_follow_flag():
+    assert _clean("SSN 123 45 6789 ok", numbers_spaced_pair_ids=False) == "SSN 123 45 <NUMBER> ok"
 
 
 def test_streaming_split_keeps_currency_context_of_amount():
