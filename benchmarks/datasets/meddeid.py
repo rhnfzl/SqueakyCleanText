@@ -1,8 +1,8 @@
 """MedDeID English + Dutch synthetic clinical benchmarks (GPT-written on Synthea, human-checked): 300 + 300 docs.
 
 The cards allow final evaluation only (no tuning, rule development or model selection), so every record is
-``part="test"``: the dev split is empty. ``lang`` is the locale (``en-gb``, ``en-us``, ``nl-be``). Gold labels
-are the span ``category``, refined from the set's own structure: ``Age_Birthdate`` is a birth date
+``part="test"``: the dev split is empty. ``lang`` is the locale (``en-gb``, ``en-us``; ``nl`` when a row names none).
+Gold labels are the span ``category``, refined from the set's own structure: ``Age_Birthdate`` is a birth date
 (``Age_Birthdate:date``) when its subannotations hold a day, month or year, else a bare age (no SCT type);
 ``Contactdetails`` is ``:email`` when it holds ``@``, else ``:phone``. Profession has no SCT type.
 """
