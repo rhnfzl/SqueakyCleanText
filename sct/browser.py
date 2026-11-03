@@ -187,6 +187,9 @@ def build_browser_manifest(config: TextCleanerConfig) -> dict[str, Any]:
             "phone_reject_embedded is a server-side rule: the browser phone rule keeps every phone match "
             "(0.8.1 behaviour).",
             "custom_deny_terms, custom_allow_terms and custom_patterns are server-side features.",
+            "The browser year rule runs before the number rule on its own, so a year-like group of an ID "
+            "run ('123-45 2020') becomes the year token and the rest of the run stays; the server masks the "
+            "whole run.",
             "Rules with fold_decimal_digits match on a copy of the text where every Unicode "
             "decimal digit (Nd, such as ٠٦ or ०६) is its ASCII digit, one code point for one, "
             "and replace the same offsets in the original text (JavaScript \\d is ASCII only).",

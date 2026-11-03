@@ -12,6 +12,12 @@ on the GPU, about 1.6x faster `process_batch` on an M4 Max with the same output.
 
 **Your own term lists.** Pass terms to always mask (`custom_deny_terms`), terms to never mask
 (`custom_allow_terms`) and your own labelled regex (`custom_patterns`). SCT still ships no list of its own.
+Each pattern gets a time limit (`custom_patterns_timeout`, 2 s per document), so a bad regex cannot hang a run.
+
+**Fixes.** An ID whose last group looks like a year (`123-45 2020`) is now masked whole instead of only
+the year, and a very long digit run no longer slows the streaming redactor. A number next to a currency code
+(`1250 EUR`, `EUR 1250`) is kept as an amount, but an ID shape next to one (`123-45-6789 USD`) is still masked,
+and long number tables stream again; a spaced ID of any length is masked whole.
 
 Heads-up: output text changes for numbers and some phones. `replace_numbers_mode='all'` and
 `phone_reject_embedded=False` restore 0.8.1.
@@ -53,12 +59,41 @@ Heads-up: output text changes for numbers and some phones. `replace_numbers_mode
   with a legacy global (default `True`): `numbers_letter_prefix_ids` (`AB1234567`, `X12345678Z`: 1-3 uppercase
   letters, 6+ digits, 0-2 uppercase letters; not `USD1000000`), `numbers_two_part_ids` (`123456/7890`,
   `12345-678901`, `123456-789K`, `12345.67890`; not year pairs `2023-2024`, round ranges `1000-3000`, times,
-  `%` or currency) and `numbers_spaced_pair_ids` (`123 45`, a spaced 5-digit postal code, and spaced IDs with 3+ groups and 7+ digits such as `123 45 6789`; thousands-grouped amounts like `1 234 567` stay). Format rules only.
+  `%` or currency) and `numbers_spaced_pair_ids` (`123 45`, a spaced 5-digit postal code, and spaced IDs with 3-6 groups and 7+ digits such as `123 45 6789`, also when spaces and hyphens mix (`123 45-6789`,
+  `1234 56-78-90`), always masked whole; thousands-grouped amounts like `1 234 567` stay). Format rules only.
   DEV (9 datasets, language macro, NER threshold 0.8): F2 0.888 -> 0.901, recall 0.919 -> 0.937, precision
   0.814 -> 0.811, over-mask 0.029 -> 0.033. Pooled gold ID/number recall 0.633 -> 0.791 (0.8.1: 0.809) and
   phone recall 0.965 -> 0.990 (0.8.1: 0.997); most lost phones were `12345-678901`-shaped and come back as
   `<NUMBER>`. `1234/5678` is now one `<NUMBER>`; a range like `12345-67890` cannot be told from an ID and is
-  masked. The streaming redactors keep `123 45` in one window.
+  masked. The streaming redactors keep `123 45` and any space/hyphen-joined digit run in one window.
+- With `replace_numbers_mode='identifiers'` the year step leaves a year-like group of a multi-group ID run
+  (`123-45 2020`, `123-45-2020`) to the numbers step, which masks the whole run; before, the year was masked
+  alone and `123-45` stayed visible. A lone year (`born in 2020`) and a run of years (`1999 2000 2001`) are still
+  `<YEAR>`. The browser export keeps the old order (listed in its
+  limitations).
+- The streaming split guard for digit-group runs no longer restarts inside a long digit run: 32,000 digits
+  with no separator took ~5 s per buffer, now about 1 ms.
+- New `numbers_keep_currency_code_amounts` (default `True`, legacy global `NUMBERS_KEEP_CURRENCY_CODE_AMOUNTS`):
+  in `'identifiers'` mode a whole digit run right before or after an uppercase ISO 4217 code, with at most one
+  space (`1250 EUR`, `EUR 1250`, `USD 1,250`), is an amount and stays. Only that amount shape: an SSN-like,
+  slash-, dot- or space-joined ID beside a code (`SSN 123-45-6789 USD`, `123456/7890 EUR`, `EUR 123 45 6789`,
+  `6789 45 123 EUR`) is masked whole, never in part (an earlier build of this release kept the first two and
+  masked only one group of the last two).
+  It reuses the code set that keeps `USD1000000` out of letter-prefix IDs; `eur` and `EURO` do not count. The
+  IBAN and card steps still mask `EUR NL91ABNA0417164300` and `USD 4111 1111 1111 1111`. Browser export and the
+  streaming guard follow it. `False` masks these numbers as before.
+- A spaced/hyphen-joined run of any length with 7+ digits stays one `<NUMBER>` (`national ID 12 34 56 78 90 12
+  34`; an earlier build of this release capped runs at 6 groups and left a 7-group ID visible). Thousands
+  grouping keeps an amount only up to 6 groups (`1 234 567 890 123 456`). The streaming guard reads runs after
+  the date, IBAN/card and phone steps; a run masked whole may split where both halves keep 7+ groups, so a
+  10,000-number table streams instead of raising `BufferError`, and comes out as several `<NUMBER>` tokens
+  where the whole document gives one. A run of up to 13 groups never splits; a run the rule does not mask whole
+  (beside a currency sign) is never split, so a buffer too small for it raises `BufferError`. Years no longer
+  end a run in the guard: an earlier build split `EUR 12 2023 2023 45 123 123` after `12` and masked differently
+  from the whole document.
+- A date written with spaces (`05 11 2023`) is handled as before this release: the date step has no spaced
+  shape, so with years on its year is `<YEAR>`; with years off the whole run is one `<NUMBER>` (an earlier
+  build of this release masked only `2023`).
 
 ### User term lists
 
@@ -75,8 +110,13 @@ Heads-up: output text changes for numbers and some phones. `replace_numbers_mode
   will not cut a term), `process_json`, `regex_counts` and `signals` (user labels count as PII; values never
   appear).
 - Clear `ValueError`s at config time: label not upper case, a string instead of a tuple of terms, empty
-  terms, one term under two labels, an invalid regex, a regex that can match the empty string. Patterns use
-  the `regex` module; nested repeats can backtrack for a long time, so pass only patterns you trust.
+  terms, one term under two labels, an invalid regex, a regex that can match the empty string.
+- New `custom_patterns_timeout` (default `2.0` seconds per pattern per document, `None` = no limit; legacy
+  global `CUSTOM_PATTERNS_TIMEOUT`) and `custom_patterns_on_timeout` (`'raise'` default | `'warn'`; legacy global
+  `CUSTOM_PATTERNS_ON_TIMEOUT`), using the `regex` module's timeout. `'raise'` raises `sct.CustomPatternTimeout`
+  (a `TimeoutError` naming the label, never the text); `'warn'` logs it, adds the `custom_pattern_timeout`
+  warning code and processes that document without the pattern. Applies in `process`, `process_batch`, both
+  streaming redactors (also the windowed split guard) and `process_json`.
 - Terms are normalised like the text before matching (`check_fix_bad_unicode`, `check_to_ascii_unicode`,
   `check_remove_emoji`), so an NFD `José` or full-width `ＡＣＭＥ` term still matches. A Unicode case variant
   (`İ` for `i`) gets its term's label. An allowed term inside a longer detection (an email `bob@Acme.com`) no

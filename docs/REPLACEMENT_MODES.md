@@ -67,6 +67,10 @@ TextCleaner(cfg).process("Blue Sky: ask support@acme.com or bob@x.com, EMP-12345
   count as PII in `signals['pii_types']`.
 - Whole-word and case rules: see `custom_deny_terms` and `custom_terms_case_sensitive` in
   [CONFIG.md](CONFIG.md). The browser manifest does not export these lists (server-side only).
+- Time limit: each pattern gets `custom_patterns_timeout` seconds per document (default `2.0`), so a pattern
+  that backtracks badly (`(a|aa)+$`, ReDoS) cannot hang processing. On a timeout SCT raises
+  `CustomPatternTimeout` naming the label (never the text), or with `custom_patterns_on_timeout='warn'` logs
+  it, adds `custom_pattern_timeout` to `metadata['warnings']` and skips that pattern for that document.
 
 ## Document Classification (GLiClass)
 

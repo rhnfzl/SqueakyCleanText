@@ -6,9 +6,21 @@ from bisect import bisect_right
 from sct.sct import TextCleaner
 from sct.utils import constants, contact
 
-# The identifier number rule reads one space past its match for a currency or unit ("€ 123 45", "1234 %"),
-# so a split there would let the half without it mask an amount.
-_NUMBER_UNIT_CONTEXT = re.compile(rf"[{constants.CURRENCY_SIGNS}] (?=\d)|\d (?=[%‰{constants.CURRENCY_SIGNS}])")
+# The identifier number rule reads one space past its match for a currency sign, code or unit ("€ 123 45",
+# "EUR 1250", "1234 %"), so a split there would let the half without it mask an amount.
+_CODE = rf"(?<![{constants._SPACED_LETTERS}])(?:{constants._CURRENCY_CODES})"
+_NUMBER_UNIT_CONTEXT = re.compile(
+    rf"[{constants.CURRENCY_SIGNS}] (?=\d)|\d (?=[%‰{constants.CURRENCY_SIGNS}])"
+    rf"|{_CODE} (?=\d)|\d (?={_CODE}(?![{constants._SPACED_LETTERS}]))")
+# Digit groups joined by single spaces or hyphens ("123 45-6789 12%"): the identifier rule reads the whole run,
+# so a split inside it could mask a part the whole document keeps (or keep a part it masks). RUN is a whole run;
+# a run the rule masks whole may split where both halves keep more than THOUSANDS_MAX_GROUPS groups, as each half
+# is then masked whole too (a number table streams). HEAD protects a run's first max+1 groups, TAIL its last
+# max+1 (both the whole run when it is short). (?<!\d): a search never restarts inside a digit run (linear).
+_RUN_SEP, _RUN_KEEP = r"[ \-\u2010\u2011]", constants.THOUSANDS_MAX_GROUPS
+_DIGIT_GROUP_RUN = re.compile(rf"(?<!\d)(?<!\d{_RUN_SEP})\d+(?:{_RUN_SEP}\d+)+")
+_DIGIT_GROUP_HEAD = re.compile(rf"(?<!\d)(?<!\d{_RUN_SEP})\d+(?:{_RUN_SEP}\d+){{1,{_RUN_KEEP}}}")
+_DIGIT_GROUP_TAIL = re.compile(rf"(?<!\d)(?:\d+{_RUN_SEP}){{1,{_RUN_KEEP}}}\d+(?!\d|{_RUN_SEP}\d)")
 # A digit run at the end of the buffer may be a phone the next feed completes ("06 12 34").
 _PHONE_TAIL = re.compile(r"[+(]?\d[\d ()+./-]*\Z")
 # Longer than any phone the regex accepts; a longer digit tail (a number table) may still split.
@@ -38,13 +50,39 @@ class BufferedStreamingRedactor:
         return self._cleaner.process("".join(self._chunks)).lm_text
 
 
-def _user_rules_split_safe(user_rules, view, cut, right_start):
+def _digit_group_runs(cleaner, cfg, view, phone_view):
+    """Spans a split must not cut in digit-group runs, read as the cleaner's steps see them: the date, IBAN/card
+    and phone steps run in turn before the numbers step, and a value one masks ends a run and moves where the next
+    step's matches fall. The year step is not applied: whether it masks a year in a run depends on the whole run
+    ("EUR 12 2023 2023 45" keeps it a run), so a year never ends one here. Returns those matches and the spans."""
+    if cfg.phone_reject_embedded:
+        phone_view = contact.RejectView(phone_view, contact.embedded_phone)
+    steps = [(cfg.check_replace_dates, cleaner._date_view),
+             (cfg.check_replace_iban_cards, contact.IBAN_VIEW), (cfg.check_replace_iban_cards, contact.CARD_VIEW),
+             (cfg.check_replace_phone_numbers, phone_view)]
+    spans = []  # each step's matches on the text it sees, which the view-wide matches may not align with
+
+    def blank(match):
+        spans.append(match.span())
+        # the shape of a protected key ("\U00100000...\U00100001"), as long as the match so offsets stay the view's
+        return "\U00100000" + "\U000F0000" * (len(match.group()) - 2) + "\U00100001"
+    for on, step in steps:
+        if on:
+            view = step.sub(blank, view)
+    masked_whole = {m.span() for m in cleaner._numbers_regex.finditer(view)}
+    spans += [m.span() for m in _DIGIT_GROUP_RUN.finditer(view) if m.span() not in masked_whole]
+    return spans + [m.span() for regex in (_DIGIT_GROUP_HEAD, _DIGIT_GROUP_TAIL) for m in regex.finditer(view)]
+
+
+def _user_rules_split_safe(cleaner, user_rules, view, cut, right_start):
     """Whether each user-rule match of *view* is found again in the half that holds it: a custom pattern
     may read context outside its match ("(?<=account )\\d{6}"), which a split can take away."""
-    for pattern, spans in user_rules:
-        found = {m.span() for m in pattern.finditer(view[:cut])}
-        found |= {(a + right_start, b + right_start)
-                  for a, b in (m.span() for m in pattern.finditer(view[right_start:], partial=True))}
+    for pattern, timed, spans in user_rules:
+        if spans is None:  # timed out on the whole view (custom_patterns_on_timeout='warn'): not applied
+            continue
+        found = {m.span() for m in cleaner._user_matches(pattern, timed, view[:cut]) or ()}
+        found |= {(a + right_start, b + right_start) for a, b in (
+            m.span() for m in cleaner._user_matches(pattern, timed, view[right_start:], partial=True) or ())}
         if not spans <= found:
             return False
     return True
@@ -108,9 +146,13 @@ class WindowedStreamingRedactor:
             views.append(constants.FUZZY_DATE_CANDIDATE_REGEX)
         if cfg.check_replace_iban_cards:  # "NL91 ABNA 0417 1643 00"
             views += [constants.IBAN_REGEX, constants.CARD_REGEX]
+        spaced_ids = cfg.check_replace_numbers and cfg.replace_numbers_mode == 'identifiers' \
+            and cfg.numbers_spaced_pair_ids
         if cfg.check_replace_numbers:  # a grouped number ("5 379") is one token too
-            views += [contact.numbers_regex(cfg.replace_numbers_in_words), cleaner._numbers_regex,  # "123 45"
+            views += [contact.numbers_regex(cfg.replace_numbers_in_words),
                       _NUMBER_UNIT_CONTEXT]  # the amount lookarounds read one space past a match: "€ 123 45"
+            if not spaced_ids:  # with spaced IDs, _digit_group_runs protects its runs (a table may split)
+                views.append(cleaner._numbers_regex)  # "123 45"
         # (start, end) of view text a split must not cut: start < split < end
         protected = [
             match.span()
@@ -118,11 +160,14 @@ class WindowedStreamingRedactor:
             for match in (regex.pattern.finditer(view.translate(regex.table))
                           if isinstance(regex, contact.DigitView) else regex.finditer(view))
         ]
+        if spaced_ids:
+            protected += _digit_group_runs(cleaner, cfg, view, phone_view)
         # User rules (a deny term holding a space, "Blue Sky Initiative"): their matches, and a match the buffer
         # end cuts off ("... the Blue Sky"), which the next feed completes.
-        user_rules = [(pattern, {m.span() for m in pattern.finditer(view, partial=True)})
-                      for pattern, _ in cleaner._user_rules]
-        protected += [span for _, spans in user_rules for span in spans]
+        # A custom pattern past custom_patterns_timeout raises, or (on_timeout='warn') protects nothing.
+        user_rules = [(pattern, timed, None if (found := cleaner._user_matches(pattern, timed, view, partial=True))
+                       is None else {m.span() for m in found}) for pattern, _, timed in cleaner._user_rules]
+        protected += [span for _, _, spans in user_rules for span in spans or ()]
         phone_digits = view.translate(phone_view.table)
         tail = _PHONE_TAIL.search(phone_digits, max(0, len(phone_digits) - _PHONE_TAIL_MAX))
         if tail:
@@ -152,7 +197,7 @@ class WindowedStreamingRedactor:
                     or not (separator == "" or separator.isspace()):
                 index -= 1
                 continue
-            if not _user_rules_split_safe(user_rules, view, offset, len(view) - len(right)):
+            if not _user_rules_split_safe(cleaner, user_rules, view, offset, len(view) - len(right)):
                 index -= 1
                 continue
             split_at = position

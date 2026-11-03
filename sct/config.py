@@ -434,8 +434,18 @@ class TextCleanerConfig:
     # Two digit groups joined by "/" or a hyphen (first 4+ digits, 7+ in all, optional check letter:
     # 123456/7890, 12345-678901) or by "." (4+ digits each side: 12345.67890); not 2023-2024 or 1000-3000
     numbers_two_part_ids: bool = True
-    # "DDD DD", a 5-digit postal code written with a space (123 45)
+    # "DDD DD", a 5-digit postal code written with a space (123 45), and a run of 3+ digit groups joined by
+    # spaces and/or hyphens with 7+ digits (123 45 6789, 123 45-6789); not dates or 1 234 567
     numbers_spaced_pair_ids: bool = True
+    # Seconds each custom_patterns regex may spend on one document (the regex module's timeout), so a pattern
+    # that backtracks badly (ReDoS) cannot hang processing. None: no limit.
+    custom_patterns_timeout: Optional[float] = 2.0
+    # On a timeout: 'raise' a CustomPatternTimeout (names the label, never the text), or 'warn': log it, add
+    # 'custom_pattern_timeout' to metadata['warnings'] and process that document without the pattern.
+    custom_patterns_on_timeout: str = 'raise'
+    # replace_numbers_mode='identifiers' only: a number right before or after an uppercase ISO 4217 code, with at
+    # most one space ("1250 EUR", "EUR 1250", "USD 1,250"), is an amount and stays. False: masked like any ID
+    numbers_keep_currency_code_amounts: bool = True
 
     def __post_init__(self):
         if self.synthetic_reference_date is not None:
@@ -820,6 +830,12 @@ def _validate_user_terms(cfg):
                 if seen.setdefault(key, label) != label:
                     raise ValueError(f"custom_deny_terms: {term!r} is listed under both {seen[key]!r} and {label!r}")
         object.__setattr__(cfg, 'custom_deny_terms', MappingProxyType(deny))
+    timeout = cfg.custom_patterns_timeout
+    if timeout is not None and (isinstance(timeout, bool) or not isinstance(timeout, (int, float))
+                                or not 0 < timeout < float('inf')):
+        raise ValueError(f"custom_patterns_timeout must be a positive number of seconds or None, got {timeout!r}")
+    if cfg.custom_patterns_on_timeout not in ('raise', 'warn'):
+        raise ValueError(f"custom_patterns_on_timeout must be 'raise' or 'warn', got {cfg.custom_patterns_on_timeout!r}")
     if cfg.custom_patterns is not None:
         if not isinstance(cfg.custom_patterns, Mapping):
             raise ValueError(f"custom_patterns must be a mapping {{LABEL: regex}}, got {cfg.custom_patterns!r}")
@@ -910,6 +926,9 @@ def _config_from_module_globals() -> TextCleanerConfig:
         numbers_letter_prefix_ids=getattr(m, 'NUMBERS_LETTER_PREFIX_IDS', True),
         numbers_two_part_ids=getattr(m, 'NUMBERS_TWO_PART_IDS', True),
         numbers_spaced_pair_ids=getattr(m, 'NUMBERS_SPACED_PAIR_IDS', True),
+        custom_patterns_timeout=getattr(m, 'CUSTOM_PATTERNS_TIMEOUT', 2.0),
+        custom_patterns_on_timeout=getattr(m, 'CUSTOM_PATTERNS_ON_TIMEOUT', 'raise'),
+        numbers_keep_currency_code_amounts=getattr(m, 'NUMBERS_KEEP_CURRENCY_CODE_AMOUNTS', True),
         check_replace_currency_symbols=m.CHECK_REPLACE_CURRENCY_SYMBOLS,
         check_ner_process=m.CHECK_NER_PROCESS,
         check_remove_isolated_letters=m.CHECK_REMOVE_ISOLATED_LETTERS,
@@ -1045,6 +1064,9 @@ CUSTOM_TERMS_CASE_SENSITIVE = False
 NUMBERS_LETTER_PREFIX_IDS = True
 NUMBERS_TWO_PART_IDS = True
 NUMBERS_SPACED_PAIR_IDS = True
+CUSTOM_PATTERNS_TIMEOUT = 2.0
+CUSTOM_PATTERNS_ON_TIMEOUT = 'raise'
+NUMBERS_KEEP_CURRENCY_CODE_AMOUNTS = True
 GLINER_ONNX = False
 LANGUAGE = None
 

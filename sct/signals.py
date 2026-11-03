@@ -19,6 +19,7 @@ NON_PII_REGEX_TYPES = frozenset({"HTML", "DATE", "YEAR", "NUMBER", "CURRENCY"})
 WARNING_CODES = frozenset({
     "language_unknown", "language_fallback", "language_low_confidence",
     "ner_fallback_models", "ner_off", "cuda_fallback", "mps_fallback", "empty_input",
+    "custom_pattern_timeout",
 })
 
 

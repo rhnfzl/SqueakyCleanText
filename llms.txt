@@ -119,7 +119,7 @@ replace_numbers_mode='identifiers'  # Only whole identifier-shaped digit runs (n
 replace_numbers_min_digits=4        # Fewest digits for 'identifiers' mode
 numbers_letter_prefix_ids=True      # 'identifiers' mode: AB1234567 (1-3 uppercase + 6+ digits) is one <NUMBER>
 numbers_two_part_ids=True           # 'identifiers' mode: 123456/7890, 12345-678901, 12345.67890 are one <NUMBER> (not 2023-2024, 1000-3000)
-numbers_spaced_pair_ids=True        # 'identifiers' mode: '123 45' (spaced postal code) and spaced IDs '123 45 6789' (3+ groups, 7+ digits) are one <NUMBER>; '1 234 567' stays
+numbers_spaced_pair_ids=True        # 'identifiers' mode: '123 45' (spaced postal code) and spaced/mixed IDs '123 45 6789', '123 45-6789' (3+ groups, 7+ digits) are one <NUMBER>; '1 234 567' stays
 check_replace_dates=True            # Replace dates with <DATE>
 check_fuzzy_replace_dates=False     # Fuzzy misspelled month matching (requires [fuzzy])
 check_remove_stopwords=True         # Language-aware stopword removal
@@ -158,6 +158,9 @@ custom_deny_terms=None              # {LABEL: ('term', ...)}: always mask as <LA
 custom_allow_terms=()               # ('term', ...): never mask (regex and NER), applied last
 custom_patterns=None                # {LABEL: r'regex'} (regex module): mask matches as <LABEL>; empty-matching patterns rejected
 custom_terms_case_sensitive=False   # Case rule for deny/allow terms
+custom_patterns_timeout=2.0         # Seconds per custom pattern per document (ReDoS guard); None = no limit
+custom_patterns_on_timeout='raise'  # 'raise' CustomPatternTimeout (label only) | 'warn': log, warning 'custom_pattern_timeout', skip pattern
+numbers_keep_currency_code_amounts=True  # 'identifiers' mode: a whole digit run next to an uppercase ISO 4217 code ('1250 EUR', 'EUR 1250') stays; ID shapes ('123-45-6789 USD') are still masked; False = mask
 custom_pipeline_steps=()            # Tuple of (text: str) -> str callables
 ```
 

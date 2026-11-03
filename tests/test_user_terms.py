@@ -252,3 +252,87 @@ def test_allow_terms_scale_linearly():
     started = time.perf_counter()
     out = cleaner.process("Acme 2024 " * 800).lm_text
     assert time.perf_counter() - started < 2 and "<NUMBER>" not in out
+
+
+# --- custom_patterns_timeout (ReDoS guard) -------------------------------------------------------------
+
+_SLOW = {'SLOW': r'(a|aa)+$'}  # catastrophic backtracking on 'a' * 40 + '!'
+_SLOW_TEXT = 'mail bob@x.com ' + 'a' * 40 + '!'
+
+
+def _timed(call, limit):
+    import time
+    started = time.perf_counter()
+    try:
+        return call()
+    finally:
+        assert time.perf_counter() - started < limit + 1
+
+
+def test_timeout_defaults_validation_and_legacy_globals(monkeypatch):
+    from sct import CustomPatternTimeout
+    cfg = TextCleanerConfig()
+    assert (cfg.custom_patterns_timeout, cfg.custom_patterns_on_timeout) == (2.0, 'raise')
+    assert TextCleanerConfig(custom_patterns_timeout=None).custom_patterns_timeout is None
+    for bad in (0, -1, True, 'x', float('inf'), float('nan')):
+        with pytest.raises(ValueError, match='custom_patterns_timeout'):
+            TextCleanerConfig(custom_patterns_timeout=bad)
+    with pytest.raises(ValueError, match='custom_patterns_on_timeout'):
+        TextCleanerConfig(custom_patterns_on_timeout='skip')
+    monkeypatch.setattr(config_module, 'CUSTOM_PATTERNS_TIMEOUT', 0.5)
+    monkeypatch.setattr(config_module, 'CUSTOM_PATTERNS_ON_TIMEOUT', 'warn')
+    cfg = config_module._config_from_module_globals()
+    assert (cfg.custom_patterns_timeout, cfg.custom_patterns_on_timeout) == (0.5, 'warn')
+    error = pickle.loads(pickle.dumps(CustomPatternTimeout('SLOW', 0.5)))  # noqa: S301 - trusted round trip
+    assert isinstance(error, TimeoutError) and error.label == 'SLOW' and "'SLOW'" in str(error)
+
+
+def test_timeout_raise_names_the_label_not_the_text():
+    from sct import CustomPatternTimeout
+    cleaner = _cleaner(custom_patterns=_SLOW, custom_patterns_timeout=0.5)
+    with pytest.raises(CustomPatternTimeout) as caught:
+        _timed(lambda: cleaner.process(_SLOW_TEXT), 0.5)
+    assert caught.value.label == 'SLOW' and 'SLOW' in str(caught.value) and 'aaaa' not in str(caught.value)
+    with pytest.raises(CustomPatternTimeout):
+        _timed(lambda: cleaner.process_batch(['ok', _SLOW_TEXT]), 0.5)
+    with pytest.raises(CustomPatternTimeout):
+        _timed(lambda: process_json(cleaner, {'k': _SLOW_TEXT}), 0.5)
+    with pytest.raises(CustomPatternTimeout):
+        _timed(lambda: WindowedStreamingRedactor(cleaner, max_buffer_chars=40, overlap_chars=10).feed(_SLOW_TEXT), 0.5)
+
+
+@pytest.mark.parametrize('mode', ['placeholder', 'reversible'])
+def test_timeout_warn_skips_the_pattern_for_that_document(mode, caplog):
+    cleaner = _cleaner(mode, custom_patterns={**_SLOW, 'TICKET': r'TCK-\d+'}, custom_patterns_timeout=0.5,
+                       custom_patterns_on_timeout='warn')
+    with caplog.at_level('WARNING', logger='sct.sct'):
+        result = _timed(lambda: cleaner.process(_SLOW_TEXT + ' TCK-12'), 0.5)
+    assert result.lm_text.startswith('mail <EMAIL') and 'a' * 40 + '!' in result.lm_text
+    assert '<TICKET' in result.lm_text  # the other patterns still run
+    assert 'custom_pattern_timeout' in result.metadata['warnings']
+    assert 'custom_pattern_timeout' in result.signals['warnings']
+    assert "'SLOW'" in caplog.text and 'aaaa' not in caplog.text
+    if mode == 'reversible':  # nothing from the timed-out pattern in the map
+        assert {e.entity_type for e in result.metadata['anon_map'].entries} == {'EMAIL', 'TICKET'}
+    fast = cleaner.process('only aaa')  # the same pattern on a short document still applies
+    assert 'custom_pattern_timeout' not in fast.metadata['warnings'] and 'SLOW' in fast.lm_text
+    batch = _timed(lambda: cleaner.process_batch([_SLOW_TEXT, 'aa']), 1.0)
+    assert 'custom_pattern_timeout' in batch[0].metadata['warnings']
+    assert 'custom_pattern_timeout' not in batch[1].metadata['warnings']
+
+
+def test_timeout_warn_in_json_and_streaming():
+    cleaner = _cleaner(custom_patterns=_SLOW, custom_patterns_timeout=0.5, custom_patterns_on_timeout='warn')
+    result = _timed(lambda: process_json(cleaner, {'k': _SLOW_TEXT}), 0.5)
+    assert 'custom_pattern_timeout' in result.signals['warnings'] and 'a' * 40 in result.value['k']
+    stream = WindowedStreamingRedactor(cleaner, max_buffer_chars=80, overlap_chars=20)
+    out = _timed(lambda: stream.feed(_SLOW_TEXT + ' tail words here ' * 4) + stream.finish(), 3.0)
+    assert '<EMAIL>' in out and 'bob@x.com' not in out
+
+
+def test_normal_patterns_unaffected_by_the_timeout():
+    text = 'ticket TCK-123 and TCK-9'
+    for timeout in (2.0, None):
+        cleaner = _cleaner(custom_patterns={'TICKET': r'TCK-\d+'}, custom_patterns_timeout=timeout)
+        result = cleaner.process(text)
+        assert result.lm_text == 'ticket <TICKET> and <TICKET>' and 'custom_pattern_timeout' not in result.metadata['warnings']
