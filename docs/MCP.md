@@ -22,7 +22,7 @@ Keys, in this order:
 
 | key | meaning |
 |---|---|
-| `warnings` | sorted warning codes (`language_unknown`, `language_fallback`, `language_low_confidence`, `ner_fallback_models`, `ner_off`, `cuda_fallback`, `mps_fallback`, `empty_input`) |
+| `warnings` | sorted warning codes (`language_unknown`, `language_fallback`, `language_low_confidence`, `ner_fallback_models`, `ner_off`, `cuda_fallback`, `mps_fallback`, `custom_pattern_timeout`, `empty_input`) |
 | `summary` | one sentence, e.g. `2 PII items (EMAIL, PERSON), 4% of text, language HINDI 0.93` |
 | `text` / `value` | the cleaned text, or the cleaned JSON value (keys cleaned too) |
 | `signals` | the value-free public view: language, confidence, chars, PII counts and share, per-type counts, regex counts, models |

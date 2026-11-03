@@ -10,7 +10,7 @@ from sct.privacy import (
     ProcessingMetrics,
     TokenStore,
 )
-from sct.sct import TextCleaner
+from sct.sct import CustomPatternTimeout, TextCleaner
 from sct.presets import PRESETS, preset_config
 from sct.adapters import (
     DataFrameResult,
@@ -52,7 +52,7 @@ from sct.utils.process_result import ProcessResult
 
 __version__ = "0.8.1"
 __all__ = [
-    "TextCleaner", "TextCleanerConfig", "PRESETS", "preset_config",
+    "TextCleaner", "TextCleanerConfig", "CustomPatternTimeout", "PRESETS", "preset_config",
     "PII_LABELS", "PII_LABEL_MAP",
     "AnonymizationMap", "MapEntry", "ProcessResult",
     "DetectedEntity", "EntityFinding", "EntityRule",

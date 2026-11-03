@@ -245,10 +245,41 @@ def test_id_shape_legacy_globals(monkeypatch):
     assert (cfg.numbers_letter_prefix_ids, cfg.numbers_two_part_ids, cfg.numbers_spaced_pair_ids) == (False,) * 3
 
 
-@pytest.mark.parametrize("text", ["123 45-6789", "123 45\u20116789"])
-def test_spaced_pair_never_masks_part_of_a_longer_run(text):
+_MIXED_RUNS = ["123 45-6789", "123 45\u20116789", "123-45 6789", "1234 56-78-90", "12345 678-90", "123-45-6789 12"]
+
+
+@pytest.mark.parametrize("text", _MIXED_RUNS)
+def test_spaced_pair_masks_mixed_runs_whole(text):
     regex = constants.identifier_numbers_regex(4, letter_prefix=True, two_part=True, spaced_pair=True)
-    assert regex.search(text) is None
+    assert [m.group() for m in regex.finditer(text)] == [text]
+    out = _clean(f"SSN {text} ok", **_NO_STEPS)
+    assert out == "SSN <NUMBER> ok" and not any(ch.isdigit() for ch in out)  # no part of the run left
+    assert _clean(f"SSN {text} ok", **_NO_STEPS, numbers_spaced_pair_ids=False) != out
+
+
+@pytest.mark.parametrize("text", [
+    "2023-11-05", "05 11 2023", "2023 11 05", "2023 11-05",  # date-shaped
+    "1 234 567", "12 345 678",  # thousands-grouped
+    "123 45-6789%", "\u20ac 123 45-6789", "123 45-6789 \u20ac", "123 45-6789.5", "123 45-6789,5",  # amounts
+])
+def test_spaced_pair_keeps_dates_and_amounts(text):
+    regex = constants.identifier_numbers_regex(4, letter_prefix=True, two_part=True, spaced_pair=True)
+    # the run is never one match; a 4-digit year alone may still be a plain digit run
+    assert not any(" " in m.group() or "-" in m.group() for m in regex.finditer(text))
+
+
+def test_streaming_does_not_split_a_mixed_run():
+    from sct.streaming import WindowedStreamingRedactor
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        cleaner = TextCleaner(cfg=TextCleanerConfig(
+            check_ner_process=False, check_detect_language=False, check_statistical_model_processing=False,
+            check_replace_currency_symbols=False, **_NO_STEPS))
+    text = "word " * 5 + "ssn 123 45-6789 12 and 1234 56-78-90 then 123 45-6789 12% " + "tail " * 6
+    expected = cleaner.process(text).lm_text
+    for size in range(30, 60, 3):
+        stream = WindowedStreamingRedactor(cleaner, max_buffer_chars=size, overlap_chars=12)
+        assert "".join(stream.feed(ch) for ch in text) + stream.finish() == expected
 
 
 _ARABIC_SPACED_ID = "ID \u0661\u0662\u0663 \u0664\u0665 \u0666\u0667\u0668\u0669 x"
@@ -292,7 +323,8 @@ def test_browser_number_rule_matches_python_next_to_non_ascii_letters():
     if not node:
         pytest.skip("node not installed")
     rule = build_browser_manifest(TextCleanerConfig())["rules"]["number"]
-    texts = ["\u00e9AB1234567", "AB1234567\u00e9", "\u00fc123 45", "\u041612345678", "x 123456 y", "zip 123 45 ok"]
+    texts = ["\u00e9AB1234567", "AB1234567\u00e9", "\u00fc123 45", "\u041612345678", "x 123456 y", "zip 123 45 ok",
+             "ssn 123 45-6789 x", "id 1234 56\u201178-90 x", "d 05 11 2023 x", "a 1 234 567 x", "p 123 45-6789% x"]
     script = ("const [p, f, t] = JSON.parse(process.argv[1]); const r = new RegExp(p, f + 'g');"
               "console.log(JSON.stringify(t.map(s => s.replace(r, '<N>'))))")
     argv = [node, "-e", script, json.dumps([rule["pattern"], rule["flags"], texts])]

@@ -22,6 +22,18 @@ from sct.utils.synthetic import FAKER_GENERATORS
 from sct.utils.process_result import ProcessResult
 
 logger = logging.getLogger(__name__)
+
+
+class CustomPatternTimeout(TimeoutError):
+    """A custom_patterns regex ran past custom_patterns_timeout on one document. Names the label, never the text."""
+
+    def __init__(self, label, timeout):
+        super().__init__(label, timeout)
+        self.label, self.timeout = label, timeout
+
+    def __str__(self):
+        return (f"custom_patterns[{self.label!r}] ran longer than {self.timeout}s on one document; "
+                "simplify the pattern, raise custom_patterns_timeout or set custom_patterns_on_timeout='warn'")
 # A _protect key (an emitted value hidden from later steps).
 _KEY = re.compile('\U00100000[\U000F0000-\U0010FFFF]\U00100001')
 
@@ -85,9 +97,10 @@ class TextCleaner:
         self._user_rules = []
         if deny_labels:  # each term is a group named by its label: m.lastgroup is the label
             self._user_rules.append((constants.terms_regex(deny_labels, case_sensitive, deny_labels),
-                                     lambda m: m.lastgroup))
+                                     lambda m: m.lastgroup, None))
+        # (pattern, label of a match, custom_patterns label for the time limit or None)
         for label, pattern in (self.cfg.custom_patterns or {}).items():
-            self._user_rules.append((regex.compile(pattern), lambda m, label=label: label))
+            self._user_rules.append((regex.compile(pattern), lambda m, label=label: label, label))
         for label in [*(self.cfg.custom_deny_terms or {}), *(self.cfg.custom_patterns or {})]:
             self._tags.setdefault(label, f'<{label}>')
         allow_terms = normalised(self.cfg.custom_allow_terms)
@@ -367,6 +380,7 @@ class TextCleaner:
             self._document_context.protected = None
             self._document_context.regex_counts = None
             self._document_context.deferred = None
+            self._document_context.warnings = None
 
     def _process_single_with_context(self, text: str) -> ProcessResult:
         """Process a single text through the entire pipeline.
@@ -411,12 +425,13 @@ class TextCleaner:
             self._document_context.protected = None
             self._document_context.regex_counts = None
             self._document_context.deferred = None
+            self._document_context.warnings = None
 
     def _before_ner(self, text: str) -> tuple:
         """Every step before NER.
 
         Returns ``(text, language, anon_map, doc_classes, started_at, regex_counts,
-        language_confidence, language_source, source_chars, source_markers, language_margin)``.
+        language_confidence, language_source, source_chars, source_markers, language_margin, deferred, warnings)``.
         """
         started_at = time.perf_counter()
 
@@ -429,6 +444,8 @@ class TextCleaner:
         # The dict travels in the returned state, so it survives the context reset.
         regex_counts: Dict[str, Dict[str, int]] = {}
         self._document_context.regex_counts = regex_counts
+        doc_warnings: set = set()  # step warnings ('custom_pattern_timeout'), travel in the state like the counts
+        self._document_context.warnings = doc_warnings
         # (protected key -> tag NER reads, [(tag, value or None) in text order])
         deferred = ({}, []) if self._defer_tags else None
         self._document_context.deferred = deferred
@@ -485,12 +502,12 @@ class TextCleaner:
 
         return (current_text, language, anon_map, doc_classes, started_at, regex_counts,
                 language_confidence, language_source, len(text), source_markers, language_margin,
-                deferred[1] if deferred else None)
+                deferred[1] if deferred else None, doc_warnings)
 
     def _after_ner(self, state: tuple, current_text: str, findings) -> ProcessResult:
         """Every step after NER, for the document *state* from ``_before_ner``."""
         (_, language, anon_map, doc_classes, started_at, regex_counts,
-         language_confidence, language_source, source_chars, _, language_margin, deferred) = state
+         language_confidence, language_source, source_chars, _, language_margin, deferred, doc_warnings) = state
         current_text = self._swap_deferred(current_text, deferred, state[0], findings, anon_map)
 
         # Statistical model processing (always returns stext, even if None)
@@ -516,7 +533,7 @@ class TextCleaner:
             entry = entity_counts.setdefault(entity_type, {'count': 0, 'chars': 0})
             entry['count'] += 1
             entry['chars'] += end - start
-        warnings = set()
+        warnings = set(doc_warnings)
         if language is None and language_source == 'none' and self._language_needed():
             warnings.add('language_unknown')
         if language_source == 'fallback':
@@ -768,10 +785,31 @@ class TextCleaner:
             if self._synthetic_replacer and label in FAKER_GENERATORS:
                 return self._emit(label, original, self._synthetic_replacer.get_replacement(label, original))
             return self._emit(label, original, self._tags[label])
-        for pattern, label_of in self._user_rules:
+        for pattern, label_of, timed in self._user_rules:
             self._document_context.step_text = text
-            text = pattern.sub(lambda m: emit(m, label_of(m)), text)
+            # Matches first, then emits: a pattern that times out adds nothing to the map.
+            parts, last = [], 0
+            for match in self._user_matches(pattern, timed, text) or ():
+                parts += [text[last:match.start()], emit(match, label_of(match))]
+                last = match.end()
+            text = ''.join(parts) + text[last:]
         return text
+
+    def _user_matches(self, pattern, label, text, **kwargs):
+        """Every match of a user rule in *text*; a custom pattern (*label* set) stops at custom_patterns_timeout
+        and then raises CustomPatternTimeout, or with custom_patterns_on_timeout='warn' logs it, adds the
+        'custom_pattern_timeout' warning and returns None."""
+        timeout = self.cfg.custom_patterns_timeout if label is not None else None
+        try:
+            return list(pattern.finditer(text, timeout=timeout, **kwargs))
+        except TimeoutError:
+            if self.cfg.custom_patterns_on_timeout == 'raise':
+                raise CustomPatternTimeout(label, timeout) from None
+            logger.warning("custom_patterns[%r] ran longer than %ss; skipped for this document", label, timeout)
+            warnings = getattr(self._document_context, 'warnings', None)
+            if warnings is not None:
+                warnings.add('custom_pattern_timeout')
+            return None
 
     def _protect(self, value):
         """Hide an emitted value from later regex steps (``<EMAIL1>``, kept IPs)."""

@@ -9,6 +9,9 @@ from sct.utils import constants, contact
 # The identifier number rule reads one space past its match for a currency or unit ("€ 123 45", "1234 %"),
 # so a split there would let the half without it mask an amount.
 _NUMBER_UNIT_CONTEXT = re.compile(rf"[{constants.CURRENCY_SIGNS}] (?=\d)|\d (?=[%‰{constants.CURRENCY_SIGNS}])")
+# Digit groups joined by single spaces or hyphens ("123 45-6789 12%"): the identifier rule reads the whole run,
+# so a split inside it could mask a part the whole document keeps (or keep a part it masks).
+_DIGIT_GROUP_RUN = re.compile(r"\d+(?:[ \-\u2010\u2011]\d+){2,}")
 # A digit run at the end of the buffer may be a phone the next feed completes ("06 12 34").
 _PHONE_TAIL = re.compile(r"[+(]?\d[\d ()+./-]*\Z")
 # Longer than any phone the regex accepts; a longer digit tail (a number table) may still split.
@@ -38,13 +41,15 @@ class BufferedStreamingRedactor:
         return self._cleaner.process("".join(self._chunks)).lm_text
 
 
-def _user_rules_split_safe(user_rules, view, cut, right_start):
+def _user_rules_split_safe(cleaner, user_rules, view, cut, right_start):
     """Whether each user-rule match of *view* is found again in the half that holds it: a custom pattern
     may read context outside its match ("(?<=account )\\d{6}"), which a split can take away."""
-    for pattern, spans in user_rules:
-        found = {m.span() for m in pattern.finditer(view[:cut])}
-        found |= {(a + right_start, b + right_start)
-                  for a, b in (m.span() for m in pattern.finditer(view[right_start:], partial=True))}
+    for pattern, timed, spans in user_rules:
+        if spans is None:  # timed out on the whole view (custom_patterns_on_timeout='warn'): not applied
+            continue
+        found = {m.span() for m in cleaner._user_matches(pattern, timed, view[:cut]) or ()}
+        found |= {(a + right_start, b + right_start) for a, b in (
+            m.span() for m in cleaner._user_matches(pattern, timed, view[right_start:], partial=True) or ())}
         if not spans <= found:
             return False
     return True
@@ -111,6 +116,8 @@ class WindowedStreamingRedactor:
         if cfg.check_replace_numbers:  # a grouped number ("5 379") is one token too
             views += [contact.numbers_regex(cfg.replace_numbers_in_words), cleaner._numbers_regex,  # "123 45"
                       _NUMBER_UNIT_CONTEXT]  # the amount lookarounds read one space past a match: "€ 123 45"
+            if cfg.replace_numbers_mode == 'identifiers' and cfg.numbers_spaced_pair_ids:
+                views.append(_DIGIT_GROUP_RUN)
         # (start, end) of view text a split must not cut: start < split < end
         protected = [
             match.span()
@@ -120,9 +127,10 @@ class WindowedStreamingRedactor:
         ]
         # User rules (a deny term holding a space, "Blue Sky Initiative"): their matches, and a match the buffer
         # end cuts off ("... the Blue Sky"), which the next feed completes.
-        user_rules = [(pattern, {m.span() for m in pattern.finditer(view, partial=True)})
-                      for pattern, _ in cleaner._user_rules]
-        protected += [span for _, spans in user_rules for span in spans]
+        # A custom pattern past custom_patterns_timeout raises, or (on_timeout='warn') protects nothing.
+        user_rules = [(pattern, timed, None if (found := cleaner._user_matches(pattern, timed, view, partial=True))
+                       is None else {m.span() for m in found}) for pattern, _, timed in cleaner._user_rules]
+        protected += [span for _, _, spans in user_rules for span in spans or ()]
         phone_digits = view.translate(phone_view.table)
         tail = _PHONE_TAIL.search(phone_digits, max(0, len(phone_digits) - _PHONE_TAIL_MAX))
         if tail:
@@ -152,7 +160,7 @@ class WindowedStreamingRedactor:
                     or not (separator == "" or separator.isspace()):
                 index -= 1
                 continue
-            if not _user_rules_split_safe(user_rules, view, offset, len(view) - len(right)):
+            if not _user_rules_split_safe(cleaner, user_rules, view, offset, len(view) - len(right)):
                 index -= 1
                 continue
             split_at = position

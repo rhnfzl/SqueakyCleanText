@@ -281,8 +281,10 @@ def identifier_numbers_regex(min_digits, in_words=False, *, letter_prefix=False,
     two_part: two digit groups joined by "/" or a hyphen, the first 4+ digits, 7+ digits in all, an optional
     uppercase check letter (123456/7890, 12345-678901, 123456-789K), or by "." with 4+ digits on each side
     (12345.67890); not a year pair (2023-2024), a round range (1000-3000) or a time (1234-5678:30).
-    spaced_pair: "DDD DD" (a 5-digit postal code written 123 45), and a run of 3+ space-separated digit groups
-    with 7+ digits (123 45 6789, 123 45 678) as one identifier, unless thousands-grouped (1 234 567)."""
+    spaced_pair: "DDD DD" (a 5-digit postal code written 123 45), and a run of 3+ digit groups joined by spaces
+    and/or hyphens (at least one space) with 7+ digits (123 45 6789, 123 45-6789, 1234 56-78-90) as one
+    identifier, unless date-shaped (05 11 2023, 2023 11 05), thousands-grouped (1 234 567) or beside a decimal,
+    % or currency sign."""
     key = (min_digits, in_words, letter_prefix, two_part, spaced_pair)
     if key not in _ID_NUMBER_CACHE:
         glue, j, unit = token_glue(in_words), PART_JOINERS, CURRENCY_SIGNS
@@ -307,11 +309,17 @@ def identifier_numbers_regex(min_digits, in_words=False, *, letter_prefix=False,
             )
             shapes.append(rf"(?<![\w\-/.,+]){no_unit_before}\d{{4,}}\.\d{{4,}}(?!\w|[\-/.,]\d){no_unit_after}")
         if spaced_pair:
-            # 3+ space-separated digit groups with 7+ digits (an ID or SSN written 123 45 6789) are one
-            # identifier, unless thousands-grouped (1 234 567, an amount); the 2-group form is a postal code.
-            tail = rf"(?!\w|[.,: \-‐‑]\d){no_unit_after}"
-            shapes.append(rf"(?<![\w.,:/\-])(?<!\d ){no_unit_before}(?!\d{{1,3}}(?: \d{{3}})+{tail})"
-                          rf"(?=(?:\d ?){{7}})\d{{1,4}}(?: \d{{2,4}}){{2,}}{tail}")
+            # A run of 3+ digit groups joined by spaces and/or hyphens with at least one space and 7+ digits
+            # (an ID or SSN written 123 45 6789, 123 45-6789, 1234 56-78-90) is one identifier, unless
+            # date-shaped (05 11 2023, 2023 11-05) or thousands-grouped (1 234 567, an amount); an all-hyphen
+            # run is the grouped rule's. It goes first, so no other shape takes part of the run.
+            sep = r"[ \-\u2010\u2011]"
+            tail = rf"(?!\w|[.,:]\d|{sep}\d){no_unit_after}"
+            spaced_date = rf"(?:\d{{1,2}}{sep}\d{{1,2}}{sep}(?:\d\d){{1,2}}|\d{{4}}{sep}\d{{1,2}}{sep}\d{{1,2}}){tail}"
+            shapes.insert(0, rf"(?<![\w.,:/\-\u2010\u2011])(?<!\d ){no_unit_before}"
+                             rf"(?!{spaced_date})(?!\d{{1,3}}(?: \d{{3}})+{tail})(?=\d+(?:{sep}\d+)*? \d)"
+                             rf"(?=(?:\d{sep}?){{7}})\d+(?:{sep}\d+){{2,}}{tail}")
+            # "DDD DD", a 5-digit postal code
             shapes.append(rf"(?<![\w.,:/\-])(?<!\d ){no_unit_before}\d{{3}} \d{{2}}{tail}")
         _ID_NUMBER_CACHE[key] = re.compile("|".join(shapes))
     return _ID_NUMBER_CACHE[key]
