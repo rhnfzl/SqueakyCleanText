@@ -734,3 +734,8 @@ section 17 rule views (`own`, `same_set`, `pairwise`). Not yet built: the common
   sct-gliner also moves to torch 2.14.1+cu126 (it resolved PyPI's CUDA 13 torch 2.15.0). sct-training takes
   onnxruntime-gpu 1.29.0 from ORT's CUDA 12 feed: PyPI's 1.27+ builds (1.31.1 included) are CUDA 13.
   `runner.gpu_twin_fixes` also matches `name @ url` pins.
+- 2026-11-03 (round 2 smoke): every entry through the real runner on GPU 3 (cap 5 GB): offset fixtures plus 20 dev
+  docs each of pl_pii, kdpii and redactionbench, then `speed.py --device cuda` (FineWeb-2, 3 docs per language,
+  1 repeat). Fixes: partial e-mail detections no longer fail the offset check (ai4privacy); CPU-only entries get
+  no GPU in a cuda run; speed keeps the adapter's last stderr line and records a batch size that raises; OPF and
+  OpenMed use `flex_attention` on cuda; llm-guard's own chunking now runs (section 11).
