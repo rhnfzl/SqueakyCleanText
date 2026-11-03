@@ -410,7 +410,7 @@ class TextCleanerConfig:
     # 7 digits gave 0.869 / precision 0.865. Shorter runs (ages, counts, list numbers) are left as they are.
     replace_numbers_min_digits: int = 4
     # Drop a digit-only phone match glued to a Latin/Greek/Cyrillic letter or "_", directly or across a joiner
-    # (ID9876543210, ref-0612345678), or starting with a yyyymmdd date (20231105123456); formatted and
+    # (ID9876543210, ref-0612345678), or that is a yyyymmdd date or yyyymmddhhmm[ss] timestamp (20231105123456); formatted and
     # international phones are not touched. On DEV:
     # precision +0.02, recall -0.01. False = 0.8.1
     phone_reject_embedded: bool = True
@@ -804,6 +804,8 @@ def _validate_user_terms(cfg):
         for label, terms in cfg.custom_deny_terms.items():
             _user_label('custom_deny_terms', label)
             deny[label] = _user_terms(f'custom_deny_terms[{label!r}]', terms)
+            if not deny[label]:
+                raise ValueError(f"custom_deny_terms[{label!r}] has no terms; drop the label or add a term")
             for term in deny[label]:
                 key = term if cfg.custom_terms_case_sensitive else term.casefold()
                 if seen.setdefault(key, label) != label:

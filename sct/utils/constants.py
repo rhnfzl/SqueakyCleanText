@@ -272,26 +272,33 @@ _ID_NUMBER_CACHE = {}
 def identifier_numbers_regex(min_digits, in_words=False):
     """A whole digit run of at least *min_digits* digits that is not part of a longer token (glued to letters,
     digits or a joiner and another token part) and not an amount, decimal, percent, time or range: those
-    shapes either join their parts (1,250.00, 100-200; 14:30 has 2-digit parts) or touch a % / currency sign."""
+    shapes either join their parts (1,250.00, 100-200; 14:30 has 2-digit parts) or touch a % / currency sign.
+    A whole digit-only token of three or more hyphen-joined groups with *min_digits* digits in all (an SSN-like
+    123-45-6789) is one identifier too, unless it is date-shaped (2023-11-05, 05-11-23)."""
     key = (min_digits, in_words)
     if key not in _ID_NUMBER_CACHE:
         glue, j, unit = token_glue(in_words), PART_JOINERS, CURRENCY_SIGNS
+        hyphen, end = r"[\-\u2010\u2011]", rf"(?![\d{j}])"
+        date = rf"(?:\d{{1,2}}{hyphen}\d{{1,2}}{hyphen}(?:\d\d){{1,2}}|\d{{4}}{hyphen}\d{{1,2}}{hyphen}\d{{1,2}}){end}"
+        grouped = rf"(?!{date})(?=\d(?:{hyphen}?\d){{{min_digits - 1}}})\d+(?:{hyphen}\d+){{2,}}"
         _ID_NUMBER_CACHE[key] = re.compile(
             rf"(?<![{glue}])(?<![{glue}{_LEFT_EDGE}][{j}])(?<![{unit}])(?<![{unit}] )"
-            rf"\d{{{min_digits},}}"
+            rf"(?:{grouped}|\d{{{min_digits},}})"
             rf"(?![{glue}])(?![{j}][{glue}{_RIGHT_EDGE}])(?! ?[%‰{unit}])"
         )
     return _ID_NUMBER_CACHE[key]
 
 
 # phone_reject_embedded: a digit-only phone match with a letter or "_" on either side, directly or across a
-# joiner, or one that starts with a yyyymmdd date (20231105123456 is a timestamp or reference, not a phone).
+# joiner, or one that is a yyyymmdd date or a yyyymmddhhmm[ss] timestamp (20231105123456), not a phone. A
+# date with other digits after it (2023010123) can be a real phone, so only these exact shapes are rejected.
 # Digits across a joiner do not count: in "06-12345678" the phone regex takes only "12345678", and rejecting
 # it would leave the whole phone visible.
 _PHONE_GLUE = rf"_{_SPACED_LETTERS}"
 PHONE_EMBEDDED_LEFT = re.compile(rf"(?:[{_PHONE_GLUE}]|[{_PHONE_GLUE}{_LEFT_EDGE}][{PART_JOINERS}])\Z")
 PHONE_EMBEDDED_RIGHT = re.compile(rf"[{_PHONE_GLUE}]|[{PART_JOINERS}][{_PHONE_GLUE}{_RIGHT_EDGE}]")
-YYYYMMDD_PREFIX = re.compile(r"(?:19|20)\d\d(?:0[1-9]|1[0-2])(?:0[1-9]|[12]\d|3[01])")
+YYYYMMDD_STAMP = re.compile(
+    r"(?:19|20)\d\d(?:0[1-9]|1[0-2])(?:0[1-9]|[12]\d|3[01])(?:(?:[01]\d|2[0-3])[0-5]\d(?:[0-5]\d)?)?")
 
 LINEBREAK_REGEX = re.compile(r"((\r\n)|[\n\v])+")
 TWO_LINEBREAK_REGEX = re.compile(r"((\r\n)|[\n\v])+((\r\n)|[\n\v])+")
@@ -691,11 +698,14 @@ CHUNK_DELIMITERS = (
 _TERM_GLUE = rf'[[\p{{L}}\p{{M}}\p{{N}}]--[{_SPACELESS}]]'
 
 
-def terms_regex(terms, case_sensitive=False):
-    """One regex for *terms* as whole words (longest first, so an overlap keeps the longer term)."""
+def terms_regex(terms, case_sensitive=False, labels=None):
+    """One regex for *terms* as whole words (longest first, so an overlap keeps the longer term). With
+    *labels* ({term: LABEL}) each term is a group named by its label, so ``match.lastgroup`` is the label
+    (a case variant such as "İ" for "i" need not equal the term after casefold)."""
     parts = []
     for term in sorted(set(terms), key=len, reverse=True):
         left = '' if _SPACELESS_CHAR.match(term[0]) else rf'(?<!{_TERM_GLUE})'
         right = '' if _SPACELESS_CHAR.match(term[-1]) else rf'(?!{_TERM_GLUE})'
-        parts.append(left + regex.escape(term) + right)
+        body = regex.escape(term) if labels is None else f'(?P<{labels[term]}>{regex.escape(term)})'
+        parts.append(left + body + right)
     return regex.compile('|'.join(parts), regex.V1 | (0 if case_sensitive else regex.IGNORECASE))

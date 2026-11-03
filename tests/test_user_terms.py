@@ -190,3 +190,65 @@ def test_streaming_does_not_split_a_deny_term():
     buffered = BufferedStreamingRedactor(cleaner)
     buffered.feed(text)
     assert "<PROJECT>" in buffered.finish()
+
+
+# --- review fixes ------------------------------------------------------------------------------------
+
+@pytest.mark.parametrize("mode", ["placeholder", "reversible", "synthetic"])
+def test_allow_term_inside_an_email_does_not_unmask_the_email(mode):
+    cleaner = _cleaner(mode, custom_deny_terms={'ORG': ('Acme',)}, custom_allow_terms=('Acme',))
+    out = cleaner.process("mail bob@Acme.com today").lm_text
+    assert "bob@" not in out and "Acme.com" not in out
+
+
+def test_windowed_streaming_masks_a_deny_phrase_fed_one_char_at_a_time():
+    cleaner = TextCleaner(TextCleanerConfig.from_preset(
+        'training', **NO_NER, custom_deny_terms={'SECRET': ('Blue Sky Initiative',)}))
+    text = "word " * 20 + "the Blue Sky Initiative is here and more words follow here " * 3
+    windowed = WindowedStreamingRedactor(cleaner, max_buffer_chars=64, overlap_chars=8)
+    out = "".join(windowed.feed(ch) for ch in text) + windowed.finish()
+    assert out == cleaner.process(text).lm_text and "Sky" not in out
+
+
+def test_windowed_streaming_keeps_a_custom_pattern_with_its_lookbehind():
+    cleaner = _cleaner(custom_patterns={'ACCOUNT': r'(?<=account )\d{6}'})
+    text = "word " * 9 + "account 123456 tail "
+    windowed = WindowedStreamingRedactor(cleaner, max_buffer_chars=64, overlap_chars=8)
+    out = "".join(windowed.feed(text[i:i + 7]) for i in range(0, len(text), 7)) + windowed.finish()
+    assert "123456" not in out and "<ACCOUNT>" in out
+
+
+def test_deny_term_matching_a_unicode_case_variant():
+    assert _cleaner(custom_deny_terms={'SECRET': ('i',)}).process("go İ now").lm_text == "go <SECRET> now"
+
+
+def test_empty_deny_term_collection_is_rejected():
+    with pytest.raises(ValueError, match="has no terms"):
+        TextCleanerConfig(custom_deny_terms={'SECRET': ()})
+
+
+@pytest.mark.parametrize("term, text", [
+    ("Jose\u0301", "ask Jos\u00e9 now"),  # NFD term, NFC text
+    ("\uff21\uff23\uff2d\uff25", "ask \uff21\uff23\uff2d\uff25 now"),  # fullwidth, folded in the text
+])
+def test_terms_are_normalised_like_the_text(term, text):
+    cleaner = TextCleaner(TextCleanerConfig.from_preset('training', **NO_NER, custom_deny_terms={'ORG': (term,)}))
+    assert cleaner.process(text).lm_text == "ask <ORG> now"
+    allowed = TextCleaner(TextCleanerConfig.from_preset(
+        'training', **NO_NER, custom_patterns={'ORG': r'\w{4}'}, custom_allow_terms=(term,)))
+    assert "<ORG>" not in allowed.process(text).lm_text
+
+
+def test_overlapping_custom_rules_round_trip_in_reversible_mode():
+    cleaner = _cleaner('reversible', custom_deny_terms={'PERSON': ('Ann',)}, custom_patterns={'SECRET': r'.+ secret'})
+    result = cleaner.process("Ann secret")
+    assert result.lm_text == "<SECRET_0>"
+    assert result.metadata['anon_map'].deanonymize(result.lm_text) == "Ann secret"
+
+
+def test_allow_terms_scale_linearly():
+    import time
+    cleaner = _cleaner(custom_allow_terms=('Acme 2024',))
+    started = time.perf_counter()
+    out = cleaner.process("Acme 2024 " * 800).lm_text
+    assert time.perf_counter() - started < 2 and "<NUMBER>" not in out

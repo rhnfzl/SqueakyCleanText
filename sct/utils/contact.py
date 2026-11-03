@@ -134,11 +134,11 @@ def numbers_regex(in_words=False, mode='all', min_digits=4):
 
 def embedded_phone(text, start, end):
     """True when text[start:end] is a bare digit-only phone match inside a longer token, or one that starts
-    with a yyyymmdd date (phone_reject_embedded)."""
+    is a yyyymmdd date or yyyymmddhhmm[ss] timestamp (phone_reject_embedded)."""
     value = text[start:end]
     if not value.isdecimal():
         return False
-    return bool(constants.YYYYMMDD_PREFIX.match(value.translate(_DIGIT_VIEW))
+    return bool(constants.YYYYMMDD_STAMP.fullmatch(value.translate(_DIGIT_VIEW))
                 or constants.PHONE_EMBEDDED_LEFT.search(text[max(0, start - 2):start])
                 or constants.PHONE_EMBEDDED_RIGHT.match(text, end))
 

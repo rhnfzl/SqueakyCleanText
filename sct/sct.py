@@ -7,6 +7,7 @@ import os
 import re
 import threading
 import time
+from bisect import bisect_right
 from collections import Counter
 from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Callable, Dict, List, Optional, Tuple
@@ -68,21 +69,29 @@ class TextCleaner:
             'IBAN': self.cfg.replace_with_iban, 'CARD': self.cfg.replace_with_cards,
             'ID': self.cfg.replace_with_identifiers,
         }
+        self.NormaliseText = normtext.NormaliseText()
+
         # User term lists: deny terms, then each user pattern, before the built-in steps; allow terms last.
+        # The text is normalised before these run, so the terms are too ("José" in NFD, fullwidth "ＡＣＭＥ").
+        def normalised(terms):
+            for step in self._normalising_steps():
+                terms = list(map(step, terms))
+            return [term for term in terms if term.strip()]
+        case_sensitive = self.cfg.custom_terms_case_sensitive
+        deny_labels = {}
+        for label, terms in (self.cfg.custom_deny_terms or {}).items():
+            for term in normalised(terms):
+                deny_labels.setdefault(term, label)
         self._user_rules = []
-        if self.cfg.custom_deny_terms:
-            labels = {term if self.cfg.custom_terms_case_sensitive else term.casefold(): label
-                      for label, terms in self.cfg.custom_deny_terms.items() for term in terms}
-            fold = str if self.cfg.custom_terms_case_sensitive else str.casefold
-            self._user_rules.append((constants.terms_regex(
-                [t for terms in self.cfg.custom_deny_terms.values() for t in terms],
-                self.cfg.custom_terms_case_sensitive), lambda m, labels=labels, fold=fold: labels[fold(m.group())]))
+        if deny_labels:  # each term is a group named by its label: m.lastgroup is the label
+            self._user_rules.append((constants.terms_regex(deny_labels, case_sensitive, deny_labels),
+                                     lambda m: m.lastgroup))
         for label, pattern in (self.cfg.custom_patterns or {}).items():
             self._user_rules.append((regex.compile(pattern), lambda m, label=label: label))
         for label in [*(self.cfg.custom_deny_terms or {}), *(self.cfg.custom_patterns or {})]:
             self._tags.setdefault(label, f'<{label}>')
-        self._allow_regex = (constants.terms_regex(self.cfg.custom_allow_terms, self.cfg.custom_terms_case_sensitive)
-                             if self.cfg.custom_allow_terms else None)
+        allow_terms = normalised(self.cfg.custom_allow_terms)
+        self._allow_regex = constants.terms_regex(allow_terms, case_sensitive) if allow_terms else None
         # Markers that are not <TAG>-shaped ("EMAIL"): NER protects them like <EMAIL> (ner.regex_markers).
         self._custom_markers = tuple(sorted({
             tag for tag in self._tags.values() if tag and not ner._PLACEHOLDER_TOKEN.fullmatch(tag)}))
@@ -134,7 +143,6 @@ class TextCleaner:
         self._html_regex = constants.HTML_REGEX if self.cfg.html_tag_strict else constants.HTML_REGEX_ANY
         self._url_regex = constants.URL_REGEX if self.cfg.url_trailing_punct_outside else constants.URL_REGEX_LEGACY
         self.ProcessSpecialSymbols = special.ProcessSpecialSymbols()
-        self.NormaliseText = normtext.NormaliseText()
 
         # Synthetic replacer: shared by regex pipeline steps + NER processor
         self._synthetic_replacer = None
@@ -238,6 +246,13 @@ class TextCleaner:
         self._post_fuzzy_pipeline: List[Callable[[str], str]] = []
         self._init_pipeline()
 
+    def _normalising_steps(self):
+        """The steps before the first regex step (unicode fix, ASCII, emoji), in pipeline order."""
+        cfg = self.cfg
+        return [step for on, step in ((cfg.check_fix_bad_unicode, self._fix_bad_unicode),
+                                      (cfg.check_to_ascii_unicode, self._to_ascii_unicode),
+                                      (cfg.check_remove_emoji, self._remove_emoji)) if on]
+
     def _init_pipeline(self):
         """Build the pipeline steps lists based on config.
 
@@ -247,12 +262,7 @@ class TextCleaner:
         """
         cfg = self.cfg
 
-        if cfg.check_fix_bad_unicode:
-            self._pipeline.append(self._fix_bad_unicode)
-        if cfg.check_to_ascii_unicode:
-            self._pipeline.append(self._to_ascii_unicode)
-        if cfg.check_remove_emoji:
-            self._pipeline.append(self._remove_emoji)
+        self._pipeline.extend(self._normalising_steps())
         # Steps before this index only normalise; markers they surface are source text.
         self._normalise_steps = len(self._pipeline)
         if cfg.check_fix_bad_unicode:  # escaped "<b>" stays text: decoded after the view, hidden from tags
@@ -693,8 +703,8 @@ class TextCleaner:
 
     def _emit(self, entity_type, original, value):
         """Count one regex replacement of *original*, then protect its *value*."""
-        if self._allowed(original):
-            return self._protect(original)
+        if self._allowed(original):  # plain text, not protected: a later detection holding it still sees it
+            return original
         counts = getattr(self._document_context, 'regex_counts', None)
         if counts is not None:
             entry = counts.setdefault(entity_type, {'count': 0, 'chars': 0})
@@ -718,28 +728,42 @@ class TextCleaner:
             return False
         cached = getattr(self._document_context, 'allow_spans', None)
         if cached is None or cached[0] is not text:
-            cached = (text, [m.span() for m in self._allow_regex.finditer(text)])
+            spans = [m.span() for m in self._allow_regex.finditer(text)]
+            cached = (text, [a for a, _ in spans], [b for _, b in spans], {})
             self._document_context.allow_spans = cached
-        spans = cached[1]
-        # shortcut: position-free; a value also found outside an allowed term is masked everywhere (no leak).
-        starts, at = [], text.find(original)
-        while at >= 0:
-            starts.append(at)
-            at = text.find(original, at + len(original))
-        return bool(spans and starts) and all(
-            any(a <= s and s + len(original) <= b for a, b in spans) for s in starts)
+        _, starts, ends, verdicts = cached
+        if original not in verdicts:  # once per value and step text, each occurrence a bisect (no cubic scan)
+            def occurrences():
+                at = text.find(original)
+                while at >= 0:
+                    yield at
+                    at = text.find(original, at + len(original))
+            # shortcut: position-free; a value also found outside an allowed term is masked everywhere (no leak).
+            # Allowed matches never overlap, so only the last one starting at or before s can hold s.
+            verdicts[original] = bool(starts) and text.find(original) >= 0 and all(
+                (i := bisect_right(starts, s) - 1) >= 0 and s + len(original) <= ends[i] for s in occurrences())
+        return verdicts[original]
 
     def _replace_user_terms(self, text):
         """custom_deny_terms, then each custom_patterns regex, as <LABEL> in every replacement mode."""
         anon_map = getattr(self._document_context, 'anon_map', None)
 
+        def source(original):
+            """*original* with an earlier rule's protected emit inside it put back as that emit's source, so
+            the map holds "Ann secret", not a private-use key ("Ann" as <PERSON_0>, then ".+ secret")."""
+            if not _KEY.search(original):
+                return original
+            values = {key: value for value, key in (getattr(self._document_context, 'protected', None) or {}).items()}
+            held = {e.placeholder: e.original for e in anon_map.entries} if anon_map is not None else {}
+            return _KEY.sub(lambda k: held.get(values.get(k.group()), values.get(k.group(), k.group())), original)
+
         def emit(match, label):
             original = match.group()
             if not original or self._allowed(original):
-                return self._protect(original) if original else original
+                return original
             if anon_map is not None:
                 placeholder = anon_map.next_placeholder(label)
-                anon_map.add(placeholder, original, label, match.start(), match.end())
+                anon_map.add(placeholder, source(original), label, match.start(), match.end())
                 return self._emit(label, original, placeholder)
             if self._synthetic_replacer and label in FAKER_GENERATORS:
                 return self._emit(label, original, self._synthetic_replacer.get_replacement(label, original))
@@ -885,7 +909,9 @@ class TextCleaner:
             return None
 
         def replace(match):
-            if keep is not None and keep(match.group()) or self._allowed(match.group()):
+            if self._allowed(match.group()):
+                return match.group()
+            if keep is not None and keep(match.group()):
                 return self._protect(match.group())
             placeholder = anon_map.next_placeholder(entity_type)
             anon_map.add(

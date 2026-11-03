@@ -59,6 +59,21 @@ def test_code_fragment_is_left_untouched_not_partially_masked():
     assert "107683" in _clean("Invoice INV-2023-107683 paid", replacement_mode="synthetic")
 
 
+@pytest.mark.parametrize("text, expected", [
+    ("SSN: 123-45-6789", "SSN: <NUMBER>"),  # a grouped ID: every group alone is a joined part
+    ("tax 1234-56-78-90 x", "tax <NUMBER> x"),
+    ("on 2023-11-05 or 05-11-23 or 5-1-2023", "on 2023-11-05 or 05-11-23 or 5-1-2023"),  # date-shaped
+    ("pages 100-200, v1-2-3, INV-123-45-6789", "pages 100-200, v1-2-3, INV-123-45-6789"),
+])
+def test_grouped_identifier_numbers(text, expected):
+    assert _clean(text, check_replace_phone_numbers=False, check_replace_dates=False,
+                  check_replace_years=False) == expected
+
+
+def test_grouped_identifier_in_default_config():
+    assert "6789" not in _clean("SSN: 123-45-6789")
+
+
 def test_min_digits():
     assert _clean("code 12345 and 123456", replace_numbers_min_digits=6) == "code 12345 and <NUMBER>"
     assert _clean("code 7 and 42", replace_numbers_min_digits=1) == "code <NUMBER> and <NUMBER>"
@@ -101,7 +116,8 @@ def test_process_batch_uses_mode():
     "ID9876543210 x",  # glued to letters
     "ref-0612345678 x",  # joined to a token part
     "0612345678-x2 y",
-    "ts 20231105123456 x",  # starts with a yyyymmdd date
+    "ts 20231105123456 x",  # a yyyymmddhhmmss timestamp
+    "on 20231105 x",  # a bare yyyymmdd date
 ])
 def test_phone_reject_embedded(text):
     assert "<PHONE>" not in _clean(text, check_replace_iban_cards=False)
@@ -114,9 +130,18 @@ def test_phone_reject_embedded(text):
     "电话9876543210",  # unspaced script: still a phone
     "رقم ٠٦١٢٣٤٥٦٧٨ هنا",  # Arabic-Indic digits
     "फोन ९८७६५४३२१० पर",  # Devanagari digits
+    "Call 2023010123 now",  # starts like a date (20230101) but is not a date or timestamp
 ])
 def test_phone_reject_embedded_keeps_real_phones(text):
     assert "<PHONE>" in _clean(text)
+
+
+@pytest.mark.parametrize("mode", ["placeholder", "reversible", "synthetic"])
+def test_date_like_phone_is_masked_in_training_preset(mode):
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        cfg = TextCleanerConfig.from_preset('training', check_ner_process=False, replacement_mode=mode)
+        assert "2023010123" not in TextCleaner(cfg).process("Call 2023010123 now").lm_text
 
 
 def test_embedded_phone_predicate():

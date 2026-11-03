@@ -4,7 +4,8 @@
 
 **Numbers stay, IDs go.** By default SCT masks only ID-shaped numbers (`Order 4711`, `#12345`) and keeps prices,
 percentages, times, ranges and short numbers (the old rule caused 62-68% of false masks on the benchmark DEV
-split). Digits inside a code (`ID9876543210`) or starting with a date are no longer taken for phones.
+split). Grouped IDs such as `123-45-6789` are still masked. Digits inside a code (`ID9876543210`) and bare
+dates or timestamps (`20231105123456`) are no longer taken for phones.
 
 **Apple GPU for torch and GLiNER.** Set `ner_device="mps"` on an Apple silicon Mac to run torch NER and GLiNER
 on the GPU, about 1.6x faster `process_batch` on an M4 Max with the same output.
@@ -24,6 +25,9 @@ Heads-up: output text changes for numbers and some phones. `replace_numbers_mode
   to one). `:` `=` `#` do not join, so `ID:98765`, `id=98765` and `#12345` are still masked. Digits of every
   script count (Arabic-Indic, Devanagari, full-width); letters of unspaced scripts do not glue (`金额50000元`).
   `'all'` = 0.8.1. `check_replace_numbers` stays the on/off switch.
+- A whole digit-only token of three or more hyphen-joined groups with at least `replace_numbers_min_digits`
+  digits in all is one `<NUMBER>` (`SSN: 123-45-6789`, `1234-56-78-90`), so grouped IDs do not leak.
+  Date-shaped tokens (`2023-11-05`, `05-11-23`) and two-part ranges (`100-200`) are kept.
 - New `replace_numbers_min_digits` (default `4`, legacy global `REPLACE_NUMBERS_MIN_DIGITS`). Chosen on DEV only
   (9 datasets, 4,298 docs, macro): 4 digits gave F2 0.881 / recall 0.893 / precision 0.856 with years and dates
   off and the phone rule below, the best F2 of 4 to 7 (7 digits: F2 0.869, precision 0.865). The 0.8.1 default
@@ -33,7 +37,8 @@ Heads-up: output text changes for numbers and some phones. `replace_numbers_mode
   has years off and keeps the code as written).
 - New `phone_reject_embedded` (default `True`, legacy global `PHONE_REJECT_EMBEDDED`): a digit-only phone match
   glued to a Latin/Greek/Cyrillic letter or `_`, directly or across a joiner (`ID9876543210`,
-  `ref-0612345678`), or starting with a yyyymmdd date is left as it is. Digits across a joiner do not count, so
+  `ref-0612345678`), or that is exactly a yyyymmdd date or a yyyymmddhhmm[ss] timestamp (`20231105123456`) is
+  left as it is. A phone that only starts like a date (`2023010123`) is still a phone. Digits across a joiner do not count, so
   `06-12345678` keeps its 0.8.1 `06-<PHONE>`.
   Formatted and international phones, `Tel:0612345678` and phones glued to unspaced scripts (`电话9876543210`)
   are unchanged; `Tel0612345678` (glued to a Latin word) is no longer masked. DEV: precision +0.02, recall
@@ -62,6 +67,17 @@ Heads-up: output text changes for numbers and some phones. `replace_numbers_mode
 - Clear `ValueError`s at config time: label not upper case, a string instead of a tuple of terms, empty
   terms, one term under two labels, an invalid regex, a regex that can match the empty string. Patterns use
   the `regex` module; nested repeats can backtrack for a long time, so pass only patterns you trust.
+- Terms are normalised like the text before matching (`check_fix_bad_unicode`, `check_to_ascii_unicode`,
+  `check_remove_emoji`), so an NFD `José` or full-width `ＡＣＭＥ` term still matches. A Unicode case variant
+  (`İ` for `i`) gets its term's label. An allowed term inside a longer detection (an email `bob@Acme.com`) no
+  longer hides that detection. When a pattern match holds an earlier deny term (`Ann` in `.+ secret`), the
+  reversible map keeps the source text, so `deanonymize` restores `Ann secret`. The allow check runs once per
+  value with a binary search, so long documents stay fast. A `custom_deny_terms` label with no terms raises
+  `ValueError`.
+- The windowed streaming redactor does not split a deny term or pattern match that the buffer end cuts off
+  (a phrase fed one character at a time), nor a pattern match from the context it reads (a lookbehind such
+  as `(?<=account )\d{6}`). A pattern that can grow across a whole line (`.+ secret`) may then need
+  `BufferedStreamingRedactor`.
 - Server-side only: the browser manifest lists them under its limitations. Benchmarks never use them.
 
 ### Apple GPU
