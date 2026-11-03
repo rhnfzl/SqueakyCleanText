@@ -347,7 +347,7 @@ excluded from totals:
 | presidio | spaCy, no hard limit | whole doc (`nlp.max_length` raised if needed) |
 | gliner-nvidia | 384 words / 512 subwords | vendor truncation at 384 words (native, logged) and common chunker |
 | gliner2-fastino | 384 words | library `batch_extract_entities_long`: 384-word windows, 64 overlap (native) |
-| opf | 128k context | vendor CPU setting on every device: 4,096-token windows, no overlap (128k does not fit ~6 GB under transformers) |
+| opf / openmed | 128k context | vendor CPU setting on every device: 4,096-token windows, no overlap (128k does not fit ~6 GB under transformers); `flex_attention` on cuda (eager's full T x T scores hit CUDA OOM at 4,096 tokens under the 5 GB cap) |
 | bardsai-v3 | 512 | bundled detector: 512-token windows, 128 overlap (native) |
 | datafog | regex | whole doc |
 

@@ -11,11 +11,14 @@ transition biases of the checkpoint's ``viterbi_calibration.json`` default opera
 Long docs: the vendor splits the token sequence into non-overlapping windows of ``n_ctx``
 tokens (4096 on CPU, the checkpoint's ``default_n_ctx`` 128000 on GPU). HF's eager attention
 builds a full T x T mask, so 128k windows cannot fit a 5-8 GB GPU; this adapter uses the
-vendor's 4096 on every device (results do not depend on the device). Attention is banded
-(+-128 tokens), so only tokens within 128 of a window edge lose context.
+vendor's 4096 on every device. Attention is banded (+-128 tokens), so only tokens within 128 of a
+window edge lose context. On cuda the model runs ``flex_attention`` (only the band is computed): eager
+attention's full T x T scores do not fit a 4096-token window under the 5 GB ``gpu_mem_gb`` cap (smoke run,
+2026-11-03: 6 of 20 RedactionBench dev docs hit CUDA OOM; peak 2.8 GB with flex at 4096 tokens). Flex and
+eager agree on 99.99% of token argmaxes (bf16 rounding); CPU keeps eager.
 
 Config (default track = ``{}``): ``device`` (cpu|cuda, default cuda when available),
-``threads``, ``n_ctx`` (window tokens, default 4096). Tuned-track knob (PROTOCOL section 3,
+``threads``, ``n_ctx`` (window tokens, default 4096), ``attn`` (attention implementation). Tuned-track knob (PROTOCOL section 3,
 "OPF's documented decoder-bias preset"): ``biases`` = {bias name: float}, merged over the
 calibration file; keys as in ``BIAS_KEYS``. ``revision`` pins the checkpoint.
 
@@ -134,7 +137,9 @@ def make_predict(name: str, revision: str, biases: dict, config: dict):
     n_ctx = int(config.get("n_ctx") or N_CTX)
     cap_gpu(config)
     tokenizer = AutoTokenizer.from_pretrained(name, revision=revision)
-    model = AutoModelForTokenClassification.from_pretrained(name, revision=revision, dtype=torch.bfloat16).to(device).eval()
+    attn = config.get("attn") or ("flex_attention" if device == "cuda" else "eager")
+    model = AutoModelForTokenClassification.from_pretrained(name, revision=revision, dtype=torch.bfloat16,
+                                                            attn_implementation=attn).to(device).eval()
     labels = [model.config.id2label[i] for i in range(len(model.config.id2label))]
     start, end, trans = transition_scores(labels, biases)
     pad = model.config.pad_token_id

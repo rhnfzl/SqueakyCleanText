@@ -2,7 +2,7 @@
 
 Same architecture and BIOES head as OPF (54 types x B/I/E/S + O), so it runs through
 ``opf_adapter.make_predict``: ``AutoModelForTokenClassification`` in bf16, log-softmax, the constrained
-Viterbi decoder, whitespace-trimmed char spans, 4096-token windows. The card recommends the ``openmed``
+Viterbi decoder, whitespace-trimmed char spans, 4096-token windows, ``flex_attention`` on cuda. The card recommends the ``openmed``
 package, which "runs the model's own BIOES Viterbi decoder"; the repo ships no ``viterbi_calibration.json``,
 so every transition bias is 0 (the same decoder at its neutral operating point). ``lang`` is ignored.
 
@@ -11,7 +11,7 @@ so every transition bias is 0 (the same decoder at its neutral operating point).
 crypto addresses, money, attributes, job, credentials and TIME out of scope. ``load`` refuses a checkpoint
 whose types differ. ``score`` and ``masked_text`` as in ``opf_adapter``.
 
-Config: ``device``, ``threads``, ``n_ctx``, ``revision``, ``gpu_mem_gb``; ``biases`` (OPF's bias names).
+Config: ``device``, ``threads``, ``n_ctx``, ``attn``, ``revision``, ``gpu_mem_gb``; ``biases`` (OPF's bias names).
 """
 
 from _protocol import serve
