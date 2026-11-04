@@ -4,6 +4,7 @@ Leak classes (research/streaming-leak-fuzz.md): a rule that reads past its match
 9th digit, "05 234 567 1"), a phone the cleaner finds only once an earlier step masked its neighbour (an IP or
 card next to "117 235 991"), and the numbers guard missing those earlier steps too.
 """
+import functools
 import random
 import re
 
@@ -13,15 +14,12 @@ from sct import TextCleaner, TextCleanerConfig
 from sct.presets import preset_config
 from sct.streaming import WindowedStreamingRedactor
 
-_CLEANERS = {}
 
-
+@functools.cache
 def _cleaner(preset):
-    if preset not in _CLEANERS:
-        cfg = TextCleanerConfig(check_ner_process=False) if preset == "default" \
-            else preset_config(preset, check_ner_process=False)
-        _CLEANERS[preset] = TextCleaner(cfg=cfg)
-    return _CLEANERS[preset]
+    cfg = TextCleanerConfig(check_ner_process=False) if preset == "default" \
+        else preset_config(preset, check_ner_process=False)
+    return TextCleaner(cfg=cfg)
 
 
 def _stream(cleaner, text, buf, overlap, chunks):

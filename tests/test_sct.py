@@ -701,11 +701,11 @@ class TextCleanerTest(unittest.TestCase):
         """
         from concurrent.futures import ThreadPoolExecutor
 
-        texts_and_entities = [
-            ("John Smith works at Microsoft.", "John Smith"),
-            ("Sarah Johnson lives in Berlin.", "Sarah Johnson"),
-            ("Pablo Garcia works in Madrid.", "Pablo Garcia"),
-            ("Willem de Vries lives in Amsterdam.", "Willem"),
+        texts = [
+            "John Smith works at Microsoft.",
+            "Sarah Johnson lives in Berlin.",
+            "Pablo Garcia works in Madrid.",
+            "Willem de Vries lives in Amsterdam.",
         ]
 
         def run_ner(text):
@@ -715,18 +715,12 @@ class TextCleanerTest(unittest.TestCase):
                 ner_confidence_threshold=0.85,
             )
 
-        # Run all NER calls concurrently
+        sequential = [run_ner(t) for t in texts]
         with ThreadPoolExecutor(max_workers=4) as executor:
-            futures = [executor.submit(run_ner, t) for t, _ in texts_and_entities]
+            futures = [executor.submit(run_ner, t) for t in texts]
             results = [f.result() for f in futures]
 
-        # Each result should have anonymized the person from its OWN text
-        for i, (result, (original_text, person)) in enumerate(zip(results, texts_and_entities)):
-            self.assertIsInstance(result, str)
-            self.assertNotEqual(result, "", f"Empty result for text {i}")
-            # At minimum, the result should be processed (not the raw input)
-            # Lightweight model may not catch every entity, so just verify no crash
-            # and that the output is a valid string
+        self.assertEqual(results, sequential)
 
     # --- split_text() unit tests (chunking only, no NER inference) ---
 
