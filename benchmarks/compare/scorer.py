@@ -39,6 +39,7 @@ None (N/A), never 0.
 import math
 import unicodedata
 from collections import Counter, defaultdict
+from typing import Any
 
 import numpy as np
 
@@ -98,7 +99,7 @@ def compact(text: str) -> str:
     return "".join(c for c in fold(text) if c.isalnum())
 
 
-def traces(value: str, output: str) -> dict:
+def traces(value: str, output: str) -> dict[str, bool]:
     """Visible traces of *value* in *output* beyond ``leak``: ``compact`` (its 4+ char compact form inside the
     compact output) and ``word`` (any 2+ char word of it, folded, as a whole word of the folded output)."""
     words = set(LEAK_WORD.findall(fold(output)))
@@ -266,7 +267,7 @@ def _fc(tp, pred, gold, beta=1.0):
     return (1 + b2) * tp / (b2 * gold + pred) if gold or pred else None
 
 
-def metrics(c: Counter) -> dict:
+def metrics(c: Counter) -> dict[str, float | None]:
     sp, sr = _r(c["strict_tp"], c["pred"]), _r(c["strict_tp"], c["gold"])
     pp, pr = _r(c["partial_tp"], c["pred"]), _r(c["partial_tp"], c["gold"])
     cp, cr = _r(c["char_tp"], c["char_pred"]), _r(c["char_tp"], c["char_gold"])
@@ -310,13 +311,13 @@ def _mean(values) -> float | None:
     return round(sum(values) / len(values), 4) if values else None
 
 
-def macro(scores: list[dict]) -> dict:
+def macro(scores: list[dict]) -> dict[str, float | None]:
     """Mean of each metric over *scores* (None skipped)."""
     keys = {k for s in scores for k, v in s.items() if isinstance(v, float) or v is None}
     return {k: _mean(s.get(k) for s in scores) for k in sorted(keys)}
 
 
-def summarise(docs: list[tuple[str, Counter]]) -> dict:
+def summarise(docs: list[tuple[str, Counter]]) -> dict[str, Any]:
     """One dataset: per-language metrics, macro over languages, micro over docs."""
     by_lang: dict[str, list] = defaultdict(list)
     for lang, c in docs:
@@ -326,7 +327,7 @@ def summarise(docs: list[tuple[str, Counter]]) -> dict:
             "by_language": per_lang}
 
 
-def aggregate(datasets: dict[str, list[tuple[str, Counter]]]) -> dict:
+def aggregate(datasets: dict[str, list[tuple[str, Counter]]]) -> dict[str, Any]:
     """Across datasets: macro = mean of each dataset's language-macro; micro = pooled counts."""
     return {"datasets": sorted(datasets),
             "macro": macro([summarise(docs)["macro"] for docs in datasets.values()]),
@@ -400,6 +401,48 @@ def native_leak(records: list[dict], outputs: dict[str, dict], mapping: dict[str
             "leak_rate": _round(_r(c["full"] + c["partial"], c["mentions"]))}
 
 
+def _map_outputs(records: list[dict], outputs: dict[str, dict], labels: dict[str, str], failed: set[str],
+                 recover: bool) -> tuple[dict[str, list[dict]], int, int]:
+    """Mapped spans per doc (failed docs have none), out-of-scope tool spans, recovered copies."""
+    mapped, out_of_scope, recovered = {}, 0, 0
+    for r in records:
+        spans, dropped = map_spans([] if r["id"] in failed else outputs[r["id"]]["spans"], labels)
+        if recover and r["id"] not in failed and "masked_text" in outputs[r["id"]]:
+            spans, added = recover_dropped(r["text"], outputs[r["id"]]["masked_text"], spans)
+            recovered += added
+        mapped[r["id"]], out_of_scope = spans, out_of_scope + dropped
+    return mapped, out_of_scope, recovered
+
+
+def _score_view(records: list[dict], completed: list[dict], failed: set[str], outputs: dict[str, dict],
+                mapped: dict[str, list[dict]], mapping: dict[str, str],
+                types: tuple) -> tuple[dict[str, Any], list[tuple]]:
+    """One view: its result cell and its ``per_doc`` list."""
+    with_date = {k: v for k, v in mapping.items() if v in types}
+    view_map = {k: v for k, v in with_date.items() if v != DATE}
+    docs = [(r, doc_stats(r, mapped[r["id"]], view_map, outputs[r["id"]].get("unplaced", 0)))
+            for r in records]
+    per_doc = [(r["id"], str(r.get("group", r["id"])), r["lang"], c) for r, c in docs]
+    done = [(r["lang"], c) for r, c in docs if r["id"] not in failed]
+    cell = {
+        "types": sorted(types),
+        "compare": summarise(done),
+        "effective": metrics(total(c for _, c in docs)),
+        "with_date": metrics(total(doc_stats(r, mapped[r["id"]], with_date, outputs[r["id"]].get("unplaced", 0),
+                                             utility=False) for r in completed)),
+        "pii": score_pii(completed, {r["id"]: mapped[r["id"]] for r in completed},
+                         {r["id"]: mask_text(r["text"], mapped[r["id"]]) for r in completed}, view_map),
+    }
+    return cell, per_doc
+
+
+def _tuning_grid(completed: list[dict], outputs: dict[str, dict], curve_floor: float | None,
+                 curve_by_filter: bool) -> list[float | None]:
+    """The run as decoded, plus the thresholds at or above the floor when the tool's scores can filter it."""
+    scored = curve_by_filter and any(s.get("score") is not None for r in completed for s in outputs[r["id"]]["spans"])
+    return [None, *(t for t in THRESHOLDS if curve_floor is None or t >= curve_floor)] if scored else [None]
+
+
 def score_run(records: list[dict], outputs: dict[str, dict], labels: dict[str, str], mapping: dict[str, str],
               views: dict[str, tuple], curve_view: str = "shared", curve_floor: float | None = None,
               curve_by_filter: bool = True, recover: bool = False) -> tuple[dict, dict]:
@@ -414,13 +457,7 @@ def score_run(records: list[dict], outputs: dict[str, dict], labels: dict[str, s
     """
     failed = {r["id"] for r in records if "error" in outputs[r["id"]]}
     completed = [r for r in records if r["id"] not in failed]
-    mapped, out_of_scope, recovered = {}, 0, 0
-    for r in records:
-        spans, dropped = map_spans([] if r["id"] in failed else outputs[r["id"]]["spans"], labels)
-        if recover and r["id"] not in failed and "masked_text" in outputs[r["id"]]:
-            spans, added = recover_dropped(r["text"], outputs[r["id"]]["masked_text"], spans)
-            recovered += added
-        mapped[r["id"]], out_of_scope = spans, out_of_scope + dropped
+    mapped, out_of_scope, recovered = _map_outputs(records, outputs, labels, failed, recover)
     result = {
         "documents": len(records), "completed": len(completed), "completion_rate": _round(_r(len(completed), len(records))),
         "flag_low_completion": len(completed) < 0.99 * len(records),
@@ -432,36 +469,21 @@ def score_run(records: list[dict], outputs: dict[str, dict], labels: dict[str, s
     }
     per_doc = {}
     for view, types in views.items():
-        with_date = {k: v for k, v in mapping.items() if v in types}
-        view_map = {k: v for k, v in with_date.items() if v != DATE}
-        docs = [(r, doc_stats(r, mapped[r["id"]], view_map, outputs[r["id"]].get("unplaced", 0)))
-                for r in records]
-        per_doc[view] = [(r["id"], str(r.get("group", r["id"])), r["lang"], c) for r, c in docs]
-        done = [(r["lang"], c) for r, c in docs if r["id"] not in failed]
-        result["views"][view] = {
-            "types": sorted(types),
-            "compare": summarise(done),
-            "effective": metrics(total(c for _, c in docs)),
-            "with_date": metrics(total(doc_stats(r, mapped[r["id"]], with_date, outputs[r["id"]].get("unplaced", 0),
-                                                 utility=False) for r in completed)),
-            "pii": score_pii(completed, {r["id"]: mapped[r["id"]] for r in completed},
-                             {r["id"]: mask_text(r["text"], mapped[r["id"]]) for r in completed}, view_map),
-        }
+        result["views"][view], per_doc[view] = _score_view(records, completed, failed, outputs, mapped, mapping, types)
     if curve_view in views:
         view_map = {k: v for k, v in mapping.items() if v in views[curve_view] and v != DATE}
         result["curve"] = curve(completed, outputs, labels, view_map, curve_floor) if curve_by_filter else None
     if "full" in views:  # tuning objective: full taxonomy minus DATE, so a tool is tuned on everything it must mask
         view_map = {k: v for k, v in mapping.items() if v in views["full"] and v != DATE}
-        scored = curve_by_filter and any(s.get("score") is not None for r in completed for s in outputs[r["id"]]["spans"])
-        grid = [None, *(t for t in THRESHOLDS if curve_floor is None or t >= curve_floor)] if scored else [None]
-        result["tuning"] = tuning_rows(records, outputs, labels, view_map, grid)
+        result["tuning"] = tuning_rows(records, outputs, labels, view_map,
+                                       _tuning_grid(completed, outputs, curve_floor, curve_by_filter))
     if any(r.get("annotators") for r in records):  # TAB: DIRECT/QUASI full-coverage rule, every annotator
         result["tab_masking"] = masking_recall(records, mapped)  # failed docs have no spans: unmasked
     result["native"] = native_leak(records, outputs, mapping)
     return result, per_doc
 
 
-def mcnemar(a: list[bool], b: list[bool]) -> dict:
+def mcnemar(a: list[bool], b: list[bool]) -> dict[str, float]:
     """Exact two-sided McNemar test on paired per-doc flags."""
     only_a = sum(1 for x, y in zip(a, b, strict=True) if x and not y)
     only_b = sum(1 for x, y in zip(a, b, strict=True) if y and not x)
@@ -471,7 +493,7 @@ def mcnemar(a: list[bool], b: list[bool]) -> dict:
 
 
 def paired_bootstrap(a: list[tuple], b: list[tuple], names=HEADLINE, samples: int = BOOTSTRAP_SAMPLES,
-                     seed: int = SEED) -> dict:
+                     seed: int = SEED) -> dict[str, Any]:
     """Paired bootstrap over groups (template or doc) for entry A minus entry B on the same docs.
 
     Each draw recomputes the language macro (the headline), not pooled micro counts.
@@ -486,7 +508,7 @@ def paired_bootstrap(a: list[tuple], b: list[tuple], names=HEADLINE, samples: in
 
 
 def macro_bootstrap(pairs: dict[str, tuple[list, list]], names=HEADLINE, samples: int = BOOTSTRAP_SAMPLES,
-                    seed: int = SEED) -> dict:
+                    seed: int = SEED) -> dict[str, Any]:
     """Paired bootstrap of A minus B on the macro over datasets, as ``aggregate`` scores a group.
 
     *pairs* maps a dataset to its ``(a, b)`` ``per_doc`` lists. Each draw resamples groups within
@@ -538,6 +560,6 @@ def views_for(supports: tuple, shared: tuple, all_types: tuple) -> dict[str, tup
     return {"supported": tuple(supports), "shared": tuple(shared), "full": tuple(all_types)}
 
 
-def shared_types(entries: list[dict], all_types: tuple) -> tuple:
+def shared_types(entries: list[dict], all_types: tuple[str, ...]) -> tuple[str, ...]:
     """Types every entry supports (the headline view)."""
     return tuple(t for t in all_types if all(t in e["supports"] for e in entries))

@@ -56,9 +56,8 @@ def claimed_macro(compare: dict, entry: str, metric: str, inside: bool = True):
     return scorer.macro(langs).get(metric) if langs else False
 
 
-def dataset_table(track_dir: Path, entries, view: str = "full", metric: str = "masked_f2", inside: bool = True,
-                  without_dir: Path | None = None) -> list[str]:
-    """Per dataset (rows, group order) x entry: the language macro on completed docs, claimed languages only.
+def dataset_table(track_dir: Path, entries, inside: bool = True, without_dir: Path | None = None) -> list[str]:
+    """Per dataset (rows, group order) x entry: full view, masked F2, language macro on completed docs, claimed languages.
 
     ``inside=False`` gives the same on the languages outside each entry's claim. Decision 21 markers:
     ``(x)`` = excluded cell (T/E/D, information only), ``x?`` = unknown training data; ``°`` = no doc of the
@@ -73,9 +72,9 @@ def dataset_table(track_dir: Path, entries, view: str = "full", metric: str = "m
             continue
         cells = []
         for f, e in zip(files, entries, strict=True):
-            value = claimed_macro(json.loads(f.read_text())["views"][view]["compare"], e, metric, inside)
+            value = claimed_macro(json.loads(f.read_text())["views"]["full"]["compare"], e, "masked_f2", inside)
             other = without_dir / e / f"{dataset}-test.json" if without_dir else None
-            without = (claimed_macro(json.loads(other.read_text())["views"][view]["compare"], e, metric, inside)
+            without = (claimed_macro(json.loads(other.read_text())["views"]["full"]["compare"], e, "masked_f2", inside)
                        if other and other.exists() else False)
             cells.append(("°" if inside else "-") if value is False else _mark(value, e, dataset, without))
         out.append(f"| {dataset} | {' | '.join(cells)} |")
@@ -132,6 +131,40 @@ def _point(agg: dict | None, metric: str = "masked_recall") -> str:
     return "-" if not agg else f"{_fmt(agg['macro'].get(metric))} ({len(agg['datasets'])})"
 
 
+def _ci_cell(key: str, ci: dict, ci_without: dict) -> str:
+    if key not in ci:
+        return "-"
+    text = f"{ci[key]['value']:.3f} [{ci[key]['ci'][0]:.3f}, {ci[key]['ci'][1]:.3f}]"
+    return text + (f"; w/o recovery {ci_without[key]['value']:.3f}" if key in ci_without else "")
+
+
+def _status_cell(cell: dict, without: dict | None, status: str, part: str) -> str:
+    """Masked recall of one status x language part, with the no-recovery number when there is one."""
+    def pick(c):
+        return ((c or {}).get(status) or {}).get(part)
+
+    text = _point(pick(cell))
+    return text + (f"; w/o recovery {_point(pick(without))}" if without is not None and text != "-" else "")
+
+
+def _own_row(entry: str, cell: dict, without: dict | None, bundle: Path) -> tuple[float, str]:
+    """(sort key, table row) of one entry."""
+    clean = cell.get("clean") or {}
+    ci = clean.get("ci", {})
+    ci_without = ((without or {}).get("clean") or {}).get("ci", {})
+    docs, rss = _speed(bundle, entry)
+    excluded = _status_cell(cell, without, "excluded", "claimed")
+    used = (clean.get("claimed") or {}).get("datasets", [])
+    return (ci.get("masked_recall", {}).get("value") or -1,
+            f"| {entry} | {', '.join(used) or 'none'} ({len(clean.get('datasets', []))}) | "
+            + " | ".join(_ci_cell(k, ci, ci_without) for k, _ in HEAD)
+            + f" | {_status_cell(cell, without, 'clean', 'outside_claim')}"
+            + f" | {_status_cell(cell, without, 'unknown', 'claimed')}"
+            + f" | {_status_cell(cell, without, 'unknown', 'outside_claim')}"
+            + f" | {'(' + excluded + ')' if excluded != '-' else '-'} | {docs} | {rss}"
+            + f" | {claimed(entry)} | {LICENCES.get(entry, '?')} |")
+
+
 def own_table(summary: dict, bundle: Path, view: str, group: str, without: dict | None = None) -> list[str]:
     """Headline (decision 21): each entry on its own clean datasets, claimed languages, 95% bootstrap CI.
 
@@ -150,26 +183,7 @@ def own_table(summary: dict, bundle: Path, view: str, group: str, without: dict 
         if cell is None:
             continue
         wo = (without or {}).get("own", {}).get(entry, {}).get(view, {}).get(group) if without else None
-
-        def info(get, cell=cell, wo=wo):
-            text = _point(get(cell))
-            return text + (f"; w/o recovery {_point(get(wo))}" if wo is not None and text != "-" else "")
-
-        clean = cell.get("clean") or {}
-        ci = clean.get("ci", {})
-        ci_wo = ((wo or {}).get("clean") or {}).get("ci", {})
-        cells = [(f"{ci[k]['value']:.3f} [{ci[k]['ci'][0]:.3f}, {ci[k]['ci'][1]:.3f}]"
-                  + (f"; w/o recovery {ci_wo[k]['value']:.3f}" if k in ci_wo else "")) if k in ci else "-" for k, _ in HEAD]
-        docs, rss = _speed(bundle, entry)
-        excluded = info(lambda c: ((c or {}).get("excluded") or {}).get("claimed"))
-        used = (clean.get("claimed") or {}).get("datasets", [])
-        rows.append((ci.get("masked_recall", {}).get("value") or -1,
-                     f"| {entry} | {', '.join(used) or 'none'} ({len(clean.get('datasets', []))}) | " + " | ".join(cells)
-                     + f" | {info(lambda c: ((c or {}).get('clean') or {}).get('outside_claim'))}"
-                     + f" | {info(lambda c: ((c or {}).get('unknown') or {}).get('claimed'))}"
-                     + f" | {info(lambda c: ((c or {}).get('unknown') or {}).get('outside_claim'))}"
-                     + f" | {'(' + excluded + ')' if excluded != '-' else '-'} | {docs} | {rss}"
-                     + f" | {claimed(entry)} | {LICENCES.get(entry, '?')} |"))
+        rows.append(_own_row(entry, cell, wo, bundle))
     return [head, "|" + "---|" * (len(HEAD) + 10), *(row for _, row in sorted(rows, reverse=True))]
 
 
@@ -305,46 +319,55 @@ def audit_table(bundle: Path, track: str) -> list[str]:
     return out
 
 
+def _group_sections(summary: dict, bundle: Path, track: str, view: str, group: str, without: dict | None) -> list[str]:
+    """Own, same-set and pairwise tables of one view x group."""
+    lines = ["", f"## {track} track, {view} view, {group}: each entry on its own clean sets, claimed languages",
+             "", *own_table(summary, bundle, view, group, without)]
+    for pool in ("all", "others"):
+        lines += ["", f"### same-set ({'every entry' if pool == 'all' else 'non-SCT entries with clean sets'})",
+                  "", *same_set_table(summary, view, group, pool)]
+    for kind in ("clean", "unknown"):
+        lines += ["", f"### SCT vs each entry, datasets {kind} for both, languages both claim", "",
+                  *pairwise_table(summary, view, group, kind)]
+    return lines
+
+
+def _track_sections(bundle: Path, track: str, summary: dict) -> list[str]:
+    wo_path = bundle / "norecover" / track / "summary.json"
+    without = json.loads(wo_path.read_text()) if wo_path.exists() else None
+    wo_dir = bundle / "norecover" / track if without else None
+    lines: list[str] = []
+    for view in ("full", "shared"):
+        for group in scorer.GROUPS:
+            if any(group in v.get(view, {}) for v in summary.get("own", {}).values()):
+                lines += _group_sections(summary, bundle, track, view, group, without)
+    for group in scorer.GROUPS:
+        for status in ("clean", "unknown"):
+            lines += ["", f"## {track} track, per language, full view, masked recall, {group}, {status} sets "
+                      "(° = outside the entry's claimed languages)", "",
+                      *language_table(bundle / track, summary["aggregate"], group, status=status)]
+    lines += ["", f"## {track} track, per dataset, full view, masked F2, claimed languages only (completed docs; "
+              "(x) = excluded, information only; x? = unknown training data; ° = no doc in a claimed language)", "",
+              *dataset_table(bundle / track, summary["aggregate"], without_dir=wo_dir)]
+    lines += ["", f"### {track} track, per dataset, outside claimed languages (information only, not a loss; "
+              "- = every doc is in a claimed language)", "",
+              *dataset_table(bundle / track, summary["aggregate"], inside=False, without_dir=wo_dir)]
+    lines += ["", f"## {track} track, completion", "", *completion_table(bundle / track, summary["aggregate"])]
+    recovery = recovery_table(bundle, track)
+    if recovery:
+        lines += ["", f"## {track} track, SCT with and without recovered dropped copies (full view)", "", *recovery]
+    audit = audit_table(bundle, track)
+    if audit:
+        lines += ["", f"### {track} track, audit of the recovered copies (seeded sample, counts only)", "", *audit]
+    return lines
+
+
 def tables(bundle: Path) -> str:
     lines = []
     for track in TRACKS:
         path = bundle / track / "summary.json"
-        if not path.exists():
-            continue
-        summary = json.loads(path.read_text())
-        wo_path = bundle / "norecover" / track / "summary.json"
-        without = json.loads(wo_path.read_text()) if wo_path.exists() else None
-        wo_dir = bundle / "norecover" / track if without else None
-        for view in ("full", "shared"):
-            for group in scorer.GROUPS:
-                if not any(group in v.get(view, {}) for v in summary.get("own", {}).values()):
-                    continue
-                lines += ["", f"## {track} track, {view} view, {group}: each entry on its own clean sets, claimed languages",
-                          "", *own_table(summary, bundle, view, group, without)]
-                for pool in ("all", "others"):
-                    lines += ["", f"### same-set ({'every entry' if pool == 'all' else 'non-SCT entries with clean sets'})",
-                              "", *same_set_table(summary, view, group, pool)]
-                for kind in ("clean", "unknown"):
-                    lines += ["", f"### SCT vs each entry, datasets {kind} for both, languages both claim", "",
-                              *pairwise_table(summary, view, group, kind)]
-        for group in scorer.GROUPS:
-            for status in ("clean", "unknown"):
-                lines += ["", f"## {track} track, per language, full view, masked recall, {group}, {status} sets "
-                          "(° = outside the entry's claimed languages)", "",
-                          *language_table(bundle / track, summary["aggregate"], group, status=status)]
-        lines += ["", f"## {track} track, per dataset, full view, masked F2, claimed languages only (completed docs; "
-                  "(x) = excluded, information only; x? = unknown training data; ° = no doc in a claimed language)", "",
-                  *dataset_table(bundle / track, summary["aggregate"], without_dir=wo_dir)]
-        lines += ["", f"### {track} track, per dataset, outside claimed languages (information only, not a loss; "
-                  "- = every doc is in a claimed language)", "",
-                  *dataset_table(bundle / track, summary["aggregate"], inside=False, without_dir=wo_dir)]
-        lines += ["", f"## {track} track, completion", "", *completion_table(bundle / track, summary["aggregate"])]
-        recovery = recovery_table(bundle, track)
-        if recovery:
-            lines += ["", f"## {track} track, SCT with and without recovered dropped copies (full view)", "", *recovery]
-        audit = audit_table(bundle, track)
-        if audit:
-            lines += ["", f"### {track} track, audit of the recovered copies (seeded sample, counts only)", "", *audit]
+        if path.exists():
+            lines += _track_sections(bundle, track, json.loads(path.read_text()))
     lines += ["", "## contamination (bold = excluded, italic = unknown, plain = clean)", "",
               *contamination_table(registry.ENTRIES)]
     for name in ("speed-16t", "speed-16t-rss", "speed-1t"):
