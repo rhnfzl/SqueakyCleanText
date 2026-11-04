@@ -90,7 +90,7 @@ def _require_portable_config(config: TextCleanerConfig) -> None:
         )
 
 
-def _ordered_rules(config: TextCleanerConfig) -> list[tuple[str, Any, str, bool]]:
+def _ordered_rules(config: TextCleanerConfig) -> list[tuple[str, Any, str | None, bool]]:
     """(name, pattern, token, enabled) per rule, in the order the browser runs them."""
     html_regex = constants.HTML_REGEX if config.html_tag_strict else constants.HTML_REGEX_ANY
     url_regex = constants.URL_REGEX if config.url_trailing_punct_outside else constants.URL_REGEX_LEGACY
@@ -110,7 +110,7 @@ def _ordered_rules(config: TextCleanerConfig) -> list[tuple[str, Any, str, bool]
     ]
 
 
-def _require_stable_tokens(ordered: list[tuple[str, Any, str, bool]]) -> None:
+def _require_stable_tokens(ordered: list[tuple[str, Any, str | None, bool]]) -> None:
     """Reject a token a later enabled rule would match (an HTML token holding an email or URL, a URL token an email)."""
     for i, (name, _, token, enabled) in enumerate(ordered):
         for later, pattern, _, later_enabled in ordered[i + 1:]:
