@@ -197,7 +197,11 @@ def test_tab_uses_the_quality_checked_annotator_and_caps_by_doc_id(tmp_path, mon
                              "ann2": {"entity_mentions": [mention(4, 7, "QUASI"), mention(5, 99)]}}},
             {"doc_id": "a", "text": "Cy", "quality_checked": None,
              "annotations": {"z": {"entity_mentions": []}, "y": {"entity_mentions": [mention(0, 2)]}}}]
-    monkeypatch.setattr(tab, "url_file", lambda url, name: write_json(tmp_path / "t.json", docs))
+    def fake_url_file(url, name):
+        assert tab.REVISION in url and tab.REVISION in name
+        return write_json(tmp_path / "t.json", docs)
+
+    monkeypatch.setattr(tab, "url_file", fake_url_file)
     first, second = tab.load(None, 1)
     assert (first["id"], first["spans"]) == ("a", [{"start": 0, "end": 2, "label": "PERSON"}])  # sorted annotators
     assert second["spans"] == [{"start": 4, "end": 7, "label": "PERSON"}]
