@@ -5,7 +5,7 @@ from types import MappingProxyType
 from hypothesis import given, settings
 from hypothesis.strategies import text, from_regex
 from faker import Faker
-from tests.helpers import bare_ner
+from tests.helpers import assert_near_linear, bare_ner
 from sct.utils.ner_chunking import simple_chunk, split_text, token_count
 from sct import config
 from sct.config import (
@@ -325,23 +325,16 @@ class TextCleanerTest(unittest.TestCase):
 
     def test_acronym_regex_no_redos(self):
         """Test that ACRONYM_REGEX doesn't catastrophically backtrack."""
-        import time
         # Adversarial input that would cause ReDoS with nested quantifiers
-        adversarial = "A." * 100
-        start = time.time()
-        constants.ACRONYM_REGEX.findall(adversarial)
-        elapsed = time.time() - start
-        self.assertLess(elapsed, 2.0, "ACRONYM_REGEX took too long - possible ReDoS")
+        assert_near_linear(constants.ACRONYM_REGEX.findall, lambda n: "A." * n, 100)
 
     def test_host_regex_no_redos(self):
         """A dotted host with no TLD fails fast (each label used to split every way: ~5 s / 10 s here)."""
-        import time
-        host = ".".join(["1" * 20] * 5) + " "
-        for name, rx, sample in (("EMAIL_REGEX", constants.EMAIL_REGEX, "a@" + host),
-                                 ("URL_REGEX", constants.URL_REGEX, "http://" + host)):
-            start = time.time()
-            rx.search(sample)
-            self.assertLess(time.time() - start, 1.0, f"{name} took too long - possible ReDoS")
+        def host(labels):
+            return ".".join(["1" * 20] * labels) + " "
+
+        assert_near_linear(constants.EMAIL_REGEX.search, lambda n: "a@" + host(n), 5, factor=5)
+        assert_near_linear(constants.URL_REGEX.search, lambda n: "http://" + host(n), 5, factor=5)
 
     # --- Consistent return type tests ---
 

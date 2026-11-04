@@ -1,12 +1,12 @@
 """Escaped markup (&lt;b&gt;) is text, not a tag: tags are found on the markup, escapes decode between them."""
 
-import time
 
 import pytest
 
 from sct import TextCleaner, TextCleanerConfig
 from sct.streaming import WindowedStreamingRedactor
 from sct.utils import normtext
+from tests.helpers import assert_near_linear
 
 CASES = [
     ("<p>Use &lt;b&gt; for bold, mail john@example.com</p>", "<HTML>Use <b> for bold, mail <EMAIL><HTML>"),
@@ -64,9 +64,12 @@ def test_escaped_marker_is_still_reserved():
     assert result.metadata["anon_map"].deanonymize(result.lm_text) == "We live in <EMAIL1> mail a@example.com"
 
 
-@pytest.mark.parametrize("text", ["<" * 200_000 + "&lt;", "&lt;" * 50_000, "<a " * 50_000 + "&gt;"])
-def test_unescape_markup_linear(text):
-    start = time.perf_counter()
-    normtext.unescape_markup(text)
-    normtext.decode_html_entities(text)
-    assert time.perf_counter() - start < 1.0
+@pytest.mark.parametrize("make, n", [
+    (lambda n: "<" * n + "&lt;", 200_000), (lambda n: "&lt;" * n, 50_000), (lambda n: "<a " * n + "&gt;", 50_000),
+])
+def test_unescape_markup_linear(make, n):
+    def decode(text):
+        normtext.unescape_markup(text)
+        normtext.decode_html_entities(text)
+
+    assert_near_linear(decode, make, n)

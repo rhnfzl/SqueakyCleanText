@@ -3,6 +3,7 @@
 import asyncio
 import re
 import threading
+import time
 from dataclasses import replace
 from types import SimpleNamespace
 
@@ -10,6 +11,24 @@ from presidio_anonymizer import AnonymizerEngine
 
 from sct.config import GLINER_BACKENDS, TextCleanerConfig
 from sct.utils.ner import GeneralNER
+
+
+def assert_near_linear(run, make, n, factor=8, repeats=3):
+    """Fail when ``run(make(n))`` grows faster than linear from size ``n // factor`` to ``n``.
+
+    Compares best-of-*repeats* times, so runner load cancels out. The limit is three times the
+    linear ratio, well below the quadratic ``factor ** 2``; tiny runs count as 5 ms against timer noise.
+    """
+    def best(size):
+        data, fastest = make(size), float("inf")
+        for _ in range(repeats):
+            start = time.perf_counter()
+            run(data)
+            fastest = min(fastest, time.perf_counter() - start)
+        return fastest
+
+    small, large = best(n // factor), best(n)
+    assert large < 3 * factor * max(small, 0.005), f"{small=:.4f}s {large=:.4f}s for sizes {n // factor}, {n}"
 
 
 def bare_ner():

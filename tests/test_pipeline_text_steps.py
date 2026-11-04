@@ -1,6 +1,5 @@
 """Pipeline text steps: JSON spans, HTML comments, isolated symbols, JSON keys, language confidence."""
 
-import time
 import types
 
 import pytest
@@ -13,6 +12,7 @@ from sct.utils import constants
 from sct.utils.special import _json_object_spans
 
 from tests.conftest import TEST_NER_MODELS
+from tests.helpers import assert_near_linear
 
 
 @pytest.fixture(scope="module")
@@ -20,16 +20,17 @@ def cleaner():
     return TextCleaner(cfg=TextCleanerConfig(check_ner_process=False))
 
 
-@pytest.mark.parametrize("text", [
-    '{"a":' * 20000,                 # no closing brace: was quadratic, then RecursionError
-    '{"a":' * 20000 + '}',           # deep nesting with a far '}'
-    '{ x ' * 50000 + '}',            # a failed parse per brace
-    '{"a":' * 900 + 'x' * 1000 + '}',
+@pytest.mark.parametrize("make, n", [
+    (lambda n: '{"a":' * n, 20000),                 # no closing brace: was quadratic, then RecursionError
+    (lambda n: '{"a":' * n + '}', 20000),           # deep nesting with a far '}'
+    (lambda n: '{ x ' * n + '}', 50000),            # a failed parse per brace
+    (lambda n: '{"a":' * n + 'x' * 1000 + '}', 900),
 ])
-def test_malformed_json_scan_is_fast_and_does_not_raise(text):
-    t0 = time.perf_counter()
-    assert _json_object_spans(text) == []
-    assert time.perf_counter() - t0 < 1.0
+def test_malformed_json_scan_is_fast_and_does_not_raise(make, n):
+    def scan(text):
+        assert _json_object_spans(text) == []
+
+    assert_near_linear(scan, make, n)
 
 
 def test_default_pipeline_survives_malformed_json(cleaner):
@@ -58,9 +59,7 @@ def test_html_comment_ends_at_close_marker(cleaner, text, expected):
 
 
 def test_many_unclosed_comments_stay_linear():
-    t0 = time.perf_counter()
-    constants.HTML_REGEX.sub('', '<!--' * 50000)
-    assert time.perf_counter() - t0 < 1.0
+    assert_near_linear(lambda text: constants.HTML_REGEX.sub('', text), lambda n: '<!--' * n, 50000)
 
 
 FAST = preset_config("training", check_ner_process=False)

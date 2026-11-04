@@ -1,6 +1,5 @@
 """The windowed stream never splits inside a phone, date, address, escape or markup token."""
 
-import time
 
 import pytest
 
@@ -214,9 +213,7 @@ def test_stream_of_markup_with_entities_splits(repeats):
     cleaner, calls = _counting_cleaner()
     text = "intro <b> " + "word &amp; " * repeats + "x" * 252
     stream = WindowedStreamingRedactor(cleaner)
-    started = time.perf_counter()
     first = stream.feed(text)
-    assert time.perf_counter() - started < 1.0
     assert calls[0] < 20  # was 1605 / 3205 (one prefix and suffix normalise per rejected space)
     assert first.startswith("intro <b> word & word")
     assert first + stream.feed(" ") + stream.finish() == cleaner.process(text + " ").lm_text

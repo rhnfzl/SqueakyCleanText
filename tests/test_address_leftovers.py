@@ -7,6 +7,7 @@ import pytest
 from sct import TextCleaner
 from sct.presets import preset_config
 from sct.utils import constants
+from tests.helpers import assert_near_linear
 
 
 def _cleaner(**kw):
@@ -69,9 +70,7 @@ def test_contexto_punctuation_with_wide_query_folds():
 @pytest.mark.parametrize("regex, head", [(constants.EMAIL_REGEX, "info@"), (constants.URL_REGEX, "https://")])
 def test_middle_dot_run_without_tld_is_linear(regex, head):
     # each dot between Han used to have two parses, so a host with no TLD backtracked 2^n ways
-    start = time.perf_counter()
-    regex.search(head + "例・" * 40 + "え")
-    assert time.perf_counter() - start < 1.0
+    assert_near_linear(regex.search, lambda n: head + "例・" * n + "え", 40)
 
 
 @pytest.mark.parametrize("text", ["see x・y.com ok", "リスト①・②です", "a@b.c・d", "見て・https://x.jp"])

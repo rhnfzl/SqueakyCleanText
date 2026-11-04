@@ -1,7 +1,6 @@
 """Email addresses in styled, full-width, non-Latin and invisible-character forms stay masked."""
 
 import pickle
-import time
 
 import pytest
 
@@ -11,6 +10,7 @@ from sct.presets import preset_config
 from sct.streaming import WindowedStreamingRedactor
 from sct.utils import constants, normtext
 from sct.utils.normtext import fold_styled
+from tests.helpers import assert_near_linear
 
 
 FAST = preset_config("training", check_ner_process=False)
@@ -127,7 +127,7 @@ def test_join_control_email_masked_in_stream():
     assert "john" not in out and "ایران" not in out
 
 
-# --- 1 (fuzz): a join control inside the TLD label, as in any other host label ---
+# --- a join control inside the TLD label, as in any other host label ---
 @pytest.mark.parametrize("email", ["ab@يت.ط‌ة‌ق", "ab@नाम.भा‍रत", "ab@يت．ط‌ة‌ق"])
 def test_join_control_in_tld_masked(email):
     out = TextCleaner(TextCleanerConfig(check_ner_process=False)).process(f"mail {email} now").lm_text
@@ -293,12 +293,15 @@ def test_middle_dot_outside_l_l_still_ends_run():
     assert _cleaner().process("Mail a·b@x。cat now").lm_text == "Mail a·<EMAIL> now"
 
 
-@pytest.mark.parametrize("text", ["l·" * 5000 + "l", "l·l＿" * 5000, "a@" + "l·" * 5000, "l·l@" * 5000])
-def test_middle_dot_runs_linear(text):
-    start = time.perf_counter()
-    normtext.fold_styled(text)
-    normtext._fold_email_runs(text)
-    assert time.perf_counter() - start < 1.0
+@pytest.mark.parametrize("make", [
+    lambda n: "l·" * n + "l", lambda n: "l·l＿" * n, lambda n: "a@" + "l·" * n, lambda n: "l·l@" * n,
+])
+def test_middle_dot_runs_linear(make):
+    def fold(text):
+        normtext.fold_styled(text)
+        normtext._fold_email_runs(text)
+
+    assert_near_linear(fold, make, 5000)
 
 
 @pytest.mark.parametrize("text", ["Mail info＠ｃｏｌ­·ｌｅｇｉ．cat now", "Mail ana_col​·legi@example。cat now"])
