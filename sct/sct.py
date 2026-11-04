@@ -1047,7 +1047,7 @@ class TextCleaner:
         return self._replace_typed(text, self._year_view(text), 'YEAR', synthetic=False)
 
     def _year_view(self, text):
-        """The year pattern the year step applies to *text* (the streaming guard reads it too)."""
+        """The year pattern the year step applies to *text*."""
         view = constants.YEAR_REGEX
         if self.cfg.check_replace_numbers and self.cfg.replace_numbers_mode == 'identifiers':
             # A year-like group of a multi-group ID ("123-45 2020") is left to the numbers step, which masks the

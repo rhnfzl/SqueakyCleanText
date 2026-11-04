@@ -1,5 +1,8 @@
+from functools import partial
+
 from sct import TextCleaner, TextCleanerConfig
-from sct.streaming import BufferedStreamingRedactor, WindowedStreamingRedactor, _masking_steps
+from sct.streaming import BufferedStreamingRedactor, WindowedStreamingRedactor, _masking_steps, _sub_fuzzy_dates
+from sct.utils import constants, contact
 
 
 def test_buffered_streaming_redactor_handles_entities_split_across_chunks():
@@ -46,4 +49,16 @@ def test_stream_guard_follows_the_masking_step_order():
         "_replace_fuzzy_dates", "_replace_iban_cards", "_replace_identifiers", "_replace_phone_numbers",
     ]
     # One guard step for each, and the IBAN/card step reads two patterns.
-    assert len(_masking_steps(cleaner, cfg, "text")) == 11
+    steps = _masking_steps(cleaner, cfg, "text")
+    owners = [s.func if isinstance(s, partial) else s.__self__ for s in steps]
+    assert len(owners) == 11
+    assert owners[0] == cleaner._sub_user_rule
+    for owner, expected in zip(owners[1:6], (cleaner._html_regex, cleaner._url_regex, constants.EMAIL_REGEX,
+                                             contact.IP_VIEW, cleaner._date_view), strict=True):
+        assert owner is expected
+    assert owners[6] is _sub_fuzzy_dates
+    for owner, expected in zip(owners[7:10], (contact.IBAN_VIEW, contact.CARD_VIEW, constants.IDENTIFIER_REGEX),
+                               strict=True):
+        assert owner is expected
+    assert isinstance(owners[10], contact.RejectView)
+    assert owners[10].view is cleaner._phone_folded_view
