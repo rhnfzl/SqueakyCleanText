@@ -421,7 +421,7 @@ DEFAULT_NER_MODELS: dict[str, str] = {
 }
 ```
 
-The ONNX pipeline (`sct/utils/onnx_pipeline.py`) handles download, caching, and inference automatically. INT8 dynamic quantization is also available at load time via the `quantize=True` parameter, reducing model size ~4× with a small accuracy trade-off.
+The ONNX pipeline (`sct/utils/onnx_pipeline.py`) handles download, caching, and inference automatically. INT8 dynamic quantization is also available at load time via the `quantize=True` parameter (install `SqueakyCleanText[quantize]` first), reducing model size ~4× with a small accuracy trade-off.
 
 ---
 
