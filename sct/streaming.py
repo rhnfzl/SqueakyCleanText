@@ -83,7 +83,10 @@ def _step_matches(steps, normalised_text):
 
     def blank(match):
         spans.append(match.span())
-        return "\U00100000" + "\U000F0000" * (len(match.group()) - 2) + "\U00100001"
+        length = len(match.group())
+        if length < 2:  # no room for the key's brackets
+            return "\U000F0000" * length
+        return "\U00100000" + "\U000F0000" * (length - 2) + "\U00100001"
     for step in steps:
         normalised_text = step(blank, normalised_text)
     return spans, normalised_text
