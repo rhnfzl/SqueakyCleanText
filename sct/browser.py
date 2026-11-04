@@ -10,6 +10,24 @@ from sct.utils import constants, resources
 from sct.utils.contact import config_numbers_regex
 
 
+_LIMITATIONS = (
+    "Python language detection is not included in the browser bundle.",
+    "Regular expressions require JavaScript compatibility tests.",
+    "Model files remain external and must keep their recorded revisions.",
+    "Reversible and synthetic replacement are server-side features.",
+    "IBAN/card checksum typing and identifier tokens are server-side rules.",
+    "phone_reject_embedded is a server-side rule: the browser phone rule keeps every phone match "
+    "(0.8.1 behaviour).",
+    "custom_deny_terms, custom_allow_terms and custom_patterns are server-side features.",
+    "The browser year rule runs before the number rule on its own, so a year-like group of an ID "
+    "run ('123-45 2020') becomes the year token and the rest of the run stays; the server masks the "
+    "whole run.",
+    "Rules with fold_decimal_digits match on a copy of the text where every Unicode "
+    "decimal digit (Nd, such as ٠٦ or ०६) is its ASCII digit, one code point for one, "
+    "and replace the same offsets in the original text (JavaScript \\d is ASCII only).",
+)
+
+
 def _rule(pattern, replacement, enabled: bool) -> dict[str, Any]:
     flags = "u"
     if pattern.flags & re.IGNORECASE:
@@ -120,80 +138,19 @@ def build_browser_manifest(config: TextCleanerConfig) -> dict[str, Any]:
         }
         for key, model_id in (config.ner_models or {}).items()
     }
+    rules = {name: _rule(pattern, token, enabled) for name, pattern, token, enabled in ordered}
+    for name in ("ip", "date", "phone"):
+        rules[name]["fold_decimal_digits"] = True
+    # identifiers mode: \d of the pattern is Unicode in Python, so the browser reads ASCII-folded digits
+    if config.replace_numbers_mode == "identifiers":
+        rules["number"].update(fold_decimal_digits=True, pattern=_unicode_word(number_regex.pattern))
     return {
         "format_version": 1,
         "runtime": "onnxruntime-web",
         "models": models,
-        "rule_order": [
-            "html", "url", "email", "ip", "date", "phone", "year", "number",
-            "currency",
-        ],
-        "rules": {
-            "html": _rule(
-                html_regex,
-                config.replace_with_html,
-                config.check_replace_html,
-            ),
-            "url": _rule(
-                url_regex,
-                config.replace_with_url,
-                config.check_replace_urls,
-            ),
-            "email": _rule(
-                constants.EMAIL_REGEX,
-                config.replace_with_email,
-                config.check_replace_emails,
-            ),
-            "ip": {**_rule(
-                constants.IP_REGEX,
-                config.replace_with_ips,
-                config.check_replace_ips,
-            ), "fold_decimal_digits": True},
-            "date": {**_rule(
-                date_regex,
-                config.replace_with_dates,
-                config.check_replace_dates,
-            ), "fold_decimal_digits": True},
-            "year": _rule(
-                constants.YEAR_REGEX,
-                config.replace_with_years,
-                config.check_replace_years,
-            ),
-            "phone": {**_rule(
-                constants.PHONE_REGEX,
-                config.replace_with_phone_numbers,
-                config.check_replace_phone_numbers,
-            ), "fold_decimal_digits": True},
-            # identifiers mode: \d of the pattern is Unicode in Python, so the browser reads ASCII-folded digits
-            "number": {**_rule(
-                number_regex,
-                config.replace_with_numbers,
-                config.check_replace_numbers,
-            ), **({"fold_decimal_digits": True,
-                   "pattern": _unicode_word(number_regex.pattern)}
-                  if config.replace_numbers_mode == "identifiers" else {})},
-            "currency": _rule(
-                constants.CURRENCY_REGEX,
-                config.replace_with_currency_symbols,
-                config.check_replace_currency_symbols,
-            ),
-        },
-        "limitations": [
-            "Python language detection is not included in the browser bundle.",
-            "Regular expressions require JavaScript compatibility tests.",
-            "Model files remain external and must keep their recorded revisions.",
-            "Reversible and synthetic replacement are server-side features.",
-            "IBAN/card checksum typing and identifier tokens are server-side rules.",
-            "phone_reject_embedded is a server-side rule: the browser phone rule keeps every phone match "
-            "(0.8.1 behaviour).",
-            "custom_deny_terms, custom_allow_terms and custom_patterns are server-side features.",
-            "The browser year rule runs before the number rule on its own, so a year-like group of an ID "
-            "run ('123-45 2020') becomes the year token and the rest of the run stays; the server masks the "
-            "whole run.",
-            "Rules with fold_decimal_digits match on a copy of the text where every Unicode "
-            "decimal digit (Nd, such as ٠٦ or ०६) is its ASCII digit, one code point for one, "
-            "and replace the same offsets in the original text (JavaScript \\d is ASCII only).",
-        ],
+        "rule_order": [name for name, *_ in ordered],
+        "rules": rules,
+        "limitations": list(_LIMITATIONS),
     }
 
 
