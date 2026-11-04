@@ -6,6 +6,7 @@ import pytest
 from sct import TextCleaner, TextCleanerConfig
 from sct.presets import preset_config
 from sct.streaming import WindowedStreamingRedactor
+from tests.helpers import assert_near_linear
 
 
 FAST = preset_config("training", check_ner_process=False)
@@ -217,6 +218,12 @@ def test_stream_of_markup_with_entities_splits(repeats):
     assert calls[0] < 20  # was 1605 / 3205 (one prefix and suffix normalise per rejected space)
     assert first.startswith("intro <b> word & word")
     assert first + stream.feed(" ") + stream.finish() == cleaner.process(text + " ").lm_text
+
+
+def test_feed_of_markup_with_entities_stays_near_linear(fast_cleaner):
+    # the smaller size must still pass max_buffer_chars, or feed() only buffers and the ratio means nothing
+    assert_near_linear(lambda text: WindowedStreamingRedactor(fast_cleaner).feed(text),
+                       lambda n: "intro <b> " + "word &amp; " * n + "x" * 252, 3200)
 
 
 def test_stream_split_matches_whole_document_for_phone_glued_to_cjk():
