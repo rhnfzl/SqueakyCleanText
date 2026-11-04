@@ -56,3 +56,45 @@ def test_browser_phone_and_ip_rules_fold_digits():
 
 def test_browser_date_rule_folds_digits():
     assert build_browser_manifest(TextCleanerConfig())["rules"]["date"]["fold_decimal_digits"]
+
+
+@pytest.mark.parametrize(
+    ("kwargs", "message"),
+    [
+        ({"ner_backend": "torch"}, "onnx"),
+        ({"replacement_mode": "synthetic"}, "placeholder"),
+        ({"replace_ips_public_only": True}, "replace_ips_public_only"),
+        ({"replace_with_email": "<EMAIL1>"}, "without digits"),
+        ({"replace_with_url": "$URL"}, "currency"),
+        ({"replace_with_html": "a@b.com"}, "later email rule"),
+    ],
+)
+def test_browser_manifest_rejects_unportable_config(kwargs, message):
+    with pytest.raises(ValueError, match=message):
+        build_browser_manifest(TextCleanerConfig(**kwargs))
+
+
+@pytest.mark.parametrize("mode", ["identifiers", "all"])
+def test_browser_manifest_rules_follow_config(mode):
+    config = TextCleanerConfig(replace_numbers_mode=mode)
+    manifest = build_browser_manifest(config)
+
+    assert manifest["rule_order"] == [
+        "html", "url", "email", "ip", "date", "phone", "year", "number", "currency",
+    ]
+    for name, token, enabled in [
+        ("html", config.replace_with_html, config.check_replace_html),
+        ("url", config.replace_with_url, config.check_replace_urls),
+        ("email", config.replace_with_email, config.check_replace_emails),
+        ("ip", config.replace_with_ips, config.check_replace_ips),
+        ("date", config.replace_with_dates, config.check_replace_dates),
+        ("phone", config.replace_with_phone_numbers, config.check_replace_phone_numbers),
+        ("year", config.replace_with_years, config.check_replace_years),
+        ("number", config.replace_with_numbers, config.check_replace_numbers),
+        ("currency", config.replace_with_currency_symbols, config.check_replace_currency_symbols),
+    ]:
+        assert manifest["rules"][name]["replacement"] == token
+        assert manifest["rules"][name]["enabled"] == enabled
+
+    folded = {name for name, rule in manifest["rules"].items() if rule.get("fold_decimal_digits")}
+    assert folded == {"ip", "date", "phone"} | ({"number"} if mode == "identifiers" else set())
