@@ -4,26 +4,52 @@ Counts, shares, type names, language and model provenance only: never entity
 text and never offsets, so the view is safe to log, store or return to a model.
 """
 
-from typing import Any, Iterable
+from typing import Any, Iterable, Optional, TypedDict
 
-PUBLIC_VIEW_KEYS: tuple[str, ...] = (
-    "language", "language_confidence", "language_source", "chars",
-    "pii_count", "pii_chars", "pii_share", "pii_types",
-    "regex_counts", "entity_counts", "sensitive", "warnings", "models",
-)
-# IP_ADDRESS / PHONE_NUMBER: the names under legacy_type_names=True.
-PII_REGEX_TYPES = frozenset({"EMAIL", "URL", "IP", "PHONE", "IP_ADDRESS", "PHONE_NUMBER", "IBAN", "CARD", "ID"})
-# Regex counts that are not PII; every other key (the built-in PII types above and the user labels of
+
+class Signals(TypedDict):
+    """The value-free public view; every key is present for every input."""
+
+    language: Optional[str]
+    language_confidence: Optional[float]
+    language_source: str
+    chars: int
+    pii_count: int
+    pii_chars: int
+    pii_share: float
+    pii_types: dict[str, int]
+    regex_counts: dict[str, dict[str, int]]
+    entity_counts: dict[str, dict[str, int]]
+    sensitive: bool
+    warnings: list[str]
+    models: list[dict[str, Any]]
+
+
+PUBLIC_VIEW_KEYS: tuple[str, ...] = tuple(Signals.__annotations__)
+# Regex counts that are not PII; every other key (the built-in PII types and the user labels of
 # custom_deny_terms / custom_patterns) counts as PII.
 NON_PII_REGEX_TYPES = frozenset({"HTML", "DATE", "YEAR", "NUMBER", "CURRENCY"})
 WARNING_CODES = frozenset({
     "language_unknown", "language_fallback", "language_low_confidence",
     "ner_fallback_models", "ner_off", "cuda_fallback", "mps_fallback", "empty_input",
-    "custom_pattern_timeout",
+    "custom_pattern_timeout", "findings_not_collected",
 })
 
 
-def public_view(result) -> dict[str, Any]:
+def is_sensitive_result(result: Any) -> bool:
+    """Return whether processing found an entity or made a regex replacement.
+
+    The one sensitivity rule: ``public_view`` and OCR region selection both use it.
+    """
+    metadata = result.metadata or {}
+    return bool(
+        metadata.get("regex_counts")
+        or metadata.get("entity_counts")
+        or metadata.get("findings")
+    )
+
+
+def public_view(result) -> Signals:
     """The value-free view of one result; same keys for every input."""
     metadata = result.metadata or {}
     chars = metadata.get("source_chars", 0)
@@ -52,7 +78,7 @@ def public_view(result) -> dict[str, Any]:
         "pii_types": dict(sorted(pii_types.items())),
         "regex_counts": regex_counts,
         "entity_counts": entity_counts,
-        "sensitive": bool(regex_counts or entity_counts),
+        "sensitive": is_sensitive_result(result),
         "warnings": sorted(warnings),
         "models": [
             {k: model.get(k) for k in ("key", "id", "revision", "provider")}
@@ -66,7 +92,7 @@ class _Empty:
     metadata: dict = {}
 
 
-def merge_views(views: Iterable[dict[str, Any]]) -> dict[str, Any]:
+def merge_views(views: Iterable[Signals]) -> Signals:
     """Merge leaf views (e.g. every string of a JSON value) into one view."""
     views = list(views)
     if not views:
