@@ -275,11 +275,10 @@ class ONNXNERPipeline:
             # HF "simple" merges B+I of same type, and consecutive same-type tokens
             if (token['entity_type'] == prev['entity_type']
                     and token['bio'] in ('I', 'B')
-                    and token['start'] <= prev['end'] + 1):
-                # Only continue with I-tags or adjacent tokens of same type
-                if token['bio'] == 'I' or token['start'] == prev['end']:
-                    current_group.append(token)
-                    continue
+                    and token['start'] <= prev['end'] + 1
+                    and (token['bio'] == 'I' or token['start'] == prev['end'])):
+                current_group.append(token)
+                continue
             # Start new group
             groups.append(current_group)
             current_group = [token]
@@ -541,7 +540,13 @@ def load_onnx_ner_model(
 
     # Optional INT8 dynamic quantization
     if quantize:
-        from onnxruntime.quantization import QuantType, quantize_dynamic  # noqa: PLC0415
+        try:
+            from onnxruntime.quantization import QuantType, quantize_dynamic  # noqa: PLC0415
+        except ImportError as exc:
+            raise ImportError(
+                "the onnx package is required for quantize=True. "
+                "Install with: pip install squeakycleantext[quantize]"
+            ) from exc
         _qcache = Path(cache_dir) if cache_dir else Path.home() / ".cache" / "sct_quantized"
         # Keyed by snapshot commit: a moved branch must not reuse another commit's weights.
         quantized_path = _qcache / _quantized_dir(model_name, commit) / "model_quantized.onnx"

@@ -104,3 +104,21 @@ def test_quantized_cache_follows_the_moving_branch(monkeypatch, tmp_path):
         pipe, _ = op.load_onnx_ner_model("org/m", revision="main", quantize=True,
                                          cache_dir=str(tmp_path / "qc"))
         assert Path(pipe.session.path).read_text() == "quantized-from:weights-" + commit[0]
+
+
+def test_quantize_without_the_onnx_package_names_the_extra(monkeypatch, tmp_path):
+    import sct.utils.onnx_pipeline as op
+
+    def fake_download(repo, filename, **kwargs):
+        if filename == "model.onnx_data":
+            raise FileNotFoundError(filename)
+        path = tmp_path / filename
+        path.write_text(json.dumps({"id2label": {"0": "O"}}) if filename == "config.json" else "{}")
+        return str(path)
+
+    monkeypatch.setitem(sys.modules, "onnxruntime.quantization", None)  # import raises ImportError
+    monkeypatch.setattr(op, "hf_hub_download", fake_download)
+    monkeypatch.setattr(op, "Tokenizer", types.SimpleNamespace(from_file=lambda p: None))
+    monkeypatch.setattr(op, "TokenizerWrapper", lambda tok, model_max_length: None)
+    with pytest.raises(ImportError, match=r"squeakycleantext\[quantize\]"):
+        op.load_onnx_ner_model("org/m", revision="main", quantize=True)

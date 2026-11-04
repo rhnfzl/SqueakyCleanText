@@ -66,11 +66,11 @@ class ProcessDateTime:
         """
         try:
             from rapidfuzz import fuzz, process as rfprocess
-        except ImportError:
+        except ImportError as exc:
             raise ImportError(
                 "rapidfuzz is required for fuzzy date detection. "
                 "Install it with: pip install squeakycleantext[fuzzy]"
-            )
+            ) from exc
 
         # Select vocabulary based on detected language
         if language and language in self._fuzzy_vocabulary_by_lang:

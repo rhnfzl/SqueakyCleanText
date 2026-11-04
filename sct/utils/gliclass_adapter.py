@@ -53,11 +53,11 @@ class GLiClassAdapter:
         try:
             from gliclass import GLiClassModel, ZeroShotClassificationPipeline  # noqa: S404
             from transformers import AutoTokenizer
-        except ImportError:
+        except ImportError as exc:
             raise ImportError(
                 "gliclass is required for GLiClass classification backend. "
                 "Install with: pip install squeakycleantext[classify]"
-            )
+            ) from exc
 
         load_kwargs = {"revision": self._revision} if self._revision else {}
         model = GLiClassModel.from_pretrained(model_id, **load_kwargs)

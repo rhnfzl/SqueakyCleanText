@@ -34,11 +34,13 @@ def assess_reidentification_risk(
     quasi_identifiers: tuple[str, ...],
     k_threshold: int = 5,
 ) -> ReidentificationRiskReport:
-    """Measure k-anonymity for selected quasi-identifiers."""
+    """Measure k-anonymity for selected quasi-identifiers; a plain string names one."""
     if not quasi_identifiers:
         raise ValueError("quasi_identifiers must not be empty")
     if k_threshold < 2:
         raise ValueError("k_threshold must be >= 2")
+    if isinstance(quasi_identifiers, str):
+        quasi_identifiers = (quasi_identifiers,)
 
     combinations = Counter()
     for record in records:

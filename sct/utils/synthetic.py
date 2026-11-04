@@ -230,11 +230,11 @@ class SyntheticReplacer:
         if locale not in fakers:
             try:
                 from faker import Faker  # noqa: S404
-            except ImportError:
+            except ImportError as exc:
                 raise ImportError(
                     "faker is required for synthetic replacement mode. "
                     "Install with: pip install squeakycleantext[synthetic]"
-                )
+                ) from exc
             fake = Faker(locale)
             fake.seed_instance(self._seed)
             for provider in fake.providers:

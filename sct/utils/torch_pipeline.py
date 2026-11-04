@@ -24,11 +24,11 @@ class TorchNERPipeline:
                 AutoTokenizer, AutoModelForTokenClassification,
                 pipeline as hf_pipeline,
             )
-        except ImportError:
+        except ImportError as exc:
             raise ImportError(
                 "torch and transformers are required for the torch NER backend. "
                 "Install with: pip install squeakycleantext[torch]"
-            )
+            ) from exc
 
         import transformers
         transformers.logging.set_verbosity_error()
@@ -67,10 +67,7 @@ class TorchNERPipeline:
     def cleanup(self):
         """Release GPU memory."""
         if self._device.startswith('cuda'):
-            try:
-                self._torch.cuda.empty_cache()
-            except Exception:  # noqa: S110
-                pass
+            self._torch.cuda.empty_cache()
 
 
 def load_torch_ner_model(

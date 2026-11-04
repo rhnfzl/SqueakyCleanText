@@ -44,11 +44,11 @@ class GLiNERAdapter:
         if variant == 'gliner':
             try:
                 from gliner import GLiNER  # noqa: S404
-            except ImportError:
+            except ImportError as exc:
                 raise ImportError(
                     "gliner is required for GLiNER backend. "
                     "Install with: pip install squeakycleantext[gliner]"
-                )
+                ) from exc
             if onnx:
                 try:
                     self.model = GLiNER.from_pretrained(
@@ -70,11 +70,11 @@ class GLiNERAdapter:
         elif variant == 'gliner2':
             try:
                 from gliner2 import GLiNER2  # noqa: S404
-            except ImportError:
+            except ImportError as exc:
                 raise ImportError(
                     "gliner2 is required for GLiNER2 backend. "
                     "Install with: pip install squeakycleantext[gliner2]"
-                )
+                ) from exc
             self.model = GLiNER2.from_pretrained(model_id, **load_kwargs)
             self._onnx = False  # GLiNER2 has no ONNX loader; it always runs in torch
         else:

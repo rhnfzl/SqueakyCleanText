@@ -1,11 +1,7 @@
 import os
-import warnings
 import threading
 
 from lingua import Language, LanguageDetectorBuilder
-
-# Only suppress known lingua deprecation warnings, not all warnings globally
-warnings.filterwarnings('ignore', module='lingua')
 
 # ---------------------------------------------------------------------------
 # ISO code → canonical Lingua name reverse lookup tables (built once)

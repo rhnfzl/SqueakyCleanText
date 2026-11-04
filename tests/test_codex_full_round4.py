@@ -42,3 +42,9 @@ def test_report_cli_k_anonymity_distinct_types(tmp_path, a, b):
 def test_risk_bool_and_int_are_distinct():
     risk = assess_reidentification_risk([{"q": True}, {"q": 1}], quasi_identifiers=("q",), k_threshold=2)
     assert risk.minimum_k == 1
+
+
+def test_a_string_quasi_identifier_names_one_field():
+    risk = assess_reidentification_risk([{"age": 30}, {"age": 30}], quasi_identifiers="age", k_threshold=2)
+    assert risk.quasi_identifiers == ("age",)
+    assert risk.record_count == 2
