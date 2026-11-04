@@ -134,10 +134,16 @@ HEAD = (("masked_recall", "mR"), ("masked_precision", "mP"), ("strict_f1", "stri
         ("doc_leak_rate", "doc leak"), ("overmask_rate", "over-mask"))
 
 
+# why an entry other than SCT has no language list (never default to "regex": two of these are models)
+NO_CLAIM = {"datafog": "all (regex, no language claim)",
+            "pii-tracer": "all (model card: en + multilingual)",
+            "presidio-full": "all (spaCy engine per gold language + recognizers)"}
+
+
 def claimed(entry: str) -> str:
     langs = registry.CLAIMED_LANGUAGES.get(entry)
     if langs is None:
-        return "all (multilingual claim)" if entry.startswith("sct") else "all (regex, no language claim)"
+        return "all (multilingual claim)" if entry.startswith("sct") else NO_CLAIM.get(entry, "all (no language claim)")
     return "24 EU" if langs == registry.EU24 else " ".join(langs)
 
 
@@ -353,6 +359,9 @@ def tables(bundle: Path) -> str:
                     lines += ["", f"### SCT vs each entry, datasets {kind} for both, languages both claim", "",
                               *pairwise_table(summary, view, group, kind)]
         for group in scorer.GROUPS:
+            if not any((bundle / track / e / f"{d}-test.json").exists()
+                       for e in summary["aggregate"] for d in scorer.GROUPS[group]):
+                continue  # group not run in this bundle (round-1 groups in a round-2 run, and back)
             for status in ("clean", "unknown"):
                 lines += ["", f"## {track} track, per language, full view, masked recall, {group}, {status} sets "
                           "(° = outside the entry's claimed languages)", "",

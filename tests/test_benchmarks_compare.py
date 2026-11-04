@@ -490,6 +490,27 @@ def test_c6_sct_offsets_survive_entity_decoding_and_invisible_chars():
     assert [(s.start, s.end) for s in got] == [(25, len(text))]
 
 
+def test_c6_sct_offsets_survive_whitespace_collapse_and_report_why_unplaced():
+    from sct.utils.normtext import NormaliseText, unescape_markup
+
+    from scripts.benchmark_release import predicted_spans
+
+    sct = _adapter_module("sct_adapter.py")
+    fix = NormaliseText().fix_bad_unicode
+
+    def normalise(token):
+        return unescape_markup(fix(token))
+
+    text = "To  Jan\u00a0\u00a0Kowalski,\n\tana&#64;example.org ok"
+    got = predicted_spans(text, "To <PERSON_0>, <EMAIL_0> ok",
+                          {"<PERSON_0>": "Jan Kowalski", "<EMAIL_0>": "ana@example.org"}, sct.sct_view(text, normalise))
+    assert [text[s.start:s.end] for s in got] == ["Jan\u00a0\u00a0Kowalski", "ana&#64;example.org"]
+    view = sct.sct_view("Call 555 - 123 now", normalise)[0]
+    assert sct.unplaced_reason("", view) == "no_value"
+    assert sct.unplaced_reason("555123", view) == "separators"
+    assert sct.unplaced_reason("Ann", view) == "absent"
+
+
 def test_c7_nvidia_postcode_is_a_number_like_gold_and_fastino():
     assert entries.NVIDIA_CARD["postcode"] == DATASET_LABELS["nemotron"]["postcode"] == entries.FASTINO_CARD["postal_code"]
 
@@ -608,6 +629,7 @@ def test_report_tables_from_a_tiny_bundle(tmp_path):
     assert "paired bootstrap vs baseline" not in out  # every set excluded/unknown for SCT: section dropped
     assert "| tab | 0.500 |" in out
     assert "| en | tab | 0.600 |" in out
+    assert "masked recall, ner," not in out  # no ner set in the bundle: no empty per-language section
 
 
 def test_vm_hwm_reads_proc_status_or_gives_none():

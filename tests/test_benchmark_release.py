@@ -95,3 +95,66 @@ def test_predicted_spans_map_unicode_folded_value_to_source_offsets():
     # A combining accent stays with its letter; a ligature maps to its one source char.
     assert predicted_spans("René met ﬁ", "<PERSON_0> met <X_0>", {"<PERSON_0>": "René", "<X_0>": "fi"}) == [
         EntitySpan("PERSON", 0, 5), EntitySpan("X", 10, 11)]
+
+
+def test_predicted_spans_place_values_whose_whitespace_sct_collapsed():
+    # SCT's normalize_whitespace turns every run (tabs, newlines, NBSP, ideographic space) into one space.
+    for source in ("Dear Jan  Kowalski, hi", "Dear Jan\nKowalski, hi", "Dear Jan\t Kowalski, hi",
+                   "Dear Jan　Kowalski, hi", "Dear\r\n  Jan Kowalski, hi"):
+        got = predicted_spans(source, "Dear <PERSON_0>, hi", {"<PERSON_0>": "Jan Kowalski"})
+        assert [source[s.start:s.end].split() for s in got] == [["Jan", "Kowalski"]]
+
+
+def test_predicted_spans_skip_tokens_sct_dropped_inside_a_value():
+    # Isolated letters/symbols and bracket content are removed before NER, so the value has a gap.
+    for source, gap in (("Dr Anna B Schulz in Bonn", "B"), ("Ask * Tom Hardy * now", None),
+                        ("Pan Jan [przyp. red.] Kowalski tu", "[przyp. red.]"), ("Hans {x} Meier, ok", "{x}")):
+        value = "Anna Schulz" if "Anna" in source else "Tom Hardy" if "Tom" in source else (
+            "Jan Kowalski" if "Jan" in source else "Hans Meier")
+        (span,) = predicted_spans(source, "x <PERSON_0> y", {"<PERSON_0>": value})
+        placed = source[span.start:span.end]
+        assert placed.split()[0] == value.split()[0] and placed.split()[-1] == value.split()[-1]
+        assert gap is None or gap in placed
+    # The exact copy after the cursor still wins over a gapped one, and a real word is never skipped.
+    assert predicted_spans("Ann B Lee met Ann Lee", "<PERSON_0> met <PERSON_1>",
+                           {"<PERSON_0>": "Ann Lee", "<PERSON_1>": "Ann Lee"}) == [
+        EntitySpan("PERSON", 0, 9), EntitySpan("PERSON", 14, 21)]
+    assert predicted_spans("Ann Bob Lee", "<PERSON_0>", {"<PERSON_0>": "Ann Lee"}) == [EntitySpan("PERSON", -1, -1)]
+
+
+def test_predicted_spans_mirror_sct_cleanup_exactly():
+    from sct.config import TextCleanerConfig
+
+    def placed(source, value, output="x <PERSON_0> y", cfg=None):
+        (span,) = predicted_spans(source, output, {"<PERSON_0>": value}, cfg=cfg)
+        return source[span.start:span.end] if span.start >= 0 else None
+
+    # Only what SCT removes is skipped: it keeps "A", non-ASCII letters, CJK and "&".
+    for source, value in (("Ann A Lee", "Ann Lee"), ("Ann ł Lee", "Ann Lee"),
+                          ("李 明 华", "李 华"), ("Smith & Jones", "Smith Jones")):
+        assert placed(source, value) is None
+    # Glued bracket content, and a quote dropped inside a token after the symbol step.
+    assert placed("Yesterday John[1] Smith came", "John Smith") == "John[1] Smith"
+    assert placed("Yesterday Anna (*) Smith came", "Anna () Smith") == "Anna (*) Smith"
+    # The steps follow the cleaner's config.
+    assert placed("Dr Ann B Lee", "Ann Lee", cfg=TextCleanerConfig(check_remove_isolated_letters=False)) is None
+    # A regex value taken before the cleanup is still whole in the uncleaned view.
+    assert predicted_spans("Call 06 - 1234 now", "Call <PHONE_0> now", {"<PHONE_0>": "06 - 1234"}) == [
+        EntitySpan("PHONE", 5, 14)]
+    # Edge whitespace is not part of a value, and a blank value is never placed.
+    assert placed("Jan  B , ok", "Jan ", "<PERSON_0>, ok") == "Jan"
+    assert placed("Hi there Bob", " ", "Hi there <PERSON_0>") is None
+
+
+def test_predicted_spans_never_credit_text_the_output_kept():
+    # SCT masked the later, differently written mention: the unmasked "Ann B Lee" is a leak, not a hit.
+    assert predicted_spans("Ann B Lee wrote. Later ANN LEE came", "Ann Lee wrote. Later <PERSON_0> came",
+                           {"<PERSON_0>": "Ann Lee"}) == [EntitySpan("PERSON", -1, -1)]
+
+
+def test_predicted_spans_expand_a_marker_a_wider_ner_span_took_in():
+    # A NER span that cut "<PHONE>" took it whole; its own placeholder is gone from the output.
+    source = "Write to Jan Kowalski at 0612345678 today."
+    got = predicted_spans(source, "Write to <PERSON_0> today.",
+                          {"<PHONE_0>": "0612345678", "<PERSON_0>": "Jan Kowalski at <PHONE>"})
+    assert [source[s.start:s.end] for s in got] == ["Jan Kowalski at 0612345678"]

@@ -89,7 +89,7 @@ def predict(cleaner, records: list[dict], workers: int) -> tuple[dict, dict, flo
         outputs[record["id"]] = result.lm_text
         predictions[record["id"]] = [
             {"start": s.start, "end": s.end, "label": s.label}
-            for s in predicted_spans(record["text"], result.lm_text, originals)]
+            for s in predicted_spans(record["text"], result.lm_text, originals, cfg=cleaner.cfg)]
     return predictions, outputs, seconds
 
 

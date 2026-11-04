@@ -12,6 +12,9 @@ Config: ``mode`` (default|gliner), ``preset`` (a ``sct.presets`` name, applied u
 ``device`` (cpu|cuda), ``gpu_mem_gb``, ``overrides`` (extra TextCleanerConfig fields).
 """
 
+from collections import Counter
+import os
+import re
 import sys
 from pathlib import Path
 
@@ -65,13 +68,22 @@ def sct_view(source: str, normalise) -> tuple[str, list[int]]:
     return "".join(pieces), offsets
 
 
+def unplaced_reason(value: str, view: str) -> str:
+    """Why a value was not placed: ``no_value`` (no anon_map entry), ``separators`` (its letters and
+    digits are in the view, a cleanup changed what lies between them) or ``absent`` (rewritten text)."""
+    if not value:
+        return "no_value"
+    alnum = re.sub(r"\W", "", value)
+    return "separators" if alnum and alnum in re.sub(r"\W", "", view) else "absent"
+
+
 def load(config: dict):
     from sct.config import TextCleanerConfig
     from sct.sct import TextCleaner
 
     from sct.utils.normtext import unescape_markup
 
-    from scripts.benchmark_release import predicted_spans
+    from scripts.benchmark_release import PLACEHOLDER_REGEX, predicted_spans
 
     base = dict(SCORING)
     if config.get("preset"):
@@ -104,6 +116,8 @@ def load(config: dict):
         return unescape_markup(model.normalise(token))
 
     warned: set = set()
+    # Set SCT_ADAPTER_UNPLACED_DEBUG=1 for per-batch counts of why spans stay unplaced (stderr, no text).
+    debug = os.environ.get("SCT_ADAPTER_UNPLACED_DEBUG")
 
     def predict(docs: list[dict]) -> list[dict]:
         groups: dict = {}
@@ -114,16 +128,23 @@ def load(config: dict):
                 print(f"sct_adapter: no SCT language for {doc.get('lang')!r}, using detection", file=sys.stderr)
             groups.setdefault(key, []).append(i)
         out: list = [None] * len(docs)
+        reasons: Counter = Counter()
         for key, indices in groups.items():
             object.__setattr__(model.cfg, "language", key)
             results = model.process_batch([docs[i]["text"] for i in indices], batch_size=workers)
             for i, result in zip(indices, results, strict=True):
                 anon_map = result.metadata.get("anon_map")
                 originals = {e.placeholder: e.original for e in anon_map.entries} if anon_map else {}
-                spans = predicted_spans(docs[i]["text"], result.lm_text, originals,
-                                        sct_view(docs[i]["text"], normalise))
+                view = sct_view(docs[i]["text"], normalise)
+                spans = predicted_spans(docs[i]["text"], result.lm_text, originals, view, model.cfg)
                 placed = [{"start": s.start, "end": s.end, "label": s.label, "score": None} for s in spans if s.start >= 0]
                 out[i] = {"spans": placed, "masked_text": result.lm_text, "unplaced": len(spans) - len(placed)}
+                if debug and len(placed) < len(spans):
+                    tags = [m.group(0) for m in PLACEHOLDER_REGEX.finditer(result.lm_text)]
+                    reasons.update(f"{s.label}:{unplaced_reason(originals.get(tag, ''), view[0])}"
+                                   for tag, s in zip(tags, spans, strict=True) if s.start < 0)
+        if reasons:
+            print(f"sct_adapter: unplaced {dict(reasons)}", file=sys.stderr)
         return out
 
     return predict
