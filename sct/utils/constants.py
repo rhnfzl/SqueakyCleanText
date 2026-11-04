@@ -2,6 +2,7 @@
 Constant symbols and compiled RegExs used for cleaning.
 """
 
+import functools
 import re
 import string
 import unicodedata
@@ -284,7 +285,6 @@ def token_glue(in_words: bool = False) -> str:
     return r"\d_" if in_words else rf"\d_{_SPACED_LETTERS}"
 
 
-_ID_NUMBER_CACHE: dict[tuple, re.Pattern[str]] = {}
 # A date written as a spaced/hyphen-joined digit run (05 11 2023, 2023 11-05): the year step keeps masking its
 # year rather than leaving it to the run's <NUMBER>, as before (the date step has no spaced date).
 SPACED_DATE_REGEX = re.compile(
@@ -295,6 +295,7 @@ SPACED_DATE_REGEX = re.compile(
 THOUSANDS_MAX_GROUPS = 6
 
 
+@functools.cache
 def identifier_numbers_regex(min_digits: int, in_words: bool = False, *, letter_prefix: bool = False,
                              two_part: bool = False, spaced_pair: bool = False,
                              keep_currency_code: bool = False) -> re.Pattern[str]:
@@ -316,48 +317,45 @@ def identifier_numbers_regex(min_digits: int, in_words: bool = False, *, letter_
     keep_currency_code: a whole digit run right before or after an uppercase ISO 4217 code (_CURRENCY_CODES), with
     at most one space between ("1250 EUR", "EUR 1250"), is an amount. Only that amount shape: an SSN-, slash-,
     dot- or space-joined ID beside a code ("123-45-6789 USD", "EUR 123 45 6789") is still masked whole."""
-    key = (min_digits, in_words, letter_prefix, two_part, spaced_pair, keep_currency_code)
-    if key not in _ID_NUMBER_CACHE:
-        glue, j, unit = token_glue(in_words), PART_JOINERS, CURRENCY_SIGNS
-        hyphen, end = r"[\-\u2010\u2011]", rf"(?![\d{j}])"
-        date = rf"(?:\d{{1,2}}{hyphen}\d{{1,2}}{hyphen}(?:\d\d){{1,2}}|\d{{4}}{hyphen}\d{{1,2}}{hyphen}\d{{1,2}}){end}"
-        grouped = rf"(?!{date})(?=\d(?:{hyphen}?\d){{{min_digits - 1}}})\d+(?:{hyphen}\d+){{2,}}"
-        no_unit_before, no_unit_after = rf"(?<![{unit}])(?<![{unit}] )", rf"(?! ?[%‰{unit}])"
-        no_code_before = no_code_after = ""
-        if keep_currency_code:  # uppercase codes only, not inside a Latin/Greek/Cyrillic word ("PEUR", "EURO")
-            code = rf"(?:{_CURRENCY_CODES})"
-            no_code_before = rf"(?<!(?<![{_SPACED_LETTERS}]){code})(?<!(?<![{_SPACED_LETTERS}]){code} )"
-            no_code_after = rf"(?! ?{code}(?![{_SPACED_LETTERS}]))"
-        shapes = [
-            rf"(?<![{glue}])(?<![{glue}{_LEFT_EDGE}][{j}]){no_unit_before}"
-            rf"(?:{grouped}|{no_code_before}\d{{{min_digits},}}{no_code_after})"
-            rf"(?![{glue}])(?![{j}][{glue}{_RIGHT_EDGE}]){no_unit_after}"
-        ]
-        if letter_prefix:
-            shapes.append(rf"(?<![\w\-/.])(?!(?:{_CURRENCY_CODES})\d)[A-Z]{{1,3}}\d{{6,}}[A-Z]{{0,2}}(?!\w)")
-        if two_part:
-            slash = r"[/\-\u2010\u2011]"
-            year = r"(?:1[89]|20)\d\d"
-            shapes.append(
-                rf"(?<![\w\-/.,+]){no_unit_before}"
-                rf"(?!{year}{slash}{year}(?!\w))(?!\d*00{slash}\d*00(?!\w))"
-                rf"(?=(?:\d{slash}?){{7}})\d{{4,}}{slash}\d{{2,6}}[A-Z]?(?!\w|[\-/.,:]\d){no_unit_after}"
-            )
-            shapes.append(rf"(?<![\w\-/.,+]){no_unit_before}\d{{4,}}\.\d{{4,}}(?!\w|[\-/.,]\d){no_unit_after}")
-        if spaced_pair:
-            # A run of 3+ digit groups joined by spaces and/or hyphens with at least one space and 7+ digits
-            # (an ID or SSN written 123 45 6789, 123 45-6789, 1234 56-78-90) is one identifier, unless
-            # thousands-grouped (1 234 567, an amount, up to THOUSANDS_MAX_GROUPS groups); an all-hyphen run is
-            # the grouped rule's. It goes first, so no other shape takes part of the run.
-            sep = r"[ \-\u2010\u2011]"
-            tail = rf"(?!\w|[.,:]\d|{sep}\d){no_unit_after}"
-            shapes.insert(0, rf"(?<![\w.,:/\-\u2010\u2011])(?<!\d ){no_unit_before}"
-                             rf"(?!\d{{1,3}}(?: \d{{3}}){{1,{THOUSANDS_MAX_GROUPS - 1}}}{tail})(?=\d+(?:{sep}\d+)*? \d)"
-                             rf"(?=(?:\d{sep}?){{7}})\d+(?:{sep}\d+){{2,}}{tail}")
-            # "DDD DD", a 5-digit postal code
-            shapes.append(rf"(?<![\w.,:/\-])(?<!\d ){no_unit_before}\d{{3}} \d{{2}}{tail}")
-        _ID_NUMBER_CACHE[key] = re.compile("|".join(shapes))
-    return _ID_NUMBER_CACHE[key]
+    glue, j, unit = token_glue(in_words), PART_JOINERS, CURRENCY_SIGNS
+    hyphen, end = r"[\-\u2010\u2011]", rf"(?![\d{j}])"
+    date = rf"(?:\d{{1,2}}{hyphen}\d{{1,2}}{hyphen}(?:\d\d){{1,2}}|\d{{4}}{hyphen}\d{{1,2}}{hyphen}\d{{1,2}}){end}"
+    grouped = rf"(?!{date})(?=\d(?:{hyphen}?\d){{{min_digits - 1}}})\d+(?:{hyphen}\d+){{2,}}"
+    no_unit_before, no_unit_after = rf"(?<![{unit}])(?<![{unit}] )", rf"(?! ?[%‰{unit}])"
+    no_code_before = no_code_after = ""
+    if keep_currency_code:  # uppercase codes only, not inside a Latin/Greek/Cyrillic word ("PEUR", "EURO")
+        code = rf"(?:{_CURRENCY_CODES})"
+        no_code_before = rf"(?<!(?<![{_SPACED_LETTERS}]){code})(?<!(?<![{_SPACED_LETTERS}]){code} )"
+        no_code_after = rf"(?! ?{code}(?![{_SPACED_LETTERS}]))"
+    shapes = [
+        rf"(?<![{glue}])(?<![{glue}{_LEFT_EDGE}][{j}]){no_unit_before}"
+        rf"(?:{grouped}|{no_code_before}\d{{{min_digits},}}{no_code_after})"
+        rf"(?![{glue}])(?![{j}][{glue}{_RIGHT_EDGE}]){no_unit_after}"
+    ]
+    if letter_prefix:
+        shapes.append(rf"(?<![\w\-/.])(?!(?:{_CURRENCY_CODES})\d)[A-Z]{{1,3}}\d{{6,}}[A-Z]{{0,2}}(?!\w)")
+    if two_part:
+        slash = r"[/\-\u2010\u2011]"
+        year = r"(?:1[89]|20)\d\d"
+        shapes.append(
+            rf"(?<![\w\-/.,+]){no_unit_before}"
+            rf"(?!{year}{slash}{year}(?!\w))(?!\d*00{slash}\d*00(?!\w))"
+            rf"(?=(?:\d{slash}?){{7}})\d{{4,}}{slash}\d{{2,6}}[A-Z]?(?!\w|[\-/.,:]\d){no_unit_after}"
+        )
+        shapes.append(rf"(?<![\w\-/.,+]){no_unit_before}\d{{4,}}\.\d{{4,}}(?!\w|[\-/.,]\d){no_unit_after}")
+    if spaced_pair:
+        # A run of 3+ digit groups joined by spaces and/or hyphens with at least one space and 7+ digits
+        # (an ID or SSN written 123 45 6789, 123 45-6789, 1234 56-78-90) is one identifier, unless
+        # thousands-grouped (1 234 567, an amount, up to THOUSANDS_MAX_GROUPS groups); an all-hyphen run is
+        # the grouped rule's. It goes first, so no other shape takes part of the run.
+        sep = r"[ \-\u2010\u2011]"
+        tail = rf"(?!\w|[.,:]\d|{sep}\d){no_unit_after}"
+        shapes.insert(0, rf"(?<![\w.,:/\-\u2010\u2011])(?<!\d ){no_unit_before}"
+                         rf"(?!\d{{1,3}}(?: \d{{3}}){{1,{THOUSANDS_MAX_GROUPS - 1}}}{tail})(?=\d+(?:{sep}\d+)*? \d)"
+                         rf"(?=(?:\d{sep}?){{7}})\d+(?:{sep}\d+){{2,}}{tail}")
+        # "DDD DD", a 5-digit postal code
+        shapes.append(rf"(?<![\w.,:/\-])(?<!\d ){no_unit_before}\d{{3}} \d{{2}}{tail}")
+    return re.compile("|".join(shapes))
 
 
 # phone_reject_embedded: a digit-only phone match with a letter or "_" on either side, directly or across a

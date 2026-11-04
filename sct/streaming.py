@@ -54,15 +54,20 @@ class BufferedStreamingRedactor:
         return self._cleaner.process("".join(self._chunks)).lm_text
 
 
+def _sub_fuzzy_dates(cleaner, score_cutoff, language, repl, text):
+    """The fuzzy date step as a ``sub(repl, text)``: *repl* runs on each candidate the date masker takes."""
+    def masked(match):
+        is_date = cleaner._date_masker.fuzzy_replace_dates(
+            match.group(), replace_with="", score_cutoff=score_cutoff, language=language) == ""
+        return repl(match) if is_date else match.group()
+    return constants.FUZZY_DATE_CANDIDATE_REGEX.sub(masked, text)
+
+
 def _masking_steps(cleaner, cfg, normalised_text):
     """The cleaner's masking steps up to the phone step, in pipeline order, each a ``sub(repl, text)``: user
     rules and fuzzy dates too, since a value they mask moves what the phone rule sees ("117 235 991 12345")."""
-    def fuzzy_dates(repl, text):
-        def is_date(match):
-            return cleaner._date_masker.fuzzy_replace_dates(
-                match.group(), replace_with="", score_cutoff=cfg.fuzzy_date_score_cutoff, language=language) == ""
-        return constants.FUZZY_DATE_CANDIDATE_REGEX.sub(lambda m: repl(m) if is_date(m) else m.group(), text)
     language = cleaner._detect_language(normalised_text)[0] if cfg.check_fuzzy_replace_dates else None
+    fuzzy_dates = partial(_sub_fuzzy_dates, cleaner, cfg.fuzzy_date_score_cutoff, language)
     # a pattern past custom_patterns_timeout raises, or (on_timeout='warn') masks nothing
     steps = [(True, partial(cleaner._sub_user_rule, pattern, timed)) for pattern, _, timed in cleaner._user_rules]
     steps += [(cfg.check_replace_html, cleaner._html_regex.sub), (cfg.check_replace_urls, cleaner._url_regex.sub),
@@ -108,6 +113,83 @@ def _digit_group_runs(cleaner, blanked):
     masked_whole = {m.span() for m in cleaner._numbers_regex.finditer(blanked)}
     spans = [m.span() for m in _DIGIT_GROUP_RUN.finditer(blanked) if m.span() not in masked_whole]
     return spans + [m.span() for regex in (_DIGIT_GROUP_HEAD, _DIGIT_GROUP_TAIL) for m in regex.finditer(blanked)]
+
+
+def _protected_spans(cleaner, cfg, normalised_text, step_spans, blanked, overlap_chars):
+    """(start, end) of normalised text a split must not cut: start < split < end."""
+    phone_view = cleaner._phone_folded_view
+    guard_patterns = [cleaner._url_regex, constants.EMAIL_REGEX, contact.IP_VIEW, phone_view]
+    if cfg.check_replace_html:  # a tag holding a space ('<a title="x y">')
+        guard_patterns.append(cleaner._html_regex)
+    if cfg.check_replace_dates:
+        guard_patterns.append(cleaner._date_view)
+    if cfg.check_fuzzy_replace_dates:  # every candidate the fuzzy step may mask ("15 Janury 1990")
+        guard_patterns.append(constants.FUZZY_DATE_CANDIDATE_REGEX)
+    if cfg.check_replace_iban_cards:  # "NL91 ABNA 0417 1643 00"
+        guard_patterns += [constants.IBAN_REGEX, constants.CARD_REGEX]
+    spaced_ids = cfg.check_replace_numbers and cfg.replace_numbers_mode == 'identifiers' \
+        and cfg.numbers_spaced_pair_ids
+    if cfg.check_replace_numbers:  # a grouped number ("5 379") is one token too
+        guard_patterns += [contact.numbers_regex(cfg.replace_numbers_in_words),
+                           _NUMBER_UNIT_CONTEXT]  # the amount lookarounds read one space past a match: "€ 123 45"
+        if not spaced_ids:  # with spaced IDs, _digit_group_runs protects its runs (a table may split)
+            guard_patterns.append(cleaner._numbers_regex)  # "123 45"
+    protected = [
+        match.span()
+        for regex in guard_patterns
+        for match in (regex.pattern.finditer(normalised_text.translate(regex.table))
+                      if isinstance(regex, contact.DigitView) else regex.finditer(normalised_text))
+    ]
+    protected += step_spans
+    if spaced_ids:
+        protected += _digit_group_runs(cleaner, blanked)
+    # User rules (a deny term holding a space, "Blue Sky Initiative"): their matches, and a match the buffer
+    # end cuts off ("... the Blue Sky"), which the next feed completes.
+    # A custom pattern past custom_patterns_timeout raises, or (on_timeout='warn') protects nothing.
+    protected += [match.span() for pattern, _, timed in cleaner._user_rules
+                  for match in cleaner._user_matches(pattern, timed, normalised_text, partial=True) or ()]
+    phone_digits = normalised_text.translate(phone_view.table)
+    tail = _PHONE_TAIL.search(phone_digits, max(0, len(phone_digits) - _PHONE_TAIL_MAX))
+    if tail:
+        protected.append((tail.start(), len(normalised_text) + 1))
+    protected += [run.span() for run in _PHONE_RUN.finditer(
+        phone_digits, max(0, len(phone_digits) - overlap_chars - _PHONE_TAIL_MAX))]
+    return protected
+
+
+def _find_split(normalise, buffer, cutoff, normalised_text, protected, steps, step_spans):
+    """(index in *buffer*, separator) of the last safe whitespace split at or before *cutoff*; index -1 if none.
+
+    A whitespace split is safe where the normalised text is the two halves' own with at most one whitespace
+    character between them ("\\r\\n" is one "\\n"), so no step reads across it, and no protected match
+    covers the cut. Candidates are tried from the cutoff back; a protected one jumps to the last candidate
+    whose own normalised text ends at or before the match start (a bisect on its offsets, since NFKC can make
+    it longer, "⑫" -> "12", or escapes shorter), so a feed normalises a few times, not once per space.
+    """
+    candidates = [index for index, character in enumerate(buffer[:cutoff + 1]) if character.isspace()]
+    index = len(candidates) - 1
+    while index >= 0:
+        position = candidates[index]
+        left = normalise(buffer[:position])
+        offset = len(left)
+        if not normalised_text.startswith(left):
+            index -= 1
+            continue
+        cover = next((start for start, end in protected if start < offset < end), None)
+        if cover is not None:
+            index = bisect_right(candidates, cover, hi=index, key=lambda p: len(normalise(buffer[:p]))) - 1
+            continue
+        right = normalise(buffer[position + 1:])
+        separator = normalised_text[offset:len(normalised_text) - len(right)]
+        if len(normalised_text) - offset - len(right) not in (0, 1) or not normalised_text.endswith(right) \
+                or not (separator == "" or separator.isspace()):
+            index -= 1
+            continue
+        if not _steps_split_safe(steps, step_spans, normalised_text, offset, len(normalised_text) - len(right)):
+            index -= 1
+            continue
+        return position, separator
+    return -1, ""
 
 
 class WindowedStreamingRedactor:
@@ -177,77 +259,10 @@ class WindowedStreamingRedactor:
         # rule that reads past a space (a phone's next group: "㉚ ⓪⑦" folds to "30 07") sees what the whole
         # document gives it.
         cutoff = len(buffer) - self._overlap_chars
-        phone_view = cleaner._phone_folded_view
-        guard_patterns = [cleaner._url_regex, constants.EMAIL_REGEX, contact.IP_VIEW, phone_view]
-        if cfg.check_replace_html:  # a tag holding a space ('<a title="x y">')
-            guard_patterns.append(cleaner._html_regex)
-        if cfg.check_replace_dates:
-            guard_patterns.append(cleaner._date_view)
-        if cfg.check_fuzzy_replace_dates:  # every candidate the fuzzy step may mask ("15 Janury 1990")
-            guard_patterns.append(constants.FUZZY_DATE_CANDIDATE_REGEX)
-        if cfg.check_replace_iban_cards:  # "NL91 ABNA 0417 1643 00"
-            guard_patterns += [constants.IBAN_REGEX, constants.CARD_REGEX]
-        spaced_ids = cfg.check_replace_numbers and cfg.replace_numbers_mode == 'identifiers' \
-            and cfg.numbers_spaced_pair_ids
-        if cfg.check_replace_numbers:  # a grouped number ("5 379") is one token too
-            guard_patterns += [contact.numbers_regex(cfg.replace_numbers_in_words),
-                               _NUMBER_UNIT_CONTEXT]  # the amount lookarounds read one space past a match: "€ 123 45"
-            if not spaced_ids:  # with spaced IDs, _digit_group_runs protects its runs (a table may split)
-                guard_patterns.append(cleaner._numbers_regex)  # "123 45"
-        # (start, end) of normalised text a split must not cut: start < split < end
-        protected = [
-            match.span()
-            for regex in guard_patterns
-            for match in (regex.pattern.finditer(normalised_text.translate(regex.table))
-                          if isinstance(regex, contact.DigitView) else regex.finditer(normalised_text))
-        ]
         steps = _masking_steps(cleaner, cfg, normalised_text)
         step_spans, blanked = _step_matches(steps, normalised_text)
-        protected += step_spans
-        step_spans = set(step_spans)
-        if spaced_ids:
-            protected += _digit_group_runs(cleaner, blanked)
-        # User rules (a deny term holding a space, "Blue Sky Initiative"): their matches, and a match the buffer
-        # end cuts off ("... the Blue Sky"), which the next feed completes.
-        # A custom pattern past custom_patterns_timeout raises, or (on_timeout='warn') protects nothing.
-        protected += [match.span() for pattern, _, timed in cleaner._user_rules
-                      for match in cleaner._user_matches(pattern, timed, normalised_text, partial=True) or ()]
-        phone_digits = normalised_text.translate(phone_view.table)
-        tail = _PHONE_TAIL.search(phone_digits, max(0, len(phone_digits) - _PHONE_TAIL_MAX))
-        if tail:
-            protected.append((tail.start(), len(normalised_text) + 1))
-        protected += [run.span() for run in _PHONE_RUN.finditer(
-            phone_digits, max(0, len(phone_digits) - self._overlap_chars - _PHONE_TAIL_MAX))]
-
-        # A whitespace split is safe where the normalised text is the two halves' own with at most one whitespace
-        # character between them ("\r\n" is one "\n"), so no step reads across it, and no protected match
-        # covers the cut. Candidates are tried from the cutoff back; a protected one jumps to the last candidate
-        # whose own normalised text ends at or before the match start (a bisect on its offsets, since NFKC can make
-        # it longer, "⑫" -> "12", or escapes shorter), so a feed normalises a few times, not once per space.
-        candidates = [index for index, character in enumerate(buffer[:cutoff + 1]) if character.isspace()]
-        split_at, index = -1, len(candidates) - 1
-        while index >= 0:
-            position = candidates[index]
-            left = normalise(buffer[:position])
-            offset = len(left)
-            if not normalised_text.startswith(left):
-                index -= 1
-                continue
-            cover = next((start for start, end in protected if start < offset < end), None)
-            if cover is not None:
-                index = bisect_right(candidates, cover, hi=index, key=lambda p: len(normalise(buffer[:p]))) - 1
-                continue
-            right = normalise(buffer[position + 1:])
-            separator = normalised_text[offset:len(normalised_text) - len(right)]
-            if len(normalised_text) - offset - len(right) not in (0, 1) or not normalised_text.endswith(right) \
-                    or not (separator == "" or separator.isspace()):
-                index -= 1
-                continue
-            if not _steps_split_safe(steps, step_spans, normalised_text, offset, len(normalised_text) - len(right)):
-                index -= 1
-                continue
-            split_at = position
-            break
+        protected = _protected_spans(cleaner, cfg, normalised_text, step_spans, blanked, self._overlap_chars)
+        split_at, separator = _find_split(normalise, buffer, cutoff, normalised_text, protected, steps, set(step_spans))
         if split_at < 0:
             raise BufferError(
                 "Streaming buffer exceeded max_buffer_chars without a safe whitespace split. "
