@@ -5,6 +5,11 @@ and removes PII, how well it detects the language, how it does on long documents
 how well it removes noise, and how fast it runs. This folder is not part of the
 PyPI wheel (`pyproject.toml` ships only `sct*`).
 
+This is not the release benchmark in [evaluation/](../evaluation/README.md). That one is a
+small fixed set committed to the repo, run with `python -m scripts.benchmark_release`, with
+results in `evaluation/results/`. This folder samples large downloaded datasets, with
+results in `benchmarks/results/`. One release can have results in both.
+
 The repo holds only download code, the scorer and the scores. Dataset files go to
 `benchmarks/.cache/` (gitignored). Result files never hold dataset text.
 
