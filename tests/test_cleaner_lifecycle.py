@@ -70,3 +70,29 @@ def test_one_character_custom_pattern_streams_without_a_buffer_error():
     redactor = WindowedStreamingRedactor(cleaner, max_buffer_chars=200, overlap_chars=20)
     out = redactor.feed(text) + redactor.finish()
     assert "user@example.com" not in out and "#" not in out
+
+
+@pytest.mark.parametrize("text, expected", [
+    ("<REF_1>-107683", "<REF_1><NUMBER_0>"),
+    ("107683-<REF_1>", "<NUMBER_0><REF_1>"),
+    ("<REF_1>,107683", "<REF_1>,<NUMBER_0>"),
+])
+def test_reversible_masks_a_number_joined_to_a_placeholder_shaped_token(text, expected):
+    assert _cleaner(replacement_mode="reversible").process(text).lm_text == expected
+
+
+@pytest.mark.parametrize("old, new", [
+    ("NormaliseText", "_text_normaliser"),
+    ("ProcessStopwords", "_stopword_remover"),
+    ("ProcessDateTime", "_date_masker"),
+    ("ProcessContacts", "_contact_masker"),
+    ("ProcessSpecialSymbols", "_symbol_masker"),
+])
+def test_renamed_collaborators_keep_their_deprecated_public_names(old, new):
+    cleaner = _cleaner()
+    with pytest.warns(DeprecationWarning, match=old):
+        assert getattr(cleaner, old) is getattr(cleaner, new)
+    replacement = object()
+    with pytest.warns(DeprecationWarning, match=old):
+        setattr(cleaner, old, replacement)
+    assert getattr(cleaner, new) is replacement

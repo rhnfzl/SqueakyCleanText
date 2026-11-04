@@ -8,6 +8,7 @@ import os
 import re
 import threading
 import time
+import warnings
 from bisect import bisect_right
 from collections import Counter
 from concurrent.futures import ThreadPoolExecutor
@@ -96,7 +97,27 @@ class _DocumentContext(threading.local):
         self.__dict__.clear()
 
 
+def _renamed_attribute(old: str, new: str) -> property:
+    """A deprecated public name that reads and writes the attribute that replaced it."""
+    message = f"TextCleaner.{old} is deprecated; it is a private attribute now and this alias will be removed"
+
+    def read(self):
+        warnings.warn(message, DeprecationWarning, stacklevel=2)
+        return getattr(self, new)
+
+    def write(self, value):
+        warnings.warn(message, DeprecationWarning, stacklevel=2)
+        setattr(self, new, value)
+    return property(read, write)
+
+
 class TextCleaner:
+
+    NormaliseText = _renamed_attribute('NormaliseText', '_text_normaliser')
+    ProcessStopwords = _renamed_attribute('ProcessStopwords', '_stopword_remover')
+    ProcessDateTime = _renamed_attribute('ProcessDateTime', '_date_masker')
+    ProcessContacts = _renamed_attribute('ProcessContacts', '_contact_masker')
+    ProcessSpecialSymbols = _renamed_attribute('ProcessSpecialSymbols', '_symbol_masker')
 
     def __init__(
         self,
@@ -1138,14 +1159,21 @@ class TextCleaner:
         return self._replace_typed(text, constants.IDENTIFIER_REGEX, 'ID')
 
     def _replace_numbers(self, text):
-        view = self._numbers_regex
-        if self._document_context.anon_map is not None:
-            # A placeholder-shaped source token keeps its digits, so it cannot collide with an allocated one.
-            placeholders = [m.span() for m in _INDEXED_PLACEHOLDER.finditer(text)]
-            if placeholders:
-                view = contact.RejectView(
-                    view, lambda _, start, end: any(a <= start and end <= b for a, b in placeholders))
-        return self._replace_typed(text, view, 'NUMBER')
+        if self._document_context.anon_map is None:
+            return self._replace_typed(text, self._numbers_regex, 'NUMBER')
+        # A placeholder-shaped source token keeps its digits, so it cannot collide with an allocated one. It is
+        # hidden, not just skipped: the pattern's lookarounds treat '<' and '>' as edges and would spare a joined run.
+        hidden = {}
+
+        def hide(match):
+            key = f"{chr(65 + len(hidden))}"
+            hidden[key] = match.group()
+            return key
+
+        replaced = self._replace_typed(_INDEXED_PLACEHOLDER.sub(hide, text), self._numbers_regex, 'NUMBER')
+        for key, placeholder in hidden.items():
+            replaced = replaced.replace(key, placeholder)
+        return replaced
 
     @property
     def _numbers_regex(self):
