@@ -6,7 +6,6 @@ records the mapping so the original text can be restored.
 """
 
 from dataclasses import dataclass, field
-from typing import List
 from uuid import uuid4
 
 
@@ -31,7 +30,7 @@ class AnonymizationMap:
     """
 
     session_id: str = field(default_factory=lambda: str(uuid4()))
-    entries: List[MapEntry] = field(default_factory=list)
+    entries: list[MapEntry] = field(default_factory=list)
 
     # Per-entity-type counter (tracks how many of each type have been seen).
     _counter: dict = field(default_factory=dict, repr=False)

@@ -5,7 +5,6 @@ Auto-detects bi-encoder models (ModernBERT, etc.) and caches label embeddings.
 Optional backend. Requires: pip install squeakycleantext[gliner] or [gliner2]
 """
 import logging
-from typing import Dict, List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -23,12 +22,12 @@ class GLiNERAdapter:
     def __init__(
         self,
         model_id: str,
-        revision: Optional[str] = None,
+        revision: str | None = None,
         variant: str = 'gliner',
-        labels: Optional[Tuple[str, ...]] = None,
+        labels: tuple[str, ...] | None = None,
         threshold: float = 0.4,
-        label_map: Optional[Dict[str, str]] = None,
-        label_descriptions: Optional[Dict[str, str]] = None,
+        label_map: dict[str, str] | None = None,
+        label_descriptions: dict[str, str] | None = None,
         device: str = 'cpu',
         onnx: bool = False,
     ):
@@ -86,7 +85,7 @@ class GLiNERAdapter:
         # Bi-encoder detection: ModernBERT and similar architectures expose encode_labels()
         self._is_bi_encoder = hasattr(self.model, 'encode_labels')
         self._label_embeddings = None
-        self._cached_labels_key: Optional[tuple] = None
+        self._cached_labels_key: tuple | None = None
 
         logger.info(
             "Loaded GLiNER model: %s (variant=%s, bi_encoder=%s)",
@@ -124,7 +123,7 @@ class GLiNERAdapter:
         """Map a GLiNER label to entity_group tag."""
         return self.label_map.get(label, label.upper())
 
-    def __call__(self, texts, batch_size: int = 1) -> List[List[dict]]:
+    def __call__(self, texts, batch_size: int = 1) -> list[list[dict]]:
         """Run NER. Returns List[List[dict]] matching ONNXNERPipeline format.
 
         GLiNER runs ``batch_size`` texts per forward pass; ``1`` keeps the
@@ -133,10 +132,10 @@ class GLiNERAdapter:
         if isinstance(texts, str):
             texts = [texts]
 
-        all_results: List[List[dict]] = []
+        all_results: list[list[dict]] = []
 
         # Build description-to-label reverse mapping for ZERONER-style labels
-        desc_to_label: Dict[str, str] = {}
+        desc_to_label: dict[str, str] = {}
         if self.label_descriptions:
             for label in self.labels:
                 desc = self.label_descriptions.get(label, label)

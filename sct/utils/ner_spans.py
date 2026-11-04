@@ -2,7 +2,6 @@
 
 import re
 import unicodedata
-from typing import List
 
 import regex
 
@@ -18,7 +17,7 @@ ENTITY_TYPE_MAP = {
 _GAP_BREAK = re.compile(r"[\n\r\u2028\u2029]|[.!?;:]\s|[。！？]")
 
 
-def _letter_scripts(text: str) -> List[str]:
+def _letter_scripts(text: str) -> list[str]:
     """Script of each letter, from its Unicode name after NFKC ("LATIN", "HIRAGANA", "THAI").
 
     Marks, digits, punctuation and modifier letters (ー, ๆ) belong to no script here.

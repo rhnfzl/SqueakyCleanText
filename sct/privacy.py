@@ -2,7 +2,8 @@
 
 from dataclasses import dataclass, field
 from types import MappingProxyType
-from typing import Mapping, Optional, Protocol
+from typing import Protocol
+from collections.abc import Mapping
 
 from sct.utils.anonymization_map import AnonymizationMap
 
@@ -16,7 +17,7 @@ class TokenStore(Protocol):
     def save(self, anon_map: AnonymizationMap) -> str:
         """Store a map and return an opaque reference."""
 
-    def load(self, reference: str) -> Optional[AnonymizationMap]:
+    def load(self, reference: str) -> AnonymizationMap | None:
         """Load a map by reference."""
 
     def delete(self, reference: str) -> None:
@@ -33,7 +34,7 @@ class InMemoryTokenStore:
         self._maps[anon_map.session_id] = anon_map
         return anon_map.session_id
 
-    def load(self, reference: str) -> Optional[AnonymizationMap]:
+    def load(self, reference: str) -> AnonymizationMap | None:
         return self._maps.get(reference)
 
     def delete(self, reference: str) -> None:
@@ -94,9 +95,9 @@ class ProcessingMetrics:
     """Opt-in processing measurements without source text or entity values."""
 
     duration_ms: float
-    language: Optional[str]
-    backend: Optional[str]
-    policy: Optional[str]
+    language: str | None
+    backend: str | None
+    policy: str | None
     entity_counts: Mapping[str, int]
 
     def __post_init__(self) -> None:

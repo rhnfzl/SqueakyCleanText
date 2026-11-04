@@ -1,7 +1,8 @@
 """Optional OCR and image redaction interfaces."""
 
 from dataclasses import dataclass
-from typing import Any, Protocol, Sequence
+from typing import Any, Protocol
+from collections.abc import Sequence
 
 from sct.sct import TextCleaner
 from sct.signals import is_sensitive_result

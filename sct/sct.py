@@ -12,7 +12,8 @@ import warnings
 from bisect import bisect_right
 from collections import Counter
 from concurrent.futures import ThreadPoolExecutor
-from typing import Any, Callable, Dict, List, NamedTuple, Optional, Tuple, cast
+from typing import Any, NamedTuple, cast
+from collections.abc import Callable
 
 import regex
 
@@ -45,24 +46,24 @@ class _DocumentState(NamedTuple):
     """One document on its way from ``_before_ner`` to ``_after_ner``."""
 
     text: str
-    language: Optional[str]
-    anon_map: Optional[AnonymizationMap]
+    language: str | None
+    anon_map: AnonymizationMap | None
     doc_classes: Any
     started_at: float
-    regex_counts: Dict[str, Dict[str, int]]
-    language_confidence: Optional[float]
+    regex_counts: dict[str, dict[str, int]]
+    language_confidence: float | None
     language_source: str
     source_chars: int
     source_markers: frozenset  # marker spans, or marker strings when a step moved markers (_source_marker_spans)
-    language_margin: Optional[float]
-    deferred: Optional[list]  # (tag, value) in text order, for _swap_deferred
+    language_margin: float | None
+    deferred: list | None  # (tag, value) in text order, for _swap_deferred
     warnings: set
 
 
-def _entity_counts(findings) -> Dict[str, Dict[str, int]]:
+def _entity_counts(findings) -> dict[str, dict[str, int]]:
     """Value-free counts per type. Overlapping findings count once, as their union labelled by the highest
     score: the same rule NER uses when it replaces them."""
-    spans: List[list] = []
+    spans: list[list] = []
     for finding in sorted(findings, key=lambda f: (f.entity.start, -f.entity.end)):
         e = finding.entity
         if spans and e.start < spans[-1][3]:
@@ -72,7 +73,7 @@ def _entity_counts(findings) -> Dict[str, Dict[str, int]]:
             last[3] = max(last[3], e.end)
         else:
             spans.append([e.entity_type, e.score, e.start, e.end])
-    counts: Dict[str, Dict[str, int]] = {}
+    counts: dict[str, dict[str, int]] = {}
     for entity_type, _, start, end in spans:
         entry = counts.setdefault(entity_type, {'count': 0, 'chars': 0})
         entry['count'] += 1
@@ -131,12 +132,12 @@ class TextCleaner:
 
     def __init__(
         self,
-        cfg: Optional[TextCleanerConfig] = None,
+        cfg: TextCleanerConfig | None = None,
         *,
-        privacy_policy: Optional[PrivacyPolicy] = None,
-        token_store: Optional[TokenStore] = None,
+        privacy_policy: PrivacyPolicy | None = None,
+        token_store: TokenStore | None = None,
         include_entities: bool = False,
-        metrics_callback: Optional[Callable[[ProcessingMetrics], None]] = None,
+        metrics_callback: Callable[[ProcessingMetrics], None] | None = None,
     ):
         """Initialize the text cleaning pipeline.
 
@@ -204,11 +205,11 @@ class TextCleaner:
                 reference_date=self.cfg.synthetic_reference_date,
             )
 
-        self.GeneralNER: Optional[ner.GeneralNER] = self._build_ner() if self.cfg.check_ner_process else None
+        self.GeneralNER: ner.GeneralNER | None = self._build_ner() if self.cfg.check_ner_process else None
         # GLiClass document-level pre-classification (optional, lazy-loaded)
         self._gliclass: Any = self._build_gliclass() if self.cfg.check_classify_document else None
 
-        self._pipeline: List[Callable[[str], str]] = []
+        self._pipeline: list[Callable[[str], str]] = []
         self._init_pipeline()
 
     @property
@@ -224,9 +225,9 @@ class TextCleaner:
             terms = list(map(step, terms))
         return [term for term in terms if term.strip()]
 
-    def _deny_labels(self) -> Dict[str, str]:
+    def _deny_labels(self) -> dict[str, str]:
         """Each normalised deny term -> its label."""
-        labels: Dict[str, str] = {}
+        labels: dict[str, str] = {}
         for label, terms in (self.cfg.custom_deny_terms or {}).items():
             for term in self._normalised_terms(terms):
                 labels.setdefault(term, label)
@@ -390,7 +391,7 @@ class TextCleaner:
         for step_fn in cfg.custom_pipeline_steps:
             self._pipeline.append(step_fn)
 
-    def _detect_language(self, text: str) -> Tuple[Optional[str], Optional[float], str, Optional[float]]:
+    def _detect_language(self, text: str) -> tuple[str | None, float | None, str, float | None]:
         """Detect language as a pure function (no instance mutation).
 
         Returns ``(name, confidence, source, margin)``; source is ``pinned``, ``detected``,
@@ -493,7 +494,7 @@ class TextCleaner:
         self._document_context.anon_map = anon_map
         self._document_context.protected = {}
         # The dict travels in the returned state, so it survives the context reset.
-        regex_counts: Dict[str, Dict[str, int]] = {}
+        regex_counts: dict[str, dict[str, int]] = {}
         self._document_context.regex_counts = regex_counts
         doc_warnings: set = set()  # step warnings ('custom_pattern_timeout'), travel in the state like the counts
         self._document_context.warnings = doc_warnings
@@ -556,9 +557,9 @@ class TextCleaner:
             warnings.add('mps_fallback')
         return warnings
 
-    def _policy_metadata(self, findings) -> Dict[str, Any]:
+    def _policy_metadata(self, findings) -> dict[str, Any]:
         """The metadata a privacy policy or include_entities adds, for empty input too."""
-        metadata: Dict[str, Any] = {}
+        metadata: dict[str, Any] = {}
         if self._privacy_policy is not None:
             metadata['policy'] = {
                 'name': self._privacy_policy.name,
@@ -582,7 +583,7 @@ class TextCleaner:
         entity_counts = _entity_counts(findings)
         ner_on = self.GeneralNER is not None
         models = self.GeneralNER.models_for(language) if ner_on else []
-        metadata: Dict[str, Any] = {
+        metadata: dict[str, Any] = {
             'source_chars': state.source_chars,
             'regex_counts': state.regex_counts,
             'entity_counts': entity_counts,
@@ -614,7 +615,7 @@ class TextCleaner:
 
         return ProcessResult(current_text, stat_text, language, metadata=metadata)
 
-    def process_batch(self, texts: List[str], batch_size: Optional[int] = None) -> List[ProcessResult]:
+    def process_batch(self, texts: list[str], batch_size: int | None = None) -> list[ProcessResult]:
         """Process multiple texts with bounded document concurrency.
 
         Args:
@@ -629,7 +630,7 @@ class TextCleaner:
         if not texts:
             return []
 
-        results: List[Optional[ProcessResult]] = [None] * len(texts)
+        results: list[ProcessResult | None] = [None] * len(texts)
         to_process = []
 
         for i, text in enumerate(texts):
@@ -641,7 +642,7 @@ class TextCleaner:
                 to_process.append((i, text))
 
         if not to_process:
-            return cast(List[ProcessResult], results)
+            return cast(list[ProcessResult], results)
 
         # Parallel processing: ONNX Runtime releases the GIL during C++ inference
         # ops, so threads achieve real concurrency for the NER inference bottleneck.
@@ -686,9 +687,9 @@ class TextCleaner:
             for (i, _), result in zip(to_process, run(self._process_single_isolated), strict=True):
                 results[i] = result
 
-        return cast(List[ProcessResult], results)
+        return cast(list[ProcessResult], results)
 
-    def _empty_metadata(self, text: str) -> Dict[str, Any]:
+    def _empty_metadata(self, text: str) -> dict[str, Any]:
         """Metadata for empty or whitespace input (nothing ran)."""
         metadata = {
             'source_chars': len(text),
@@ -708,7 +709,7 @@ class TextCleaner:
                 metadata['anon_map'] = AnonymizationMap()
         return metadata
 
-    async def aprocess_batch(self, texts: List[str], batch_size: Optional[int] = None) -> List[ProcessResult]:
+    async def aprocess_batch(self, texts: list[str], batch_size: int | None = None) -> list[ProcessResult]:
         """Async version of process_batch for use with asyncio-based frameworks (FastAPI, aiohttp).
 
         Runs process_batch in a thread-pool executor so it doesn't block the event loop.
@@ -717,7 +718,7 @@ class TextCleaner:
         loop = asyncio.get_running_loop()
         return await loop.run_in_executor(None, self.process_batch, texts, batch_size)
 
-    def warmup(self, languages: Optional[List[str]] = None) -> None:
+    def warmup(self, languages: list[str] | None = None) -> None:
         """Pre-load NER models to avoid first-request latency.
 
         A language that fails to load is logged as a warning and skipped; it loads (or fails) on first use.
@@ -922,7 +923,7 @@ class TextCleaner:
         """
         if not order:
             return text
-        values: Dict[str, list] = {}
+        values: dict[str, list] = {}
         for tag, value in order:
             values.setdefault(tag, []).append(value)
         tags = sorted(values, key=len, reverse=True)
@@ -932,7 +933,7 @@ class TextCleaner:
         held = {e.placeholder for e in anon_map.entries} - set(values) if anon_map is not None else set()
         in_text = re.compile('|'.join(map(re.escape, sorted([*held, *tags], key=len, reverse=True))))
         found = Counter(match.group() for match in in_text.finditer(text) if match.group() in values)
-        where: Dict[str, list] = {}
+        where: dict[str, list] = {}
         for match in pattern.finditer(source):
             where.setdefault(match.group(), []).append(match.span())
         spans = [(f.entity.start, f.entity.end) for f in findings]
@@ -1158,7 +1159,7 @@ class TextCleaner:
     def _normalize_whitespace(self, text):
         return self._text_normaliser.normalize_whitespace(text, no_line_breaks=True)
 
-    def _build_stat_text(self, text: str, language: Optional[str]) -> str:
+    def _build_stat_text(self, text: str, language: str | None) -> str:
         """Generate statistical model text (lowercase, no stopwords, no punctuation)."""
         stat_text = text
         if self.cfg.check_smart_casefold:

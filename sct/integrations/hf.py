@@ -1,6 +1,7 @@
 """Hugging Face ``datasets`` adapter (``pip install squeakycleantext[datasets]``)."""
 
-from typing import Any, Optional, Sequence, Union
+from typing import Any
+from collections.abc import Sequence
 
 import sct
 from sct.config import TextCleanerConfig
@@ -14,7 +15,7 @@ class SCTMap:
         self,
         columns: Sequence[str] = ("text",),
         output: str = "overwrite",
-        config: Union[TextCleanerConfig, str, None] = None,
+        config: TextCleanerConfig | str | None = None,
         score: bool = False,
     ):
         self.columns = as_columns(columns)
@@ -55,9 +56,9 @@ def clean_dataset(
     *,
     columns: Sequence[str] = ("text",),
     output: str = "overwrite",
-    config: Union[TextCleanerConfig, str, None] = None,
+    config: TextCleanerConfig | str | None = None,
     batch_size: int = 64,
-    num_proc: Optional[int] = None,
+    num_proc: int | None = None,
     score: bool = False,
     **map_kwargs: Any,
 ) -> Any:

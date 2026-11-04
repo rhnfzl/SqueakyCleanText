@@ -8,7 +8,8 @@ ONNX sessions. Pickling keeps only the config.
 import os
 import threading
 from dataclasses import replace
-from typing import Any, Mapping, Optional, Sequence, Union
+from typing import Any
+from collections.abc import Mapping, Sequence
 
 from sct.config import ONNX_BACKENDS, TextCleanerConfig
 from sct.presets import preset_config
@@ -23,7 +24,7 @@ if hasattr(os, "register_at_fork"):
     os.register_at_fork(after_in_child=lambda: globals().update(_BUILD_LOCK=threading.Lock()))
 
 
-def resolve_config(config: Union[TextCleanerConfig, str, None]) -> TextCleanerConfig:
+def resolve_config(config: TextCleanerConfig | str | None) -> TextCleanerConfig:
     """``None`` -> ``"training"`` preset, a str -> that preset, a config -> itself."""
     if config is None:
         config = "training"
@@ -39,7 +40,7 @@ def resolve_config(config: Union[TextCleanerConfig, str, None]) -> TextCleanerCo
     return config
 
 
-def _pin_loaded_revisions(cleaner: Optional[TextCleaner], config: TextCleanerConfig) -> TextCleanerConfig:
+def _pin_loaded_revisions(cleaner: TextCleaner | None, config: TextCleanerConfig) -> TextCleanerConfig:
     """Pin unpinned ONNX models to the commits *cleaner* loaded, so workers skip the Hub."""
     ner = getattr(cleaner, "GeneralNER", None)
     if ner is None or config.ner_backend not in ONNX_BACKENDS:
@@ -53,10 +54,10 @@ def _pin_loaded_revisions(cleaner: Optional[TextCleaner], config: TextCleanerCon
 class CleanerHandle:
     """Picklable owner of one ``TextCleaner`` per process."""
 
-    def __init__(self, config: Union[TextCleanerConfig, str, None] = None):
+    def __init__(self, config: TextCleanerConfig | str | None = None):
         self.config = resolve_config(config)
-        self._cleaner: Optional[TextCleaner] = None
-        self._pid: Optional[int] = None
+        self._cleaner: TextCleaner | None = None
+        self._pid: int | None = None
 
     def get(self) -> TextCleaner:
         pid = os.getpid()
@@ -143,11 +144,11 @@ def clean_columns(
 
 def clean_records(
     handle: CleanerHandle,
-    records: Sequence[tuple[Optional[str], Mapping[str, Any]]],
+    records: Sequence[tuple[str | None, Mapping[str, Any]]],
     text_key: str,
     columns: Sequence[str],
     output: str,
-) -> list[tuple[Optional[str], dict]]:
+) -> list[tuple[str | None, dict]]:
     """Clean ``(text, metadata)`` pairs of document objects.
 
     A column equal to ``text_key`` is the document text, any other is a metadata

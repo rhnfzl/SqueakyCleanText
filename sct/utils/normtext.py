@@ -2,7 +2,6 @@ import logging
 import re
 import unicodedata
 from encodings.idna import dots as _idna_dots
-from typing import Optional, Set
 from ftfy import fix_text
 from ftfy.chardata import HTML_ENTITY_RE
 from ftfy.fixes import unescape_html
@@ -63,7 +62,7 @@ def _nfkc_ascii_alnum(tags):
 _STYLED_ALNUM = _nfkc_ascii_alnum({'<font>', '<wide>'})
 _CIRCLED_ALNUM = {**_nfkc_ascii_alnum({'<circle>'}),
                   **{cp: ch for cp, ch in _nfkc_ascii_alnum({'<square>'}).items() if len(ch) == 1}}
-_CIRCLED_RUN_REGEX = re.compile('[%s]+' % ''.join(map(chr, _CIRCLED_ALNUM)))
+_CIRCLED_RUN_REGEX = re.compile('[{}]+'.format(''.join(map(chr, _CIRCLED_ALNUM))))
 # Contact punctuation in every compatibility form (full-width ＠, small ﹫, font ﬩ for +), picked by
 # decomposition tag and NFKC value so every rule below folds the same set; ideographic space too.
 _COMPAT_PUNCT = {ch: unicodedata.normalize('NFKC', ch) for ch, decomposition in constants.DECOMPOSITIONS.items()
@@ -170,7 +169,7 @@ def _fold_styled_email_run(m):
 # text edge it joins nothing and drops too (1990년 6월\u2060 1일). Between two other letters they stay (ZWNJ in
 # Persian, ZWSP between Thai words).
 _INVISIBLE_REGEX = re.compile(f'[{_FORMAT_CHARS}]+')
-_RUN_CHAR = re.compile('[A-Za-z\\d\u00b7%s%s%s%s%s%s%s%s]' % (
+_RUN_CHAR = re.compile('[A-Za-z\\d\u00b7{}{}{}{}{}{}{}{}]'.format(
     ''.join(map(chr, _CIRCLED_ALNUM)), _PUNCT_ANY, _DASHES, _IDNA_DOTS, _HOST_DOTS, _LOCAL_FORMS, _LOCAL_ATEXT, _PARENS))
 _LETTER = re.compile(rf'[^\W_]|[{constants.MARKS}]')
 
@@ -188,9 +187,9 @@ def _drop_invisible(m):
 
 # A lone circled number between space-separated digit groups (06 ⑬ 01 68) or after two or more of
 # them (06 73 86 88 ㊺) is one group of them; a lone one before a number (① 2024年) is a list marker.
-_DIGIT_GROUP = '(?:\\d|[%s])' % ''.join(chr(cp) for cp, plain in _CIRCLED_ALNUM.items() if plain.isdigit())
+_DIGIT_GROUP = '(?:\\d|[{}])'.format(''.join(chr(cp) for cp, plain in _CIRCLED_ALNUM.items() if plain.isdigit()))
 # Groups may be set off by any space (Zs: no-break, thin, narrow no-break, ideographic), as the phone view reads them.
-_SPACE = '[%s]' % constants.CATEGORY_CHARS['Zs']
+_SPACE = '[{}]'.format(constants.CATEGORY_CHARS['Zs'])
 _DIGIT_BEFORE, _DIGIT_AFTER = re.compile(_DIGIT_GROUP + _SPACE), re.compile(_SPACE + _DIGIT_GROUP)
 _GROUPS_BEFORE = re.compile(rf'(?:{_DIGIT_GROUP}+{_SPACE}){{2,}}\Z')
 # An IDNA dot after a decimal digit is a host label dot (𖭗𖭗｡⑫｡15.example), so a circled run after it folds.
@@ -303,7 +302,7 @@ class NormaliseText:
         """Detect lowercase-to-uppercase transition (e.g., GraphQL, DevOps)."""
         return bool(re.search(r'[a-z][A-Z]', text))
 
-    def smart_casefold(self, text: str, stop_words: Optional[Set[str]] = None) -> str:
+    def smart_casefold(self, text: str, stop_words: set[str] | None = None) -> str:
         """Case-fold text while preserving abbreviations and camelCase.
 
         Per-token rules (applied in order):

@@ -14,8 +14,7 @@ import random
 import sys
 import threading
 import types
-from datetime import date, datetime, timedelta, timezone
-from typing import Dict, Optional
+from datetime import date, datetime, timedelta
 
 logger = logging.getLogger(__name__)
 
@@ -114,7 +113,7 @@ def _swap_globals(lock, modules, held):
                 _SWAPPED.remove(patch)
 
 # Maps entity tags to Faker method names
-FAKER_GENERATORS: Dict[str, str] = {
+FAKER_GENERATORS: dict[str, str] = {
     # Standard NER tags
     'PER': 'name', 'PERSON': 'name',
     'LOC': 'city', 'LOCATION': 'city',
@@ -153,8 +152,8 @@ FAKER_GENERATORS: Dict[str, str] = {
 }
 
 
-@functools.lru_cache(maxsize=None)
-def faker_locale_for(language: Optional[str]) -> str:
+@functools.cache
+def faker_locale_for(language: str | None) -> str:
     """Faker locale for a Lingua language name (``'DUTCH'`` -> ``'nl_NL'``).
 
     The territory comes from the C library's locale alias table (``locale.normalize``),
@@ -183,9 +182,9 @@ class _DocumentCache(dict):
     ``seed`` is set in per-document mode; ``language`` is the detected document language.
     """
 
-    seed: Optional[int] = None
-    language: Optional[str] = None
-    locale: Optional[str] = None  # overrides the language's locale (low-confidence detection)
+    seed: int | None = None
+    language: str | None = None
+    locale: str | None = None  # overrides the language's locale (low-confidence detection)
 
 
 class SyntheticReplacer:
@@ -210,9 +209,9 @@ class SyntheticReplacer:
     ``DATE_OF_BIRTH``) end on, so they do not change with the clock; None = today.
     """
 
-    def __init__(self, seed: int = 42, per_document: bool = True, locale: Optional[str] = None,
-                 low_confidence_locale: Optional[str] = None, collapse_period: bool = False,
-                 reference_date: Optional[str] = None):
+    def __init__(self, seed: int = 42, per_document: bool = True, locale: str | None = None,
+                 low_confidence_locale: str | None = None, collapse_period: bool = False,
+                 reference_date: str | None = None):
         self._seed = seed
         self._per_document = per_document
         self._locale = locale
@@ -222,7 +221,7 @@ class SyntheticReplacer:
             date.fromisoformat(reference_date), datetime.min.time())
         self._local = threading.local()
 
-    def _get_faker(self, locale: Optional[str] = None):
+    def _get_faker(self, locale: str | None = None):
         """Get or create the thread-local Faker instance for *locale* (default: en_US)."""
         fakers = getattr(self._local, 'fakers', None)
         if fakers is None:
@@ -245,7 +244,7 @@ class SyntheticReplacer:
             fakers[locale] = fake
         return fakers[locale]
 
-    def reset_cache(self, text: Optional[str] = None, language: Optional[str] = None,
+    def reset_cache(self, text: str | None = None, language: str | None = None,
                     low_confidence: bool = False) -> None:
         """Start a document: fresh consistency cache, fakes seeded from *text*.
 
@@ -264,7 +263,7 @@ class SyntheticReplacer:
             ).digest()
             self._local.cache.seed = int.from_bytes(digest, 'big')
 
-    def swap_cache(self, cache: Optional[Dict[tuple, str]] = None) -> Dict[tuple, str]:
+    def swap_cache(self, cache: dict[tuple, str] | None = None) -> dict[tuple, str]:
         """Install *cache* (default: a new one) for this thread; return the previous one.
 
         Lets a document's cache move between threads and processing stages.
@@ -273,7 +272,7 @@ class SyntheticReplacer:
         self._local.cache = _DocumentCache() if cache is None else cache
         return previous
 
-    def _get_cache(self) -> Dict[tuple, str]:
+    def _get_cache(self) -> dict[tuple, str]:
         """Get or create the thread-local consistency cache."""
         if not hasattr(self._local, 'cache'):
             self._local.cache = _DocumentCache()
@@ -307,7 +306,7 @@ class SyntheticReplacer:
             # UTC, since Faker reads a naive range in the worker's local timezone (fakes differ per machine).
             between = functools.partial(fake.date_time_between_dates,
                                         self._reference - timedelta(days=115 * 365 + 28),
-                                        self._reference, timezone.utc)
+                                        self._reference, _datetime_module.UTC)
             generate = functools.partial(_date_part, between)
         method = getattr(generate, 'func', generate)
         if method is _date_part:  # the Faker call inside decides whose clock and random to hold

@@ -135,7 +135,7 @@ _MIDDLE_DOT = "(?<=l)\u00b7(?=l)"
 
 def _script_class(*scripts):
     """Character-class body of the code points of *scripts* (Unicode Script property)."""
-    script = regex.compile('[%s]' % ''.join(rf'\p{{Script={name}}}' for name in scripts))
+    script = regex.compile('[{}]'.format(''.join(rf'\p{{Script={name}}}' for name in scripts)))
     # Every code point: regex has its own Unicode tables, which may assign what unicodedata does not.
     return _ranges(script.findall(''.join(map(chr, range(0x110000)))))
 

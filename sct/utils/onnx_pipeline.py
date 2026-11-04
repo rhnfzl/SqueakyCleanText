@@ -16,7 +16,7 @@ import sys
 import uuid
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 from urllib.parse import quote
 
 import numpy as np
@@ -45,8 +45,8 @@ class _EncodingResult:
 
     __slots__ = ('input_ids', 'offset_mapping')
 
-    def __init__(self, ids: List[int],
-                 offsets: Optional[List[Tuple[int, int]]] = None):
+    def __init__(self, ids: list[int],
+                 offsets: list[tuple[int, int]] | None = None):
         self.input_ids = ids
         self.offset_mapping = offsets
 
@@ -110,12 +110,12 @@ class ONNXNERPipeline:
         Mapping from model output indices to label strings (e.g. ``{0: "O", 1: "B-PER", …}``).
     """
 
-    provider: Optional[str] = None  # set by load_onnx_ner_model
-    revision: Optional[str] = None
+    provider: str | None = None  # set by load_onnx_ner_model
+    revision: str | None = None
 
     def __init__(self, session: ort.InferenceSession,
                  tokenizer_wrapper: TokenizerWrapper,
-                 id2label: Dict[int, str],
+                 id2label: dict[int, str],
                  pad_id: int = 0):
         self._session = session
         self._tokenizer = tokenizer_wrapper
@@ -138,8 +138,8 @@ class ONNXNERPipeline:
     # ------------------------------------------------------------------
 
     def __call__(self, texts, batch_size: int = 1, max_workers: int = 1,
-                 subword_widen: Optional[float] = 1.0,
-                 subword_same_script: bool = True) -> List[List[dict]]:
+                 subword_widen: float | None = 1.0,
+                 subword_same_script: bool = True) -> list[list[dict]]:
         """Run NER on one or more texts.
 
         Parameters
@@ -168,7 +168,7 @@ class ONNXNERPipeline:
             texts = [texts]
 
         encodings = [self._tokenizer.encode_for_inference(text) for text in texts]
-        all_results: List[List[dict]] = [[] for _ in texts]
+        all_results: list[list[dict]] = [[] for _ in texts]
         # Similar lengths share a batch, which keeps padding small.
         order = sorted(range(len(texts)), key=lambda i: len(encodings[i].ids))
         batch_size = 1 if self._single_row else max(1, batch_size)
@@ -183,7 +183,7 @@ class ONNXNERPipeline:
                     dtype=np.int64,
                 )
 
-            feeds: Dict[str, np.ndarray] = {
+            feeds: dict[str, np.ndarray] = {
                 'input_ids': padded('ids', self._pad_id),
                 'attention_mask': padded('attention_mask', 0),
             }
@@ -219,8 +219,8 @@ class ONNXNERPipeline:
         return exp / exp.sum(axis=-1, keepdims=True)
 
     def _aggregate_simple(self, text: str, encoding, scores: np.ndarray,
-                          subword_widen: Optional[float] = 1.0,
-                          subword_same_script: bool = True) -> List[dict]:
+                          subword_widen: float | None = 1.0,
+                          subword_same_script: bool = True) -> list[dict]:
         """Reimplements HuggingFace ``aggregation_strategy="simple"``.
 
         For each non-special token:
@@ -266,7 +266,7 @@ class ONNXNERPipeline:
         if not pre_entities:
             return []
 
-        groups: List[List[dict]] = []
+        groups: list[list[dict]] = []
         current_group = [pre_entities[0]]
 
         for token in pre_entities[1:]:
@@ -329,7 +329,7 @@ class ONNXNERPipeline:
 # Model loader
 # ---------------------------------------------------------------------------
 
-def _quantized_dir(model_name: str, revision: Optional[str]) -> str:
+def _quantized_dir(model_name: str, revision: str | None) -> str:
     """Cache dir name for a quantized model; distinct ids and revisions never share one.
 
     Keeps the 0.7.1 ``org__name`` form unless the id holds ``__`` itself.
@@ -403,7 +403,7 @@ def _colocate_external_data(model_path: str, data_path: str, link_dir: Path) -> 
     return str(link_dir / 'model.onnx')
 
 
-def _read_model_max_length(config_path: Optional[str]) -> int:
+def _read_model_max_length(config_path: str | None) -> int:
     """``model_max_length`` of a tokenizer_config.json; 512 when absent, unreadable or unusable."""
     if config_path is None:
         return 512
@@ -420,13 +420,13 @@ def _read_model_max_length(config_path: Optional[str]) -> int:
 def _create_session(
     model_path: str,
     device: str,
-    intra_op_threads: Optional[int],
-    inter_op_threads: Optional[int],
+    intra_op_threads: int | None,
+    inter_op_threads: int | None,
     cuda_device_id: int,
-    cuda_provider_options: Optional[Dict[str, Any]],
-) -> Tuple[ort.InferenceSession, bool]:
+    cuda_provider_options: dict[str, Any] | None,
+) -> tuple[ort.InferenceSession, bool]:
     """ONNX session on the requested providers, and whether CUDA was requested."""
-    providers: List[Any] = []
+    providers: list[Any] = []
     cuda_requested = device == 'cuda' and 'CUDAExecutionProvider' in ort.get_available_providers()
     if cuda_requested:
         providers.append(('CUDAExecutionProvider',
@@ -452,14 +452,14 @@ def _create_session(
 def load_onnx_ner_model(
     model_name: str,
     device: str = 'cpu',
-    cache_dir: Optional[str] = None,
+    cache_dir: str | None = None,
     quantize: bool = False,
-    revision: Optional[str] = None,
-    intra_op_threads: Optional[int] = None,
-    inter_op_threads: Optional[int] = None,
+    revision: str | None = None,
+    intra_op_threads: int | None = None,
+    inter_op_threads: int | None = None,
     cuda_device_id: int = 0,
-    cuda_provider_options: Optional[Dict[str, Any]] = None,
-) -> Tuple[ONNXNERPipeline, TokenizerWrapper]:
+    cuda_provider_options: dict[str, Any] | None = None,
+) -> tuple[ONNXNERPipeline, TokenizerWrapper]:
     """Download and load an ONNX NER model from HuggingFace Hub.
 
     Parameters

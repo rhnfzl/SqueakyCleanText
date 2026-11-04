@@ -4,7 +4,8 @@ from collections import Counter
 from dataclasses import asdict, dataclass
 import json
 from pathlib import Path
-from typing import Any, Mapping, Sequence
+from typing import Any
+from collections.abc import Mapping, Sequence
 
 
 @dataclass(frozen=True)

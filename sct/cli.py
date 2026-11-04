@@ -5,7 +5,8 @@ import json
 import os
 import sys
 from pathlib import Path
-from typing import Optional, Sequence, TextIO
+from typing import TextIO
+from collections.abc import Sequence
 
 from sct.adapters import process_json
 from sct.presets import PRESETS, preset_config
@@ -75,7 +76,7 @@ def _write_token_map(token_path: Path, anon_map) -> None:
 
 
 def main(
-    argv: Optional[Sequence[str]] = None,
+    argv: Sequence[str] | None = None,
     *,
     stdin: TextIO = sys.stdin,
     stdout: TextIO = sys.stdout,

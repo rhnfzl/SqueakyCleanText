@@ -7,7 +7,8 @@ import re
 import threading
 from collections import defaultdict
 import logging
-from typing import Any, Collection, Dict, List, Mapping, Optional, Sequence, Tuple, Union
+from typing import Any
+from collections.abc import Collection, Mapping, Sequence
 
 from sct.utils import constants, resources
 from sct.utils.anonymization_map import AnonymizationMap
@@ -42,7 +43,7 @@ from sct.privacy import (
 logger = logging.getLogger(__name__)
 
 # An inference lock's key: 'gliner', or a token model's (name, revision).
-ModelKey = Tuple[str, Optional[str]]
+ModelKey = tuple[str, str | None]
 
 # A regex step's placeholder (<PHONE>, <EMAIL_0>); NER spans inside one are dropped,
 # so "call <PHONE>" never becomes "call <<MISC>>". Marker-shaped text already in the
@@ -71,7 +72,7 @@ class ModelLoadError(Exception):
     pass
 
 
-def _presidio_type_map(legacy_type_names: bool, label_map: Optional[Mapping[str, str]]) -> Dict[str, str]:
+def _presidio_type_map(legacy_type_names: bool, label_map: Mapping[str, str] | None) -> dict[str, str]:
     """Presidio entity type -> SCT type: the label map, and PHONE_NUMBER/IP_ADDRESS -> PHONE/IP."""
     types = {} if legacy_type_names else {old: new for new, old in constants.LEGACY_TYPE_NAMES.items()}
     types.update({label.upper(): tag for label, tag in (label_map or {}).items()})
@@ -104,7 +105,7 @@ class GeneralNER:
         synthetic_replacer=None,
         regex_markers: Sequence[str] = (),
         allow_regex=None,
-        privacy_policy: Optional[PrivacyPolicy] = None,
+        privacy_policy: PrivacyPolicy | None = None,
     ):
         """Load the NER models *cfg* selects.
 
@@ -125,9 +126,9 @@ class GeneralNER:
         self._regex_markers = tuple(regex_markers)
         self._privacy_policy = privacy_policy
         # Per language key: {"key", "id", "revision", "provider"} of the model that key loaded.
-        self.provenance: Dict[str, Dict[str, Optional[str]]] = {}
+        self.provenance: dict[str, dict[str, str | None]] = {}
         self._gliner_pipe = None
-        self._ensemble_models: Dict[str, tuple] = (
+        self._ensemble_models: dict[str, tuple] = (
             dict(cfg.ner_ensemble) if cfg.ner_ensemble is not None else DEFAULT_NER_ENSEMBLE
         )
         self._ensemble_default_keys: tuple = (
@@ -160,12 +161,12 @@ class GeneralNER:
         self._engine = None
 
         # Common state for all backends
-        self._pipelines: Dict = {}
-        self._tokenizers: Dict = {}
+        self._pipelines: dict = {}
+        self._tokenizers: dict = {}
         self._load_lock = threading.Lock()
         # Per-model inference locks for torch models and GLiNER. ONNX runs lock-free:
         # InferenceSession.run and the Rust tokenizer are thread-safe.
-        self._inference_locks: Dict[Union[str, ModelKey], threading.Lock] = {}
+        self._inference_locks: dict[str | ModelKey, threading.Lock] = {}
         self._locks_lock = threading.Lock()  # Guards creation of per-model locks
 
         # --- Backend-specific initialization ---
@@ -230,7 +231,7 @@ class GeneralNER:
             en_tok.max_len_single_sentence <= multi_tok.max_len_single_sentence
         ) else multi_tok
 
-    def _get_lock(self, model_key: Union[str, ModelKey]) -> threading.Lock:
+    def _get_lock(self, model_key: str | ModelKey) -> threading.Lock:
         """Get or create a per-model inference lock (double-checked locking)."""
         if model_key not in self._inference_locks:
             with self._locks_lock:
@@ -273,7 +274,7 @@ class GeneralNER:
             return (language,)
         return self._ensemble_default_keys
 
-    def _has_own_model(self, language: Optional[str]) -> bool:
+    def _has_own_model(self, language: str | None) -> bool:
         """True when the user brought a model for *language* (e.g. ``ner_models={"HINDI": ...}``).
 
         Built-in FR/PT/IT keys point at the default multilingual model and keep the fallback.
@@ -283,7 +284,7 @@ class GeneralNER:
         defaults = DEFAULT_TORCH_NER_MODELS if self.cfg.ner_backend in TORCH_BACKENDS else DEFAULT_NER_MODELS
         return self._model_names[language] != defaults.get(language)
 
-    def uses_fallback_models(self, language: Optional[str]) -> bool:
+    def uses_fallback_models(self, language: str | None) -> bool:
         """True when *language* has no dedicated NER route and runs the default keys."""
         return (
             bool(self._model_names)
@@ -376,7 +377,7 @@ class GeneralNER:
             'provider': getattr(pipe, 'provider', None) or self._torch_device,
         }
 
-    def models_for(self, language: Optional[str]) -> List[Dict[str, Optional[str]]]:
+    def models_for(self, language: str | None) -> list[dict[str, str | None]]:
         """Provenance of the loaded models that NER runs for *language* (copies)."""
         keys: tuple = ()
         if self.cfg.ner_backend in TOKEN_MODEL_BACKENDS:
@@ -519,11 +520,11 @@ class GeneralNER:
     def ner_process_detailed(
         self,
         text: str,
-        positional_tags: Optional[Sequence[str]] = None,
-        ner_confidence_threshold: Optional[float] = None,
-        language: Optional[str] = None,
-        anon_map: Optional['AnonymizationMap'] = None,
-        source_markers: Optional[Collection[Any]] = None,
+        positional_tags: Sequence[str] | None = None,
+        ner_confidence_threshold: float | None = None,
+        language: str | None = None,
+        anon_map: 'AnonymizationMap | None' = None,
+        source_markers: Collection[Any] | None = None,
     ) -> NERProcessingResult:
         """Process text and return transformed text with entity findings.
 
@@ -610,14 +611,14 @@ class GeneralNER:
     def ner_process_batch_detailed(
         self,
         texts: Sequence[str],
-        languages: Sequence[Optional[str]],
-        positional_tags: Optional[Sequence[str]] = None,
-        ner_confidence_threshold: Optional[float] = None,
-        anon_maps: Optional[Sequence[Optional['AnonymizationMap']]] = None,
+        languages: Sequence[str | None],
+        positional_tags: Sequence[str] | None = None,
+        ner_confidence_threshold: float | None = None,
+        anon_maps: Sequence['AnonymizationMap | None'] | None = None,
         before_finalize=None,
         max_workers: int = 1,
-        source_markers: Optional[Sequence[Optional[Collection[Any]]]] = None,
-    ) -> List[NERProcessingResult]:
+        source_markers: Sequence[Collection[Any] | None] | None = None,
+    ) -> list[NERProcessingResult]:
         """``ner_process_detailed`` for many documents, batching model calls across them.
 
         Windows of all documents go through each model in calls of up to
@@ -708,7 +709,7 @@ class GeneralNER:
         gliner_max = self._gliner_pipe.max_context_length if self._gliner_pipe else 384
         return int(gliner_max * 0.9)
 
-    def _plan_windows(self, text: str, keys=None) -> List[tuple]:
+    def _plan_windows(self, text: str, keys=None) -> list[tuple]:
         """Split *text* into model windows ``(window, win_start, offsets, own_start, own_end)``.
 
         Windows fit the models in *keys* (the document's ensemble; None: every
@@ -787,11 +788,11 @@ class GeneralNER:
 
     def _detect(
         self,
-        chunks: List[str],
-        languages: List[Optional[str]],
+        chunks: list[str],
+        languages: list[str | None],
         positional_tags: Sequence[str],
         max_workers: int = 1,
-    ) -> List[list]:
+    ) -> list[list]:
         """Run every model on its chunks; return the raw NER results per chunk.
 
         The only place that calls model pipelines. Each model gets one call over
@@ -800,8 +801,8 @@ class GeneralNER:
         Per chunk, results keep the order of that language's ensemble keys,
         then GLiNER, as in the one-chunk-at-a-time loop.
         """
-        per_key: List[Dict[str, list]] = [{} for _ in chunks]
-        chunk_keys: List[tuple] = [()] * len(chunks)
+        per_key: list[dict[str, list]] = [{} for _ in chunks]
+        chunk_keys: list[tuple] = [()] * len(chunks)
 
         # Primary backend: ONNX or Torch — run each key in the ensemble
         if self.cfg.ner_backend in TOKEN_MODEL_BACKENDS:
@@ -850,11 +851,11 @@ class GeneralNER:
     def _finalize(
         self,
         text: str,
-        windows: List[tuple],
-        window_results: List[list],
+        windows: list[tuple],
+        window_results: list[list],
         ner_confidence_threshold: float,
-        anon_map: Optional['AnonymizationMap'],
-        source_markers: Optional[Collection[Any]] = None,
+        anon_map: 'AnonymizationMap | None',
+        source_markers: Collection[Any] | None = None,
     ) -> NERProcessingResult:
         """Merge window spans in document coordinates, vote, and replace once."""
         spans, foreign = [], []
@@ -946,10 +947,10 @@ class GeneralNER:
     def ner_process(
         self,
         text: str,
-        positional_tags: Optional[Sequence[str]] = None,
-        ner_confidence_threshold: Optional[float] = None,
-        language: Optional[str] = None,
-        anon_map: Optional['AnonymizationMap'] = None,
+        positional_tags: Sequence[str] | None = None,
+        ner_confidence_threshold: float | None = None,
+        language: str | None = None,
+        anon_map: 'AnonymizationMap | None' = None,
     ) -> str:
         """Process text while preserving the legacy string return type."""
         return self.ner_process_detailed(
@@ -962,12 +963,12 @@ class GeneralNER:
 
     def ner_process_batch(
         self,
-        texts: List[str],
-        positional_tags: Optional[Sequence[str]] = None,
-        batch_size: Optional[int] = None,
-        ner_confidence_threshold: Optional[float] = None,
-        language: Optional[str] = None
-    ) -> List[str]:
+        texts: list[str],
+        positional_tags: Sequence[str] | None = None,
+        batch_size: int | None = None,
+        ner_confidence_threshold: float | None = None,
+        language: str | None = None
+    ) -> list[str]:
         """Process multiple texts, *batch_size* documents per batched model call."""
         batch_size = batch_size if batch_size is not None else self.cfg.ner_batch_size
         results = []

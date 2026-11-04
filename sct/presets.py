@@ -7,7 +7,8 @@ and escapes in code stay as written. ``"sct"`` is the library default config.
 """
 
 from types import MappingProxyType
-from typing import Any, Mapping
+from typing import Any
+from collections.abc import Mapping
 
 from sct.config import TextCleanerConfig
 

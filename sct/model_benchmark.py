@@ -3,7 +3,8 @@
 import math
 import time
 from dataclasses import asdict, dataclass
-from typing import Any, Callable, Sequence
+from typing import Any
+from collections.abc import Callable, Sequence
 
 from sct.evaluation import (
     EntitySpan,

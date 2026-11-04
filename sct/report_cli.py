@@ -3,7 +3,8 @@
 import argparse
 import json
 from pathlib import Path
-from typing import Any, Optional, Sequence
+from typing import Any
+from collections.abc import Sequence
 
 from sct.presets import PRESETS, preset_config
 from sct.risk import assess_reidentification_risk
@@ -67,7 +68,7 @@ def _hashable(value):
     return json.dumps(value, sort_keys=True, ensure_ascii=False, default=str)
 
 
-def main(argv: Optional[Sequence[str]] = None) -> int:
+def main(argv: Sequence[str] | None = None) -> int:
     """Run the report command."""
     parser = _parser()
     args = parser.parse_args(argv)

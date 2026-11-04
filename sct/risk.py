@@ -3,7 +3,8 @@
 from collections import Counter
 from dataclasses import dataclass
 from types import MappingProxyType
-from typing import Any, Mapping, Sequence
+from typing import Any
+from collections.abc import Mapping, Sequence
 
 
 @dataclass(frozen=True)

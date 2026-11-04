@@ -4,14 +4,15 @@ Counts, shares, type names, language and model provenance only: never entity
 text and never offsets, so the view is safe to log, store or return to a model.
 """
 
-from typing import Any, Iterable, Optional, TypedDict
+from typing import Any, TypedDict
+from collections.abc import Iterable
 
 
 class Signals(TypedDict):
     """The value-free public view; every key is present for every input."""
 
-    language: Optional[str]
-    language_confidence: Optional[float]
+    language: str | None
+    language_confidence: float | None
     language_source: str
     chars: int
     pii_count: int

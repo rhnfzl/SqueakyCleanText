@@ -45,7 +45,7 @@ mode. Failures with ``fold_styled_characters=False`` are recorded, not counted.
 import argparse
 from collections import Counter, defaultdict
 from encodings.idna import dots as IDNA_DOTS
-from functools import lru_cache, partial
+from functools import partial, cache
 import json
 import multiprocessing
 from pathlib import Path
@@ -353,7 +353,7 @@ def _cruft_inside(rng, plain, inserts, kinds):
     if not free or rng.random() >= 0.15:
         return kinds
     for index in rng.sample(free, rng.randint(1, min(2, len(free)))):
-        ansi = "\x1b[%sm" % rng.choice(("0", "1", "32", "1;31", "38;5;208"))
+        ansi = "\x1b[{}m".format(rng.choice(("0", "1", "32", "1;31", "38;5;208")))
         inserts[index] = ("cruft", ansi if rng.random() < 0.5 else rng.choice(CRUFT_CONTROLS))
     return sorted(kinds + ["cruft"])
 
@@ -755,7 +755,7 @@ def steps(value):
 # --- oracle ---
 
 
-@lru_cache(maxsize=None)
+@cache
 def cleaner(preset: str, fold_styled: bool, mode: str) -> TextCleaner:
     name, extra = PRESET_ARGS[preset]
     cfg = TextCleanerConfig.from_preset(name, check_ner_process=False, fold_styled_characters=fold_styled, **extra,

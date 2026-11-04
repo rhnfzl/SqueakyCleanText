@@ -2,7 +2,8 @@
 
 from collections.abc import Mapping
 from dataclasses import fields, replace
-from typing import Any, Sequence, Union
+from typing import Any
+from collections.abc import Sequence
 
 from haystack import Document, component, default_from_dict, default_to_dict
 
@@ -30,7 +31,7 @@ class SCTDocumentCleaner:
         self,
         columns: Sequence[str] = ("content",),
         output: str = "overwrite",
-        config: Union[TextCleanerConfig, str, None] = None,
+        config: TextCleanerConfig | str | None = None,
     ):
         self.columns = as_columns(columns)
         self.output = output

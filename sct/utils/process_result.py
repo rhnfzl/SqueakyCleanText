@@ -5,7 +5,8 @@ while exposing ``.metadata`` for new features (reversible anonymization maps,
 document classification, etc.).
 """
 
-from typing import TYPE_CHECKING, Any, Optional, Sequence, TypedDict
+from typing import TYPE_CHECKING, Any, TypedDict
+from collections.abc import Sequence
 
 if TYPE_CHECKING:
     from sct.privacy import EntityFinding
@@ -19,7 +20,7 @@ class ProcessMetadata(TypedDict, total=False):
     source_chars: int
     regex_counts: dict[str, dict[str, int]]
     entity_counts: dict[str, dict[str, int]]
-    language_confidence: Optional[float]
+    language_confidence: float | None
     language_source: str
     warnings: list[str]
     provenance: dict[str, Any]
@@ -59,9 +60,9 @@ class ProcessResult:
     def __init__(
         self,
         lm_text: str,
-        stat_text: Optional[str],
-        language: Optional[str],
-        metadata: Optional[ProcessMetadata] = None,
+        stat_text: str | None,
+        language: str | None,
+        metadata: ProcessMetadata | None = None,
     ):
         self.lm_text = lm_text
         self.stat_text = stat_text

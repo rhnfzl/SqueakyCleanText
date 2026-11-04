@@ -201,7 +201,7 @@ class _FakeRunDetector(_FakeGLiNER):
     """Tags capitalised words as PER; with min_words=2 only runs of two or more."""
 
     def __init__(self, min_words=1):
-        self.pattern = re.compile(r"[A-Z][a-z]+(?: [A-Z][a-z]+){%d,}" % (min_words - 1))
+        self.pattern = re.compile(rf"[A-Z][a-z]+(?: [A-Z][a-z]+){{{min_words - 1},}}")
 
     def __call__(self, texts, batch_size=1):
         return [

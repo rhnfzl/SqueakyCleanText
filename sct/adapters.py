@@ -5,7 +5,8 @@ or a privacy policy). ``sensitive`` and ``signals`` are always filled.
 """
 
 from dataclasses import dataclass, field, replace
-from typing import Any, Iterable, Mapping, Optional
+from typing import Any
+from collections.abc import Iterable, Mapping
 
 from sct.presets import PRESETS
 from sct.privacy import EntityFinding
@@ -51,7 +52,7 @@ class ProcessedRAGChunk:
 
     id: str
     text: str
-    language: Optional[str]
+    language: str | None
     metadata: Mapping[str, Any]
     findings: tuple[EntityFinding, ...]
     sensitive: bool = False

@@ -18,7 +18,8 @@ from collections.abc import Iterable
 from dataclasses import dataclass, fields
 from datetime import date
 from types import MappingProxyType
-from typing import Any, Literal, Mapping, Optional, Tuple, Union, get_args
+from typing import Any, Literal, get_args
+from collections.abc import Mapping
 
 from sct.utils.resources import DEFAULT_LANGUAGES, resolve_language
 
@@ -225,13 +226,13 @@ class TextCleanerConfig:
     replace_with_dates: str = "<DATE>"
     replace_with_phone_numbers: str = "<PHONE>"
     replace_with_numbers: str = "<NUMBER>"
-    replace_with_currency_symbols: Optional[str] = None
+    replace_with_currency_symbols: str | None = None
 
     # NER settings
-    positional_tags: Tuple[str, ...] = ('PER', 'LOC', 'ORG', 'MISC')
-    ner_confidence_threshold: Optional[float] = None  # None = effective_ner_confidence_threshold
+    positional_tags: tuple[str, ...] = ('PER', 'LOC', 'ORG', 'MISC')
+    ner_confidence_threshold: float | None = None  # None = effective_ner_confidence_threshold
     ner_batch_size: int = 8
-    language: Optional[Union[str, Tuple[str, ...]]] = None
+    language: str | tuple[str, ...] | None = None
 
     # NER backend selection
     ner_backend: NerBackend = 'onnx'
@@ -245,39 +246,39 @@ class TextCleanerConfig:
     # Models must have model.onnx, config.json, tokenizer.json on Hub.
     # ENGLISH and MULTILINGUAL are always required (loaded eagerly).
     # Missing keys are filled from DEFAULT_NER_MODELS.
-    ner_models: Optional[Mapping[str, str]] = None
-    ner_model_revisions: Optional[Mapping[str, str]] = None
+    ner_models: Mapping[str, str] | None = None
+    ner_model_revisions: Mapping[str, str] | None = None
 
     # Ensemble routing: maps each input language to an ordered tuple of model keys
     # to run. Keys must exist in the resolved ner_models dict.
     # If None, DEFAULT_NER_ENSEMBLE is used (with NER_ENSEMBLE_DEFAULT_KEYS fallback).
-    ner_ensemble: Optional[Mapping[str, Tuple[str, ...]]] = None
+    ner_ensemble: Mapping[str, tuple[str, ...]] | None = None
 
     # Fallback keys for any language not listed in ner_ensemble (e.g. FR, PT, IT).
     # If None, NER_ENSEMBLE_DEFAULT_KEYS is used. Pass an empty tuple to skip
     # ensemble inference for unmapped languages.
-    ner_ensemble_default_keys: Optional[Tuple[str, ...]] = None
+    ner_ensemble_default_keys: tuple[str, ...] | None = None
 
     # Deprecated: positional tuple (English, Dutch, German, Spanish, Multilingual).
     # Use ner_models dict instead. Kept for backward compatibility.
-    ner_models_list: Tuple[str, ...] = tuple(DEFAULT_NER_MODELS[k] for k in LANG_KEYS)
+    ner_models_list: tuple[str, ...] = tuple(DEFAULT_NER_MODELS[k] for k in LANG_KEYS)
 
     # Torch backend models (only used when ner_backend is 'torch' or 'ensemble_torch')
-    torch_ner_models: Optional[Mapping[str, str]] = None
-    torch_ner_model_revisions: Optional[Mapping[str, str]] = None
+    torch_ner_models: Mapping[str, str] | None = None
+    torch_ner_model_revisions: Mapping[str, str] | None = None
 
     # GLiNER settings (only used when ner_backend contains 'gliner' or 'ensemble')
-    gliner_model: Optional[str] = None
-    gliner_revision: Optional[str] = None
+    gliner_model: str | None = None
+    gliner_revision: str | None = None
     gliner_variant: str = 'gliner'  # 'gliner' or 'gliner2'
-    gliner_labels: Tuple[str, ...] = ('person', 'organization', 'location')
-    gliner_label_map: Optional[Mapping[str, str]] = None
-    gliner_threshold: Optional[float] = None  # None = effective_gliner_threshold
+    gliner_labels: tuple[str, ...] = ('person', 'organization', 'location')
+    gliner_label_map: Mapping[str, str] | None = None
+    gliner_threshold: float | None = None  # None = effective_gliner_threshold
 
     # Entity description labels (ZERONER-style): maps labels to natural-language descriptions.
     # When provided, descriptions are sent to GLiNER for inference, results mapped back to labels.
     # Example: {'person': "a person's full legal name", 'location': "a geographical place name"}
-    gliner_label_descriptions: Optional[Mapping[str, str]] = None
+    gliner_label_descriptions: Mapping[str, str] | None = None
 
     # Load GLiNER model in ONNX mode (uses pre-built ONNX weights from HuggingFace Hub).
     # Only works with uni-encoder models. Auto-set when ner_mode='pii' + ner_backend='onnx'.
@@ -285,21 +286,21 @@ class TextCleanerConfig:
 
     # GLiClass document-level pre-classification (zero-shot)
     check_classify_document: bool = False
-    gliclass_model: Optional[str] = None
-    gliclass_revision: Optional[str] = None
-    gliclass_labels: Tuple[str, ...] = ()
+    gliclass_model: str | None = None
+    gliclass_revision: str | None = None
+    gliclass_labels: tuple[str, ...] = ()
     gliclass_threshold: float = 0.5
     gliclass_classification_type: str = 'single-label'
     gliclass_onnx: bool = False
 
     # Plugin: user-provided pipeline steps, each callable (text: str) -> str.
     # Appended to the pre-NER pipeline in _init_pipeline(), so they run before NER.
-    custom_pipeline_steps: Tuple = ()
+    custom_pipeline_steps: tuple = ()
 
     # Language extensibility — extend Lingua detection, stopwords, dates, NER
-    extra_languages: Tuple[str, ...] = ()
-    custom_stopwords: Optional[Mapping[str, frozenset]] = None
-    custom_month_names: Optional[Mapping[str, Tuple[str, ...]]] = None
+    extra_languages: tuple[str, ...] = ()
+    custom_stopwords: Mapping[str, frozenset] | None = None
+    custom_month_names: Mapping[str, tuple[str, ...]] | None = None
 
     # Computed at __post_init__ — union of all language sources
     supported_languages: frozenset = frozenset()
@@ -311,15 +312,15 @@ class TextCleanerConfig:
     replace_numbers_in_words: bool = False  # True also replaces digits glued to Latin/Greek/Cyrillic letters (GPT4)
 
     # Added in 0.8.0; kept last so existing positional arguments keep their meaning.
-    onnx_intra_op_threads: Optional[int] = None  # None = ONNX Runtime default (all cores)
-    onnx_inter_op_threads: Optional[int] = None  # None = ONNX Runtime default
+    onnx_intra_op_threads: int | None = None  # None = ONNX Runtime default (all cores)
+    onnx_inter_op_threads: int | None = None  # None = ONNX Runtime default
     ner_chunk_overlap: int = 0  # tokens of neighbouring text each NER window adds per side; 0 = 0.7.1 chunks
     detect_all_languages: bool = True  # False = 0.7 detector over supported_languages only
     language_confidence_warning: float = 0.0  # below this confidence, warn language_low_confidence; 0.5 = early 0.8.0
     check_decode_unicode_escapes: bool = True  # False keeps literal \n, \u00e9 escapes (code, JSON)
-    ner_device: Optional[str] = None  # None = auto (CUDA when available), 'cpu', 'cuda', 'mps'
+    ner_device: str | None = None  # None = auto (CUDA when available), 'cpu', 'cuda', 'mps'
     cuda_device_id: int = 0  # GPU index for ONNX, torch and GLiNER when on CUDA
-    onnx_cuda_provider_options: Optional[Mapping[str, Any]] = None  # extra CUDAExecutionProvider options
+    onnx_cuda_provider_options: Mapping[str, Any] | None = None  # extra CUDAExecutionProvider options
     # process_json keys: 'pii' = regex PII steps only (NER tags lone words like 'message' out of context),
     # 'pii_ner' = PII steps plus NER, 'full' = whole config (0.7), 'off' = raw
     json_key_cleaning: JsonKeyCleaning = 'pii'
@@ -339,7 +340,7 @@ class TextCleanerConfig:
     # WordPiece NER: widen an entity to its whole word when the added text is at most this many
     # times the tagged span ("John Do" + "##e"); None = always (whole unspaced Thai/kana clauses
     # too), 0 = never (0.7)
-    ner_subword_widen: Optional[float] = 1.0
+    ner_subword_widen: float | None = 1.0
     # Part of check_fix_bad_unicode. True folds math-alphanumeric (𝐞𝐱), circled (ⓙ) and full-width
     # URL punctuation (：／？) inside ASCII runs and drops invisible Cf characters (ZWSP, soft hyphen)
     # inside them, so styled emails/URLs/phones are replaced without
@@ -351,20 +352,20 @@ class TextCleanerConfig:
     # Faker locale for replacement_mode='synthetic': None = follow the detected document language
     # (Dutch text gets Dutch names, en_US when Faker has no locale for it); a string forces that
     # locale ('en_US' = 0.7)
-    synthetic_locale: Optional[str] = None
+    synthetic_locale: str | None = None
     # synthetic/reversible: NER reads the same text as placeholder mode (<EMAIL>, <PHONE>...) and
     # the fakes / indexed placeholders go in after NER, so every mode finds the same entities;
     # False = 0.7 order (NER reads the fakes / <EMAIL_0>)
     ner_sees_tags: bool = True
     # synthetic_locale=None: Faker locale for documents whose detection gets the
     # language_low_confidence warning; None = follow the detected language anyway (earlier 0.8.0)
-    synthetic_low_confidence_locale: Optional[str] = 'en_US'
+    synthetic_low_confidence_locale: str | None = 'en_US'
     # synthetic: drop a fake's final '.' when a '.' follows the entity ('B.Eng..' -> 'B.Eng.');
     # False = keep both (earlier 0.8.0)
     synthetic_collapse_period: bool = True
     # synthetic: ISO date that date fakes (DATE, DATE_OF_BIRTH) end on, so a document gets the
     # same dates on any day; None = today, from the clock (earlier 0.8.0)
-    synthetic_reference_date: Optional[str] = '2026-01-01'
+    synthetic_reference_date: str | None = '2026-01-01'
     # NER ensemble vote per span: 'max' keeps a span when its best model score passes
     # ner_confidence_threshold, so a weak second model never hides a strong hit; 'mean' averages
     # the model scores (0.8.0)
@@ -374,7 +375,7 @@ class TextCleanerConfig:
     ner_propagate_masked: bool = True
     # score a span needs before its value is propagated (0..1); None = the effective NER cut.
     # Raising it spreads fewer wrong tags at the cost of more visible repeats
-    ner_propagate_min_score: Optional[float] = None
+    ner_propagate_min_score: float | None = None
     # IBANs (mod-97 checksum) and payment cards (Luhn checksum) become one <IBAN> / <CARD> each,
     # before the phone step; False = 0.8.0 (the phone/number steps take pieces of them)
     check_replace_iban_cards: bool = True
@@ -393,7 +394,7 @@ class TextCleanerConfig:
     # A month name, "/" and a 2- or 4-digit year is one <DATE> (October/55, Oct/2019)
     date_month_name_slash_year: bool = True
     # ISO codes of the built-in month data dates use (en nl de es fr pt it th); None = all
-    date_builtin_month_languages: Optional[Tuple[str, ...]] = None
+    date_builtin_month_languages: tuple[str, ...] | None = None
     # HTML rule reads only tag shapes (<b>, </a>, <br/>, <!-- -->); False = 0.8.0 "<.*?>" (eats "<a@b.com>")
     html_tag_strict: bool = True
     # join two LOCATION spans whose gap has <= N chars (placeholders not counted), no line break
@@ -423,14 +424,14 @@ class TextCleanerConfig:
     # User term lists (SCT ships none; the user decides the words). Empty by default.
     # {LABEL: (term, ...)}: always mask these terms as <LABEL>, as whole words (no letter, mark or digit of a
     # spaced script glued to them; an edge in CJK/Thai is a word edge). Runs before the built-in regex steps.
-    custom_deny_terms: Optional[Mapping[str, Tuple[str, ...]]] = None
+    custom_deny_terms: Mapping[str, tuple[str, ...]] | None = None
     # Never mask these terms: a regex or NER detection equal to or inside an occurrence is kept as text.
     # Applied last, so it also wins over custom_deny_terms and custom_patterns.
-    custom_allow_terms: Tuple[str, ...] = ()
+    custom_allow_terms: tuple[str, ...] = ()
     # {LABEL: regex}: mask every match as <LABEL> (the third-party ``regex`` module, compiled once). Runs
     # with custom_deny_terms, before the built-in steps. A pattern that can match "" is rejected; a pattern
     # with nested repeats can backtrack for a long time (ReDoS), so only pass patterns you trust.
-    custom_patterns: Optional[Mapping[str, str]] = None
+    custom_patterns: Mapping[str, str] | None = None
     # Whether custom_deny_terms and custom_allow_terms match case-sensitively. False: "acme" matches "ACME".
     custom_terms_case_sensitive: bool = False
     # replace_numbers_mode='identifiers' only: whole-token ID shapes the plain digit-run rule rejects (format
@@ -445,7 +446,7 @@ class TextCleanerConfig:
     numbers_spaced_pair_ids: bool = True
     # Seconds each custom_patterns regex may spend on one document (the regex module's timeout), so a pattern
     # that backtracks badly (ReDoS) cannot hang processing. None: no limit.
-    custom_patterns_timeout: Optional[float] = 2.0
+    custom_patterns_timeout: float | None = 2.0
     # On a timeout: 'raise' a CustomPatternTimeout (names the label, never the text), or 'warn': log it, add
     # 'custom_pattern_timeout' to metadata['warnings'] and process that document without the pattern.
     custom_patterns_on_timeout: OnPatternTimeout = 'raise'

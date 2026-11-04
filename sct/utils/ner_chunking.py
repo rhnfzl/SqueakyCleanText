@@ -1,7 +1,6 @@
 """Split text into NER windows: plain functions over text and a tokenizer, no model state."""
 
 import re
-from typing import List
 
 from sct.utils import constants
 
@@ -11,7 +10,7 @@ def token_count(text: str, tokenizer) -> int:
     return len(tokenizer(text).input_ids)
 
 
-def split_pieces(pattern, text: str) -> List[tuple]:
+def split_pieces(pattern, text: str) -> list[tuple]:
     """Split *text* on *pattern* into ``(separator_before, piece)`` pairs.
 
     Keeping the matched separator lets chunks be rejoined exactly as in
@@ -32,7 +31,7 @@ def split_pieces(pattern, text: str) -> List[tuple]:
     return pieces
 
 
-def merge_pieces(pieces: List[tuple], fits) -> List[str]:
+def merge_pieces(pieces: list[tuple], fits) -> list[str]:
     """Greedily merge adjacent ``(separator, piece)`` pairs while ``fits(chunk)``.
 
     Pieces inside a chunk are rejoined with their original separator.
@@ -54,7 +53,7 @@ def merge_pieces(pieces: List[tuple], fits) -> List[str]:
     return chunks
 
 
-def simple_chunk(text: str, max_tokens: int = 384) -> List[str]:
+def simple_chunk(text: str, max_tokens: int = 384) -> list[str]:
     """Split text into chunks of at most ``max_tokens * 2`` characters for GLiNER.
 
     Used for GLiNER-only mode where no ONNX/torch tokenizer is available.
@@ -69,7 +68,7 @@ def simple_chunk(text: str, max_tokens: int = 384) -> List[str]:
         pieces = split_pieces(delimiter, text)
         if len(pieces) <= 1:
             continue
-        chunks: List[str] = []
+        chunks: list[str] = []
         for chunk in merge_pieces(pieces, lambda c: len(c) <= max_chars):
             chunks.extend(simple_chunk(chunk, max_tokens))
         return chunks
@@ -130,7 +129,7 @@ def align_chunk(
     return source_chunk, match.start(), offsets
 
 
-def split_text(text: str, max_tokens: int, tokenizer) -> List[str]:
+def split_text(text: str, max_tokens: int, tokenizer) -> list[str]:
     """Split text into token-bounded chunks using a delimiter hierarchy.
 
     Tries sentence boundaries first (preferred: respects sentence integrity),

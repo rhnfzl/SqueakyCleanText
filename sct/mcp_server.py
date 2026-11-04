@@ -17,7 +17,7 @@ Server settings come from the environment only:
 import os
 import stat
 import threading
-from typing import Any, Literal, NotRequired, Optional, TypedDict
+from typing import Any, Literal, NotRequired, TypedDict
 
 from sct.adapters import _DuplicateKeyError, process_json
 from sct.presets import preset_config
@@ -213,11 +213,11 @@ _ANNOTATIONS = {
 
 
 def create_mcp_server(
-    cleaner: Optional[TextCleaner] = None,
+    cleaner: TextCleaner | None = None,
     *,
-    root: Optional[str] = None,
-    max_bytes: Optional[int] = None,
-    preset: Optional[str] = None,
+    root: str | None = None,
+    max_bytes: int | None = None,
+    preset: str | None = None,
 ):
     """Create a FastMCP server without importing FastMCP at package import.
 
@@ -272,8 +272,8 @@ def create_mcp_server(
 
     @server.tool(title="Clean text", annotations={**_ANNOTATIONS, "title": "Clean text"})
     def clean_text(
-        text: Optional[str] = None,
-        path: Optional[str] = None,
+        text: str | None = None,
+        path: str | None = None,
         pii: bool = False,
         detail: Literal["concise", "full"] = "concise",
     ) -> TextOutput:

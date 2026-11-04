@@ -25,6 +25,6 @@ def on_page_content(html, page, files, **kwargs):
         target = files.get_file_from_path(src) if src else None
         if target is None:
             return m.group(0)
-        return 'href="%s%s"' % (get_relative_url(target.url, page.url), m.group(2) or "")
+        return 'href="{}{}"'.format(get_relative_url(target.url, page.url), m.group(2) or "")
 
     return _HREF.sub(local, html)
