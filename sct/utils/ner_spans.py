@@ -29,6 +29,23 @@ def _letter_scripts(text: str) -> list[str]:
             if unicodedata.category(c) in ('Lu', 'Ll', 'Lt', 'Lo')]
 
 
+def _joins_word(char: str, script: str | None) -> bool:
+    if unicodedata.category(char)[0] not in 'LM' or unicodedata.east_asian_width(char) in 'WF':
+        return False
+    return not script or set(_letter_scripts(char)) <= {script}
+
+
+def _word_bounds(text: str, start: int, end: int, scripts: list[str] | None) -> tuple[int, int]:
+    new_start, new_end = start, end
+    if _joins_word(text[start], None):
+        while new_start > 0 and _joins_word(text[new_start - 1], scripts and scripts[0]):
+            new_start -= 1
+    if _joins_word(text[end - 1], None):
+        while new_end < len(text) and _joins_word(text[new_end], scripts and scripts[-1]):
+            new_end += 1
+    return new_start, new_end
+
+
 def snap_word_edges(text: str, start: int, end: int, ratio: float | None, same_script: bool) -> tuple[int, int]:
     """Move span edges that fall inside a word out to the word edges ("Salut" + "e").
 
@@ -39,20 +56,7 @@ def snap_word_edges(text: str, start: int, end: int, ratio: float | None, same_s
     """
     if start >= end:
         return start, end
-    scripts = _letter_scripts(text[start:end]) if same_script else None
-
-    def joins(char, script):
-        if unicodedata.category(char)[0] not in 'LM' or unicodedata.east_asian_width(char) in 'WF':
-            return False
-        return not script or set(_letter_scripts(char)) <= {script}
-
-    new_start, new_end = start, end
-    if joins(text[start], None):
-        while new_start > 0 and joins(text[new_start - 1], scripts and scripts[0]):
-            new_start -= 1
-    if joins(text[end - 1], None):
-        while new_end < len(text) and joins(text[new_end], scripts and scripts[-1]):
-            new_end += 1
+    new_start, new_end = _word_bounds(text, start, end, _letter_scripts(text[start:end]) if same_script else None)
     if ratio is not None and (new_end - new_start) - (end - start) > ratio * (end - start):
         return start, end
     return new_start, new_end
@@ -103,6 +107,18 @@ def merge_location_gaps(text: str, spans: Iterable[dict[str, Any]], markers: Col
     return merged
 
 
+def _spreadable_values(text: str, spans: list[dict[str, Any]], min_score: float | None) -> dict[str, dict[str, Any]]:
+    """Value -> its best-scored span, for the spans ``propagate`` may spread."""
+    sources: dict[str, dict[str, Any]] = {}
+    for item in spans:
+        value = text[item['start']:item['end']]
+        if (item['entity_group'] in ('PER', 'ORG', 'LOC') and (min_score is None or item['score'] >= min_score)
+                and len(value) >= 2 and any(ch.isalpha() for ch in value)
+                and (value not in sources or item['score'] > sources[value]['score'])):
+            sources[value] = item
+    return sources
+
+
 def propagate(text: str, spans: list[dict[str, Any]], markers: Iterable[tuple[int, int]],
               min_score: float | None) -> list[dict[str, Any]]:
     """Add a span at every other whole-word, case-sensitive copy of a masked PER/ORG/LOC value.
@@ -111,13 +127,7 @@ def propagate(text: str, spans: list[dict[str, Any]], markers: Iterable[tuple[in
     shorter than 2 characters or without a letter is not spread. Copies that overlap a
     span or a marker are skipped, longest value first, so added spans stay disjoint.
     """
-    sources: dict[str, dict[str, Any]] = {}
-    for item in spans:
-        value = text[item['start']:item['end']]
-        if (item['entity_group'] in ('PER', 'ORG', 'LOC') and (min_score is None or item['score'] >= min_score)
-                and len(value) >= 2 and any(ch.isalpha() for ch in value)
-                and (value not in sources or item['score'] > sources[value]['score'])):
-            sources[value] = item
+    sources = _spreadable_values(text, spans, min_score)
     taken = [(s['start'], s['end']) for s in spans] + list(markers)
     added = []
     for value in sorted(sources, key=len, reverse=True):

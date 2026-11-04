@@ -6,6 +6,7 @@ from collections.abc import Sequence
 import sct
 from sct.config import TextCleanerConfig
 from sct.integrations._runtime import CleanerHandle, as_columns, clean_columns, output_column
+from sct.score import SCORE_A_COLUMNS, SCORE_A_TYPES
 
 
 class SCTMap:
@@ -30,7 +31,6 @@ class SCTMap:
         # dropping a written column would keep a stale same-named input column.
         produced = [output_column(c, self.output) for c in self.columns]
         if self.score:
-            from sct.score import SCORE_A_COLUMNS
             produced += SCORE_A_COLUMNS
         return {k: out[k] for k in produced if k in out}
 
@@ -43,7 +43,6 @@ def _output_features(features: Any, fn: SCTMap, remove_columns: Any) -> Any:
         # Non-str cells pass through, so a written column keeps its source type.
         out[output_column(col, fn.output)] = features[col]
     if fn.score:
-        from sct.score import SCORE_A_TYPES
         out.update({
             name: HFSequence(Value(kind[0])) if isinstance(kind, list) else Value(kind)
             for name, kind in SCORE_A_TYPES.items()

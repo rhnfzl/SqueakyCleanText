@@ -96,6 +96,14 @@ class TokenizerWrapper:
 # ONNXNERPipeline — callable pipeline matching HF output format
 # ---------------------------------------------------------------------------
 
+def _padded(batch, width: int, field: str, pad: int) -> np.ndarray:
+    """One encoding field of *batch* as an int64 array, each row right-padded to *width*."""
+    return np.array(
+        [getattr(encoding, field) + [pad] * (width - len(encoding.ids)) for encoding in batch],
+        dtype=np.int64,
+    )
+
+
 class ONNXNERPipeline:
     """ONNX-backed NER pipeline producing the same output format as
     ``transformers.pipeline("ner", aggregation_strategy="simple")``.
@@ -175,20 +183,13 @@ class ONNXNERPipeline:
 
         def run_batch(rows):
             width = max(len(encodings[i].ids) for i in rows)
-
-            def padded(field, pad):
-                return np.array(
-                    [getattr(encodings[i], field) + [pad] * (width - len(encodings[i].ids))
-                     for i in rows],
-                    dtype=np.int64,
-                )
-
+            batch = [encodings[i] for i in rows]
             feeds: dict[str, np.ndarray] = {
-                'input_ids': padded('ids', self._pad_id),
-                'attention_mask': padded('attention_mask', 0),
+                'input_ids': _padded(batch, width, 'ids', self._pad_id),
+                'attention_mask': _padded(batch, width, 'attention_mask', 0),
             }
             if self._needs_token_type_ids:
-                feeds['token_type_ids'] = padded('type_ids', 0)
+                feeds['token_type_ids'] = _padded(batch, width, 'type_ids', 0)
 
             logits = self._session.run(None, feeds)[0]  # (rows, width, num_labels)
 
@@ -230,13 +231,24 @@ class ONNXNERPipeline:
         4. Group score = mean of per-token scores
         5. Word = text[start:end] using character offsets
         """
-        special_tokens_mask = encoding.special_tokens_mask
-        offsets = encoding.offsets
+        entities = []
+        for group in self._group_tokens(self._token_predictions(encoding, scores)):
+            start, end = self._widen_to_words(text, encoding, group, subword_widen, subword_same_script)
+            entities.append({
+                'entity_group': group[0]['entity_type'],
+                'score': float(np.mean([t['score'] for t in group])),
+                'word': text[start:end],
+                'start': start,
+                'end': end,
+            })
 
-        # Per-token predictions (skip special tokens and "O" labels)
+        return entities
+
+    def _token_predictions(self, encoding, scores: np.ndarray) -> list[dict]:
+        """Per-token predictions (skip special tokens and "O" labels)."""
         pre_entities = []
         for idx in range(len(scores)):
-            if special_tokens_mask[idx]:
+            if encoding.special_tokens_mask[idx]:
                 continue
 
             label_id = int(np.argmax(scores[idx]))
@@ -245,7 +257,7 @@ class ONNXNERPipeline:
                 continue
 
             token_score = float(scores[idx][label_id])
-            start, end = offsets[idx]
+            start, end = encoding.offsets[idx]
 
             # Parse BIO prefix
             if '-' in label:
@@ -261,8 +273,11 @@ class ONNXNERPipeline:
                 'start': start,
                 'end': end,
             })
+        return pre_entities
 
-        # Group consecutive tokens with matching entity type
+    @staticmethod
+    def _group_tokens(pre_entities: list[dict]) -> list[list[dict]]:
+        """Group consecutive tokens with matching entity type."""
         if not pre_entities:
             return []
 
@@ -284,45 +299,35 @@ class ONNXNERPipeline:
             current_group = [token]
 
         groups.append(current_group)
+        return groups
 
-        entities = []
-        for group in groups:
-            entity_type = group[0]['entity_type']
-            start = group[0]['start']
-            end = group[-1]['end']
-            tokens = getattr(encoding, 'tokens', None) if self._subword_prefix and subword_widen != 0 else None
-            if tokens:
-                # Widen to whole words so "John Do" + "##e" never leaves "e" behind.
-                first, last = group[0]['idx'], group[-1]['idx'] + 1
-                # Letters of an added piece must share the script of the entity's edge letter.
-                span = _letter_scripts(text[start:end]) if subword_same_script else None
-                left, right = ({span[0]}, {span[-1]}) if span else (None, None)
+    def _widen_to_words(self, text: str, encoding, group: list[dict], subword_widen: float | None,
+                        subword_same_script: bool) -> tuple[int, int]:
+        """The group's span; widened to whole words so "John Do" + "##e" never leaves "e" behind."""
+        start, end = group[0]['start'], group[-1]['end']
+        tokens = getattr(encoding, 'tokens', None) if self._subword_prefix and subword_widen != 0 else None
+        if not tokens:
+            return start, end
+        special_tokens_mask, offsets = encoding.special_tokens_mask, encoding.offsets
+        first, last = group[0]['idx'], group[-1]['idx'] + 1
+        # Letters of an added piece must share the script of the entity's edge letter.
+        span = _letter_scripts(text[start:end]) if subword_same_script else None
+        left, right = ({span[0]}, {span[-1]}) if span else (None, None)
 
-                def same(idx, edge):
-                    return not edge or set(_letter_scripts(text[slice(*offsets[idx])])) <= edge
+        def same(idx, edge):
+            return not edge or set(_letter_scripts(text[slice(*offsets[idx])])) <= edge
 
-                while first > 0 and tokens[first].startswith(self._subword_prefix) \
-                        and not special_tokens_mask[first - 1] and same(first - 1, left):
-                    first -= 1
-                while last < len(tokens) and not special_tokens_mask[last] \
-                        and tokens[last].startswith(self._subword_prefix) and same(last, right):
-                    last += 1
-                wide_start, wide_end = offsets[first][0], offsets[last - 1][1]
-                # Unspaced scripts (Thai, kana) make a whole clause one word: widen only a short tail.
-                if subword_widen is None or (wide_end - wide_start) - (end - start) <= subword_widen * (end - start):
-                    start, end = wide_start, wide_end
-            avg_score = float(np.mean([t['score'] for t in group]))
-            word = text[start:end]
-
-            entities.append({
-                'entity_group': entity_type,
-                'score': avg_score,
-                'word': word,
-                'start': start,
-                'end': end,
-            })
-
-        return entities
+        while first > 0 and tokens[first].startswith(self._subword_prefix) \
+                and not special_tokens_mask[first - 1] and same(first - 1, left):
+            first -= 1
+        while last < len(tokens) and not special_tokens_mask[last] \
+                and tokens[last].startswith(self._subword_prefix) and same(last, right):
+            last += 1
+        wide_start, wide_end = offsets[first][0], offsets[last - 1][1]
+        # Unspaced scripts (Thai, kana) make a whole clause one word: widen only a short tail.
+        if subword_widen is None or (wide_end - wide_start) - (end - start) <= subword_widen * (end - start):
+            return wide_start, wide_end
+        return start, end
 
 
 # ---------------------------------------------------------------------------

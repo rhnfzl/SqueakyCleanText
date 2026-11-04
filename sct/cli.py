@@ -75,6 +75,17 @@ def _write_token_map(token_path: Path, anon_map) -> None:
         token_file.write("\n")
 
 
+def _check_reversible_args(parser: argparse.ArgumentParser, args: argparse.Namespace) -> None:
+    if not args.token_map:
+        parser.error("--token-map is required for reversible mode")
+    if args.json_input:
+        parser.error("reversible mode currently supports text input only")
+    # shortcut: Windows on Python 3.13+ has os.fchmod, but it only sets the read-only flag; refuse there too
+    # if the map must be restricted from other accounts.
+    if not hasattr(os, "fchmod"):
+        parser.error("reversible mode needs os.fchmod to restrict the token map, which this platform lacks")
+
+
 def main(
     argv: Sequence[str] | None = None,
     *,
@@ -84,14 +95,8 @@ def main(
     """Run the command-line cleaner."""
     parser = _parser()
     args = parser.parse_args(argv)
-    if args.replacement_mode == "reversible" and not args.token_map:
-        parser.error("--token-map is required for reversible mode")
-    if args.json_input and args.replacement_mode == "reversible":
-        parser.error("reversible mode currently supports text input only")
-    # shortcut: Windows on Python 3.13+ has os.fchmod, but it only sets the read-only flag; refuse there too
-    # if the map must be restricted from other accounts.
-    if args.replacement_mode == "reversible" and not hasattr(os, "fchmod"):
-        parser.error("reversible mode needs os.fchmod to restrict the token map, which this platform lacks")
+    if args.replacement_mode == "reversible":
+        _check_reversible_args(parser, args)
     try:
         source = stdin.read() if args.input == "-" else Path(args.input).read_text(encoding="utf-8")
     except (OSError, ValueError) as exc:  # missing file or not UTF-8

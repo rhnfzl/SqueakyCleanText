@@ -115,10 +115,9 @@ def _digit_group_runs(cleaner, blanked):
     return spans + [m.span() for regex in (_DIGIT_GROUP_HEAD, _DIGIT_GROUP_TAIL) for m in regex.finditer(blanked)]
 
 
-def _protected_spans(cleaner, cfg, normalised_text, step_spans, blanked, overlap_chars):
-    """(start, end) of normalised text a split must not cut: start < split < end."""
-    phone_view = cleaner._phone_folded_view
-    guard_patterns = [cleaner._url_regex, constants.EMAIL_REGEX, contact.IP_VIEW, phone_view]
+def _guard_patterns(cleaner, cfg, spaced_ids):
+    """Every regex or view whose matches a split must not cut, for the steps *cfg* turns on."""
+    guard_patterns = [cleaner._url_regex, constants.EMAIL_REGEX, contact.IP_VIEW, cleaner._phone_folded_view]
     if cfg.check_replace_html:  # a tag holding a space ('<a title="x y">')
         guard_patterns.append(cleaner._html_regex)
     if cfg.check_replace_dates:
@@ -127,16 +126,21 @@ def _protected_spans(cleaner, cfg, normalised_text, step_spans, blanked, overlap
         guard_patterns.append(constants.FUZZY_DATE_CANDIDATE_REGEX)
     if cfg.check_replace_iban_cards:  # "NL91 ABNA 0417 1643 00"
         guard_patterns += [constants.IBAN_REGEX, constants.CARD_REGEX]
-    spaced_ids = cfg.check_replace_numbers and cfg.replace_numbers_mode == 'identifiers' \
-        and cfg.numbers_spaced_pair_ids
     if cfg.check_replace_numbers:  # a grouped number ("5 379") is one token too
         guard_patterns += [contact.numbers_regex(cfg.replace_numbers_in_words),
                            _NUMBER_UNIT_CONTEXT]  # the amount lookarounds read one space past a match: "€ 123 45"
         if not spaced_ids:  # with spaced IDs, _digit_group_runs protects its runs (a table may split)
             guard_patterns.append(cleaner._numbers_regex)  # "123 45"
+    return guard_patterns
+
+
+def _protected_spans(cleaner, cfg, normalised_text, step_spans, blanked, overlap_chars):
+    """(start, end) of normalised text a split must not cut: start < split < end."""
+    spaced_ids = cfg.check_replace_numbers and cfg.replace_numbers_mode == 'identifiers' \
+        and cfg.numbers_spaced_pair_ids
     protected = [
         match.span()
-        for regex in guard_patterns
+        for regex in _guard_patterns(cleaner, cfg, spaced_ids)
         for match in (regex.pattern.finditer(normalised_text.translate(regex.table))
                       if isinstance(regex, contact.DigitView) else regex.finditer(normalised_text))
     ]
@@ -148,7 +152,7 @@ def _protected_spans(cleaner, cfg, normalised_text, step_spans, blanked, overlap
     # A custom pattern past custom_patterns_timeout raises, or (on_timeout='warn') protects nothing.
     protected += [match.span() for pattern, _, timed in cleaner._user_rules
                   for match in cleaner._user_matches(pattern, timed, normalised_text, partial=True) or ()]
-    phone_digits = normalised_text.translate(phone_view.table)
+    phone_digits = normalised_text.translate(cleaner._phone_folded_view.table)
     tail = _PHONE_TAIL.search(phone_digits, max(0, len(phone_digits) - _PHONE_TAIL_MAX))
     if tail:
         protected.append((tail.start(), len(normalised_text) + 1))

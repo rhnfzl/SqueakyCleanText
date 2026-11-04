@@ -720,7 +720,7 @@ class TextCleaner:
         for lang in langs:
             try:
                 self.GeneralNER.load_language(lang)
-            except Exception as e:
+            except ner.ModelLoadError as e:
                 logger.warning("warmup: skipping %s: %s", lang, e)
 
     def process(self, text: str) -> ProcessResult:

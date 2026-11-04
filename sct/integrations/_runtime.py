@@ -13,6 +13,7 @@ from collections.abc import Iterable, Mapping, Sequence
 
 from sct.config import ONNX_BACKENDS, TextCleanerConfig
 from sct.presets import preset_config
+from sct.score import SCORE_A_COLUMNS, score_record
 from sct.sct import TextCleaner
 
 OUTPUTS = ("overwrite", "new_column")
@@ -132,7 +133,6 @@ def clean_columns(
     """
     out, results = _clean(handle, batch, columns, output)
     if score:
-        from sct.score import SCORE_A_COLUMNS, score_record
         first = as_columns(columns)[0]
         records = [
             None if r is None else score_record(r, original=t)

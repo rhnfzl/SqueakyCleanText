@@ -159,7 +159,12 @@ def split_text(text: str, max_tokens: int, tokenizer: Callable[..., Any]) -> lis
                 result.extend(split_text(chunk, max_tokens, tokenizer))
         return result
 
-    # Last resort: character-level splitting via token offsets
+    return _split_by_token_offsets(text, max_tokens, tokenizer, fits)
+
+
+def _split_by_token_offsets(text: str, max_tokens: int, tokenizer: Callable[..., Any],
+                            fits: Callable[[str], bool]) -> list[str]:
+    """Last resort: character-level splitting via token offsets."""
     tokenized = tokenizer(text, return_offsets_mapping=True)
     offsets = tokenized.offset_mapping
     # Reserve room for the special tokens ([CLS]/[SEP]) each chunk gets back.

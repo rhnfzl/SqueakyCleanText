@@ -16,6 +16,7 @@ from sct.score import (
     score_records,
 )
 from sct.sct import TextCleaner
+from sct.utils.atomic_file import write_text_atomic
 from sct.utils.ner import ModelLoadError
 
 
@@ -68,20 +69,50 @@ def _hashable(value):
     return json.dumps(value, sort_keys=True, ensure_ascii=False, default=str)
 
 
+def _column_texts(rows: list[dict[str, Any]], column: str, parser: argparse.ArgumentParser) -> list[str]:
+    texts = []
+    for i, row in enumerate(rows):
+        if not isinstance(row, dict):
+            parser.error(f"row {i}: not a JSON object")
+        value = row.get(column)
+        if value is not None and not isinstance(value, str):
+            parser.error(f"row {i}: column {column!r} is not text")
+        texts.append(value or "")
+    return texts
+
+
+def _k_anonymity(rows: list[dict[str, Any]], columns: str, k_threshold: int,
+                 parser: argparse.ArgumentParser) -> dict[str, Any]:
+    names = tuple(c.strip() for c in columns.split(",") if c.strip())
+    # Only the named columns are read, so other columns never reach the report.
+    try:
+        records = [{c: _hashable(row[c]) for c in names} for row in rows]
+        risk = assess_reidentification_risk(
+            records, quasi_identifiers=names, k_threshold=k_threshold,
+        )
+    except KeyError as exc:
+        parser.error(f"quasi-identifier column missing: {exc}")
+    except ValueError as exc:
+        parser.error(str(exc))
+    return {
+        "quasi_identifiers": list(risk.quasi_identifiers),
+        "k_threshold": risk.k_threshold,
+        "minimum_k": risk.minimum_k,
+        "at_risk_records": risk.at_risk_records,
+        "at_risk_fraction": risk.at_risk_fraction,
+        "class_size_counts": {
+            str(k): v for k, v in sorted(risk.class_size_counts.items())
+        },
+    }
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     """Run the report command."""
     parser = _parser()
     args = parser.parse_args(argv)
     rows = _read_rows(Path(args.input), parser)
 
-    texts = []
-    for i, row in enumerate(rows):
-        if not isinstance(row, dict):
-            parser.error(f"row {i}: not a JSON object")
-        value = row.get(args.text_column)
-        if value is not None and not isinstance(value, str):
-            parser.error(f"row {i}: column {args.text_column!r} is not text")
-        texts.append(value or "")
+    texts = _column_texts(rows, args.text_column, parser)
 
     config = ScoreConfig(
         quality=args.quality_model is not None,
@@ -114,27 +145,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     if config.minhash:
         report["minhash"] = minhash_metadata(config)
     if args.quasi_identifiers:
-        names = tuple(c.strip() for c in args.quasi_identifiers.split(",") if c.strip())
-        # Only the named columns are read, so other columns never reach the report.
-        try:
-            records = [{c: _hashable(row[c]) for c in names} for row in rows]
-            risk = assess_reidentification_risk(
-                records, quasi_identifiers=names, k_threshold=args.k,
-            )
-        except KeyError as exc:
-            parser.error(f"quasi-identifier column missing: {exc}")
-        except ValueError as exc:
-            parser.error(str(exc))
-        report["k_anonymity"] = {
-            "quasi_identifiers": list(risk.quasi_identifiers),
-            "k_threshold": risk.k_threshold,
-            "minimum_k": risk.minimum_k,
-            "at_risk_records": risk.at_risk_records,
-            "at_risk_fraction": risk.at_risk_fraction,
-            "class_size_counts": {
-                str(k): v for k, v in sorted(risk.class_size_counts.items())
-            },
-        }
+        report["k_anonymity"] = _k_anonymity(rows, args.quasi_identifiers, args.k, parser)
 
     _write(args.out, json.dumps(report, indent=2, ensure_ascii=False) + "\n")
     if args.card:
@@ -149,7 +160,7 @@ def main(argv: Sequence[str] | None = None) -> int:
 def _write(path: str, text: str) -> None:
     target = Path(path)
     target.parent.mkdir(parents=True, exist_ok=True)
-    target.write_text(text, encoding="utf-8")
+    write_text_atomic(target, text)
 
 
 if __name__ == "__main__":

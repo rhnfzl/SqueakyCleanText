@@ -5,6 +5,7 @@ import re
 from pathlib import Path
 from typing import Any
 
+from sct.utils.atomic_file import write_text_atomic
 from sct.config import TextCleanerConfig
 from sct.utils import constants, resources
 from sct.utils.contact import config_numbers_regex
@@ -159,11 +160,11 @@ def write_browser_manifest(
     output: str | Path,
 ) -> None:
     """Write a deterministic JSON deployment manifest."""
-    Path(output).write_text(
+    write_text_atomic(
+        output,
         json.dumps(
             build_browser_manifest(config),
             indent=2,
             sort_keys=True,
         ) + "\n",
-        encoding="utf-8",
     )

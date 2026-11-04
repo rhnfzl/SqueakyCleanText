@@ -17,6 +17,7 @@ Server settings come from the environment only:
 import os
 import stat
 import threading
+from collections.abc import Callable
 from typing import TYPE_CHECKING, Any, Literal, NotRequired, TypedDict, cast
 
 from sct.adapters import _DuplicateKeyError, process_json
@@ -170,6 +171,11 @@ def read_under_root(root: str, path: str, max_bytes: int = DEFAULT_MAX_BYTES) ->
         raise ToolError(
             "path must be relative to SCT_MCP_ROOT, with no empty, hidden, '.' or '..' parts."
         )
+    return _read_capped(_open_below(root, parts), max_bytes)
+
+
+def _open_below(root: str, parts: list[str]) -> int:
+    """Descriptor of the file *parts* names below *root*, each folder opened from its parent's descriptor."""
     try:
         dir_fd = os.open(root, os.O_RDONLY | os.O_DIRECTORY)
     except OSError:
@@ -179,13 +185,17 @@ def read_under_root(root: str, path: str, max_bytes: int = DEFAULT_MAX_BYTES) ->
             next_fd = os.open(part, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=dir_fd)
             os.close(dir_fd)
             dir_fd = next_fd
-        file_fd = os.open(parts[-1], os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK, dir_fd=dir_fd)
+        return os.open(parts[-1], os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK, dir_fd=dir_fd)
     except OSError:
         raise ToolError(
             "path not found under SCT_MCP_ROOT, or it goes through a symlink or a non-folder."
         ) from None
     finally:
         os.close(dir_fd)
+
+
+def _read_capped(file_fd: int, max_bytes: int) -> str:
+    """Read and close *file_fd*: a regular UTF-8 file of at most *max_bytes* bytes."""
     try:
         if not stat.S_ISREG(os.fstat(file_fd).st_mode):
             raise ToolError("path must name a regular file, not a folder, link, pipe or device.")
@@ -215,6 +225,45 @@ _ANNOTATIONS = {
 }
 
 
+def _server_settings(root: str | None, max_bytes: int | None, preset: str | None) -> tuple[str | None, int, str]:
+    """Arguments, else the environment, else the defaults; a bad value fails at start-up, not per call."""
+    root = root or os.environ.get("SCT_MCP_ROOT") or None
+    if root is not None and not os.path.isdir(root):
+        raise ValueError("SCT_MCP_ROOT must be an existing directory")
+    if max_bytes is None:
+        max_bytes = int(os.environ.get("SCT_MCP_MAX_BYTES") or DEFAULT_MAX_BYTES)
+    if max_bytes < 0:
+        raise ValueError("SCT_MCP_MAX_BYTES must be zero or more")
+    preset = preset or os.environ.get("SCT_MCP_PRESET") or "sct"
+    preset_config(preset)
+    return root, max_bytes, preset
+
+
+def _cleaner_getter(cleaner: TextCleaner | None, preset: str) -> Callable[[bool], TextCleaner]:
+    """``get_cleaner(pii)``: the given cleaner, else one built on first use for each mode."""
+    ascii_override = {"check_to_ascii_unicode": True} if os.environ.get("SCT_MCP_TO_ASCII") == "1" else {}
+    cleaners: dict[bool, TextCleaner] = {}
+    cleaners_lock = threading.Lock()  # sync tools run on worker threads
+
+    def get_cleaner(pii: bool) -> TextCleaner:
+        if cleaner is not None:
+            if pii and cleaner.cfg.ner_mode != "pii":
+                raise ToolError(
+                    "This server's cleaner is not configured for PII mode. "
+                    "Call with pii=false, or start the server with a PII-mode cleaner."
+                )
+            return cleaner
+        if pii not in cleaners:
+            with cleaners_lock:
+                if pii not in cleaners:
+                    cleaners[pii] = TextCleaner(
+                        cfg=preset_config(preset, ner_mode="pii" if pii else "standard", **ascii_override),
+                        include_entities=True,
+                    )
+        return cleaners[pii]
+    return get_cleaner
+
+
 def create_mcp_server(
     cleaner: TextCleaner | None = None,
     *,
@@ -235,16 +284,7 @@ def create_mcp_server(
             "Install with: pip install squeakycleantext[mcp]"
         ) from exc
 
-    root = root or os.environ.get("SCT_MCP_ROOT") or None
-    if root is not None and not os.path.isdir(root):
-        raise ValueError("SCT_MCP_ROOT must be an existing directory")  # fail at start-up, not per call
-    if max_bytes is None:
-        max_bytes = int(os.environ.get("SCT_MCP_MAX_BYTES") or DEFAULT_MAX_BYTES)
-    if max_bytes < 0:
-        raise ValueError("SCT_MCP_MAX_BYTES must be zero or more")
-    preset = preset or os.environ.get("SCT_MCP_PRESET") or "sct"
-    preset_config(preset)  # fail at start-up on an unknown name
-    ascii_override = {"check_to_ascii_unicode": True} if os.environ.get("SCT_MCP_TO_ASCII") == "1" else {}
+    root, max_bytes, preset = _server_settings(root, max_bytes, preset)
 
     server = FastMCP(
         "SqueakyCleanText",
@@ -253,25 +293,7 @@ def create_mcp_server(
             "models, logs, or retrieval systems."
         ),
     )
-    cleaners: dict[bool, TextCleaner] = {}
-    cleaners_lock = threading.Lock()  # sync tools run on worker threads
-
-    def get_cleaner(pii: bool) -> TextCleaner:
-        if cleaner is not None:
-            if pii and cleaner.cfg.ner_mode != "pii":
-                raise ToolError(
-                    "This server's cleaner is not configured for PII mode. "
-                    "Call with pii=false, or start the server with a PII-mode cleaner."
-                )
-            return cleaner
-        if pii not in cleaners:
-            with cleaners_lock:
-                if pii not in cleaners:
-                    cleaners[pii] = TextCleaner(
-                        cfg=preset_config(preset, ner_mode="pii" if pii else "standard", **ascii_override),
-                        include_entities=True,
-                    )
-        return cleaners[pii]
+    get_cleaner = _cleaner_getter(cleaner, preset)
 
     @server.tool(title="Clean text", annotations={**_ANNOTATIONS, "title": "Clean text"})
     def clean_text(

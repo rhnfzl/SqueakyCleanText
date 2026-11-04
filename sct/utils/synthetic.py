@@ -51,6 +51,14 @@ def _date_part(generate):
     return generate().date()
 
 
+def _provider_modules(generate):
+    """The modules whose clock and random to hold: those of the Faker call inside *generate*."""
+    method = getattr(generate, 'func', generate)
+    if method is _date_part:
+        method = generate.args[0].func
+    return {sys.modules.get(getattr(method, '__module__', ''))} - {None}
+
+
 @contextlib.contextmanager
 def _clock_at(reference, modules):
     """Faker code in *modules* reads *reference* as today and now.
@@ -298,21 +306,8 @@ class SyntheticReplacer:
             # depend on which thread or stage generates them.
             fake.seed_instance(doc_seed + len(cache))
         method_name = FAKER_GENERATORS.get(entity_group)
-
-        generate = getattr(fake, method_name) if method_name and hasattr(fake, method_name) else fake.name
-        if self._reference is not None and method_name == 'date':
-            generate = functools.partial(fake.date, end_datetime=self._reference)
-        elif self._reference is not None and method_name == 'date_of_birth':
-            # Faker's date_of_birth range (ages 0-115) ending on the reference date, not today; drawn in
-            # UTC, since Faker reads a naive range in the worker's local timezone (fakes differ per machine).
-            between = functools.partial(fake.date_time_between_dates,
-                                        self._reference - timedelta(days=115 * 365 + 28),
-                                        self._reference, _datetime_module.UTC)
-            generate = functools.partial(_date_part, between)
-        method = getattr(generate, 'func', generate)
-        if method is _date_part:  # the Faker call inside decides whose clock and random to hold
-            method = generate.args[0].func
-        modules = {sys.modules.get(getattr(method, '__module__', ''))} - {None}
+        generate = self._faker_call(fake, method_name)
+        modules = _provider_modules(generate)
         if self._reference is not None:
             clock_modules = modules | ({sys.modules.get('faker.providers.date_time')} - {None})
             generate = functools.partial(self._at_reference, generate, clock_modules)
@@ -324,6 +319,20 @@ class SyntheticReplacer:
 
         cache[cache_key] = replacement
         return replacement
+
+    def _faker_call(self, fake, method_name):
+        """The Faker call for *method_name* (default ``name``); date fakes end on the reference date, if set."""
+        generate = getattr(fake, method_name) if method_name and hasattr(fake, method_name) else fake.name
+        if self._reference is not None and method_name == 'date':
+            return functools.partial(fake.date, end_datetime=self._reference)
+        if self._reference is not None and method_name == 'date_of_birth':
+            # Faker's date_of_birth range (ages 0-115) ending on the reference date, not today; drawn in
+            # UTC, since Faker reads a naive range in the worker's local timezone (fakes differ per machine).
+            between = functools.partial(fake.date_time_between_dates,
+                                        self._reference - timedelta(days=115 * 365 + 28),
+                                        self._reference, _datetime_module.UTC)
+            return functools.partial(_date_part, between)
+        return generate
 
     def _at_reference(self, generate, modules):
         with _clock_at(self._reference, modules):
