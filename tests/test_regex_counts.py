@@ -87,7 +87,7 @@ def test_batch_path_equals_single_path():
     docs = [f"John Smith mailed {EMAIL} in 2020.", "call +1-202-555-0147", "plain words"]
 
     batched = cleaner.process_batch(docs, batch_size=1)
-    single = [cleaner._process_single(doc) for doc in docs]
+    single = [cleaner._process_single_isolated(doc) for doc in docs]
 
     for b, s in zip(batched, single):
         assert b.metadata["regex_counts"] == s.metadata["regex_counts"]
