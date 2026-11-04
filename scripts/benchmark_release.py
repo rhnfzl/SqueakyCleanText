@@ -25,82 +25,17 @@ import re
 import subprocess
 import sys
 import time
-import unicodedata
 from pathlib import Path
 
-from sct.evaluation import EntitySpan, evaluate_pii, load_evaluation_jsonl
-from sct.utils.constants import LEGACY_TYPE_NAMES
+from benchmarks.score import PLACEHOLDER, predicted_spans
+from sct.evaluation import evaluate_pii, load_evaluation_jsonl
 
 ROOT = Path(__file__).resolve().parents[1]
 DATASET = ROOT / "evaluation" / "release_benchmark.jsonl"
 RESULTS = ROOT / "evaluation" / "results"
-PLACEHOLDER_REGEX = re.compile(r"<([A-Z][A-Z_]*?)_\d+>")
 NON_PII_LABELS = frozenset({"YEAR", "NUMBER"})
-# Pre-0.8.0 reversible type names (legacy_type_names=True) -> dataset label.
-LABEL_ALIASES = {old: new for new, old in LEGACY_TYPE_NAMES.items()}
-ANY_PLACEHOLDER_REGEX = re.compile(r"<[A-Z][A-Z_]*(?:_\d+)?>")
 SPEED_REPEATS = 3
 CORRECTNESS_OVERRIDES = {"replacement_mode": "reversible", "check_to_ascii_unicode": False}
-
-
-def _nfkc_view(text: str) -> tuple[str, list[int]]:
-    """NFKC form of *text*, plus the source offset of each of its characters.
-
-    Each base character is normalised together with its combining marks, so every
-    piece of the view maps back to one exact source range.
-    shortcut: Hangul jamo sequences compose across clusters and fall back to -1 spans; fine
-    unless a dataset ships decomposed Hangul.
-    """
-    pieces, offsets, start = [], [], 0
-    for i in range(1, len(text) + 1):
-        if i < len(text) and unicodedata.combining(text[i]):
-            continue
-        piece = unicodedata.normalize("NFKC", text[start:i])
-        pieces.append(piece)
-        offsets.extend([start] * len(piece))
-        start = i
-    offsets.append(len(text))
-    return "".join(pieces), offsets
-
-
-def predicted_spans(source: str, output: str, originals: dict[str, str],
-                    view: tuple[str, list[int]] | None = None) -> list[EntitySpan]:
-    """Map each ``<TAG_n>`` placeholder in output order to the source span it replaced.
-
-    SCT may have folded the text (full-width to ASCII) before replacing it, so the
-    search runs on the NFKC form of the source and the found range is mapped back
-    to source offsets. *view* replaces that NFKC view with another ``(text, source offset
-    of each char + [len(source)])`` pair, e.g. one that also decodes entities as SCT does.
-    """
-    view, offsets = view or _nfkc_view(source)
-    output = unicodedata.normalize("NFKC", output)
-    spans, cursor, previous_end = [], 0, 0
-    for match in PLACEHOLDER_REGEX.finditer(output):
-        # Skip past the unchanged output text before this placeholder, so an
-        # untouched earlier copy of the value ("Ann met <PERSON_0>") is not reused.
-        context = output[previous_end:match.start()]
-        previous_end = match.end()
-        # A cleanup step may have changed the context ("Ann x met" -> "Ann met"):
-        # align on its longest suffix still found in the source.
-        for cut in range(len(context)):
-            found = view.find(context[cut:], cursor)
-            if found >= 0:
-                cursor = found + len(context) - cut
-                break
-        label = LABEL_ALIASES.get(match.group(1), match.group(1))
-        value = unicodedata.normalize("NFKC", originals.get(match.group(0), ""))
-        start = view.find(value, cursor) if value else -1
-        if start < 0 and value:
-            start = view.find(value)
-        if start < 0:
-            # The replaced value is not in the source (an earlier step changed it): never matches.
-            spans.append(EntitySpan(label, -1, -1))
-            continue
-        end = start + len(value)
-        # A piece of the view can be several chars of one source char: end after that char.
-        spans.append(EntitySpan(label, offsets[start], next(o for o in offsets[end - 1:] if o > offsets[end - 1])))
-        cursor = end
-    return spans
 
 
 def find_leaks(example, output: str) -> tuple[list[dict], list[dict]]:
@@ -111,7 +46,7 @@ def find_leaks(example, output: str) -> tuple[list[dict], list[dict]]:
     split values (``98765<NUMBER>``, ``<NUMBER>.1.10``) count.
     """
     leaks, partial = [], []
-    visible = ANY_PLACEHOLDER_REGEX.sub("\0", output)
+    visible = PLACEHOLDER.sub("\0", output)
     fragments = [
         fragment.rstrip(".,;:!?)'\"")
         for fragment in re.findall(r"[^\s\0]+(?=\0)|(?<=\0)[^\s\0]+", visible)
@@ -152,8 +87,20 @@ def _git_commit() -> str | None:
         return None
 
 
-def run(dataset: Path) -> dict:
+def run_header(dataset: Path) -> dict:
+    """Run metadata every result file starts with."""
     import sct
+
+    return {
+        "sct_version": sct.__version__,
+        "git_commit": _git_commit(),
+        "python": platform.python_version(),
+        "platform": platform.platform(),
+        "dataset": dataset.name,
+    }
+
+
+def run(dataset: Path) -> dict:
     from sct.config import TextCleanerConfig
     from sct.sct import TextCleaner
 
@@ -192,11 +139,7 @@ def run(dataset: Path) -> dict:
     cfg = speed_cleaner.cfg
 
     return {
-        "sct_version": sct.__version__,
-        "git_commit": _git_commit(),
-        "python": platform.python_version(),
-        "platform": platform.platform(),
-        "dataset": dataset.name,
+        **run_header(dataset),
         "dataset_sha256": hashlib.sha256(dataset.read_bytes()).hexdigest(),
         "documents": len(examples),
         "entities": sum(len(e.expected) for e in examples),
@@ -250,7 +193,6 @@ def run_batch(
     **cfg_overrides,
 ) -> dict:
     """Time ``process_batch`` over *documents* docs (the dataset cycled) after one warmup call."""
-    import sct
     from sct.config import TextCleanerConfig
     from sct.sct import TextCleaner
 
@@ -269,11 +211,7 @@ def run_batch(
         seconds.append(time.perf_counter() - started_at)
     output_hash = hashlib.sha256("\0".join(r.lm_text for r in results).encode()).hexdigest()
     return {
-        "sct_version": sct.__version__,
-        "git_commit": _git_commit(),
-        "python": platform.python_version(),
-        "platform": platform.platform(),
-        "dataset": dataset.name,
+        **run_header(dataset),
         "long_documents": long,
         "settings": {
             "documents": documents,

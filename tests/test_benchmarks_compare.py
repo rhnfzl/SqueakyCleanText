@@ -434,7 +434,7 @@ def test_c5_reuse_needs_a_matching_cache_key(tmp_path, monkeypatch):
 def test_c6_sct_offsets_survive_entity_decoding_and_invisible_chars():
     from sct.utils.normtext import NormaliseText, unescape_markup
 
-    from scripts.benchmark_release import predicted_spans
+    from benchmarks.score import predicted_spans
 
     sct = _adapter_module("sct_adapter.py")
     fix = NormaliseText().fix_bad_unicode

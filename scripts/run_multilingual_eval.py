@@ -21,11 +21,11 @@ import argparse
 from datetime import date
 import hashlib
 import json
-import platform
 import time
 from pathlib import Path
 
-from scripts.benchmark_release import CORRECTNESS_OVERRIDES, _git_commit, predicted_spans
+from benchmarks.score import predicted_spans
+from scripts.benchmark_release import CORRECTNESS_OVERRIDES, run_header
 from scripts.build_multilingual_eval import LABELS, OUTPUT as DATASET
 from sct.evaluation import EntitySpan, evaluate_pii, load_evaluation_jsonl
 
@@ -84,8 +84,6 @@ def hub_licence(model_id: str) -> str | None:
 
 
 def run(dataset: Path, models: list[str], threshold: float) -> dict:
-    import sct
-
     examples = load_evaluation_jsonl(dataset)
     reports = {}
     for name in models:
@@ -107,11 +105,7 @@ def run(dataset: Path, models: list[str], threshold: float) -> dict:
             },
         }
     return {
-        "sct_version": sct.__version__,
-        "git_commit": _git_commit(),
-        "python": platform.python_version(),
-        "platform": platform.platform(),
-        "dataset": dataset.name,
+        **run_header(dataset),
         "dataset_sha256": hashlib.sha256(dataset.read_bytes()).hexdigest(),
         "documents": len(examples),
         "entities": sum(len(e.expected) for e in examples),

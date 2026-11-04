@@ -1,5 +1,14 @@
-from scripts.benchmark_release import find_leaks, predicted_spans
+from benchmarks.score import predicted_spans
+from scripts.benchmark_release import find_leaks
 from sct.evaluation import EntitySpan, EvaluationExample
+
+
+def test_digits_in_a_user_label_are_a_placeholder():
+    # Labels may hold digits (sct.config._USER_LABEL): the scorers must read such tags too.
+    assert predicted_spans("Ref AB-1 here", "Ref <EU1_0> here", {"<EU1_0>": "AB-1"}) == [EntitySpan("EU1", 4, 8)]
+    example = EvaluationExample(
+        id="doc", text="EU1 Smith", language="en", domain="test", expected=(EntitySpan("PERSON", 0, 9),))
+    assert find_leaks(example, "<EU1> here") == ([], [])
 
 
 def test_predicted_spans_maps_placeholders_in_order():

@@ -17,9 +17,8 @@ from pathlib import Path
 
 from benchmarks import datasets
 from benchmarks.labels import DATASET_LABELS
-from benchmarks.score import inject_noise, masking_recall, score_lid, score_noise, score_pii
+from benchmarks.score import inject_noise, masking_recall, predicted_spans, score_lid, score_noise, score_pii
 from benchmarks.speed import environment, measure, rates, run_batch
-from scripts.benchmark_release import predicted_spans
 
 ROOT = Path(__file__).resolve().parent
 SUITES = {
