@@ -81,9 +81,9 @@ def _git_commit() -> str | None:
     try:
         return subprocess.run(
             ["git", "rev-parse", "HEAD"], cwd=ROOT, capture_output=True,  # noqa: S607
-            text=True, check=True,
+            text=True, check=True, timeout=30,
         ).stdout.strip()
-    except (OSError, subprocess.CalledProcessError):
+    except (OSError, subprocess.CalledProcessError, subprocess.TimeoutExpired):
         return None
 
 

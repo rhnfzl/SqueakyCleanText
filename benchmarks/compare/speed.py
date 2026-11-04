@@ -38,12 +38,15 @@ VRAM_POLL_SECONDS = 0.2
 
 
 def vram_mb(pid: int) -> float | None:
-    """GPU memory (MiB) used by *pid* now, from nvidia-smi's compute-app list; None without nvidia-smi."""
+    """GPU memory (MiB) used by *pid* now, from nvidia-smi's compute-app list; None without nvidia-smi or if it hangs."""
     smi = shutil.which("nvidia-smi")
     if smi is None:
         return None
-    out = subprocess.run([smi, "--query-compute-apps=pid,used_memory", "--format=csv,noheader,nounits"],  # noqa: S603
-                         capture_output=True, text=True).stdout
+    try:
+        out = subprocess.run([smi, "--query-compute-apps=pid,used_memory", "--format=csv,noheader,nounits"],  # noqa: S603
+                             capture_output=True, text=True, timeout=30).stdout
+    except subprocess.TimeoutExpired:
+        return None
     return sum(float(used) for p, used in (line.split(", ") for line in out.strip().splitlines() if ", " in line)
                if int(p) == pid)
 

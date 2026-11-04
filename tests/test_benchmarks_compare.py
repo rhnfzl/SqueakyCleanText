@@ -1,5 +1,7 @@
 """Tool-comparison harness: dev/test split, new loaders' span building, entry tables (no dataset data)."""
 
+import subprocess
+
 from benchmarks.compare import entries, split
 from benchmarks.datasets import MODULES, get
 from benchmarks.datasets.gretel_en import entity_spans
@@ -738,3 +740,15 @@ def test_audit_table_reads_both_passes(tmp_path):
         {"entries": {"sct-default": {"tab": {**c, "recovered": 8, "passed": 5, "failed_compact": 0}}}}))
     assert report.audit_table(tmp_path, "default")[2] == "| sct-default | tab | 9 | 5 | 1 | 8 | 5 | 5 | 2 |"
     assert report.audit_table(tmp_path, "tuned") == []
+
+
+def test_hung_tool_probes_fall_back(tmp_path, monkeypatch):
+    from benchmarks.compare import speed
+
+    def hang(cmd, **kwargs):
+        raise subprocess.TimeoutExpired(cmd, kwargs["timeout"])
+
+    monkeypatch.setattr(subprocess, "run", hang)
+    monkeypatch.setattr(speed.shutil, "which", lambda name: f"/usr/bin/{name}")
+    assert speed.vram_mb(123) is None
+    assert runner.freeze(tmp_path / "bin" / "python") == ""

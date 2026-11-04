@@ -67,7 +67,7 @@ def ensure_env(name: str, requirements: Path | None, envs_root: Path, python: st
     subprocess.run([uv, "venv", "--clear", "--python", python, str(venv)], check=True)  # noqa: S603
     subprocess.run([uv, "pip", "install", "--python", str(py), "-r", str(requirements)], check=True)  # noqa: S603
     freeze = subprocess.run([uv, "pip", "freeze", "--python", str(py)], check=True,  # noqa: S603
-                            capture_output=True, text=True).stdout
+                            capture_output=True, text=True, timeout=30).stdout
     (venv / "freeze.txt").write_text(freeze)
     stamp.write_text(digest)
     return py
@@ -79,7 +79,10 @@ def freeze(py: Path) -> str:
         return frozen.read_text()
     uv = shutil.which("uv")
     cmd = [uv, "pip", "freeze", "--python", str(py)] if uv else [str(py), "-m", "pip", "freeze"]
-    done = subprocess.run(cmd, capture_output=True, text=True)  # noqa: S603
+    try:
+        done = subprocess.run(cmd, capture_output=True, text=True, timeout=30)  # noqa: S603
+    except subprocess.TimeoutExpired:
+        return ""
     return done.stdout
 
 
@@ -115,7 +118,7 @@ def pick_gpu(min_free_gb: float = 6.0) -> str:
     if smi is None:
         raise RuntimeError("no nvidia-smi: use --device cpu")
     out = subprocess.run([smi, "--query-gpu=index,memory.free", "--format=csv,noheader,nounits"],  # noqa: S603
-                         capture_output=True, text=True, check=True).stdout
+                         capture_output=True, text=True, check=True, timeout=30).stdout
     index, free = max((line.split(", ") for line in out.strip().splitlines()), key=lambda x: float(x[1]))
     if float(free) < min_free_gb * 1024:
         raise RuntimeError(f"GPU {index} has only {float(free) / 1024:.1f} GB free (< {min_free_gb})")

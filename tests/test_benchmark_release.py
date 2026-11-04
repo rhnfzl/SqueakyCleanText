@@ -1,8 +1,9 @@
 from benchmarks.score import predicted_spans
-from scripts.benchmark_release import find_leaks
+from scripts.benchmark_release import _git_commit, find_leaks
 from sct.evaluation import EntitySpan, EvaluationExample
 import builtins
 import importlib
+import subprocess
 import sys
 
 
@@ -121,3 +122,11 @@ def test_benchmark_imports_without_resource_module(monkeypatch):
     monkeypatch.setattr(builtins, "__import__", no_resource)
     module = importlib.import_module("scripts.benchmark_release")
     assert module._peak_rss_mb() is None
+
+
+def test_git_commit_is_none_when_git_hangs(monkeypatch):
+    def hang(cmd, **kwargs):
+        raise subprocess.TimeoutExpired(cmd, kwargs["timeout"])
+
+    monkeypatch.setattr(subprocess, "run", hang)
+    assert _git_commit() is None

@@ -14,6 +14,7 @@ Legacy API (backward compatible):
 
 import re
 import sys
+import warnings
 from collections.abc import Iterable
 from dataclasses import dataclass, fields
 from datetime import date
@@ -804,7 +805,6 @@ def _reconcile_ner_models(cfg):
     else:
         # No dict provided — derive from ner_models_list (may be default or custom)
         if cfg.ner_models_list != TextCleanerConfig.ner_models_list:
-            import warnings
             warnings.warn(
                 "ner_models_list is deprecated. Use ner_models dict instead.",
                 DeprecationWarning,
