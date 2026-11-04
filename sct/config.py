@@ -485,7 +485,7 @@ class TextCleanerConfig:
         return self.effective_gliner_threshold if self.ner_mode == 'pii' else 0.85
 
     @classmethod
-    def from_preset(cls, name: str = "training", **overrides) -> "TextCleanerConfig":
+    def from_preset(cls, name: str = "training", **overrides: Any) -> "TextCleanerConfig":
         """Build a config from a named preset (see ``sct.presets.PRESETS``)."""
         from sct.presets import preset_config
         return preset_config(name, **overrides)
@@ -898,7 +898,7 @@ def _config_from_module_globals() -> TextCleanerConfig:
     Supports backward compatibility with the legacy config pattern.
     """
     m = sys.modules[__name__]
-    kwargs = {
+    kwargs: dict[str, Any] = {
         f.name: getattr(m, f.name.upper(), f.default)
         for f in fields(TextCleanerConfig)
         if f.name not in _NO_PLAIN_GLOBAL

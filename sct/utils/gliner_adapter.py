@@ -5,6 +5,7 @@ Auto-detects bi-encoder models (ModernBERT, etc.) and caches label embeddings.
 Optional backend. Requires: pip install squeakycleantext[gliner] or [gliner2]
 """
 import logging
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -141,7 +142,7 @@ class GLiNERAdapter:
                 desc = self.label_descriptions.get(label, label)
                 desc_to_label[desc] = label
 
-        raw_batch = None
+        raw_batch: Any = None
         if self.variant == 'gliner':
             inference_labels = self._get_inference_labels()
             if self._is_bi_encoder:

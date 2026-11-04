@@ -9,7 +9,7 @@ import os
 import threading
 from dataclasses import replace
 from typing import Any
-from collections.abc import Mapping, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 
 from sct.config import ONNX_BACKENDS, TextCleanerConfig
 from sct.presets import preset_config
@@ -46,9 +46,10 @@ def _pin_loaded_revisions(cleaner: TextCleaner | None, config: TextCleanerConfig
     if ner is None or config.ner_backend not in ONNX_BACKENDS:
         return config
     loaded = {key: p["revision"] for key, p in ner.provenance.items() if p.get("revision")}
-    if not loaded.keys() - config.ner_model_revisions.keys():
+    pinned = config.ner_model_revisions or {}
+    if not loaded.keys() - pinned.keys():
         return config
-    return replace(config, ner_model_revisions={**loaded, **config.ner_model_revisions})
+    return replace(config, ner_model_revisions={**loaded, **pinned})
 
 
 class CleanerHandle:
@@ -79,7 +80,7 @@ class CleanerHandle:
         self._pid = None
 
 
-def as_columns(columns) -> tuple:
+def as_columns(columns: str | Iterable[str]) -> tuple:
     """One column name or a sequence of them, as a tuple ("text" is not ("t", "e", "x", "t"))."""
     return (columns,) if isinstance(columns, str) else tuple(columns)
 

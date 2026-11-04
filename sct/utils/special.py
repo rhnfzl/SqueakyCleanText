@@ -1,6 +1,7 @@
 import json
 import re
 import unicodedata
+from collections.abc import Callable
 
 from sct.utils import constants
 
@@ -67,19 +68,20 @@ def _remove_bracketed(text, remove_brackets, remove_braces, max_chars, max_words
 
 class ProcessSpecialSymbols:
 
-    def replace_currency_symbols(self, text, replace_with="<CUR>"):
+    def replace_currency_symbols(self, text: str,
+                                 replace_with: str | Callable[[re.Match[str]], str] | None = "<CUR>") -> str:
         """Replace runs of currency symbols with ``replace_with``, a string or a callable as ``re.sub`` takes;
         None replaces each symbol with its ISO code ('$' with 'USD', '£' with 'GBP')."""
         if replace_with is None:
             return self.replace_currency_symbols_with_fn(text, constants.CURRENCIES.__getitem__)
         return constants.CURRENCY_REGEX.sub(replace_with, text)
 
-    def replace_currency_symbols_with_fn(self, text, replace_fn):
+    def replace_currency_symbols_with_fn(self, text: str, replace_fn: Callable[[str], str]) -> str:
         """Replace each single currency symbol: replace_fn(symbol) -> replacement."""
         return constants.CURRENCY_SYMBOL_REGEX.sub(lambda m: replace_fn(m.group()), text)
 
 
-    def remove_isolated_letters(self, text):
+    def remove_isolated_letters(self, text: str) -> str:
         """
         Removes any isolated letters which doesn't add any value to the text.
         """
@@ -87,8 +89,8 @@ class ProcessSpecialSymbols:
 
         return cleaned_text
 
-    def remove_isolated_special_symbols(self, text, remove_brackets=True, remove_braces=True,
-                                        max_chars=0, max_words=0, keep_json=False):
+    def remove_isolated_special_symbols(self, text: str, remove_brackets: bool = True, remove_braces: bool = True,
+                                        max_chars: int = 0, max_words: int = 0, keep_json: bool = False) -> str:
         """
         Removes any isolated symbols which shouldn't be present in the text.
 
@@ -113,5 +115,5 @@ class ProcessSpecialSymbols:
 
         return cleaned_text
 
-    def remove_punctuation(self, text):
+    def remove_punctuation(self, text: str) -> str:
         return constants.PUNCTUATION_REGEX.sub('', text)

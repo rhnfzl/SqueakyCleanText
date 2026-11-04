@@ -1,11 +1,15 @@
+import re
+from collections.abc import Callable, Mapping
+from typing import Any
+
 from sct.utils import constants
 from sct.utils.contact import DigitView
 
 
 class ProcessDateTime:
 
-    def __init__(self, date_regex=None, fuzzy_vocabulary=None,
-                 fuzzy_vocabulary_by_lang=None):
+    def __init__(self, date_regex: re.Pattern[str] | None = None, fuzzy_vocabulary: tuple[str, ...] | None = None,
+                 fuzzy_vocabulary_by_lang: Mapping[str, tuple[str, ...]] | None = None):
         """
         Args:
             date_regex: Compiled regex for date matching. Defaults to constants.DATE_REGEX.
@@ -20,13 +24,13 @@ class ProcessDateTime:
         self._fuzzy_vocabulary_by_lang = (constants.FUZZY_MONTH_VOCABULARY_BY_LANG if fuzzy_vocabulary_by_lang is None
                                           else fuzzy_vocabulary_by_lang)
 
-    def replace_years(self, text, replace_with="<YEAR>"):
+    def replace_years(self, text: str, replace_with: str | Callable[[re.Match[str]], str] = "<YEAR>") -> str:
         """
         Replaces years between 1900 to 2099 in the text with a special token.
         """
         return constants.YEAR_REGEX.sub(replace_with, text)
 
-    def replace_dates(self, text, replace_with="<DATE>"):
+    def replace_dates(self, text: str, replace_with: str | Callable[[Any], str] = "<DATE>") -> str:
         """
         Replaces common date formats in the text with a special token.
 
@@ -36,8 +40,8 @@ class ProcessDateTime:
         """
         return self._date_regex.sub(replace_with, text)
 
-    def fuzzy_replace_dates(self, text, replace_with="<DATE>", score_cutoff=80,
-                            language=None):
+    def fuzzy_replace_dates(self, text: str, replace_with: str | Callable[[str], str] = "<DATE>",
+                            score_cutoff: float = 80, language: str | None = None) -> str:
         """
         Fuzzy post-regex pass: catches misspelled month names that DATE_REGEX missed.
 

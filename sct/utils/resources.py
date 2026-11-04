@@ -1,7 +1,11 @@
 import os
 import threading
+from typing import TYPE_CHECKING
 
-from lingua import Language, LanguageDetectorBuilder
+from lingua import Language, LanguageDetector, LanguageDetectorBuilder
+
+if TYPE_CHECKING:
+    from sct.config import TextCleanerConfig
 
 # ---------------------------------------------------------------------------
 # ISO code → canonical Lingua name reverse lookup tables (built once)
@@ -55,7 +59,7 @@ if hasattr(os, "register_at_fork"):
 # ---------------------------------------------------------------------------
 
 
-def build_detector(supported_languages: frozenset):
+def build_detector(supported_languages: frozenset) -> LanguageDetector:
     """Build a Lingua detector for the given language set.
 
     Filters out 'MULTILINGUAL' (not a real Lingua language).
@@ -74,7 +78,7 @@ def build_detector(supported_languages: frozenset):
 _all_detector = None
 
 
-def build_all_detector():
+def build_all_detector() -> LanguageDetector:
     """Lingua detector over all 75 languages (high accuracy), built once per process."""
     global _all_detector
     if _all_detector is None:
@@ -99,7 +103,7 @@ def language_to_iso(name: str) -> str:
         return name[:2].lower()
 
 
-def configured_month_names(cfg):
+def configured_month_names(cfg: "TextCleanerConfig") -> dict[str, frozenset[str]] | None:
     """Month-name dict for cfg's date options, or None when all of them are at the default (DATE_REGEX).
 
     Shared by TextCleaner and the browser export so both build the same date regex.

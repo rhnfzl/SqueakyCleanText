@@ -51,7 +51,7 @@ class AdoptionDecision:
 
 def candidate_config(candidate: ModelCandidate) -> TextCleanerConfig:
     """Build a span-preserving configuration for one supported candidate."""
-    common = {
+    common: dict[str, Any] = {
         "check_fix_bad_unicode": False,
         "check_to_ascii_unicode": False,
         "check_replace_html": False,

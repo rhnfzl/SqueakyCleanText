@@ -63,7 +63,7 @@ class TorchNERPipeline:
             results = [results]
         return results
 
-    def cleanup(self):
+    def cleanup(self) -> None:
         """Release GPU memory."""
         if self._device.startswith('cuda'):
             self._torch.cuda.empty_cache()

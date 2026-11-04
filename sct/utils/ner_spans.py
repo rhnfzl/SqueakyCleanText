@@ -2,6 +2,8 @@
 
 import re
 import unicodedata
+from collections.abc import Callable, Collection, Iterable
+from typing import Any
 
 import regex
 
@@ -27,7 +29,7 @@ def _letter_scripts(text: str) -> list[str]:
             if unicodedata.category(c) in ('Lu', 'Ll', 'Lt', 'Lo')]
 
 
-def snap_word_edges(text, start, end, ratio, same_script):
+def snap_word_edges(text: str, start: int, end: int, ratio: float | None, same_script: bool) -> tuple[int, int]:
     """Move span edges that fall inside a word out to the word edges ("Salut" + "e").
 
     A word is a run of Unicode letters and marks; wide (CJK) characters never join, since
@@ -56,13 +58,13 @@ def snap_word_edges(text, start, end, ratio, same_script):
     return new_start, new_end
 
 
-def merge_overlaps(text, filtered_data):
+def merge_overlaps(text: str, filtered_data: Iterable[dict[str, Any]]) -> list[dict[str, Any]]:
     """Merge overlapping spans into their union, labelled by the highest score.
 
     Same rule as ``PrivacyPolicy.transform``, so no part of a nested or
     partly overlapping entity stays visible.
     """
-    merged = []
+    merged: list[dict[str, Any]] = []
     for item in sorted(filtered_data, key=lambda x: (x['start'], -x['end'])):
         if merged and item['start'] < merged[-1]['end']:
             last = merged[-1]
@@ -75,14 +77,15 @@ def merge_overlaps(text, filtered_data):
     return merged
 
 
-def merge_location_gaps(text, spans, markers, max_gap):
+def merge_location_gaps(text: str, spans: Iterable[dict[str, Any]], markers: Collection[tuple[int, int]],
+                        max_gap: int) -> list[dict[str, Any]]:
     """Join neighbouring LOCATION spans into one, so an address is one span.
 
     Format rule only: the gap between them may hold at most *max_gap* characters outside
     placeholders (``<NUMBER>`` in ``IL <NUMBER>,`` is not counted and is taken in), no line
     break and no sentence end (``.!?;:`` before whitespace, or ``。！？``).
     """
-    merged = []
+    merged: list[dict[str, Any]] = []
     for item in sorted(spans, key=lambda x: (x['start'], -x['end'])):
         last = merged[-1] if merged else None
         if last and ENTITY_TYPE_MAP.get(last['entity_group']) == 'LOCATION' \
@@ -100,14 +103,15 @@ def merge_location_gaps(text, spans, markers, max_gap):
     return merged
 
 
-def propagate(text, spans, markers, min_score):
+def propagate(text: str, spans: list[dict[str, Any]], markers: Iterable[tuple[int, int]],
+              min_score: float | None) -> list[dict[str, Any]]:
     """Add a span at every other whole-word, case-sensitive copy of a masked PER/ORG/LOC value.
 
     The values come from the models' own spans; a span below *min_score*,
     shorter than 2 characters or without a letter is not spread. Copies that overlap a
     span or a marker are skipped, longest value first, so added spans stay disjoint.
     """
-    sources = {}
+    sources: dict[str, dict[str, Any]] = {}
     for item in spans:
         value = text[item['start']:item['end']]
         if (item['entity_group'] in ('PER', 'ORG', 'LOC') and (min_score is None or item['score'] >= min_score)
@@ -126,7 +130,8 @@ def propagate(text, spans, markers, min_score):
     return sorted(spans + added, key=lambda x: x['start']) if added else spans
 
 
-def drop_allowed(allow, text, items, span):
+def drop_allowed(allow: regex.Pattern | None, text: str, items: list[Any],
+                 span: Callable[[Any], tuple[int, int]]) -> list[Any]:
     """*items* without those equal to or inside a custom_allow_terms occurrence (applied last)."""
     if allow is None or not items:
         return items

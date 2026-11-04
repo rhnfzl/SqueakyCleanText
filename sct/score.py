@@ -12,10 +12,13 @@ from collections import Counter
 from dataclasses import dataclass
 from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
-from typing import Any, Protocol
+from typing import TYPE_CHECKING, Any, Protocol
 from collections.abc import Iterable, Sequence
 
 import regex
+
+if TYPE_CHECKING:
+    from sct.utils.process_result import ProcessResult
 
 # Column -> Arrow type name; a list means a list of that type.
 SCORE_A_TYPES = {
@@ -119,7 +122,7 @@ def minhash_metadata(config: ScoreConfig) -> dict[str, Any]:
 
 
 def score_record(
-    result,
+    result: "ProcessResult",
     *,
     original: str | None = None,
     quality: QualityScorer | float | None = None,
@@ -196,7 +199,7 @@ class ONNXQualityScorer:
     revision recorded at export time.
     """
 
-    def __init__(self, model_dir, *, revision: str | None = None,
+    def __init__(self, model_dir: str | Path, *, revision: str | None = None,
                  batch_size: int = 32, max_length: int = 512,
                  providers: list | None = None):
         import onnxruntime as ort

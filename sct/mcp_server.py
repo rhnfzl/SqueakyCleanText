@@ -17,18 +17,21 @@ Server settings come from the environment only:
 import os
 import stat
 import threading
-from typing import Any, Literal, NotRequired, TypedDict
+from typing import TYPE_CHECKING, Any, Literal, NotRequired, TypedDict, cast
 
 from sct.adapters import _DuplicateKeyError, process_json
 from sct.presets import preset_config
 from sct.sct import TextCleaner
 from sct.signals import Signals, public_view
 
-try:
+if TYPE_CHECKING:
     from fastmcp.exceptions import ToolError
-except ImportError:  # the helpers below stay usable (and testable) without the mcp extra
-    class ToolError(Exception):
-        """Stand-in for ``fastmcp.exceptions.ToolError``."""
+else:
+    try:
+        from fastmcp.exceptions import ToolError
+    except ImportError:  # the helpers below stay usable (and testable) without the mcp extra
+        class ToolError(Exception):
+            """Stand-in for ``fastmcp.exceptions.ToolError``."""
 
 DEFAULT_MAX_BYTES = 1_048_576
 # path needs a dir-fd walk with O_NOFOLLOW; without it (Windows) path stays off.
@@ -218,7 +221,7 @@ def create_mcp_server(
     root: str | None = None,
     max_bytes: int | None = None,
     preset: str | None = None,
-):
+) -> Any:
     """Create a FastMCP server without importing FastMCP at package import.
 
     *root*, *max_bytes* and *preset* default to ``SCT_MCP_ROOT`` /
@@ -288,7 +291,7 @@ def create_mcp_server(
             if root is None:
                 raise ToolError("path input is off. Set SCT_MCP_ROOT to a folder to allow it, or pass text.")
             text = read_under_root(root, path, max_bytes)
-        return sanitize_text(get_cleaner(pii), text, detail)
+        return sanitize_text(get_cleaner(pii), cast(str, text), detail)
 
     @server.tool(title="Clean JSON", annotations={**_ANNOTATIONS, "title": "Clean JSON"})
     def clean_json(

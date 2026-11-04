@@ -50,7 +50,7 @@ PRESETS: Mapping[str, Mapping[str, Any]] = MappingProxyType({
 })
 
 
-def preset_config(name: str = "training", **overrides) -> TextCleanerConfig:
+def preset_config(name: str = "training", **overrides: Any) -> TextCleanerConfig:
     """Return the ``name`` preset as a config; ``overrides`` are any config fields."""
     if name not in PRESETS:
         raise ValueError(f"unknown preset {name!r}; valid presets: {sorted(PRESETS)}")

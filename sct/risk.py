@@ -43,7 +43,7 @@ def assess_reidentification_risk(
     if isinstance(quasi_identifiers, str):
         quasi_identifiers = (quasi_identifiers,)
 
-    combinations = Counter()
+    combinations: Counter[tuple] = Counter()
     for record in records:
         missing = set(quasi_identifiers).difference(record)
         if missing:

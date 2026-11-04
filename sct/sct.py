@@ -18,11 +18,11 @@ from collections.abc import Callable
 import regex
 
 from sct.config import GLICLASS_DEFAULT_MODEL, TextCleanerConfig, _config_from_module_globals
-from sct.privacy import PrivacyPolicy, ProcessingMetrics, TokenStore
+from sct.privacy import EntityFinding, PrivacyPolicy, ProcessingMetrics, TokenStore
 from sct.utils import constants, contact, datetime, ner, normtext, resources, special, stopwords
 from sct.utils.anonymization_map import AnonymizationMap
 from sct.utils.synthetic import FAKER_GENERATORS
-from sct.utils.process_result import ProcessResult
+from sct.utils.process_result import ProcessMetadata, ProcessResult
 
 logger = logging.getLogger(__name__)
 
@@ -30,7 +30,7 @@ logger = logging.getLogger(__name__)
 class CustomPatternTimeout(TimeoutError):
     """A custom_patterns regex ran past custom_patterns_timeout on one document. Names the label, never the text."""
 
-    def __init__(self, label, timeout):
+    def __init__(self, label: str, timeout: float):
         super().__init__(label, timeout)
         self.label, self.timeout = label, timeout
 
@@ -84,15 +84,15 @@ def _entity_counts(findings) -> dict[str, dict[str, int]]:
 class _DocumentContext(threading.local):
     """One document's state on the running thread; every field reads None outside a document."""
 
-    anon_map = None
-    protected = None
-    regex_counts = None
-    deferred = None
-    warnings = None
-    language = None
-    marker_order = None
-    step_text = None
-    allow_spans = None
+    anon_map: Any = None
+    protected: Any = None
+    regex_counts: Any = None
+    deferred: Any = None
+    warnings: Any = None
+    language: Any = None
+    marker_order: Any = None
+    step_text: Any = None
+    allow_spans: Any = None
 
     def clear(self) -> None:
         self.__dict__.clear()
@@ -235,7 +235,7 @@ class TextCleaner:
 
     def _build_user_rules(self, deny_labels) -> list:
         """(pattern, label of a match, custom_patterns label for the time limit or None) per rule."""
-        rules = []
+        rules: list[tuple[Any, Callable[..., Any], str | None]] = []
         if deny_labels:  # each term is a group named by its label: m.lastgroup is the label
             rules.append((constants.terms_regex(deny_labels, self.cfg.custom_terms_case_sensitive, deny_labels),
                           lambda m: m.lastgroup, None))
@@ -409,19 +409,18 @@ class TextCleaner:
         if isinstance(language_config, str):
             return language_config, 1.0, 'pinned', None
 
-        restricted = isinstance(language_config, tuple)
-        if not restricted and not self._language_needed():
+        if not isinstance(language_config, tuple) and not self._language_needed():
             return None, None, 'none', None
 
         values = self._detector.compute_language_confidence_values(text)
         # Same "unknown" rule as Lingua's detect_language_of: nothing scored, or a tie at the top.
         if values and values[0].value > 0 and (len(values) < 2 or values[1].value < values[0].value):
             top = values[0]
-            if not restricted or top.language.name in language_config:
+            if not isinstance(language_config, tuple) or top.language.name in language_config:
                 # Lingua's sum order varies per process (last-ulp noise); round so workers match.
                 margin = top.value - (values[1].value if len(values) > 1 else 0.0)
                 return top.language.name, round(top.value, 6), 'detected', round(margin, 6)
-        if restricted:
+        if isinstance(language_config, tuple):
             first = language_config[0]
             conf = next((v.value for v in values if v.language.name == first), 0.0)
             return first, round(conf, 6), 'fallback', None
@@ -455,7 +454,7 @@ class TextCleaner:
         current_text = state.text
 
         # NER processing; always detailed (same detection) so entity counts are known.
-        findings = ()
+        findings: tuple[EntityFinding, ...] = ()
         if self.GeneralNER is not None:
             detailed = self.GeneralNER.ner_process_detailed(
                 current_text,
@@ -499,7 +498,7 @@ class TextCleaner:
         doc_warnings: set = set()  # step warnings ('custom_pattern_timeout'), travel in the state like the counts
         self._document_context.warnings = doc_warnings
         # (protected key -> tag NER reads, [(tag, value or None) in text order])
-        deferred = ({}, []) if self._defer_tags else None
+        deferred: tuple[dict, list] | None = ({}, []) if self._defer_tags else None
         self._document_context.deferred = deferred
 
         # Document-level classification (before any text modification)
@@ -550,10 +549,10 @@ class TextCleaner:
             warnings.add('language_low_confidence')
         if self.GeneralNER is not None and self.GeneralNER.uses_fallback_models(state.language):
             warnings.add('ner_fallback_models')
-        if any(m['provider'] == 'CPUExecutionProvider' for m in models) \
+        if self.GeneralNER is not None and any(m['provider'] == 'CPUExecutionProvider' for m in models) \
                 and self.GeneralNER.device == 'cuda':
             warnings.add('cuda_fallback')
-        if any(m['provider'] == 'cpu' for m in models) and self.GeneralNER.device == 'mps':
+        if self.GeneralNER is not None and any(m['provider'] == 'cpu' for m in models) and self.GeneralNER.device == 'mps':
             warnings.add('mps_fallback')
         return warnings
 
@@ -582,7 +581,7 @@ class TextCleaner:
         # Value-free counts are always present; entity text only on opt-in below.
         entity_counts = _entity_counts(findings)
         ner_on = self.GeneralNER is not None
-        models = self.GeneralNER.models_for(language) if ner_on else []
+        models = self.GeneralNER.models_for(language) if self.GeneralNER is not None else []
         metadata: dict[str, Any] = {
             'source_chars': state.source_chars,
             'regex_counts': state.regex_counts,
@@ -613,7 +612,7 @@ class TextCleaner:
                 entity_counts={k: v['count'] for k, v in entity_counts.items()},
             ))
 
-        return ProcessResult(current_text, stat_text, language, metadata=metadata)
+        return ProcessResult(current_text, stat_text, language, metadata=cast(ProcessMetadata, metadata))
 
     def process_batch(self, texts: list[str], batch_size: int | None = None) -> list[ProcessResult]:
         """Process multiple texts with bounded document concurrency.
@@ -637,7 +636,7 @@ class TextCleaner:
             if not isinstance(text, str):
                 raise ValueError(f"Input must be string, got {type(text)}")
             if not text or text.isspace():
-                results[i] = ProcessResult("", "", None, metadata=self._empty_metadata(text))
+                results[i] = ProcessResult("", "", None, metadata=cast(ProcessMetadata, self._empty_metadata(text)))
             else:
                 to_process.append((i, text))
 

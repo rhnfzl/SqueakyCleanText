@@ -15,6 +15,7 @@ import sys
 import threading
 import types
 from datetime import date, datetime, timedelta
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -23,7 +24,7 @@ logger = logging.getLogger(__name__)
 _GLOBAL_RANDOM_LOCK = threading.Lock()
 _CLOCK_LOCK = threading.Lock()
 # (module, name, original) of every global swap a lock holder has applied, if any.
-_SWAPPED = []
+_SWAPPED: list[tuple[Any, str, Any]] = []
 
 
 def _after_fork_in_child():
@@ -311,7 +312,7 @@ class SyntheticReplacer:
         method = getattr(generate, 'func', generate)
         if method is _date_part:  # the Faker call inside decides whose clock and random to hold
             method = generate.args[0].func
-        modules = {sys.modules.get(getattr(method, '__module__', None))} - {None}
+        modules = {sys.modules.get(getattr(method, '__module__', ''))} - {None}
         if self._reference is not None:
             clock_modules = modules | ({sys.modules.get('faker.providers.date_time')} - {None})
             generate = functools.partial(self._at_reference, generate, clock_modules)

@@ -1,3 +1,5 @@
+from collections.abc import Collection, Mapping
+
 from stop_words import StopWordError, get_stop_words as _get_pkg_stop_words
 
 from sct.config import DEFAULT_LANGUAGES
@@ -6,7 +8,8 @@ from sct.utils.resources import language_to_iso
 
 class ProcessStopwords:
 
-    def __init__(self, supported_languages=None, custom_stopwords=None):
+    def __init__(self, supported_languages: Collection[str] | None = None,
+                 custom_stopwords: Mapping[str, Collection[str]] | None = None):
         """
         Args:
             supported_languages: frozenset of language names (e.g. {'ENGLISH', 'POLISH'})
@@ -16,7 +19,7 @@ class ProcessStopwords:
         languages = supported_languages or DEFAULT_LANGUAGES
         custom = custom_stopwords or {}
 
-        self._lang_map = {}
+        self._lang_map: dict[str, set[str]] = {}
         for lang in languages:
             if lang in custom:
                 # Custom stopwords replace auto-detected
@@ -33,7 +36,7 @@ class ProcessStopwords:
         """Get the stopword set for a language. Falls back to English."""
         return self._lang_map.get(language, self._lang_map.get('ENGLISH', set()))
 
-    def remove_stopwords(self, text, language):
+    def remove_stopwords(self, text: str, language: str) -> str:
         """Remove stopwords based on the detected language.
 
         Falls back to English stopwords for unknown languages.

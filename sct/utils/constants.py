@@ -6,6 +6,7 @@ import re
 import string
 import unicodedata
 import regex
+from collections.abc import Iterable, Mapping
 
 CURRENCIES = {
     "$": "USD",
@@ -69,7 +70,7 @@ CATEGORY_CHARS, DECOMPOSITIONS = _scan_unicode()
 NFKC_DOTS = ''.join(ch for ch in DECOMPOSITIONS if unicodedata.normalize('NFKC', ch) == '.')
 
 
-def category_chars(*prefixes):
+def category_chars(*prefixes: str) -> list[str]:
     """Characters, in code point order, of the general categories starting with one of *prefixes*."""
     return sorted(''.join(chars for category, chars in CATEGORY_CHARS.items() if category.startswith(prefixes)))
 
@@ -277,13 +278,13 @@ _LEFT_EDGE, _RIGHT_EDGE = ">\U00100001", "<\U00100000"
 CURRENCY_SIGNS = CATEGORY_CHARS['Sc']
 
 
-def token_glue(in_words=False):
+def token_glue(in_words: bool = False) -> str:
     """Characters that glue to a digit run: digits, "_", and (unless in_words) Latin/Greek/Cyrillic letters.
     Letters of unspaced scripts (CJK, Thai) do not glue, as for NUMBERS_REGEX: 金额50000元 is a whole number."""
     return r"\d_" if in_words else rf"\d_{_SPACED_LETTERS}"
 
 
-_ID_NUMBER_CACHE = {}
+_ID_NUMBER_CACHE: dict[tuple, re.Pattern[str]] = {}
 # A date written as a spaced/hyphen-joined digit run (05 11 2023, 2023 11-05): the year step keeps masking its
 # year rather than leaving it to the run's <NUMBER>, as before (the date step has no spaced date).
 SPACED_DATE_REGEX = re.compile(
@@ -294,8 +295,9 @@ SPACED_DATE_REGEX = re.compile(
 THOUSANDS_MAX_GROUPS = 6
 
 
-def identifier_numbers_regex(min_digits, in_words=False, *, letter_prefix=False, two_part=False, spaced_pair=False,
-                             keep_currency_code=False):
+def identifier_numbers_regex(min_digits: int, in_words: bool = False, *, letter_prefix: bool = False,
+                             two_part: bool = False, spaced_pair: bool = False,
+                             keep_currency_code: bool = False) -> re.Pattern[str]:
     """A whole digit run of at least *min_digits* digits that is not part of a longer token (glued to letters,
     digits or a joiner and another token part) and not an amount, decimal, percent, time or range: those
     shapes either join their parts (1,250.00, 100-200; 14:30 has 2-digit parts) or touch a % / currency sign.
@@ -572,7 +574,8 @@ _MONTH_ALTERNATION = '|'.join(
 # Module-level constants above remain the defaults.
 # ---------------------------------------------------------------------------
 
-def build_month_names_dict(extra_month_names=None, builtin_languages=None):
+def build_month_names_dict(extra_month_names: Mapping[str, Iterable[str]] | None = None,
+                           builtin_languages: Iterable[str] | None = None) -> dict[str, frozenset[str]]:
     """Build month-name lookup dict, merging defaults + custom names.
 
     Args:
@@ -647,7 +650,8 @@ _CIRCLED_DAYS = ''.join(chr(cp) for cp in range(0x2460, 0x3300)
                         and 1 <= int(unicodedata.normalize('NFKC', chr(cp))) <= 31)
 
 
-def build_date_regex(month_names_dict=None, styled=False, slash_year=True):
+def build_date_regex(month_names_dict: Mapping[str, frozenset[str]] | None = None, styled: bool = False,
+                     slash_year: bool = True) -> re.Pattern[str]:
     """Build DATE_REGEX from a month-names dict.
 
     Args:
@@ -678,7 +682,10 @@ def build_date_regex(month_names_dict=None, styled=False, slash_year=True):
     )
 
 
-def build_fuzzy_vocabulary(month_names_dict=None, lang_to_vocab=None):
+def build_fuzzy_vocabulary(
+    month_names_dict: Mapping[str, frozenset[str]] | None = None,
+    lang_to_vocab: Mapping[str, str] | None = None,
+) -> tuple[tuple[str, ...], dict[str, tuple[str, ...]]]:
     """Build fuzzy month vocabulary (full names only, len > 4).
 
     Returns:
@@ -770,7 +777,8 @@ CHUNK_DELIMITERS = (
 _TERM_GLUE = rf'[[\p{{L}}\p{{M}}\p{{N}}]--[{_SPACELESS}]]'
 
 
-def terms_regex(terms, case_sensitive=False, labels=None):
+def terms_regex(terms: Iterable[str], case_sensitive: bool = False,
+                labels: Mapping[str, str] | None = None) -> regex.Pattern:
     """One regex for *terms* as whole words (longest first, so an overlap keeps the longer term). With
     *labels* ({term: LABEL}) each term is a group named by its label, so ``match.lastgroup`` is the label
     (a case variant such as "İ" for "i" need not equal the term after casefold)."""

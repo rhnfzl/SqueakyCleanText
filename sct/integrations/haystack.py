@@ -1,9 +1,8 @@
 """Haystack component (``pip install squeakycleantext[haystack]``)."""
 
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import fields, replace
 from typing import Any
-from collections.abc import Sequence
 
 from haystack import Document, component, default_from_dict, default_to_dict
 
@@ -43,7 +42,7 @@ class SCTDocumentCleaner:
 
         Haystack raises SerializationError for values it cannot store (custom steps).
         """
-        config = self._config
+        config: Any = self._config
         if isinstance(config, TextCleanerConfig):
             default = TextCleanerConfig()
             # The pickle state: a derived PII label map is None there, so the loaded config re-derives it.
@@ -65,7 +64,7 @@ class SCTDocumentCleaner:
         return default_from_dict(cls, {**data, "init_parameters": params})
 
     @component.output_types(documents=list[Document])
-    def run(self, documents: list[Document]):
+    def run(self, documents: list[Document]) -> dict[str, list[Document]]:
         pairs = clean_records(
             self.handle, [(d.content, d.meta) for d in documents], "content", self.columns, self.output
         )

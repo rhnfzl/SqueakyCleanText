@@ -7,8 +7,8 @@ import re
 import threading
 from collections import defaultdict
 import logging
-from typing import Any
-from collections.abc import Collection, Mapping, Sequence
+from typing import TYPE_CHECKING, Any, cast
+from collections.abc import Callable, Collection, Iterable, Mapping, Sequence
 
 from sct.utils import constants, resources
 from sct.utils.anonymization_map import AnonymizationMap
@@ -39,6 +39,11 @@ from sct.privacy import (
     NERProcessingResult,
     PrivacyPolicy,
 )
+
+if TYPE_CHECKING:
+    import regex
+
+    from sct.utils.synthetic import SyntheticReplacer
 
 logger = logging.getLogger(__name__)
 
@@ -102,9 +107,9 @@ class GeneralNER:
         self,
         cfg: TextCleanerConfig,
         *,
-        synthetic_replacer=None,
+        synthetic_replacer: 'SyntheticReplacer | None' = None,
         regex_markers: Sequence[str] = (),
-        allow_regex=None,
+        allow_regex: 'regex.Pattern | None' = None,
         privacy_policy: PrivacyPolicy | None = None,
     ):
         """Load the NER models *cfg* selects.
@@ -158,7 +163,7 @@ class GeneralNER:
             self._torch_device = 'cpu'
         logger.info("Using device: %s (backend: %s)", self._torch_device, ner_backend)
 
-        self._engine = None
+        self._engine: Any = None
 
         # Common state for all backends
         self._pipelines: dict = {}
@@ -172,7 +177,7 @@ class GeneralNER:
         # --- Backend-specific initialization ---
 
         if ner_backend in TOKEN_MODEL_BACKENDS:
-            self._model_names = dict(cfg.torch_ner_models if ner_backend in TORCH_BACKENDS else cfg.ner_models)
+            self._model_names = dict((cfg.torch_ner_models if ner_backend in TORCH_BACKENDS else cfg.ner_models) or {})
             self._ensure_loaded('ENGLISH')
             self._ensure_loaded('MULTILINGUAL')
             self._init_tokenizer_props()
@@ -188,7 +193,7 @@ class GeneralNER:
         if ner_backend in GLINER_ADAPTER_BACKENDS:
             from sct.utils.gliner_adapter import GLiNERAdapter
             self._gliner_pipe = GLiNERAdapter(
-                model_id=cfg.gliner_model,
+                model_id=cast(str, cfg.gliner_model),  # __post_init__ requires it for these backends
                 revision=cfg.gliner_revision,
                 variant=cfg.gliner_variant,
                 labels=cfg.gliner_labels,
@@ -301,7 +306,7 @@ class GeneralNER:
         revisions = (self.cfg.torch_ner_model_revisions
                      if self.cfg.ner_backend in TORCH_BACKENDS
                      else self.cfg.ner_model_revisions)
-        return self._model_names.get(lang_key, lang_key), revisions.get(lang_key)
+        return self._model_names.get(lang_key, lang_key), (revisions or {}).get(lang_key)
 
     def _get_model_name(self, lang_key: str) -> str:
         """Get model name for a language via direct dict lookup."""
@@ -345,14 +350,14 @@ class GeneralNER:
                     from sct.utils.torch_pipeline import load_torch_ner_model
                     pipeline_obj, tok = load_torch_ner_model(
                         model_name, device=self._torch_device,
-                        revision=self.cfg.torch_ner_model_revisions.get(lang_key),
+                        revision=(self.cfg.torch_ner_model_revisions or {}).get(lang_key),
                     )
                 else:
                     from sct.utils.onnx_pipeline import load_onnx_ner_model
                     pipeline_obj, tok = load_onnx_ner_model(
                         model_name,
                         device=self.device,
-                        revision=self.cfg.ner_model_revisions.get(lang_key),
+                        revision=(self.cfg.ner_model_revisions or {}).get(lang_key),
                         intra_op_threads=self.cfg.onnx_intra_op_threads,
                         inter_op_threads=self.cfg.onnx_inter_op_threads,
                         cuda_device_id=self.cfg.cuda_device_id,
@@ -387,7 +392,7 @@ class GeneralNER:
             keys += ('GLINER',)
         return [dict(self.provenance[k]) for k in keys if k in self.provenance]
 
-    def entities_with_position_key(self, results, labels):
+    def entities_with_position_key(self, results: Iterable[dict[str, Any]], labels: Collection[str]) -> list[dict[str, Any]]:
         """Keep the entities whose group is in *labels*, with collision-safe position keys."""
         return [
             {
@@ -401,17 +406,17 @@ class GeneralNER:
             for ix in results if ix['entity_group'] in labels
         ]
 
-    def filter_ner_data(self, data, keys):
+    def filter_ner_data(self, data: Iterable[dict[str, Any]], keys: Collection[str]) -> list[dict[str, Any]]:
         """Filter NER data, keeping highest-scoring entity per key."""
-        unique_data = {}
+        unique_data: dict[str, dict[str, Any]] = {}
         for item in data:
             if item['key'] in keys:
                 if item['key'] not in unique_data or item['score'] > unique_data[item['key']]['score']:
                     unique_data[item['key']] = item
         return list(unique_data.values())
 
-    def anonymize_text(self, text, filtered_data, replacement_mode='placeholder',
-                       anon_map=None):
+    def anonymize_text(self, text: str, filtered_data: list[dict[str, Any]], replacement_mode: str = 'placeholder',
+                       anon_map: AnonymizationMap | None = None) -> str:
         """Anonymize text. Supports placeholder, synthetic, or reversible replacement."""
         has_custom = any(
             items['entity_group'] not in ENTITY_TYPE_MAP
@@ -425,7 +430,7 @@ class GeneralNER:
             return self._anonymize_reversible(text, filtered_data, anon_map)
 
         if replacement_mode == 'synthetic':
-            return self._synthetic_replacer.generate_for_entities(text, filtered_data)
+            return cast('SyntheticReplacer', self._synthetic_replacer).generate_for_entities(text, filtered_data)
 
         if has_custom:
             # Mixed labels: right-to-left string replacement (preserves offsets)
@@ -457,7 +462,7 @@ class GeneralNER:
             return self.engine.anonymize(text=text, analyzer_results=analyzer_result).text
 
     @property
-    def engine(self):
+    def engine(self) -> Any:
         # Lazy: presidio_anonymizer imports presidio_analyzer (and torch via GLiNER) when installed.
         if self._engine is None:
             from presidio_anonymizer import AnonymizerEngine
@@ -489,7 +494,7 @@ class GeneralNER:
 
         return text
 
-    def vote_entities(self, entities, threshold):
+    def vote_entities(self, entities: list[dict[str, Any]], threshold: float) -> list[dict[str, Any]]:
         """Apply ensemble voting across multiple model results.
 
         Groups entities by position key and keeps a key whose vote passes *threshold*:
@@ -615,7 +620,7 @@ class GeneralNER:
         positional_tags: Sequence[str] | None = None,
         ner_confidence_threshold: float | None = None,
         anon_maps: Sequence['AnonymizationMap | None'] | None = None,
-        before_finalize=None,
+        before_finalize: Callable[[int], object] | None = None,
         max_workers: int = 1,
         source_markers: Sequence[Collection[Any] | None] | None = None,
     ) -> list[NERProcessingResult]:
@@ -858,7 +863,8 @@ class GeneralNER:
         source_markers: Collection[Any] | None = None,
     ) -> NERProcessingResult:
         """Merge window spans in document coordinates, vote, and replace once."""
-        spans, foreign = [], []
+        spans: list[dict[str, Any]] = []
+        foreign: list[dict[str, Any]] = []
         for (_, win_start, offsets, own_start, own_end), ner_results in zip(windows, window_results):
             for item in ner_results:
                 start = win_start + offsets[item['start']]
@@ -871,7 +877,7 @@ class GeneralNER:
                 (spans if own_start <= start < own_end else foreign).append(span)
         # Windows repeat context and WordPiece widening can give one model two labels for a
         # span; neither is another model: one vote per model and span, its best score.
-        best = {}
+        best: dict[tuple, dict[str, Any]] = {}
         for span in spans + foreign:
             vote = (span.get('model'), span['key'])
             if vote not in best or span['score'] > best[vote]['score']:
@@ -971,7 +977,7 @@ class GeneralNER:
     ) -> list[str]:
         """Process multiple texts, *batch_size* documents per batched model call."""
         batch_size = batch_size if batch_size is not None else self.cfg.ner_batch_size
-        results = []
+        results: list[str] = []
         for i in range(0, len(texts), batch_size):
             batch = texts[i:i + batch_size]
             results.extend(result.text for result in self.ner_process_batch_detailed(

@@ -89,7 +89,7 @@ class TesseractOCRProvider:
             lang=self.language,
             output_type=pytesseract.Output.DICT,
         )
-        lines = {}
+        lines: dict[tuple, list] = {}
         for index, text in enumerate(data["text"]):
             text = text.strip()
             if not text:

@@ -1,16 +1,18 @@
 """Split text into NER windows: plain functions over text and a tokenizer, no model state."""
 
 import re
+from collections.abc import Callable
+from typing import Any
 
 from sct.utils import constants
 
 
-def token_count(text: str, tokenizer) -> int:
+def token_count(text: str, tokenizer: Callable[..., Any]) -> int:
     """Count tokens in text."""
     return len(tokenizer(text).input_ids)
 
 
-def split_pieces(pattern, text: str) -> list[tuple]:
+def split_pieces(pattern: re.Pattern[str], text: str) -> list[tuple]:
     """Split *text* on *pattern* into ``(separator_before, piece)`` pairs.
 
     Keeping the matched separator lets chunks be rejoined exactly as in
@@ -31,7 +33,7 @@ def split_pieces(pattern, text: str) -> list[tuple]:
     return pieces
 
 
-def merge_pieces(pieces: list[tuple], fits) -> list[str]:
+def merge_pieces(pieces: list[tuple], fits: Callable[[str], bool]) -> list[str]:
     """Greedily merge adjacent ``(separator, piece)`` pairs while ``fits(chunk)``.
 
     Pieces inside a chunk are rejoined with their original separator.
@@ -129,7 +131,7 @@ def align_chunk(
     return source_chunk, match.start(), offsets
 
 
-def split_text(text: str, max_tokens: int, tokenizer) -> list[str]:
+def split_text(text: str, max_tokens: int, tokenizer: Callable[..., Any]) -> list[str]:
     """Split text into token-bounded chunks using a delimiter hierarchy.
 
     Tries sentence boundaries first (preferred: respects sentence integrity),

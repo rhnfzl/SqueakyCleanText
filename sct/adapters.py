@@ -5,13 +5,17 @@ or a privacy policy). ``sensitive`` and ``signals`` are always filled.
 """
 
 from dataclasses import dataclass, field, replace
-from typing import Any
+from typing import Any, cast
 from collections.abc import Iterable, Mapping
 
 from sct.presets import PRESETS
 from sct.privacy import EntityFinding
 from sct.sct import TextCleaner
-from sct.signals import is_sensitive_result, merge_views
+from sct.signals import Signals, is_sensitive_result, merge_views
+
+
+def _no_signals() -> Signals:
+    return cast(Signals, {})
 
 
 @dataclass(frozen=True)
@@ -30,7 +34,7 @@ class StructuredResult:
     findings: tuple[PathFinding, ...]
     sensitive: bool
     # merge_views over every string leaf, keys included.
-    signals: dict = field(default_factory=dict)
+    signals: Signals = field(default_factory=_no_signals)
 
 
 @dataclass(frozen=True)
@@ -56,7 +60,7 @@ class ProcessedRAGChunk:
     metadata: Mapping[str, Any]
     findings: tuple[EntityFinding, ...]
     sensitive: bool = False
-    signals: dict = field(default_factory=dict)
+    signals: Signals = field(default_factory=_no_signals)
     metadata_findings: tuple[PathFinding, ...] = ()
 
 
@@ -68,7 +72,7 @@ class DataFrameResult:
     findings: tuple[PathFinding, ...]
     sensitive: bool = False
     # merge_views over every processed cell.
-    signals: dict = field(default_factory=dict)
+    signals: Signals = field(default_factory=_no_signals)
 
 
 class _DuplicateKeyError(ValueError):
@@ -86,7 +90,7 @@ def _require_adapter_mode(cleaner: TextCleaner) -> None:
 def _pii_only_cleaner(cleaner: TextCleaner, ner: bool = True) -> TextCleaner:
     """Return a view of *cleaner* that runs only its PII steps, sharing its NER models."""
     # Everything the training preset turns off (folding, letter/number removal, casefold...).
-    off = {name: value for name, value in PRESETS['training'].items() if value is False}
+    off: dict[str, Any] = {name: value for name, value in PRESETS['training'].items() if value is False}
     if not ner:
         off['check_ner_process'] = False
     return cleaner._with_config(replace(cleaner.cfg, **off))
@@ -102,10 +106,10 @@ def process_json(cleaner: TextCleaner, value: Any) -> StructuredResult:
     config; ``'off'`` keeps keys as written.
     """
     _require_adapter_mode(cleaner)
-    findings = []
-    views = []
+    findings: list[PathFinding] = []
+    views: list[Signals] = []
     key_mode = cleaner.cfg.json_key_cleaning
-    key_cleaner = None
+    key_cleaner: TextCleaner | None = None
 
     def visit(item: Any, path: tuple[str | int, ...], text_cleaner: TextCleaner = cleaner) -> Any:
         nonlocal key_cleaner
@@ -127,7 +131,7 @@ def process_json(cleaner: TextCleaner, value: Any) -> StructuredResult:
                     processed_key = visit(
                         key,
                         path + ("@key", index),
-                        cleaner if key_mode == 'full' else key_cleaner,
+                        cleaner if key_mode == 'full' else cast(TextCleaner, key_cleaner),
                     )
                 else:
                     processed_key = key
@@ -212,8 +216,8 @@ def process_dataframe(
         raise KeyError(f"Unknown columns: {sorted(unknown)}")
 
     output = frame.copy(deep=True)
-    findings = []
-    views = []
+    findings: list[PathFinding] = []
+    views: list[Signals] = []
     # Positional access: a duplicate row or column label makes .at return a Series.
     selected = [j for j, name in enumerate(output.columns) if name in columns]
     for i, row in enumerate(output.index):

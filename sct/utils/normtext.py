@@ -1,7 +1,9 @@
 import logging
 import re
 import unicodedata
+from collections.abc import Callable
 from encodings.idna import dots as _idna_dots
+from typing import Literal
 from ftfy import fix_text
 from ftfy.chardata import HTML_ENTITY_RE
 from ftfy.fixes import unescape_html
@@ -215,7 +217,7 @@ def _decode_entity(match):
     return match.group() if decoded in ('<', '>') else decoded
 
 
-def decode_html_entities(text):
+def decode_html_entities(text: str) -> str:
     """ftfy's entity decoding (to a fixpoint, "&amp;#64;" -> "@"), except escaped ``<`` and ``>``.
 
     Each entity decodes on its own, so a text split at whitespace decodes as the whole. ``&lt;`` and ``&gt;``
@@ -230,7 +232,7 @@ def decode_html_entities(text):
 _MARKUP_OR_ENTITY = re.compile(r'<[^<>\n]*>|&#?[0-9A-Za-z]{1,24};')
 
 
-def unescape_markup(text, protect=lambda value: value):
+def unescape_markup(text: str, protect: Callable[[str], str] = lambda value: value) -> str:
     """Decode the ``&lt;`` / ``&gt;`` that ``decode_html_entities`` kept, outside tags, through *protect*."""
     def replace(match):
         if match.group()[0] == '<':
@@ -240,7 +242,7 @@ def unescape_markup(text, protect=lambda value: value):
     return _MARKUP_OR_ENTITY.sub(replace, text)
 
 
-def fold_styled(text):
+def fold_styled(text: str) -> str:
     """Fold styled/compatibility letters, digits and in-run URL punctuation to ASCII."""
     text = _INVISIBLE_REGEX.sub(_drop_invisible, text.translate(_STYLED_ALNUM))
     text = _CIRCLED_RUN_REGEX.sub(_fold_circled_run, text)
@@ -251,8 +253,9 @@ def fold_styled(text):
 
 class NormaliseText:
 
-    def fix_bad_unicode(self, text, normalization="NFC", decode_escapes=True, fix_character_width=False,
-                        fold_styled_characters=True):
+    def fix_bad_unicode(self, text: str, normalization: Literal["NFC", "NFD", "NFKC", "NFKD"] | None = "NFC",
+                        decode_escapes: bool = True, fix_character_width: bool = False,
+                        fold_styled_characters: bool = True) -> str:
         """
         Fix unicode text that's "broken" using `ftfy <http://ftfy.readthedocs.org/>`_;
         this includes mojibake, HTML entities and other code cruft,
@@ -281,19 +284,19 @@ class NormaliseText:
         text = text.translate(_FULLWIDTH_ALNUM)
         return _fold_email_runs(_FULLWIDTH_JOINER_REGEX.sub(lambda m: _FULLWIDTH_JOINER[m.group()], text))
 
-    def fix_strange_quotes(self, text):
+    def fix_strange_quotes(self, text: str) -> str:
         """Replace strange quotes with standard single/double quotes."""
         text = constants.SINGLE_QUOTE_REGEX.sub("'", text)
         text = constants.DOUBLE_QUOTE_REGEX.sub('"', text)
         return text
 
-    def to_ascii_unicode(self, text):
+    def to_ascii_unicode(self, text: str) -> str:
         """
         Convert non-ASCII characters into their closest ASCII equivalents.
         """
         return unidecode(self.fix_strange_quotes(text))
 
-    def remove_emoji(self, text):
+    def remove_emoji(self, text: str) -> str:
         """Remove all emoji characters from text."""
         return replace_emoji(text, replace='')
 
@@ -320,7 +323,8 @@ class NormaliseText:
             result.append(token if keep else token.casefold())
         return ' '.join(result)
 
-    def normalize_whitespace(self, text, strip_lines=True, no_line_breaks=False, keep_two_line_breaks=False):
+    def normalize_whitespace(self, text: str, strip_lines: bool = True, no_line_breaks: bool = False,
+                             keep_two_line_breaks: bool = False) -> str:
         """
         Given ``text`` str, replace one or more spacings with a single space, and one
         or more line breaks with a single newline. Also strip leading/trailing whitespace.
