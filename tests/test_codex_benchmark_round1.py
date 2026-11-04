@@ -9,7 +9,7 @@ from sct.browser import build_browser_manifest
 from sct.utils import constants
 from sct.utils.datetime import ProcessDateTime
 from sct.utils.special import _json_object_spans
-from tests.test_final_check_fixes import _finalize_spans
+from tests.helpers import finalize_spans
 
 
 @pytest.fixture(scope="module")
@@ -45,7 +45,7 @@ def test_c2_json_with_replaced_number_is_kept(cleaner):
 
 def test_c3_propagation_does_not_match_inside_a_word_with_combining_mark():
     text = "राज met राजा, राज."
-    ner, windows, results = _finalize_spans(text, [(0, 3, 'PER', 0.99)])
+    ner, windows, results = finalize_spans(text, [(0, 3, 'PER', 0.99)])
     assert ner._finalize(text, windows, results, 0.85, None).text == "<PERSON> met राजा, <PERSON>."
 
 

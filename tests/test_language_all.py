@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 from lingua import Language, LanguageDetectorBuilder
 
-from tests.ner_helpers import bare_ner, set_cfg
+from tests.helpers import bare_ner, set_cfg
 import sct.config as config_module
 from sct import TextCleaner, TextCleanerConfig
 from tests.conftest import TEST_NER_MODELS
@@ -217,7 +217,7 @@ def test_builtin_fallback_keys_keep_default_route():
     assert ner._get_ensemble_keys("FRENCH") == ("FRENCH",)
 
 
-class _FakeGLiNER:
+class FakeGLiNER:
     max_context_length = 512
     labels = ["person"]
     label_map = {"person": "PER"}
@@ -232,7 +232,7 @@ def test_gliner_hindi_pin_runs(monkeypatch):
         set_cfg(ner, ner_backend="gliner")
         set_cfg(ner, ner_batch_size=1)
         set_cfg(ner, ner_chunk_overlap=0)
-        ner._gliner_pipe = _FakeGLiNER()
+        ner._gliner_pipe = FakeGLiNER()
         set_cfg(ner, replacement_mode="placeholder")
         ner._synthetic_replacer = None
         ner._inference_locks = {}

@@ -7,31 +7,9 @@ import pytest
 from sct.integrations import _runtime
 from sct.integrations._runtime import CleanerHandle, clean_columns, clean_records
 from sct.presets import preset_config
-from sct.utils.process_result import ProcessResult
 
 EMAIL = "mail john@example.com now"
 FAST = preset_config("training", check_ner_process=False)
-
-
-def _fake_view(result):
-    md = result.metadata or {}
-    types = {
-        t: c["count"]
-        for t, c in {**md.get("regex_counts", {}), **md.get("entity_counts", {})}.items()
-        if t not in ("NUMBER", "YEAR", "DATE", "HTML", "CURRENCY")
-    }
-    return {
-        "pii_count": sum(types.values()),
-        "pii_types": dict(sorted(types.items())),
-        "sensitive": bool(md.get("regex_counts") or md.get("entity_counts")),
-    }
-
-
-@pytest.fixture
-def signals_view(monkeypatch):
-    """Use the real ProcessResult.signals (K1) when present, else a value-free stand-in."""
-    if not hasattr(ProcessResult, "signals"):
-        monkeypatch.setattr(ProcessResult, "signals", property(_fake_view), raising=False)
 
 
 def test_default_config_is_training_preset():
@@ -96,8 +74,6 @@ def test_clean_columns_validation():
         clean_columns(handle, {"text": []}, ())
 
 
-@pytest.mark.skipif(not hasattr(ProcessResult, "signals"),
-                    reason="needs ProcessResult.signals (K1)")
 def test_clean_columns_score_adds_score_a_columns():
     score = pytest.importorskip("sct.score")
     out = clean_columns(CleanerHandle(FAST), {"text": [EMAIL, None]}, score=True)
@@ -106,7 +82,7 @@ def test_clean_columns_score_adds_score_a_columns():
     assert out["sct_pii_count"][0] >= 1
 
 
-def test_clean_records_text_and_metadata(signals_view):
+def test_clean_records_text_and_metadata():
     handle = CleanerHandle(FAST)
     records = [(EMAIL, {"author": EMAIL, "n": 1}), ("plain", {})]
     out = clean_records(handle, records, "body", ("body", "author"), "overwrite")

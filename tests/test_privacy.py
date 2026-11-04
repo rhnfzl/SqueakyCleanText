@@ -1,6 +1,6 @@
 import threading
 
-from tests.ner_helpers import bare_ner, set_cfg
+from tests.helpers import bare_ner, set_cfg
 from sct.privacy import (
     DetectedEntity,
     EntityRule,

@@ -5,11 +5,10 @@ overlap checked against models loaded after construction."""
 import pytest
 
 from sct.utils.ner_chunking import token_count
-from tests.test_chunking import _FakeRunDetector, _word_ner, _words
-from tests.test_review_round1 import _Tok
+from tests.helpers import FakeRunDetector, WordCountTokenizer, numbered_words, word_ner
 
 
-class _ScoredDetector(_FakeRunDetector):
+class _ScoredDetector(FakeRunDetector):
     """Finds "John Smith"; 0.99 when "has arrived" follows in the window, else 0.60."""
 
     def __call__(self, texts, batch_size=1):
@@ -23,9 +22,9 @@ class _ScoredDetector(_FakeRunDetector):
 
 def test_rejected_owner_does_not_hide_an_eligible_neighbour():
     # The owning window sees "John Smith has" (0.60), its neighbour "... has arrived" (0.99).
-    text = _words(40, {7: "John", 8: "Smith", 9: "has", 10: "arrived"})
+    text = numbered_words(40, {7: "John", 8: "Smith", 9: "has", 10: "arrived"})
     expected = text.replace("John Smith", "<PERSON>")
-    ner = _word_ner(2, _ScoredDetector())
+    ner = word_ner(2, _ScoredDetector())
     single = ner.ner_process_detailed(text, positional_tags=("PER",), ner_confidence_threshold=0.85)
     assert single.text == expected and len(single.findings) == 1
     batch = ner.ner_process_batch_detailed(
@@ -34,34 +33,34 @@ def test_rejected_owner_does_not_hide_an_eligible_neighbour():
 
 
 def _two_language_ner(overlap=0):
-    ner = _word_ner(overlap, _FakeRunDetector(min_words=2), budget=12)
+    ner = word_ner(overlap, FakeRunDetector(min_words=2), budget=12)
     ner._ensemble_models = {"ENGLISH": ("ENGLISH",), "DUTCH": ("DUTCH",)}
-    ner._tokenizers = {"ENGLISH": _Tok(1)}
+    ner._tokenizers = {"ENGLISH": WordCountTokenizer(1)}
     return ner
 
 
 def test_unrelated_loaded_model_does_not_change_a_document():
     # A heavier Dutch tokenizer halves the window and would split "John | Smith".
-    text = _words(30, {5: "John", 6: "Smith"})
+    text = numbered_words(30, {5: "John", 6: "Smith"})
     expected = text.replace("John Smith", "<PERSON>")
     ner = _two_language_ner()
     kwargs = {"positional_tags": ("PER",), "ner_confidence_threshold": 0.5}
     assert ner.ner_process_detailed(text, language="ENGLISH", **kwargs).text == expected
-    ner._tokenizers["DUTCH"] = _Tok(2)
+    ner._tokenizers["DUTCH"] = WordCountTokenizer(2)
     assert ner.ner_process_detailed(text, language="ENGLISH", **kwargs).text == expected
     batch = ner.ner_process_batch_detailed([text, text], ["ENGLISH", "DUTCH"], **kwargs)
     assert batch[0].text == expected
     # The Dutch document is still sized for the Dutch tokenizer.
     windows = ner._plan_windows(text, ner._get_ensemble_keys("DUTCH"))
-    assert all(token_count(w[0], _Tok(2)) <= 12 for w in windows)
+    assert all(token_count(w[0], WordCountTokenizer(2)) <= 12 for w in windows)
 
 
 def test_overlap_rechecked_after_a_smaller_model_loads():
     ner = _two_language_ner(overlap=2)  # 2 * 2 < 12 // 2 passes at construction
-    small = _Tok(1)
+    small = WordCountTokenizer(1)
     small.max_len_single_sentence = 5
     ner._tokenizers["DUTCH"] = small
-    text = _words(30, {15: "John", 16: "Smith"})
+    text = numbered_words(30, {15: "John", 16: "Smith"})
     kwargs = {"positional_tags": ("PER",), "ner_confidence_threshold": 0.5}
     with pytest.raises(ValueError, match="ner_chunk_overlap"):
         ner.ner_process_detailed(text, language="DUTCH", **kwargs)

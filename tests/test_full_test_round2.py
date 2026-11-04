@@ -79,9 +79,9 @@ def test_cli_reports_duplicate_json_key_as_usage_error(monkeypatch):
 
 def test_ner_leaves_regex_synthetic_fakes_alone():
     from sct.utils.synthetic import SyntheticReplacer
-    from tests.test_chunking import _FakeRunDetector, _word_ner
+    from tests.helpers import FakeRunDetector, word_ner
 
-    ner = _word_ner(0, _FakeRunDetector(), mode="synthetic")
+    ner = word_ner(0, FakeRunDetector(), mode="synthetic")
     ner._synthetic_replacer = SyntheticReplacer()
     ner._synthetic_replacer.reset_cache()
     fake = ner._synthetic_replacer.get_replacement("EMAIL", "anna@beispiel.de")

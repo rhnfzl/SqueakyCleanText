@@ -5,19 +5,9 @@ pipeline published before its tokenizer."""
 from sct.privacy import EntityRule, PrivacyPolicy
 from sct.config import TextCleanerConfig
 from sct.utils.ner import GeneralNER
-from tests.test_chunking import _FakeRunDetector, _word_ner, _words
+from tests.helpers import FakeRunDetector, both_paths, numbered_words, word_ner
 
-KWARGS = {"positional_tags": ("PER", "LOC"), "ner_confidence_threshold": 0.85}
-
-
-def _both_paths(ner, text, privacy_policy=None, **kwargs):
-    ner._privacy_policy = privacy_policy
-    single = ner.ner_process_detailed(text, **KWARGS, **kwargs)
-    batch = ner.ner_process_batch_detailed([text, text], [None, None], **KWARGS, **kwargs)
-    return [single] + batch
-
-
-class _AliceDetector(_FakeRunDetector):
+class _AliceDetector(FakeRunDetector):
     """Finds "Alice"; 0.99 when "alpha" is in the window, else 0.60."""
 
     def __call__(self, texts, batch_size=1):
@@ -32,12 +22,12 @@ class _AliceDetector(_FakeRunDetector):
 def test_repeated_neighbour_copies_are_one_model_vote():
     # Short "Alice." core: both neighbours see Alice (0.99 and 0.60), the owner 0.60.
     text = "alpha w1 w2 w3 w4 w5 w6 w7. Alice. Beta b1 b2 b3 b4 b5 b6 b7."
-    for result in _both_paths(_word_ner(2, _AliceDetector()), text):
+    for result in both_paths(word_ner(2, _AliceDetector()), text):
         assert result.text == text.replace("Alice", "<PERSON>")
         assert len(result.findings) == 1
 
 
-class _ContextDetector(_FakeRunDetector):
+class _ContextDetector(FakeRunDetector):
     """"John Smith" at 0.99 PER when "has arrived" follows; otherwise *fallback*."""
 
     def __init__(self, fallback):
@@ -59,14 +49,14 @@ class _ContextDetector(_FakeRunDetector):
         return out
 
 
-TEXT = _words(40, {7: "John", 8: "Smith", 9: "has", 10: "arrived"})
+TEXT = numbered_words(40, {7: "John", 8: "Smith", 9: "has", 10: "arrived"})
 
 
 def test_policy_threshold_sees_the_neighbours_score():
     # Owner: 0.86 passes the detector but not the policy; neighbour: 0.99.
     policy = PrivacyPolicy("p", "1", {"PERSON": EntityRule("redact", 0.95)})
-    ner = _word_ner(2, _ContextDetector(("PER", 0.86, "John Smith")))
-    for result in _both_paths(ner, TEXT, privacy_policy=policy):
+    ner = word_ner(2, _ContextDetector(("PER", 0.86, "John Smith")))
+    for result in both_paths(ner, TEXT, privacy_policy=policy):
         assert result.text == TEXT.replace("John Smith", "<REDACTED>")
 
 
@@ -74,11 +64,11 @@ def test_kept_owner_span_does_not_hide_a_redacted_neighbour():
     # Owner: "John Smith has" as LOC (keep); neighbour: "John Smith" as PER (redact).
     policy = PrivacyPolicy("p", "1", {"PERSON": EntityRule("redact"),
                                       "LOCATION": EntityRule("keep")})
-    ner = _word_ner(2, _ContextDetector(("LOC", 0.99, "John Smith has")))
-    for result in _both_paths(ner, TEXT, privacy_policy=policy):
+    ner = word_ner(2, _ContextDetector(("LOC", 0.99, "John Smith has")))
+    for result in both_paths(ner, TEXT, privacy_policy=policy):
         assert result.text == TEXT.replace("John Smith", "<REDACTED>")
     # Without a policy the covering owner span is replaced and the copy dropped.
-    for result in _both_paths(ner, TEXT):
+    for result in both_paths(ner, TEXT):
         assert result.text == TEXT.replace("John Smith has", "<LOCATION>")
         assert len(result.findings) == 1
 

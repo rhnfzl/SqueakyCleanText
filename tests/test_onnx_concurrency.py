@@ -7,7 +7,7 @@ from concurrent.futures import ThreadPoolExecutor
 
 import pytest
 
-from tests.ner_helpers import bare_ner, set_cfg
+from tests.helpers import bare_ner, set_cfg
 from sct import config
 from sct.config import TextCleanerConfig
 from sct.utils import ner as ner_module

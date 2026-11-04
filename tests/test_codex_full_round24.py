@@ -72,10 +72,10 @@ def test_literal_custom_marker_emitted_marker_not_split(marker_cleaners, mode):
 
 
 def test_source_marker_spans_exempt_only_those_occurrences():
-    from tests.test_chunking import _FakeRunDetector, _word_ner
-    detector = _FakeRunDetector()
+    from tests.helpers import FakeRunDetector, word_ner
+    detector = FakeRunDetector()
     detector.pattern = re.compile(r"[A-Z]{2,}")
-    ner = _word_ner(0, detector)
+    ner = word_ner(0, detector)
     text = "<LONDON> and <LONDON>"
     result = ner.ner_process_detailed(
         text, positional_tags=("PER",), ner_confidence_threshold=0.5, source_markers=frozenset({(0, 8)}))

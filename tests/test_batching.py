@@ -6,7 +6,7 @@ from dataclasses import replace
 
 import pytest
 
-from tests.ner_helpers import bare_ner, set_cfg
+from tests.helpers import bare_ner, set_cfg
 from sct.config import TextCleanerConfig
 from sct.sct import TextCleaner
 from sct.utils.gliner_adapter import GLiNERAdapter

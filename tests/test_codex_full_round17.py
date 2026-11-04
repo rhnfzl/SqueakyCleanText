@@ -4,7 +4,7 @@ import dataclasses
 
 import pytest
 
-from tests.ner_helpers import bare_ner, set_cfg
+from tests.helpers import bare_ner, set_cfg
 from sct import TextCleaner, TextCleanerConfig
 from sct.privacy import EntityRule, PrivacyPolicy
 from sct.streaming import WindowedStreamingRedactor

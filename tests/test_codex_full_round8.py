@@ -4,7 +4,7 @@ import pytest
 
 from sct import TextCleaner
 from sct.presets import preset_config
-from tests.test_chunking import _FakeRunDetector, _word_ner
+from tests.helpers import FakeRunDetector, word_ner
 
 
 # --- 1: URLs with private, loopback or IPv6 hosts are replaced whole ---
@@ -19,7 +19,7 @@ def test_url_with_ip_host_hides_query_values(host):
 
 # --- 2: one model's two labels for a widened span are one vote, its best ---
 
-class _TwoLabelDetector(_FakeRunDetector):
+class _TwoLabelDetector(FakeRunDetector):
     """Like a widened "Do" + "##e": PER 0.99 and MISC 0.60 over the same word."""
 
     def __call__(self, texts, batch_size=1):
@@ -29,7 +29,7 @@ class _TwoLabelDetector(_FakeRunDetector):
 
 
 def test_same_model_two_labels_do_not_average_below_threshold():
-    ner = _word_ner(0, _TwoLabelDetector())
+    ner = word_ner(0, _TwoLabelDetector())
     result = ner.ner_process_detailed("w0 w1 Doe w3", positional_tags=("PER", "MISC"),
                                       ner_confidence_threshold=0.85)
     assert result.text == "w0 w1 <PERSON> w3"

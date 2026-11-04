@@ -9,8 +9,7 @@ from sct import TextCleaner
 from sct.presets import preset_config
 from sct.streaming import WindowedStreamingRedactor
 from sct.utils import resources
-from tests.test_chunking import _FakeRunDetector, _word_ner
-from tests.test_review_round1 import _Tok
+from tests.helpers import FakeRunDetector, WordCountTokenizer, word_ner
 
 
 # --- 1: an HTML entity inside a spaced phone does not hide it from the split check ---
@@ -39,10 +38,10 @@ def test_overlap_offsets_use_route_tokenizer():
         return SimpleNamespace(input_ids=spans, offset_mapping=spans)
 
     one_span.max_len_single_sentence = 1000
-    ner = _word_ner(2, _FakeRunDetector(min_words=2), budget=12)
+    ner = word_ner(2, FakeRunDetector(min_words=2), budget=12)
     ner.tokenizer = one_span
     ner._ensemble_models = {"ENGLISH": ("ENGLISH",), "HINDI": ("HINDI",)}
-    ner._tokenizers = {"ENGLISH": one_span, "HINDI": _Tok(1)}
+    ner._tokenizers = {"ENGLISH": one_span, "HINDI": WordCountTokenizer(1)}
     text = "a b c d e f g John Smith h i j k l m n"
     windows = [w[0] for w in ner._plan_windows(text, ner._get_ensemble_keys("HINDI"))]
     assert all(len(w.split()) <= 12 for w in windows)

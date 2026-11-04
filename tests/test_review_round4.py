@@ -2,13 +2,11 @@
 windows voting twice, overlap splitting a document that fits one window, and
 revision cache dirs that alias on case-insensitive filesystems."""
 
-from tests.ner_helpers import set_cfg
 from sct.privacy import EntityRule, PrivacyPolicy
-from tests.test_chunking import _FakeRunDetector, _gliner_ner, _word_ner
-from tests.test_review_round3 import _both_paths
+from tests.helpers import FakeRunDetector, both_paths, gliner_ner, set_cfg, word_ner
 
 
-class _LabelSwitchDetector(_FakeRunDetector):
+class _LabelSwitchDetector(FakeRunDetector):
     """"Alice" as PER 0.99 beside "alpha", as LOC 0.60 beside "b7", else nothing."""
 
     def __call__(self, texts, batch_size=1):
@@ -28,14 +26,14 @@ def test_label_change_across_windows_is_one_model_vote():
     # The owner window sees nothing; the neighbours see PER 0.99 and LOC 0.60.
     text = "alpha w1 w2 w3 w4 w5 w6 w7. Alice. Beta b1 b2 b3 b4 b5 b6 b7."
     policy = PrivacyPolicy("p", "1", {"PERSON": EntityRule("redact")})
-    for result in _both_paths(_word_ner(2, _LabelSwitchDetector()), text):
+    for result in both_paths(word_ner(2, _LabelSwitchDetector()), text):
         assert result.text == text.replace("Alice", "<PERSON>")
         assert len(result.findings) == 1
-    for result in _both_paths(_word_ner(2, _LabelSwitchDetector()), text, privacy_policy=policy):
+    for result in both_paths(word_ner(2, _LabelSwitchDetector()), text, privacy_policy=policy):
         assert result.text == text.replace("Alice", "<REDACTED>")
 
 
-class _BothMarkersDetector(_FakeRunDetector):
+class _BothMarkersDetector(FakeRunDetector):
     """"Alice" at 0.99 only when the window holds both "alpha" and "omega"."""
 
     def __call__(self, texts, batch_size=1):
@@ -48,14 +46,14 @@ class _BothMarkersDetector(_FakeRunDetector):
 
 def test_overlap_keeps_a_fitting_document_in_one_window():
     text = "alpha w1 w2 w3 w4 Alice w6 w7 w8 w9 omega"  # 11 tokens, budget 12
-    ner = _word_ner(2, _BothMarkersDetector())
+    ner = word_ner(2, _BothMarkersDetector())
     assert [w[0] for w in ner._plan_windows(text)] == [text]
-    for result in _both_paths(ner, text):
+    for result in both_paths(ner, text):
         assert result.text == text.replace("Alice", "<PERSON>")
 
 
 def test_overlap_keeps_a_fitting_document_in_one_window_gliner_only():
-    ner = _gliner_ner("placeholder")
+    ner = gliner_ner("placeholder")
     set_cfg(ner, ner_chunk_overlap=10)
     text = "x" * (ner._chunk_budget() * 2)
     assert [w[0] for w in ner._plan_windows(text)] == [text]

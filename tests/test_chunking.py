@@ -2,15 +2,13 @@
 document-relative reversible map offsets. No model download needed."""
 
 import re
-import threading
 from types import SimpleNamespace
 
 import pytest
 from hypothesis import given, settings
 from hypothesis import strategies as st
-from presidio_anonymizer import AnonymizerEngine
 
-from tests.ner_helpers import bare_ner, set_cfg
+from tests.helpers import FakeRunDetector, bare_ner, gliner_ner, numbered_words, set_cfg, word_ner
 from sct.utils.ner_chunking import align_chunk, simple_chunk, split_text, token_count
 from sct.utils.anonymization_map import AnonymizationMap
 from sct.config import TextCleanerConfig
@@ -113,42 +111,6 @@ def test_split_text_ignores_tokenizer_file_padding():
     assert split_text("x" * 30, 20, wrapper) == ["x" * 20, "x" * 10]
 
 
-class _FakeGLiNER:
-    """Finds every occurrence of NAMES in a chunk, like a perfect detector."""
-
-    max_context_length = 100  # -> 90 tokens -> 180-char chunks
-    labels = ["person"]
-    label_map = {"person": "PER"}
-    names = ("王小明", "राहुल", "ரவி")
-
-    def __call__(self, texts, batch_size=1):
-        out = []
-        for text in texts:
-            found = []
-            for name in self.names:
-                start = text.find(name)
-                while start != -1:
-                    found.append({"entity_group": "PER", "score": 0.99, "word": name,
-                                  "start": start, "end": start + len(name)})
-                    start = text.find(name, start + 1)
-            out.append(found)
-        return out
-
-
-def _gliner_ner(mode):
-    ner = _ner()
-    set_cfg(ner, ner_backend="gliner")
-    ner._gliner_pipe = _FakeGLiNER()
-    set_cfg(ner, replacement_mode=mode)
-    ner._synthetic_replacer = None
-    ner._inference_locks = {}
-    ner._locks_lock = threading.Lock()
-    ner._ensemble_models = {}
-    ner._ensemble_default_keys = ()
-    ner.tokenizer = None
-    return ner
-
-
 @pytest.mark.parametrize("text, name", [
     ("这是一段很长的中文文本。" * 60 + "联系人王小明。", "王小明"),
     ("東京都の会社です。" * 80 + "王小明に連絡。", "王小明"),
@@ -157,7 +119,7 @@ def _gliner_ner(mode):
 ])
 def test_reversible_map_offsets_are_document_relative(text, name):
     anon_map = AnonymizationMap()
-    result = _gliner_ner("reversible").ner_process_detailed(
+    result = gliner_ner("reversible").ner_process_detailed(
         text, positional_tags=("PER",), ner_confidence_threshold=0.5, anon_map=anon_map,
     )
     assert name not in result.text
@@ -176,7 +138,7 @@ def test_reversible_map_offsets_are_document_relative(text, name):
 ])
 def test_whitespace_at_hard_cuts_keeps_alignment(text):
     anon_map = AnonymizationMap()
-    result = _gliner_ner("reversible").ner_process_detailed(
+    result = gliner_ner("reversible").ner_process_detailed(
         text, positional_tags=("PER",), ner_confidence_threshold=0.5, anon_map=anon_map,
     )
     assert "王小明" not in result.text
@@ -192,50 +154,14 @@ def test_align_chunk_maps_normalized_whitespace():
 
 # --- ner_chunk_overlap: token windows, document-level merge, replace once ---
 
-def _word_tokenizer(text, **kwargs):
-    spans = [m.span() for m in re.finditer(r"\S+", text)]
-    return SimpleNamespace(input_ids=spans, offset_mapping=spans)
-
-
-class _FakeRunDetector(_FakeGLiNER):
-    """Tags capitalised words as PER; with min_words=2 only runs of two or more."""
-
-    def __init__(self, min_words=1):
-        self.pattern = re.compile(rf"[A-Z][a-z]+(?: [A-Z][a-z]+){{{min_words - 1},}}")
-
-    def __call__(self, texts, batch_size=1):
-        return [
-            [{"entity_group": "PER", "score": 0.99, "word": m.group(),
-              "start": m.start(), "end": m.end()} for m in self.pattern.finditer(text)]
-            for text in texts
-        ]
-
-
-def _word_ner(overlap, detector, budget=12, mode="placeholder"):
-    ner = _gliner_ner(mode)
-    ner._gliner_pipe = detector
-    ner.tokenizer = _word_tokenizer
-    ner.min_token_length = budget
-    set_cfg(ner, ner_chunk_overlap=overlap)
-    ner._engine = AnonymizerEngine()
-    return ner
-
-
-def _words(n, names):
-    words = [f"w{i}" for i in range(n)]
-    for index, name in names.items():
-        words[index] = name
-    return " ".join(words)
-
-
 def test_overlap_finds_name_split_between_chunks():
     # Cores of 12 (overlap 0) and 8 (overlap 2) words both end right after "John".
-    text = _words(40, {23: "John", 24: "Smith"})
-    old = _word_ner(0, _FakeRunDetector(min_words=2)).ner_process_detailed(
+    text = numbered_words(40, {23: "John", 24: "Smith"})
+    old = word_ner(0, FakeRunDetector(min_words=2)).ner_process_detailed(
         text, positional_tags=("PER",), ner_confidence_threshold=0.5)
     assert "John Smith" in old.text and not old.findings  # the 0.7.1 limit
 
-    result = _word_ner(2, _FakeRunDetector(min_words=2)).ner_process_detailed(
+    result = word_ner(2, FakeRunDetector(min_words=2)).ner_process_detailed(
         text, positional_tags=("PER",), ner_confidence_threshold=0.5)
     assert result.text == text.replace("John Smith", "<PERSON>")
     [finding] = result.findings
@@ -244,9 +170,9 @@ def test_overlap_finds_name_split_between_chunks():
 
 def test_overlap_keeps_one_copy_of_a_span_seen_by_two_windows():
     # Window 3 (core w16..w23) also sees "Paul Smith" in its left overlap.
-    text = _words(40, {13: "John", 14: "Paul", 15: "Smith"})
+    text = numbered_words(40, {13: "John", 14: "Paul", 15: "Smith"})
     anon_map = AnonymizationMap()
-    ner = _word_ner(2, _FakeRunDetector(min_words=2), mode="reversible")
+    ner = word_ner(2, FakeRunDetector(min_words=2), mode="reversible")
     result = ner.ner_process_detailed(
         text, positional_tags=("PER",), ner_confidence_threshold=0.5, anon_map=anon_map)
     [finding] = result.findings
@@ -263,7 +189,7 @@ def test_overlap_windows_fit_the_budget_at_hard_cuts():
             offset_mapping=[(0, 0)] + [(i, i + 1) for i in range(len(text))] + [(0, 0)],
         )
 
-    ner = _word_ner(3, _FakeRunDetector(), budget=20)
+    ner = word_ner(3, FakeRunDetector(), budget=20)
     ner.tokenizer = bert_like
     windows = ner._plan_windows("x" * 100)
     assert all(token_count(w[0], bert_like) <= 20 for w in windows)
@@ -271,7 +197,7 @@ def test_overlap_windows_fit_the_budget_at_hard_cuts():
     owned = [(w[3], w[4]) for w in windows]
     assert owned[0][0] == 0 and all(a[1] == b[0] for a, b in zip(owned, owned[1:]))
 
-    gliner = _gliner_ner("placeholder")
+    gliner = gliner_ner("placeholder")
     set_cfg(gliner, ner_chunk_overlap=10)
     budget = gliner._chunk_budget()
     windows = gliner._plan_windows("张" * 2841)
@@ -305,7 +231,7 @@ def _finalize_071(ner, text, threshold):
 )
 def test_overlap_zero_matches_071_per_chunk_replacement(words, seps):
     text = "".join(word + sep for word, sep in zip(words, seps))
-    ner = _word_ner(0, _FakeRunDetector(), budget=6)
+    ner = word_ner(0, FakeRunDetector(), budget=6)
     result = ner.ner_process_detailed(text, positional_tags=("PER",), ner_confidence_threshold=0.5)
     expected_text, expected_spans = _finalize_071(ner, text, 0.5)
     assert result.text == expected_text
@@ -315,8 +241,8 @@ def test_overlap_zero_matches_071_per_chunk_replacement(words, seps):
 def test_whole_document_replacement_merges_names_across_chunk_boundary():
     # Deliberate 0.8.0 change: Presidio merges same-type spans split only by
     # spaces, now also when a chunk boundary falls between them.
-    text = _words(30, {11: "Ann", 12: "Bob"})
-    ner = _word_ner(0, _FakeRunDetector())
+    text = numbered_words(30, {11: "Ann", 12: "Bob"})
+    ner = word_ner(0, FakeRunDetector())
     result = ner.ner_process_detailed(text, positional_tags=("PER",), ner_confidence_threshold=0.5)
     assert result.text == text.replace("Ann Bob", "<PERSON>")
     assert _finalize_071(ner, text, 0.5)[0] == text.replace("Ann Bob", "<PERSON> <PERSON>")
@@ -355,9 +281,9 @@ def test_overlap_with_real_tokenizer():
 
 def test_ner_span_inside_regex_placeholder_is_dropped():
     # Old code: a model tagging "PHONE" in "<PHONE>" gave "call <<PERSON>>" (0.7.1 too).
-    detector = _FakeRunDetector()
+    detector = FakeRunDetector()
     detector.pattern = re.compile(r"[A-Z]{2,}|Ann")
-    ner = _word_ner(0, detector)
+    ner = word_ner(0, detector)
     result = ner.ner_process_detailed(
         "call <PHONE> or <EMAIL_0>, ask Ann", positional_tags=("PER",), ner_confidence_threshold=0.5)
     assert result.text == "call <PHONE> or <EMAIL_0>, ask <PERSON>"

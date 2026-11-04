@@ -12,7 +12,7 @@ import pytest
 from sct.utils.ner_chunking import token_count
 from sct.utils.anonymization_map import AnonymizationMap
 from sct.utils.synthetic import SyntheticReplacer
-from tests.test_chunking import _FakeRunDetector, _word_ner, _word_tokenizer, _words
+from tests.helpers import FakeRunDetector, WordCountTokenizer, numbered_words, word_ner
 
 TEXT = "John Paul Smith. " + "filler " * 25 + "email=a@b.com"
 NESTED = [
@@ -25,7 +25,7 @@ NESTED = [
 
 @pytest.mark.parametrize("mode", ["placeholder", "reversible", "synthetic"])
 def test_nested_spans_leave_no_part_of_the_entity(mode):
-    ner = _word_ner(0, _FakeRunDetector(), mode=mode)
+    ner = word_ner(0, FakeRunDetector(), mode=mode)
     ner._synthetic_replacer = SyntheticReplacer()
     anon_map = AnonymizationMap()
     text = ner.anonymize_text(TEXT, [dict(d) for d in NESTED], mode, anon_map=anon_map)
@@ -37,7 +37,7 @@ def test_nested_spans_leave_no_part_of_the_entity(mode):
         assert anon_map.deanonymize(text) == TEXT
 
 
-class _ContextDetector(_FakeRunDetector):
+class _ContextDetector(FakeRunDetector):
     """Finds "John Smith" only when "has arrived" follows it in the same window."""
 
     def __call__(self, texts, batch_size=1):
@@ -50,43 +50,30 @@ class _ContextDetector(_FakeRunDetector):
 
 
 def test_overlap_keeps_a_detection_only_a_neighbour_window_made():
-    text = _words(40, {7: "John", 8: "Smith", 9: "has", 10: "arrived"})
-    no_overlap = _word_ner(0, _ContextDetector()).ner_process_detailed(
+    text = numbered_words(40, {7: "John", 8: "Smith", 9: "has", 10: "arrived"})
+    no_overlap = word_ner(0, _ContextDetector()).ner_process_detailed(
         text, positional_tags=("PER",), ner_confidence_threshold=0.5)
     assert "John Smith" not in no_overlap.text
-    result = _word_ner(2, _ContextDetector()).ner_process_detailed(
+    result = word_ner(2, _ContextDetector()).ner_process_detailed(
         text, positional_tags=("PER",), ner_confidence_threshold=0.5)
     assert result.text == text.replace("John Smith", "<PERSON>")
     assert len(result.findings) == 1
 
 
-class _Tok:
-    """Word tokenizer counting *per_word* tokens per word, like a heavier vocabulary."""
-
-    max_len_single_sentence = 1000
-
-    def __init__(self, per_word):
-        self.per_word = per_word
-
-    def __call__(self, text, **kwargs):
-        spans = _word_tokenizer(text).input_ids
-        return SimpleNamespace(input_ids=spans * self.per_word, offset_mapping=spans)
-
-
 @pytest.mark.parametrize("overlap", [0, 2])
 def test_windows_fit_every_model_tokenizer(overlap):
-    ner = _word_ner(overlap, _FakeRunDetector(), budget=12)
-    heavy = _Tok(2)
-    ner._tokenizers = {"ENGLISH": _Tok(1), "MULTILINGUAL": heavy}
-    windows = ner._plan_windows(_words(60, {}))
+    ner = word_ner(overlap, FakeRunDetector(), budget=12)
+    heavy = WordCountTokenizer(2)
+    ner._tokenizers = {"ENGLISH": WordCountTokenizer(1), "MULTILINGUAL": heavy}
+    windows = ner._plan_windows(numbered_words(60, {}))
     assert all(token_count(w[0], heavy) <= 12 for w in windows)
 
 
 def test_window_budget_honours_a_smaller_model_limit():
-    ner = _word_ner(0, _FakeRunDetector(), budget=12)
-    small = _Tok(1)
+    ner = word_ner(0, FakeRunDetector(), budget=12)
+    small = WordCountTokenizer(1)
     small.max_len_single_sentence = 5
-    ner._tokenizers = {"ENGLISH": _Tok(1), "DUTCH": small}
+    ner._tokenizers = {"ENGLISH": WordCountTokenizer(1), "DUTCH": small}
     assert ner._chunk_budget() == 5
 
 

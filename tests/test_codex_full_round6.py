@@ -9,8 +9,7 @@ import pytest
 from sct import TextCleaner
 from sct.config import TextCleanerConfig
 from sct.utils import constants
-from tests.test_chunking import _FakeRunDetector, _word_ner
-from tests.test_review_round1 import _Tok
+from tests.helpers import FakeRunDetector, WordCountTokenizer, word_ner
 
 
 # --- 1: URL user info never runs across "/", "?" or markup to a later "@" ---
@@ -33,11 +32,11 @@ def test_percent_encoded_email_in_query_is_not_left_behind():
 # --- 2: a route without the primary model is not split by the primary's count ---
 
 def test_route_without_primary_counts_with_its_own_tokenizer():
-    ner = _word_ner(0, _FakeRunDetector(min_words=2), budget=12)
-    heavy = _Tok(2)
+    ner = word_ner(0, FakeRunDetector(min_words=2), budget=12)
+    heavy = WordCountTokenizer(2)
     ner.tokenizer = heavy  # primary (ENGLISH), 2 tokens per word
     ner._ensemble_models = {"ENGLISH": ("ENGLISH",), "HINDI": ("HINDI",)}
-    ner._tokenizers = {"ENGLISH": heavy, "HINDI": _Tok(1)}
+    ner._tokenizers = {"ENGLISH": heavy, "HINDI": WordCountTokenizer(1)}
     text = "a b c d e John Smith f g h"  # 10 HINDI tokens, inside the budget of 12
     keys = ner._get_ensemble_keys("HINDI")
     assert [w[0] for w in ner._plan_windows(text, keys)] == [text]

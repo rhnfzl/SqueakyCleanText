@@ -9,7 +9,7 @@ import pytest
 from sct import TextCleaner, TextCleanerConfig
 from sct.presets import preset_config
 from tests.conftest import TEST_NER_MODELS
-from tests.test_chunking import _FakeRunDetector, _word_ner
+from tests.helpers import FakeRunDetector, word_ner
 
 FAST = preset_config("training", check_ner_process=False)
 RAW = "mail alice@example.com"
@@ -18,9 +18,9 @@ RAW = "mail alice@example.com"
 # --- 1: marker-shaped source text is not protected like SCT's own placeholders ---
 
 def test_source_marker_text_gets_no_placeholder_protection():
-    detector = _FakeRunDetector()
+    detector = FakeRunDetector()
     detector.pattern = re.compile(r"[A-Z]{2,}")
-    ner = _word_ner(0, detector)
+    ner = word_ner(0, detector)
     text = "call <PHONE>, live in <LONDON>"
     # Old code dropped the LONDON span too, as if SCT had written "<LONDON>".
     result = ner.ner_process_detailed(

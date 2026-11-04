@@ -39,14 +39,14 @@ def test_cli_keeps_scripts_by_default_and_to_ascii_folds():
 def test_mcp_keeps_scripts_by_default_and_env_folds(monkeypatch):
     pytest.importorskip("fastmcp")
     import sct.mcp_server as mcp_module
-    from tests.test_mcp_server import _client_call
+    from tests.helpers import client_call
 
     seen = []
     monkeypatch.setattr(mcp_module, "TextCleaner", lambda cfg, **_: seen.append(cfg) or TextCleaner(cfg=_cfg()))
     call = lambda c: c.call_tool("clean_text", {"text": "x"})  # noqa: E731
-    _client_call(mcp_module.create_mcp_server(), call)
+    client_call(mcp_module.create_mcp_server(), call)
     monkeypatch.setenv("SCT_MCP_TO_ASCII", "1")
-    _client_call(mcp_module.create_mcp_server(), call)
+    client_call(mcp_module.create_mcp_server(), call)
     assert [cfg.check_to_ascii_unicode for cfg in seen] == [False, True]
 
 

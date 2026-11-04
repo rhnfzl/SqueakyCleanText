@@ -5,7 +5,7 @@ from types import MappingProxyType
 from hypothesis import given, settings
 from hypothesis.strategies import text, from_regex
 from faker import Faker
-from tests.ner_helpers import bare_ner
+from tests.helpers import bare_ner
 from sct.utils.ner_chunking import simple_chunk, split_text, token_count
 from sct import config
 from sct.config import (

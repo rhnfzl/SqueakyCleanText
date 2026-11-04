@@ -4,7 +4,7 @@ import datetime
 
 import pytest
 
-from tests.ner_helpers import bare_ner, set_cfg
+from tests.helpers import bare_ner, set_cfg
 from sct import TextCleaner, TextCleanerConfig
 from sct.browser import build_browser_manifest
 from sct.privacy import EntityRule, PrivacyPolicy

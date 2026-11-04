@@ -1,4 +1,3 @@
-import asyncio
 import json
 import sys
 
@@ -14,6 +13,7 @@ from sct.mcp_server import (
 )
 from sct.privacy import DetectedEntity, EntityFinding
 from sct.utils.process_result import ProcessResult
+from tests.helpers import client_call
 
 SIGNAL_KEYS = [
     "language", "language_confidence", "language_source", "chars",
@@ -169,23 +169,13 @@ def test_bad_max_bytes_rejected():
         create_mcp_server(_cleaner(), max_bytes=-1)
 
 
-def _client_call(server, coro):
-    from fastmcp import Client
-
-    async def run():
-        async with Client(server) as client:
-            return await coro(client)
-
-    return asyncio.run(run())
-
-
 def test_tools_declare_output_schema_and_annotations():
     pytest.importorskip("fastmcp")
 
     async def list_tools(client):
         return await client.list_tools()
 
-    tools = {t.name: t for t in _client_call(create_mcp_server(_cleaner()), list_tools)}
+    tools = {t.name: t for t in client_call(create_mcp_server(_cleaner()), list_tools)}
 
     assert set(tools) == {"clean_text", "clean_json"}
     for tool in tools.values():
@@ -212,7 +202,7 @@ def test_tool_calls_return_structured_content_and_tool_errors():
         data = await client.call_tool("clean_json", {"value": {"email": "maria@example.com"}})
         return text.structured_content, data.structured_content
 
-    text, data = _client_call(server, calls)
+    text, data = client_call(server, calls)
     assert list(text) == ["warnings", "summary", "text", "signals"]
     assert text["text"] == "Email <EMAIL>"
     assert data["value"] == {"email": "<EMAIL>"}
@@ -221,7 +211,7 @@ def test_tool_calls_return_structured_content_and_tool_errors():
         return await client.call_tool("clean_text", {"text": "Maria", "pii": True})
 
     with pytest.raises(FastToolError, match="not configured for PII mode"):
-        _client_call(server, pii)
+        client_call(server, pii)
 
 
 def test_preset_picks_the_built_in_cleaner_config(monkeypatch):
@@ -233,5 +223,5 @@ def test_preset_picks_the_built_in_cleaner_config(monkeypatch):
     seen = []
     monkeypatch.setattr(mcp_module, "TextCleaner", lambda cfg, **_: seen.append(cfg) or _cleaner())
     monkeypatch.setenv("SCT_MCP_PRESET", "training")
-    _client_call(create_mcp_server(), lambda c: c.call_tool("clean_text", {"text": "x"}))
+    client_call(create_mcp_server(), lambda c: c.call_tool("clean_text", {"text": "x"}))
     assert seen[0].check_to_ascii_unicode is False

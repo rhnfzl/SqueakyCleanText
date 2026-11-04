@@ -13,7 +13,7 @@ from sct.adapters import process_json
 from sct.config import TextCleanerConfig
 from sct.streaming import BufferedStreamingRedactor, WindowedStreamingRedactor
 from sct.utils.constants import terms_regex
-from tests.test_chunking import _FakeRunDetector, _word_ner
+from tests.helpers import FakeRunDetector, word_ner
 
 NO_NER = dict(check_ner_process=False)
 
@@ -139,7 +139,7 @@ def test_allow_terms_win_over_deny_terms_and_patterns():
 
 
 def test_allow_terms_keep_ner_detections():
-    ner = _word_ner(0, _FakeRunDetector())
+    ner = word_ner(0, FakeRunDetector())
     ner._allow_regex = terms_regex(["Ann"])
     result = ner.ner_process_detailed("Ann met Bob today", positional_tags=("PER",), ner_confidence_threshold=0.5)
     assert result.text == "Ann met <PERSON> today"

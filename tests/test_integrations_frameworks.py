@@ -5,14 +5,13 @@ import asyncio
 import pytest
 
 from sct.presets import preset_config
-from tests.test_integrations_runtime import signals_view  # noqa: F401
 
 FAST = preset_config("training", check_ner_process=False)
 RAW = "mail john@example.com now"
 CLEAN = "mail <EMAIL> now"
 
 
-def test_datatrove_step(signals_view):  # noqa: F811
+def test_datatrove_step():
     pytest.importorskip("datatrove")
     from datatrove.data import Document
 
@@ -27,7 +26,7 @@ def test_datatrove_step(signals_view):  # noqa: F811
     assert stats["pii"].total == 3 and stats["pii_EMAIL"].total == 3 and stats["sensitive"].total == 3
 
 
-def test_langchain_transformer(signals_view):  # noqa: F811
+def test_langchain_transformer():
     pytest.importorskip("langchain_core")
     from langchain_core.documents import Document
 
@@ -41,7 +40,7 @@ def test_langchain_transformer(signals_view):  # noqa: F811
     assert new[0].page_content == RAW and new[0].metadata["page_content_clean"] == CLEAN
 
 
-def test_haystack_component(signals_view):  # noqa: F811
+def test_haystack_component():
     pytest.importorskip("haystack")
     from haystack import Document
 
