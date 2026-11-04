@@ -1,6 +1,5 @@
 """Boundary adapters for structured data and retrieval pipelines."""
 
-import copy
 from dataclasses import dataclass, field, replace
 from typing import Any, Iterable, Mapping, Optional
 
@@ -77,15 +76,11 @@ def is_sensitive_result(result: Any) -> bool:
 
 def _pii_only_cleaner(cleaner: TextCleaner, ner: bool = True) -> TextCleaner:
     """Return a view of *cleaner* that runs only its PII steps, sharing its NER models."""
-    key_cleaner = copy.copy(cleaner)
     # Everything the training preset turns off (folding, letter/number removal, casefold...).
     off = {name: value for name, value in PRESETS['training'].items() if value is False}
     if not ner:
         off['check_ner_process'] = False
-    key_cleaner.cfg = replace(cleaner.cfg, **off)
-    key_cleaner._pipeline, key_cleaner._post_fuzzy_pipeline = [], []
-    key_cleaner._init_pipeline()
-    return key_cleaner
+    return cleaner._with_config(replace(cleaner.cfg, **off))
 
 
 def process_json(cleaner: TextCleaner, value: Any) -> StructuredResult:
