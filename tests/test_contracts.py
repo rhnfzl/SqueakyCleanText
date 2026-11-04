@@ -5,7 +5,8 @@ import warnings
 import pytest
 
 from sct import EntityRule, PrivacyPolicy, TextCleaner, TextCleanerConfig
-from sct.utils.contact import ProcessContacts
+from sct.utils import constants
+from sct.utils.normtext import NormaliseText
 from sct.utils.ner import GeneralNER
 
 
@@ -37,11 +38,13 @@ def test_process_batch_uses_batch_size_as_concurrency_limit():
     assert max_active == 1
 
 
+def test_to_ascii_unicode_accepts_emoji():
+    # The old no_emoji=False branch called demojize with a keyword the supported emoji versions lack.
+    assert NormaliseText().to_ascii_unicode("caf\u00e9 \U0001F600") == "cafe "
+
+
 def test_html_replacement_honors_configured_token():
-    result = ProcessContacts().replace_html(
-        "<p>Hello <strong>world</strong></p>",
-        replace_with="[TAG]",
-    )
+    result = constants.HTML_REGEX.sub("[TAG]", "<p>Hello <strong>world</strong></p>")
 
     assert result == "[TAG]Hello [TAG]world[TAG][TAG]"
 

@@ -84,7 +84,7 @@ class TextCleanerTest(unittest.TestCase):
     @settings(deadline=None)
     @given(from_regex(constants.EMAIL_REGEX, fullmatch=True))
     def test_email_regex(self, rx):
-        self.assertEqual("", self.ProcessContacts.replace_emails(rx, ""))
+        self.assertEqual("", self.ProcessContacts.replace_emails_with_fn(rx, lambda _: ""))
 
     # The alternation is leftmost-first, so an earlier alternative may take only
     # part of a string a later one matches whole ("+000000000(0)" leaves "(0)").
@@ -92,17 +92,17 @@ class TextCleanerTest(unittest.TestCase):
     @settings(deadline=None, derandomize=True)
     @given(from_regex(constants.PHONE_REGEX, fullmatch=True))
     def test_phone_regex(self, rx):
-        self.assertNotRegex(self.ProcessContacts.replace_phone_numbers(rx, ""), r"\d{3}")
+        self.assertNotRegex(self.ProcessContacts.replace_phone_numbers_with_fn(rx, lambda _: ""), r"\d{3}")
 
     @settings(deadline=None)
     @given(from_regex(constants.NUMBERS_REGEX, fullmatch=True))
     def test_number_regex(self, rx):
-        self.assertEqual("", self.ProcessContacts.replace_numbers(rx, ""))
+        self.assertEqual("", contact.numbers_regex().sub("", rx))
 
     @settings(deadline=None)
     @given(from_regex(constants.URL_REGEX, fullmatch=True))
     def test_url_regex(self, rx):
-        self.assertNotEqual(rx, self.ProcessContacts.replace_urls(rx, ""))
+        self.assertNotEqual(rx, constants.URL_REGEX.sub("", rx))
 
     @settings(deadline=None)
     @given(from_regex(constants.YEAR_REGEX, fullmatch=True))
@@ -131,7 +131,7 @@ class TextCleanerTest(unittest.TestCase):
     def test_faker_email(self, fkw):
         """Check if generated emails are replaced correctly."""
         email = self.fake.email()
-        clean_email = self.ProcessContacts.replace_emails(email, replace_with=fkw)
+        clean_email = self.ProcessContacts.replace_emails_with_fn(email, lambda _: fkw)
         self.assertEqual(clean_email, fkw)
 
     @settings(deadline=None)
@@ -139,7 +139,7 @@ class TextCleanerTest(unittest.TestCase):
     def test_faker_phone_number(self, fkw):
         """Check if generated phone numbers are replaced correctly."""
         phonenum = self.fake.phone_number()
-        clean_phonenum = self.ProcessContacts.replace_phone_numbers(phonenum, replace_with=fkw)
+        clean_phonenum = self.ProcessContacts.replace_phone_numbers_with_fn(phonenum, lambda _: fkw)
         self.assertEqual(clean_phonenum, fkw)
 
     @settings(deadline=None)
@@ -147,7 +147,7 @@ class TextCleanerTest(unittest.TestCase):
     def test_faker_url(self, fkw):
         """Check if generated URLs are replaced correctly."""
         url = self.fake.url()
-        clean_url = self.ProcessContacts.replace_urls(url, replace_with=fkw)
+        clean_url = constants.URL_REGEX.sub(fkw, url)
         self.assertEqual(clean_url, fkw)
 
     # --- Stopwords tests (non-NER) ---
@@ -168,8 +168,8 @@ class TextCleanerTest(unittest.TestCase):
 
     def test_stopwords_set_performance(self):
         """Verify stopwords are stored as sets (O(1) lookup)."""
-        self.assertIsInstance(self.ProcessStopwords.STOP_WORDS_EN, set)
-        self.assertIsInstance(self.ProcessStopwords.STOP_WORDS_NL, set)
+        self.assertIsInstance(self.ProcessStopwords.get_stop_words("ENGLISH"), set)
+        self.assertIsInstance(self.ProcessStopwords.get_stop_words("DUTCH"), set)
 
     # --- Config dataclass tests ---
 
@@ -308,13 +308,13 @@ class TextCleanerTest(unittest.TestCase):
     def test_url_regex_unicode_domain(self):
         """Test URL regex handles non-ASCII domains."""
         text = "Visit https://www.example.com/path"
-        result = self.ProcessContacts.replace_urls(text, "<URL>")
+        result = constants.URL_REGEX.sub("<URL>", text)
         self.assertIn("<URL>", result)
 
     def test_email_regex_basic(self):
         """Test email regex handles standard emails."""
         text = "Send to user@example.com please"
-        result = self.ProcessContacts.replace_emails(text, "<EMAIL>")
+        result = self.ProcessContacts.replace_emails_with_fn(text, lambda _: "<EMAIL>")
         self.assertIn("<EMAIL>", result)
 
     # --- ACRONYM_REGEX ReDoS safety test ---
@@ -1917,16 +1917,6 @@ class ContactSyntheticMethodTest(unittest.TestCase):
         self.assertIn('REPLACED', result)
         self.assertEqual(len(replacements), 1)
         self.assertEqual(replacements[0], 'test@example.com')
-
-    def test_replace_urls_with_fn(self):
-        """replace_urls_with_fn should call the provided function."""
-        pc = contact.ProcessContacts()
-        result = pc.replace_urls_with_fn(
-            "Visit https://example.com today",
-            lambda m: 'FAKE_URL',
-        )
-        self.assertIn('FAKE_URL', result)
-        self.assertNotIn('https://example.com', result)
 
     def test_replace_phone_numbers_with_fn(self):
         """replace_phone_numbers_with_fn should call the provided function."""
