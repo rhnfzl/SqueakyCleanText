@@ -11,6 +11,7 @@ from sct.privacy import (
     TokenStore,
 )
 from sct.sct import CustomPatternTimeout, TextCleaner
+from sct.utils.ner import ModelLoadError
 from sct.presets import PRESETS, preset_config
 from sct.adapters import (
     DataFrameResult,
@@ -52,7 +53,7 @@ from sct.utils.process_result import ProcessResult
 
 __version__ = "0.8.2"
 __all__ = [
-    "TextCleaner", "TextCleanerConfig", "CustomPatternTimeout", "PRESETS", "preset_config",
+    "TextCleaner", "TextCleanerConfig", "CustomPatternTimeout", "ModelLoadError", "PRESETS", "preset_config",
     "PII_LABELS", "PII_LABEL_MAP",
     "AnonymizationMap", "MapEntry", "ProcessResult",
     "DetectedEntity", "EntityFinding", "EntityRule",

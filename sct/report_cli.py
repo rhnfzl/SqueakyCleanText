@@ -15,6 +15,7 @@ from sct.score import (
     score_records,
 )
 from sct.sct import TextCleaner
+from sct.utils.ner import ModelLoadError
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -42,9 +43,23 @@ def _read_rows(path: Path, parser: argparse.ArgumentParser) -> list[dict[str, An
             import pyarrow.parquet as pq
         except ImportError:
             parser.error("Parquet input needs pyarrow: pip install pyarrow")
-        return pq.read_table(path).to_pylist()
-    with path.open(encoding="utf-8") as handle:
-        return [json.loads(line) for line in handle if line.strip()]
+        try:
+            return pq.read_table(path).to_pylist()
+        except (OSError, ValueError) as exc:
+            parser.error(f"cannot read {path.name}: {exc}")
+    rows = []
+    try:
+        with path.open(encoding="utf-8") as handle:
+            for number, line in enumerate(handle, 1):
+                if not line.strip():
+                    continue
+                try:
+                    rows.append(json.loads(line))
+                except ValueError as exc:
+                    parser.error(f"{path.name} line {number}: {exc}")
+    except (OSError, ValueError) as exc:  # missing file or not UTF-8
+        parser.error(f"cannot read {path.name}: {exc}")
+    return rows
 
 
 def _hashable(value):
@@ -60,6 +75,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
 
     texts = []
     for i, row in enumerate(rows):
+        if not isinstance(row, dict):
+            parser.error(f"row {i}: not a JSON object")
         value = row.get(args.text_column)
         if value is not None and not isinstance(value, str):
             parser.error(f"row {i}: column {args.text_column!r} is not text")
@@ -75,7 +92,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         cleaner = TextCleaner(cfg=preset_config(args.preset, **overrides))
         results = cleaner.process_batch(texts)
         scored = score_records(results, texts, config)
-    except ImportError as exc:
+    except (ImportError, ModelLoadError) as exc:
         parser.error(str(exc))
     models = [m for result in results for m in result.signals["models"]]
 
