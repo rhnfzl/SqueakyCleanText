@@ -291,6 +291,18 @@ def test_unusable_model_max_length_falls_back(tmp_path, content, expected):
     assert onnx_pipeline._read_model_max_length(str(config)) == expected
 
 
+@pytest.mark.parametrize("content, expected", [
+    ('{"model_max_length": 256.0}', 256),  # a JSON float is still a token count
+    ('{"model_max_length": -Infinity}', 512),
+    ('{"model_max_length": 0}', 512),
+])
+def test_model_max_length_is_a_positive_int(tmp_path, content, expected):
+    config = tmp_path / "tokenizer_config.json"
+    config.write_text(content)
+    value = onnx_pipeline._read_model_max_length(str(config))
+    assert value == expected and type(value) is int
+
+
 def test_failed_optional_download_is_not_taken_for_a_missing_file(tmp_path, snapshot, monkeypatch):
     real = onnx_pipeline.hf_hub_download
 

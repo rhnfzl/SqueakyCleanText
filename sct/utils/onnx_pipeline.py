@@ -23,7 +23,7 @@ import numpy as np
 import onnxruntime as ort
 from huggingface_hub import hf_hub_download, try_to_load_from_cache
 from huggingface_hub.errors import EntryNotFoundError
-from tokenizers import Tokenizer
+from tokenizers import Encoding, Tokenizer
 
 from sct.utils.ner_spans import _letter_scripts
 
@@ -87,7 +87,7 @@ class TokenizerWrapper:
         offsets = encoding.offsets if return_offsets_mapping else None
         return _EncodingResult(ids=encoding.ids, offsets=offsets)
 
-    def encode_for_inference(self, text: str):
+    def encode_for_inference(self, text: str) -> Encoding:
         """Return the full ``tokenizers.Encoding`` for ONNX inference."""
         return self._tokenizer.encode(text)
 
@@ -414,7 +414,7 @@ def _read_model_max_length(config_path: str | None) -> int:
         logger.warning("Cannot read %s (%s), using max_length=512", config_path, e)
         return 512
     # Some models set absurdly large values (e.g. 1e30), null or a non-number.
-    return value if isinstance(value, (int, float)) and value <= 100_000 else 512
+    return int(value) if isinstance(value, (int, float)) and 0 < value <= 100_000 else 512
 
 
 def _create_session(
@@ -486,7 +486,7 @@ def load_onnx_ner_model(
         Ready-to-use pipeline and tokenizer. The pipeline carries ``provider`` (the
         execution provider that runs it) and ``revision`` (resolved snapshot commit).
     """
-    download_kwargs = {}
+    download_kwargs: dict[str, Any] = {}
     if cache_dir:
         download_kwargs['cache_dir'] = cache_dir
     if revision:
