@@ -14,11 +14,18 @@ import random
 import sys
 import time
 from pathlib import Path
+from typing import Any
+
+import sct
+from lingua import Language
+from sct.config import TextCleanerConfig
+from sct.presets import PRESETS
+from sct.sct import TextCleaner
 
 from benchmarks import datasets
 from benchmarks.labels import DATASET_LABELS
-from benchmarks.score import inject_noise, masking_recall, predicted_spans, score_lid, score_noise, score_pii
-from benchmarks.speed import environment, measure, rates, run_batch
+from benchmarks.score import SCORING, inject_noise, masking_recall, predicted_spans, score_lid, score_noise, score_pii
+from benchmarks.speed import environment, measure, rates, run_batch, write_atomic
 
 ROOT = Path(__file__).resolve().parent
 SUITES = {
@@ -29,14 +36,10 @@ SUITES = {
     "speed": ("fineweb2",),
     "clean": ("fineweb2",),
 }
-# Scoring needs each placeholder to map back to the value it replaced.
-SCORING = {"replacement_mode": "reversible", "check_to_ascii_unicode": False}
 DEFAULT_N = {"pii": 300, "long": None, "lid": 100, "speed": 100, "clean": 100}
 
 
-def config_overrides(name: str) -> dict:
-    from sct.presets import PRESETS
-
+def config_overrides(name: str) -> dict[str, Any]:
     if name == "default":
         return {}
     if name == "training":
@@ -52,7 +55,7 @@ class Cleaners:
     def __init__(self, args):
         self.args, self.cache = args, {}
 
-    def overrides(self, name: str, scoring: bool) -> dict:
+    def overrides(self, name: str, scoring: bool) -> dict[str, Any]:
         args = self.args
         cfg = {**config_overrides(name), **(SCORING if scoring else {}),
                "onnx_intra_op_threads": args.threads, "ner_device": args.device}
@@ -63,13 +66,10 @@ class Cleaners:
     def get(self, name: str, scoring: bool = True):
         key = (name, scoring)
         if key not in self.cache:
-            from sct.config import TextCleanerConfig
-            from sct.sct import TextCleaner
-
             self.cache[key] = TextCleaner(cfg=TextCleanerConfig(**self.overrides(name, scoring)))
         return self.cache[key]
 
-    def models(self) -> dict:
+    def models(self) -> dict[str, Any]:
         cleaner = next(iter(self.cache.values()), None)
         if cleaner is None:
             return {}
@@ -92,7 +92,34 @@ def predict(cleaner, records: list[dict], workers: int) -> tuple[dict, dict, flo
     return predictions, outputs, seconds
 
 
-def run_dataset(name: str, suite: str, args, cleaners: Cleaners) -> dict:
+def _lid_config(cleaners: Cleaners, records: list[dict], chars: int) -> dict[str, Any]:
+    cleaner = cleaners.get("default", scoring=False)
+    started = time.perf_counter()
+    guesses = {}
+    for record in records:
+        lingua_name = cleaner._detect_language(record["text"])[0]  # the detector process() uses
+        guesses[record["id"]] = (getattr(Language, lingua_name).iso_code_639_3.name.lower()
+                                 if lingua_name else None)
+    seconds = time.perf_counter() - started
+    in_set = {lang.iso_code_639_3.name.lower() for lang in Language.all()}
+    return {**score_lid(records, guesses, in_set), "time": rates(len(records), chars, seconds)}
+
+
+def _clean_configs(records: list[dict], args, cleaners: Cleaners) -> dict[str, dict]:
+    rng = random.Random(args.seed)  # noqa: S311  # noise placement, not crypto
+    noisy, items = [], {}
+    for record in records:
+        text, items[record["id"]] = inject_noise(record["text"], rng)
+        noisy.append({**record, "text": text})
+    configs = {}
+    for config in args.configs:
+        _, outputs, seconds = predict(cleaners.get(config, scoring=False), noisy, args.workers)
+        configs[config] = {"noise": score_noise(items, outputs),
+                           "time": rates(len(noisy), sum(len(r["text"]) for r in noisy), seconds)}
+    return configs
+
+
+def run_dataset(name: str, suite: str, args, cleaners: Cleaners) -> dict[str, Any]:
     module = datasets.get(name)
     n = args.n if args.n is not None else DEFAULT_N[suite]
     started = time.perf_counter()
@@ -115,36 +142,75 @@ def run_dataset(name: str, suite: str, args, cleaners: Cleaners) -> dict:
                 scores["masking_recall"] = masking_recall(records, predictions)
             result["configs"][config] = {**scores, "time": rates(len(records), chars, seconds)}
     elif suite == "lid":
-        from lingua import Language
-
-        cleaner = cleaners.get("default", scoring=False)
-        started = time.perf_counter()
-        guesses = {}
-        for record in records:
-            lingua_name = cleaner._detect_language(record["text"])[0]  # the detector process() uses
-            guesses[record["id"]] = (getattr(Language, lingua_name).iso_code_639_3.name.lower()
-                                     if lingua_name else None)
-        seconds = time.perf_counter() - started
-        in_set = {lang.iso_code_639_3.name.lower() for lang in Language.all()}
-        result["configs"]["default"] = {**score_lid(records, guesses, in_set), "time": rates(len(records), chars, seconds)}
+        result["configs"]["default"] = _lid_config(cleaners, records, chars)
     elif suite == "speed":
         for config in args.configs:
             result["configs"][config] = measure(cleaners.get(config, scoring=False), records, args.workers)
     elif suite == "clean":
-        rng = random.Random(args.seed)  # noqa: S311  # noise placement, not crypto
-        noisy, items = [], {}
-        for record in records:
-            text, items[record["id"]] = inject_noise(record["text"], rng)
-            noisy.append({**record, "text": text})
-        for config in args.configs:
-            _, outputs, seconds = predict(cleaners.get(config, scoring=False), noisy, args.workers)
-            result["configs"][config] = {"noise": score_noise(items, outputs),
-                                         "time": rates(len(noisy), sum(len(r["text"]) for r in noisy), seconds)}
+        result["configs"] = _clean_configs(records, args, cleaners)
     return result
 
 
 def _pct(value) -> str:
     return "-" if value is None else f"{100 * value:.1f}"
+
+
+def _pii_lines(pii: dict[str, dict]) -> list[str]:
+    lines = ["## PII", "", "| dataset | config | docs | strict F1 | partial P | partial R | masked R | leak | docs/s |",
+             "|---|---|---|---|---|---|---|---|---|"]
+    for name, res in pii.items():
+        for config, c in res["configs"].items():
+            lines.append(f"| {name} | {config} | {c['documents']} | {_pct(c['strict']['overall']['f1'])} | "
+                         f"{_pct(c['partial']['overall']['precision'])} | {_pct(c['partial']['overall']['recall'])} | "
+                         f"{_pct(c['partial']['overall'].get('masked_recall'))} | "
+                         f"{_pct(c['leak']['overall']['leak_rate'])} | {c['time']['docs_per_second']} |")
+    for name, res in pii.items():
+        config = next(iter(res["configs"]))
+        c = res["configs"][config]
+        lines += ["", f"### {name} ({config}): by type and language", "",
+                  "| | gold | partial R | masked R | partial P | strict F1 | leak |", "|---|---|---|---|---|---|---|"]
+        for group in ("by_label", "by_language"):
+            for key, m in c["partial"][group].items():
+                strict = c["strict"][group].get(key, {})
+                leak = c["leak"][group].get(key, {})
+                lines.append(f"| {key} | {m['gold']} | {_pct(m['recall'])} | {_pct(m.get('masked_recall'))} | "
+                             f"{_pct(m['precision'])} | "
+                             f"{_pct(strict.get('f1'))} | {_pct(leak.get('leak_rate'))} |")
+        if "masking_recall" in c:
+            mr = c["masking_recall"]
+            lines += ["", f"TAB masking recall (any type, macro over {mr['annotators']} annotators): "
+                      f"all {_pct(mr['all']['macro_recall'])}, direct {_pct(mr['direct']['macro_recall'])}, "
+                      f"quasi {_pct(mr['quasi']['macro_recall'])}.",
+                      "Partial recall by start offset: " + ", ".join(
+                          f"{k}: {_pct(v['recall'])} ({v['gold']})" for k, v in c["by_position"].items())]
+    return lines
+
+
+def _suite_lines(name: str, res: dict[str, Any]) -> list[str]:
+    """The language-ID, speed or cleaning section of one result (none for a failed or PII result)."""
+    suite = res.get("suite")
+    if "configs" not in res:
+        return []
+    lines: list[str] = []
+    if suite == "lid":
+        c = res["configs"]["default"]
+        lines += ["", f"## Language ID ({name})", "",
+                  f"Accuracy {_pct(c['accuracy'])}, macro {_pct(c['macro_accuracy'])} over "
+                  f"{c['in_set_documents']} in-set docs. Out-of-set docs given a language: "
+                  f"{_pct(c['out_of_set']['false_positive_rate'])} of {c['out_of_set']['documents']}.", "",
+                  "| script | docs | accuracy |", "|---|---|---|",
+                  *(f"| {k} | {v['total']} | {_pct(v['accuracy'])} |" for k, v in c["by_script"].items())]
+    if suite == "speed":
+        lines += ["", f"## Speed ({name})", "", "| config | script | docs | docs/s | chars/s |", "|---|---|---|---|---|"]
+        for config, c in res["configs"].items():
+            for key, m in [("all", c["total"]), *c["by_script"].items()]:
+                lines.append(f"| {config} | {key} | {m['documents']} | {m['docs_per_second']} | {m['chars_per_second']} |")
+    if suite == "clean":
+        lines += ["", f"## Cleaning: injected noise removed ({name})", "", "| config | kind | injected | removed |",
+                  "|---|---|---|---|"]
+        for config, c in res["configs"].items():
+            lines += [f"| {config} | {k} | {v['injected']} | {_pct(v['removal_rate'])} |" for k, v in c["noise"].items()]
+    return lines
 
 
 def summary(out: Path) -> str:
@@ -161,52 +227,9 @@ def summary(out: Path) -> str:
     results = {p.stem: json.loads(p.read_text(encoding="utf-8")) for p in sorted(out.glob("*.json")) if p.stem != "run"}
     pii = {k: v for k, v in results.items() if v.get("suite") in ("pii", "long") and "configs" in v}
     if pii:
-        lines += ["## PII", "", "| dataset | config | docs | strict F1 | partial P | partial R | masked R | leak | docs/s |",
-                  "|---|---|---|---|---|---|---|---|---|"]
-        for name, res in pii.items():
-            for config, c in res["configs"].items():
-                lines.append(f"| {name} | {config} | {c['documents']} | {_pct(c['strict']['overall']['f1'])} | "
-                             f"{_pct(c['partial']['overall']['precision'])} | {_pct(c['partial']['overall']['recall'])} | "
-                             f"{_pct(c['partial']['overall'].get('masked_recall'))} | "
-                             f"{_pct(c['leak']['overall']['leak_rate'])} | {c['time']['docs_per_second']} |")
-        for name, res in pii.items():
-            config = next(iter(res["configs"]))
-            c = res["configs"][config]
-            lines += ["", f"### {name} ({config}): by type and language", "",
-                      "| | gold | partial R | masked R | partial P | strict F1 | leak |", "|---|---|---|---|---|---|---|"]
-            for group in ("by_label", "by_language"):
-                for key, m in c["partial"][group].items():
-                    strict = c["strict"][group].get(key, {})
-                    leak = c["leak"][group].get(key, {})
-                    lines.append(f"| {key} | {m['gold']} | {_pct(m['recall'])} | {_pct(m.get('masked_recall'))} | "
-                                 f"{_pct(m['precision'])} | "
-                                 f"{_pct(strict.get('f1'))} | {_pct(leak.get('leak_rate'))} |")
-            if "masking_recall" in c:
-                mr = c["masking_recall"]
-                lines += ["", f"TAB masking recall (any type, macro over {mr['annotators']} annotators): "
-                          f"all {_pct(mr['all']['macro_recall'])}, direct {_pct(mr['direct']['macro_recall'])}, "
-                          f"quasi {_pct(mr['quasi']['macro_recall'])}.",
-                          "Partial recall by start offset: " + ", ".join(
-                              f"{k}: {_pct(v['recall'])} ({v['gold']})" for k, v in c["by_position"].items())]
+        lines += _pii_lines(pii)
     for name, res in results.items():
-        if res.get("suite") == "lid" and "configs" in res:
-            c = res["configs"]["default"]
-            lines += ["", f"## Language ID ({name})", "",
-                      f"Accuracy {_pct(c['accuracy'])}, macro {_pct(c['macro_accuracy'])} over "
-                      f"{c['in_set_documents']} in-set docs. Out-of-set docs given a language: "
-                      f"{_pct(c['out_of_set']['false_positive_rate'])} of {c['out_of_set']['documents']}.", "",
-                      "| script | docs | accuracy |", "|---|---|---|",
-                      *(f"| {k} | {v['total']} | {_pct(v['accuracy'])} |" for k, v in c["by_script"].items())]
-        if res.get("suite") == "speed" and "configs" in res:
-            lines += ["", f"## Speed ({name})", "", "| config | script | docs | docs/s | chars/s |", "|---|---|---|---|---|"]
-            for config, c in res["configs"].items():
-                for key, m in [("all", c["total"]), *c["by_script"].items()]:
-                    lines.append(f"| {config} | {key} | {m['documents']} | {m['docs_per_second']} | {m['chars_per_second']} |")
-        if res.get("suite") == "clean" and "configs" in res:
-            lines += ["", f"## Cleaning: injected noise removed ({name})", "", "| config | kind | injected | removed |",
-                      "|---|---|---|---|"]
-            for config, c in res["configs"].items():
-                lines += [f"| {config} | {k} | {v['injected']} | {_pct(v['removal_rate'])} |" for k, v in c["noise"].items()]
+        lines += _suite_lines(name, res)
     errors = {k: v["error"] for k, v in results.items() if "error" in v}
     if errors:
         lines += ["", "## Not run", "", *(f"- {k}: {v}" for k, v in errors.items())]
@@ -214,8 +237,6 @@ def summary(out: Path) -> str:
 
 
 def main(argv=None) -> None:
-    import sct
-
     parser = argparse.ArgumentParser(description=(__doc__ or "").splitlines()[0])
     parser.add_argument("--suite", nargs="+", default=["all"], choices=["all", *SUITES])
     parser.add_argument("--datasets", nargs="+", help="only these datasets of the chosen suites")
@@ -255,10 +276,10 @@ def main(argv=None) -> None:
                 result = {"suite": suite, "error": f"{type(error).__name__}: {error}"}
                 print(f"  failed: {result['error']}", file=sys.stderr)
             result["run"] = {**run, "models": cleaners.models()}
-            target.write_text(json.dumps(result, indent=1, ensure_ascii=False, sort_keys=True) + "\n", encoding="utf-8")
+            write_atomic(target, json.dumps(result, indent=1, ensure_ascii=False, sort_keys=True) + "\n")
     run.update(models=cleaners.models(), wall_seconds=round(time.perf_counter() - started, 1))
-    (out / "run.json").write_text(json.dumps(run, indent=1, sort_keys=True) + "\n", encoding="utf-8")
-    (out / "summary.md").write_text(summary(out), encoding="utf-8")
+    write_atomic(out / "run.json", json.dumps(run, indent=1, sort_keys=True) + "\n")
+    write_atomic(out / "summary.md", summary(out))
     print(out / "summary.md")
 
 

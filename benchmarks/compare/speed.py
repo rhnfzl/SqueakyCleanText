@@ -28,9 +28,19 @@ import sys
 import threading
 import time
 from pathlib import Path
+from typing import Any
 
 from benchmarks.compare import entries as registry
-from benchmarks.compare.runner import CACHE, _read_lines, _write, child_env, command, ensure_env, pick_gpu
+from benchmarks.compare.runner import (
+    POLL_SECONDS,
+    _read_lines,
+    _write,
+    add_entry_args,
+    command,
+    device_env,
+    entry_config,
+    entry_python,
+)
 from benchmarks.datasets import get
 from benchmarks.speed import environment
 
@@ -66,8 +76,26 @@ def dir_mb(path: Path) -> float:
     return round(sum(f.stat().st_size for f in path.rglob("*") if f.is_file() and not f.is_symlink()) / 2**20, 1)
 
 
+def _sample_vram(pid: int, stop: threading.Event, peak: dict[str, float | None]) -> None:
+    while not stop.is_set():
+        used = vram_mb(pid)
+        if used is not None:
+            peak["vram_mb"] = max(peak["vram_mb"] or 0.0, used)
+        stop.wait(VRAM_POLL_SECONDS)
+
+
+def _take_timings(lines: list[dict], result: dict[str, Any], started: float) -> None:
+    for line in lines:
+        if line["event"] == "first":
+            result["cold_start_seconds"] = round(time.perf_counter() - started, 3)
+        if line["event"] == "throughput":
+            result.setdefault("throughput", []).append(line)
+        else:
+            result[line["event"]] = line
+
+
 def measure(cmd: list[str], docs: list[dict], work: Path, env: dict, batch_size: int, timeout: float,
-            poll_vram: bool) -> dict:
+            poll_vram: bool) -> dict[str, Any]:
     """One fresh adapter process in speed mode; returns its timing lines plus cold start and VRAM peak."""
     work.mkdir(parents=True, exist_ok=True)
     inp, out = work / "speed-in.jsonl", work / "speed-out.jsonl"
@@ -76,46 +104,28 @@ def measure(cmd: list[str], docs: list[dict], work: Path, env: dict, batch_size:
     started = time.perf_counter()
     proc = subprocess.Popen([*cmd, "--input", str(inp), "--output", str(out), "--speed", "--batch-size", str(batch_size)],  # noqa: S603
                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, env=env)
-    peak = {"vram_mb": None}
+    peak: dict[str, float | None] = {"vram_mb": None}
     stop = threading.Event()
-
-    def sample():
-        while not stop.is_set():
-            used = vram_mb(proc.pid)
-            if used is not None:
-                peak["vram_mb"] = max(peak["vram_mb"] or 0.0, used)
-            stop.wait(VRAM_POLL_SECONDS)
-
-    sampler = threading.Thread(target=sample, daemon=True)
     if poll_vram:
-        sampler.start()
-    result, offset = {"cold_start_seconds": None, "peak_rss_mb_proc": None}, 0
-
-    def take(lines):
-        for line in lines:
-            if line["event"] == "first":
-                result["cold_start_seconds"] = round(time.perf_counter() - started, 3)
-            if line["event"] == "throughput":
-                result.setdefault("throughput", []).append(line)
-            else:
-                result[line["event"]] = line
-
+        threading.Thread(target=_sample_vram, args=(proc.pid, stop, peak), daemon=True).start()
+    result: dict[str, Any] = {"cold_start_seconds": None, "peak_rss_mb_proc": None}
+    offset = 0
     try:
         while True:
             lines, offset = _read_lines(out, offset)
-            take(lines)
+            _take_timings(lines, result, started)
             hwm = vm_hwm_mb(proc.pid)  # the last read before exit is the process peak
             if hwm is not None:
                 result["peak_rss_mb_proc"] = max(result["peak_rss_mb_proc"] or 0.0, hwm)
             if proc.poll() is not None:
-                take(_read_lines(out, offset)[0])
+                _take_timings(_read_lines(out, offset)[0], result, started)
                 break
             if time.perf_counter() - started > timeout:
                 proc.kill()
                 proc.wait()
                 result["error"] = f"timeout after {timeout:.0f}s"
                 break
-            time.sleep(0.05)
+            time.sleep(POLL_SECONDS)
     finally:
         stop.set()
         inp.unlink(missing_ok=True)
@@ -130,7 +140,7 @@ def _spread(values: list[float]) -> dict | None:
     return {"median": round(statistics.median(values), 4), "min": min(values), "max": max(values)} if values else None
 
 
-def summarise(runs: list[dict]) -> dict:
+def summarise(runs: list[dict]) -> dict[str, Any]:
     ok = [r for r in runs if "error" not in r and "done" in r]
     common = [next((t for t in r.get("throughput", []) if t["common"]), {}) for r in ok]
     return {
@@ -151,33 +161,22 @@ def summarise(runs: list[dict]) -> dict:
 
 def main(argv=None) -> None:
     parser = argparse.ArgumentParser(description=(__doc__ or "").splitlines()[0])
-    parser.add_argument("--entries", nargs="+", required=True)
-    parser.add_argument("--out", type=Path, required=True)
+    add_entry_args(parser)
     parser.add_argument("--n", type=int, default=100, help="FineWeb-2 speed docs per language")
     parser.add_argument("--seed", type=int, default=13)
     parser.add_argument("--repeats", type=int, default=3)
     parser.add_argument("--batch-size", type=int, default=8, help="entry's own best batch (8 = common only)")
     parser.add_argument("--timeout", type=float, default=3600.0)
-    parser.add_argument("--cache", type=Path, default=CACHE)
-    parser.add_argument("--python", action="append", default=[], metavar="ENTRY=PATH")
-    parser.add_argument("--threads", type=int)
-    parser.add_argument("--cpus", help="taskset CPU list, e.g. 0-15 (or 0 for the single-thread run)")
-    parser.add_argument("--device", choices=["cpu", "cuda"], default="cpu")
-    parser.add_argument("--gpu")
-    parser.add_argument("--gpu-mem-gb", type=float, default=5.0)
-    parser.add_argument("--hf-hub-cache")
     args = parser.parse_args(argv)
-    pythons = dict(item.split("=", 1) for item in args.python)
     docs = [{"id": r["id"], "text": r["text"], "lang": r["lang"]} for r in get("fineweb2").load(args.n, args.seed)]
-    gpu = None if args.device == "cpu" else (args.gpu or pick_gpu(args.gpu_mem_gb + 1))
-    env = child_env(args.threads, args.device, gpu, args.hf_hub_cache)
+    gpu, env = device_env(args)
     tools = {name: registry.tool(name) for name in args.entries}
     commands, sizes = {}, {}
     for name, t in tools.items():
-        py = Path(pythons[name]) if name in pythons else ensure_env(name, t["requirements"], args.cache / "venvs")
-        config = {**t["adapter_config"], "threads": args.threads, "device": args.device, "gpu_mem_gb": args.gpu_mem_gb}
-        commands[name] = command(py, t["adapter"], config, args.cpus)
-        sizes[name] = dir_mb(py.parent.parent) if name not in pythons and t["requirements"] else None
+        py = entry_python(name, t, args)
+        commands[name] = command(py, t["adapter"], entry_config(t, args), args.cpus)
+        pinned = any(item.startswith(f"{name}=") for item in args.python)
+        sizes[name] = dir_mb(py.parent.parent) if not pinned and t["requirements"] else None
     runs: dict[str, list] = {name: [] for name in tools}
     rng = random.Random(args.seed)  # noqa: S311  # run order, not crypto
     for repeat in range(args.repeats):
