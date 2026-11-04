@@ -4,7 +4,7 @@ import dataclasses
 
 import pytest
 
-from tests.ner_helpers import bare_ner
+from tests.ner_helpers import bare_ner, set_cfg
 from sct import TextCleaner, TextCleanerConfig
 from sct.privacy import EntityRule, PrivacyPolicy
 from sct.streaming import WindowedStreamingRedactor
@@ -37,16 +37,16 @@ class _Analyzer:
 
 def test_presidio_aliases_use_canonical_types():
     ner = bare_ner()
-    ner._ner_backend, ner._analyzer = "presidio_gliner", _Analyzer()
-    ner._presidio_types = _presidio_type_map(
-        {"label_map": {"person": "PER", "location": "LOC", "organization": "ORG"}})
+    set_cfg(ner, ner_backend="presidio_gliner")
+    ner._analyzer = _Analyzer()
+    ner._presidio_types = _presidio_type_map(False, {"person": "PER", "location": "LOC", "organization": "ORG"})
     policy = PrivacyPolicy(name="p", version="1",
                            rules={"PERSON": EntityRule(action="redact"),
                                   "LOCATION": EntityRule(action="placeholder"),
                                   "ORGANISATION": EntityRule(action="placeholder")},
                            default_rule=EntityRule(action="keep"))
-    result = ner.ner_process_detailed("Anna Schmidt in London at Acme", positional_tags=("PER",),
-                                      privacy_policy=policy)
+    ner._privacy_policy = policy
+    result = ner.ner_process_detailed("Anna Schmidt in London at Acme", positional_tags=("PER",))
     assert result.text == "<REDACTED> in <LOCATION> at <ORGANISATION>"
     assert [f.entity.entity_type for f in result.findings] == ["PERSON", "LOCATION", "ORGANISATION"]
 

@@ -15,7 +15,7 @@ from sct.config import (
 from sct.utils import contact, datetime, special, normtext, stopwords, constants, resources
 from sct.utils.constants import build_month_names_dict, build_date_regex
 from sct.utils.stopwords import ProcessStopwords
-from sct.utils.ner import GeneralNER
+from sct.utils.ner import GeneralNER, ModelLoadError
 from unittest.mock import patch, MagicMock
 from functools import wraps
 from sct.sct import TextCleaner
@@ -59,14 +59,16 @@ class TextCleanerTest(unittest.TestCase):
         # Always use lightweight ONNX test model — never download production models
         cls.ner = None
         try:
-            cls.ner = GeneralNER(device='cpu', model_names=TEST_NER_MODELS)
+            cls.ner = GeneralNER(TextCleanerConfig(ner_device='cpu', ner_models=TEST_NER_MODELS))
             cls.ner.ner_process(
                 "Test sentence.",
                 positional_tags=['PER', 'ORG', 'LOC'],
                 ner_confidence_threshold=0.85,
             )
             print("NER test models loaded successfully!")
-        except Exception as e:
+        except ModelLoadError as e:
+            if not isinstance(e.__cause__, OSError):  # download or network failure; anything else is a bug
+                raise
             print(f"NER models unavailable: {e}")
             cls.ner = None
 
@@ -536,7 +538,7 @@ class TextCleanerTest(unittest.TestCase):
             shared_model = "protectai/bert-base-NER-onnx"
             models = {'ENGLISH': shared_model, 'MULTILINGUAL': shared_model,
                       'FRENCH': shared_model}
-            ner2 = GeneralNER(device='cpu', model_names=models)
+            ner2 = GeneralNER(TextCleanerConfig(ner_device='cpu', ner_models=models))
             ner2._ensure_loaded('FRENCH')
             ner2._ensure_loaded('MULTILINGUAL')
             self.assertIs(ner2._pipelines['FRENCH'],
@@ -1524,8 +1526,8 @@ class TextCleanerTest(unittest.TestCase):
         ]
         text = "I bought iPhone today"
         result = self.ner.anonymize_text(text, filtered)
-        self.assertIn('<PRODUCT>', result.text)
-        self.assertNotIn('iPhone', result.text)
+        self.assertIn('<PRODUCT>', result)
+        self.assertNotIn('iPhone', result)
 
     @requires_ner
     def test_anonymize_mixed_labels(self):
@@ -1538,8 +1540,8 @@ class TextCleanerTest(unittest.TestCase):
         ]
         text = "John bought an iPad today"
         result = self.ner.anonymize_text(text, filtered)
-        self.assertIn('<PERSON>', result.text)
-        self.assertIn('<PRODUCT>', result.text)
+        self.assertIn('<PERSON>', result)
+        self.assertIn('<PRODUCT>', result)
 
     @classmethod
     def tearDownClass(cls):
@@ -2049,13 +2051,13 @@ class ReversibleAnonymizationTest(unittest.TestCase):
         ]
 
         result = ner_obj._anonymize_reversible(text, filtered, amap)
-        self.assertIn('<PERSON_0>', result.text)
-        self.assertIn('<ORGANISATION_0>', result.text)
-        self.assertIn('<LOCATION_0>', result.text)
+        self.assertIn('<PERSON_0>', result)
+        self.assertIn('<ORGANISATION_0>', result)
+        self.assertIn('<LOCATION_0>', result)
         self.assertEqual(len(amap.entries), 3)
 
         # Round-trip (anon_map is mutated in-place, use the passed-in reference)
-        self.assertEqual(amap.deanonymize(result.text), text)
+        self.assertEqual(amap.deanonymize(result), text)
 
 
 class GLiClassConfigTest(unittest.TestCase):

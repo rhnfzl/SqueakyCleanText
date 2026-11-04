@@ -100,8 +100,8 @@ def test_torch_backend_gets_indexed_cuda_device(monkeypatch):
         return object(), Tok()
 
     monkeypatch.setattr("sct.utils.torch_pipeline.load_torch_ner_model", fake_load)
-    ner = GeneralNER(device="cuda", cuda_device_id=2, ner_backend="torch",
-                     torch_model_names={"ENGLISH": "a", "MULTILINGUAL": "b"})
+    ner = GeneralNER(TextCleanerConfig(ner_device="cuda", cuda_device_id=2, ner_backend="torch",
+                                       torch_ner_models={"ENGLISH": "a", "MULTILINGUAL": "b"}))
     assert seen == ["cuda:2", "cuda:2"]
     assert [m["provider"] for m in ner.models_for("ENGLISH")] == ["cuda:2", "cuda:2"]
 
@@ -117,8 +117,8 @@ def test_onnx_loader_gets_device_id_and_options(monkeypatch):
         return object(), Tok()
 
     monkeypatch.setattr("sct.utils.onnx_pipeline.load_onnx_ner_model", fake_load)
-    GeneralNER(device="cuda", cuda_device_id=3, onnx_cuda_provider_options={"a": 1},
-               model_names={"ENGLISH": "a", "MULTILINGUAL": "b"})
+    GeneralNER(TextCleanerConfig(ner_device="cuda", cuda_device_id=3, onnx_cuda_provider_options={"a": 1},
+                                 ner_models={"ENGLISH": "a", "MULTILINGUAL": "b"}))
     assert seen == [("cuda", 3, {"a": 1})] * 2
 
 
@@ -166,8 +166,8 @@ def _fake_torch_loader(monkeypatch):
 def test_mps_moves_torch_or_falls_back_to_cpu(monkeypatch, available, device):
     monkeypatch.setattr(ner_module, "_mps_available", lambda: available)
     seen = _fake_torch_loader(monkeypatch)
-    ner = GeneralNER(device="mps", ner_backend="torch",
-                     torch_model_names={"ENGLISH": "a", "MULTILINGUAL": "b"})
+    ner = GeneralNER(TextCleanerConfig(ner_device="mps", ner_backend="torch",
+                                       torch_ner_models={"ENGLISH": "a", "MULTILINGUAL": "b"}))
     assert seen == [device, device]
     assert [m["provider"] for m in ner.models_for("ENGLISH")] == [device, device]
 
@@ -183,7 +183,7 @@ def test_mps_keeps_onnx_on_cpu(spy_sessions, monkeypatch):
 def test_mps_fallback_warning(monkeypatch):
     monkeypatch.setattr(ner_module, "_mps_available", lambda: False)
     cleaner = TextCleaner(cfg=_cfg(ner_device="mps"))
-    cleaner.GeneralNER._provenance["ENGLISH"]["provider"] = "cpu"  # a torch model that fell back
+    cleaner.GeneralNER.provenance["ENGLISH"]["provider"] = "cpu"  # a torch model that fell back
     assert "mps_fallback" in cleaner.process(TEXT).metadata["warnings"]
     assert TextCleanerConfig(check_ner_process=False, ner_device="mps").ner_device == "mps"
 

@@ -115,7 +115,7 @@ def test_forked_handle_pins_the_parent_commits(monkeypatch):
 
     handle = rt.CleanerHandle(TextCleanerConfig(ner_models=TEST_NER_MODELS))
     handle.get().GeneralNER.load_language("ENGLISH")
-    commit = handle.get().GeneralNER._provenance["ENGLISH"]["revision"]
+    commit = handle.get().GeneralNER.provenance["ENGLISH"]["revision"]
     copied = pickle.loads(pickle.dumps(handle))  # noqa: S301 - own object
     assert copied.config.ner_model_revisions["ENGLISH"] == commit
     monkeypatch.setattr(rt.os, "getpid", lambda: -1)  # as in a forked child

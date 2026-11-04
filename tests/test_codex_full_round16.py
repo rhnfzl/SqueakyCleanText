@@ -4,7 +4,7 @@ import datetime
 
 import pytest
 
-from tests.ner_helpers import bare_ner
+from tests.ner_helpers import bare_ner, set_cfg
 from sct import TextCleaner, TextCleanerConfig
 from sct.browser import build_browser_manifest
 from sct.privacy import EntityRule, PrivacyPolicy
@@ -45,13 +45,14 @@ class _Analyzer:
 
 def test_empty_presidio_type_map_keeps_legacy_names():
     ner = bare_ner()
-    ner._ner_backend, ner._analyzer = "presidio_gliner", _Analyzer()
-    ner._presidio_types = _presidio_type_map({"legacy_type_names": True, "label_map": None})
+    set_cfg(ner, ner_backend="presidio_gliner")
+    ner._analyzer = _Analyzer()
+    ner._presidio_types = _presidio_type_map(True, None)
     assert ner._presidio_types == {}
     policy = PrivacyPolicy(name="p", version="1", rules={"PHONE_NUMBER": EntityRule(action="redact")},
                            default_rule=EntityRule(action="keep"))
-    result = ner.ner_process_detailed("Anna 0612345678 now", positional_tags=("PER",),
-                                      privacy_policy=policy)
+    ner._privacy_policy = policy
+    result = ner.ner_process_detailed("Anna 0612345678 now", positional_tags=("PER",))
     assert "0612345678" not in result.text
     assert [f.entity.entity_type for f in result.findings] == ["PHONE_NUMBER"]
 

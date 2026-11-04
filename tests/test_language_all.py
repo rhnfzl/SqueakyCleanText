@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 from lingua import Language, LanguageDetectorBuilder
 
-from tests.ner_helpers import bare_ner
+from tests.ner_helpers import bare_ner, set_cfg
 import sct.config as config_module
 from sct import TextCleaner, TextCleanerConfig
 from tests.conftest import TEST_NER_MODELS
@@ -204,7 +204,7 @@ def test_bring_your_own_model_routes_hindi(monkeypatch):
 
 def test_builtin_fallback_keys_keep_default_route():
     ner = bare_ner()
-    ner._ner_backend = "onnx"
+    set_cfg(ner, ner_backend="onnx")
     ner._ensemble_models = config_module.DEFAULT_NER_ENSEMBLE
     ner._ensemble_default_keys = config_module.NER_ENSEMBLE_DEFAULT_KEYS
     ner._model_names = dict(config_module.DEFAULT_NER_MODELS)
@@ -227,20 +227,20 @@ class _FakeGLiNER:
 
 
 def test_gliner_hindi_pin_runs(monkeypatch):
-    def fake_ner(**kwargs):
+    def fake_ner(cfg, **kwargs):
         ner = bare_ner()
-        ner._ner_backend = "gliner"
-        ner._ner_batch_size = 1
-        ner._ner_chunk_overlap = 0
+        set_cfg(ner, ner_backend="gliner")
+        set_cfg(ner, ner_batch_size=1)
+        set_cfg(ner, ner_chunk_overlap=0)
         ner._gliner_pipe = _FakeGLiNER()
-        ner._replacement_mode = "placeholder"
+        set_cfg(ner, replacement_mode="placeholder")
         ner._synthetic_replacer = None
         ner._inference_locks = {}
         ner._locks_lock = threading.Lock()
         ner._ensemble_models = {}
         ner._ensemble_default_keys = ()
         ner._model_names = {}
-        ner._provenance = {}
+        ner.provenance = {}
         ner.tokenizer = None
         return ner
 

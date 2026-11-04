@@ -28,13 +28,13 @@ def test_nested_spans_leave_no_part_of_the_entity(mode):
     ner = _word_ner(0, _FakeRunDetector(), mode=mode)
     ner._synthetic_replacer = SyntheticReplacer()
     anon_map = AnonymizationMap()
-    result = ner.anonymize_text(TEXT, [dict(d) for d in NESTED], mode, anon_map=anon_map)
-    assert "Smith" not in result.text and "Paul" not in result.text
-    assert "a@b.com" not in result.text
+    text = ner.anonymize_text(TEXT, [dict(d) for d in NESTED], mode, anon_map=anon_map)
+    assert "Smith" not in text and "Paul" not in text
+    assert "a@b.com" not in text
     if mode == "placeholder":
-        assert result.text.startswith("<PERSON>. ")
+        assert text.startswith("<PERSON>. ")
     if mode == "reversible":
-        assert anon_map.deanonymize(result.text) == TEXT
+        assert anon_map.deanonymize(text) == TEXT
 
 
 class _ContextDetector(_FakeRunDetector):

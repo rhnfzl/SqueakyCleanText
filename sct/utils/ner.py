@@ -7,11 +7,7 @@ import re
 import threading
 from collections import defaultdict
 import logging
-from typing import Any, Collection, Dict, List, Optional, Sequence, Tuple, Union
-
-from pathlib import Path
-
-from typing import NamedTuple as _NamedTuple
+from typing import Any, Collection, Dict, List, Mapping, Optional, Sequence, Tuple, Union
 
 from sct.utils import constants, resources
 from sct.utils.anonymization_map import AnonymizationMap
@@ -27,9 +23,14 @@ from sct.utils.ner_spans import (
 from sct.config import (
     DEFAULT_NER_MODELS,
     DEFAULT_NER_ENSEMBLE,
+    DEFAULT_TORCH_NER_MODELS,
+    GLINER_ADAPTER_BACKENDS,
     GLINER_BACKENDS,
     NER_ENSEMBLE_DEFAULT_KEYS,
-    LANG_KEYS,
+    ONNX_BACKENDS,
+    TOKEN_MODEL_BACKENDS,
+    TORCH_BACKENDS,
+    TextCleanerConfig,
 )
 from sct.privacy import (
     DetectedEntity,
@@ -38,21 +39,7 @@ from sct.privacy import (
     PrivacyPolicy,
 )
 
-
-class AnonymizeResult(_NamedTuple):
-    """Result of text anonymization — lightweight typed container."""
-    text: str
-
 logger = logging.getLogger(__name__)
-
-# Final NER score cut when the caller passes none.
-DEFAULT_NER_CONFIDENCE = 0.85
-
-ONNX_BACKENDS = frozenset({'onnx', 'ensemble_onnx'})
-TORCH_BACKENDS = frozenset({'torch', 'ensemble_torch'})
-TOKEN_MODEL_BACKENDS = ONNX_BACKENDS | TORCH_BACKENDS
-# Backends that run SCT's own GLiNER adapter; presidio_gliner loads GLiNER through Presidio.
-GLINER_ADAPTER_BACKENDS = GLINER_BACKENDS - {'presidio_gliner'}
 
 # An inference lock's key: 'gliner', or a token model's (name, revision).
 ModelKey = Tuple[str, Optional[str]]
@@ -62,7 +49,7 @@ ModelKey = Tuple[str, Optional[str]]
 # source (*source_markers*: its text, e.g. "<LONDON>", or the (start, end) spans of its occurrences,
 # so an emitted marker of the same text keeps its protection) gets none, so it cannot hide PII.
 # Custom replace_with_* markers ("EMAIL") are protected the same way through *regex_markers*.
-_PLACEHOLDER_TOKEN = re.compile(r"<[A-Z][A-Z0-9_]*>")
+PLACEHOLDER_TOKEN = re.compile(r"<[A-Z][A-Z0-9_]*>")
 
 
 # Freeing an inherited ONNX session in a forked child crashes or hangs, so children pin every live
@@ -84,11 +71,10 @@ class ModelLoadError(Exception):
     pass
 
 
-def _presidio_type_map(gliner_config):
+def _presidio_type_map(legacy_type_names: bool, label_map: Optional[Mapping[str, str]]) -> Dict[str, str]:
     """Presidio entity type -> SCT type: the label map, and PHONE_NUMBER/IP_ADDRESS -> PHONE/IP."""
-    types = {} if gliner_config.get('legacy_type_names') else {
-        old: new for new, old in constants.LEGACY_TYPE_NAMES.items()}
-    types.update({label.upper(): tag for label, tag in (gliner_config.get('label_map') or {}).items()})
+    types = {} if legacy_type_names else {old: new for new, old in constants.LEGACY_TYPE_NAMES.items()}
+    types.update({label.upper(): tag for label, tag in (label_map or {}).items()})
     return types
 
 
@@ -111,100 +97,49 @@ class GeneralNER:
         ensemble_torch — Torch + GLiNER combined via ensemble voting
     """
 
-    def __init__(self, cache_dir: Optional[Path] = None, device: Optional[str] = None,
-                 model_names: Optional[Union[Dict[str, str], List[str]]] = None,
-                 model_revisions: Optional[Dict[str, str]] = None,
-                 ner_backend: str = 'onnx',
-                 gliner_config: Optional[Dict] = None,
-                 torch_model_names: Optional[Dict[str, str]] = None,
-                 torch_model_revisions: Optional[Dict[str, str]] = None,
-                 ner_batch_size: int = 8,
-                 ner_subword_widen: Optional[float] = 1.0,
-                 ner_subword_widen_same_script: bool = True,
-                 ensemble_models: Optional[Dict] = None,
-                 ensemble_default_keys: Optional[tuple] = None,
-                 replacement_mode: str = 'placeholder',
-                 synthetic_replacer=None,
-                 regex_markers: Sequence[str] = (),
-                 onnx_intra_op_threads: Optional[int] = None,
-                 onnx_inter_op_threads: Optional[int] = None,
-                 ner_chunk_overlap: int = 0,
-                 cuda_device_id: int = 0,
-                 onnx_cuda_provider_options: Optional[Dict] = None,
-                 ner_ensemble_vote: str = 'max',
-                 ner_propagate_masked: bool = True,
-                 ner_propagate_min_score: Optional[float] = None,
-                 ner_merge_location_gap: int = 0,
-                 ner_snap_word_edges: bool = True,
-                 allow_regex=None):
-        """Initialize NER processor.
+    def __init__(
+        self,
+        cfg: TextCleanerConfig,
+        *,
+        synthetic_replacer=None,
+        regex_markers: Sequence[str] = (),
+        allow_regex=None,
+        privacy_policy: Optional[PrivacyPolicy] = None,
+    ):
+        """Load the NER models *cfg* selects.
 
         Args:
-            cache_dir: Optional directory for caching models
-            device: Device for inference ('cuda', 'mps' or 'cpu'). Auto-detects if None.
-            model_names: Language-keyed dict of ONNX model repo IDs (preferred),
-                or positional list for backward compat. Uses DEFAULT_NER_MODELS if None.
-            ner_backend: Backend selection ('onnx', 'torch', 'gliner',
-                'ensemble_onnx', 'ensemble_torch').
-            gliner_config: Dict with keys: model, variant, labels, threshold, label_map.
-                Required when ner_backend involves GLiNER.
-            torch_model_names: Language-keyed dict of PyTorch model repo IDs.
-                Required when ner_backend involves torch.
+            cfg: Every NER option (``ner_*``, ``gliner_*``, ``torch_ner_*``, ``onnx_*``, ``cuda_device_id``,
+                ``positional_tags``, ``replacement_mode``) is read from here; the field comments in
+                ``TextCleanerConfig`` document them.
             synthetic_replacer: Shared SyntheticReplacer instance (from TextCleaner).
             regex_markers: Custom regex-step markers (``replace_with_email="EMAIL"``) protected
                 like ``<EMAIL>`` unless the source already holds them.
-            onnx_intra_op_threads, onnx_inter_op_threads: ONNX Runtime session
-                thread counts; None keeps the ONNX Runtime default.
-            ner_chunk_overlap: Tokens of neighbouring text each NER window adds on
-                both sides of its chunk; 0 keeps the 0.7.1 chunks.
-            cuda_device_id: GPU index used when *device* resolves to CUDA.
-            onnx_cuda_provider_options: Extra ``CUDAExecutionProvider`` options.
-            ner_ensemble_vote: Per-span vote across models: 'max' keeps a span whose best
-                model score passes the cut, 'mean' averages the scores (0.8.0).
-            ner_propagate_masked: Mask every other case-sensitive whole-word copy of a
-                masked PER/ORG/LOC value in the same document; False = 0.8.0 output.
-            ner_propagate_min_score: Score a span needs to be propagated; None = the NER cut.
-            ner_merge_location_gap: Join two LOCATION spans whose gap holds at most this many
-                characters (placeholders not counted), no line break and no sentence end; 0 = off.
-            ner_snap_word_edges: Move a span edge that falls inside a word (letters and marks,
-                not wide CJK) out to the word edge, any backend, within the
-                ner_subword_widen cap and script rule; False = 0.8.0 spans.
             allow_regex: Compiled custom_allow_terms; a span equal to or inside a match is kept as text.
+            privacy_policy: Decides each entity's action in place of ``cfg.replacement_mode``; None = replace all.
         """
         _LIVE_NER.add(self)
-        self._ner_backend = ner_backend
-        self._ner_batch_size = ner_batch_size
-        self._ner_subword_widen = ner_subword_widen
-        self._ner_subword_widen_same_script = ner_subword_widen_same_script
-        self._ner_chunk_overlap = ner_chunk_overlap
-        self._ner_ensemble_vote = ner_ensemble_vote
-        self._ner_propagate_masked = ner_propagate_masked
-        self._ner_propagate_min_score = ner_propagate_min_score
-        self._ner_merge_location_gap = ner_merge_location_gap
-        self._ner_snap_word_edges = ner_snap_word_edges
+        self.cfg = cfg
         self._allow_regex = allow_regex
-        self._replacement_mode = replacement_mode
         self._synthetic_replacer = synthetic_replacer
         self._regex_markers = tuple(regex_markers)
-        self._model_revisions = dict(model_revisions or {})
-        self._torch_model_revisions = dict(torch_model_revisions or {})
-        self._onnx_intra_op_threads = onnx_intra_op_threads
-        self._onnx_inter_op_threads = onnx_inter_op_threads
-        self._cuda_device_id = cuda_device_id
-        self._onnx_cuda_provider_options = dict(onnx_cuda_provider_options or {})
+        self._privacy_policy = privacy_policy
         # Per language key: {"key", "id", "revision", "provider"} of the model that key loaded.
-        self._provenance: Dict[str, Dict[str, Optional[str]]] = {}
+        self.provenance: Dict[str, Dict[str, Optional[str]]] = {}
         self._gliner_pipe = None
-        self._ensemble_models: Dict[str, tuple] = ensemble_models if ensemble_models is not None else DEFAULT_NER_ENSEMBLE
+        self._ensemble_models: Dict[str, tuple] = (
+            dict(cfg.ner_ensemble) if cfg.ner_ensemble is not None else DEFAULT_NER_ENSEMBLE
+        )
         self._ensemble_default_keys: tuple = (
-            ensemble_default_keys
-            if ensemble_default_keys is not None
+            tuple(cfg.ner_ensemble_default_keys)
+            if cfg.ner_ensemble_default_keys is not None
             else NER_ENSEMBLE_DEFAULT_KEYS
         )
+        ner_backend = cfg.ner_backend
 
         # Device detection
-        if device:
-            self.device = device
+        if cfg.ner_device:
+            self.device = cfg.ner_device
         elif ner_backend in TORCH_BACKENDS:
             try:
                 import torch  # noqa: S404
@@ -215,7 +150,7 @@ class GeneralNER:
             import onnxruntime as ort
             self.device = 'cuda' if 'CUDAExecutionProvider' in ort.get_available_providers() else 'cpu'
         # Torch and GLiNER take an indexed device string; ONNX gets the index as a provider option.
-        self._torch_device = f"cuda:{cuda_device_id}" if self.device == 'cuda' else self.device
+        self._torch_device = f"cuda:{cfg.cuda_device_id}" if self.device == 'cuda' else self.device
         # 'mps' (Apple GPU) moves torch and GLiNER only; ONNX models stay on CPU.
         if self.device == 'mps' and not _mps_available():
             logger.warning("NER runs on CPU: Apple GPU (mps) was requested but torch has no MPS backend")
@@ -223,7 +158,6 @@ class GeneralNER:
         logger.info("Using device: %s (backend: %s)", self._torch_device, ner_backend)
 
         self._engine = None
-        self._cache_args = {"cache_dir": str(cache_dir)} if cache_dir else {}
 
         # Common state for all backends
         self._pipelines: Dict = {}
@@ -236,73 +170,47 @@ class GeneralNER:
 
         # --- Backend-specific initialization ---
 
-        if ner_backend in ONNX_BACKENDS:
-            # ONNX backend: build model mapping from dict, list, or defaults
-            if model_names is None:
-                self._model_names = dict(DEFAULT_NER_MODELS)
-            elif isinstance(model_names, dict):
-                self._model_names = dict(model_names)
-            else:
-                self._model_names = dict(zip(LANG_KEYS, model_names))
-
+        if ner_backend in TOKEN_MODEL_BACKENDS:
+            self._model_names = dict(cfg.torch_ner_models if ner_backend in TORCH_BACKENDS else cfg.ner_models)
             self._ensure_loaded('ENGLISH')
             self._ensure_loaded('MULTILINGUAL')
             self._init_tokenizer_props()
-
-        elif ner_backend in TORCH_BACKENDS:
-            # Torch backend
-            if torch_model_names is None:
-                from sct.config import DEFAULT_TORCH_NER_MODELS
-                self._model_names = dict(DEFAULT_TORCH_NER_MODELS)
-            else:
-                self._model_names = dict(torch_model_names)
-
-            self._ensure_loaded('ENGLISH')
-            self._ensure_loaded('MULTILINGUAL')
-            self._init_tokenizer_props()
-
-        elif ner_backend == 'gliner':
-            # GLiNER-only: no token-classification models needed
+        else:
+            # GLiNER-only, or Presidio (GLiNER recognition + anonymization): no token-classification models
             self._model_names = {}
             self.min_token_length = None
             self.tokenizer = None
-
-        elif ner_backend == 'presidio_gliner':
-            # Presidio handles everything: GLiNER recognition + anonymization
-            self._model_names = {}
-            self.min_token_length = None
-            self.tokenizer = None
-            if gliner_config:
-                self._init_presidio_gliner(gliner_config)
+            if ner_backend == 'presidio_gliner':
+                self._init_presidio_gliner()
 
         # --- GLiNER pipeline (for gliner/ensemble modes) ---
-        if ner_backend in GLINER_ADAPTER_BACKENDS and gliner_config:
+        if ner_backend in GLINER_ADAPTER_BACKENDS:
             from sct.utils.gliner_adapter import GLiNERAdapter
             self._gliner_pipe = GLiNERAdapter(
-                model_id=gliner_config['model'],
-                revision=gliner_config.get('revision'),
-                variant=gliner_config.get('variant', 'gliner'),
-                labels=gliner_config.get('labels'),
-                threshold=gliner_config.get('threshold', 0.4),
-                label_map=gliner_config.get('label_map'),
-                label_descriptions=gliner_config.get('label_descriptions'),
+                model_id=cfg.gliner_model,
+                revision=cfg.gliner_revision,
+                variant=cfg.gliner_variant,
+                labels=cfg.gliner_labels,
+                threshold=cfg.effective_gliner_threshold,
+                label_map=dict(cfg.gliner_label_map or {}),
+                label_descriptions=dict(cfg.gliner_label_descriptions or {}),
                 device=self._torch_device,
-                onnx=gliner_config.get('onnx', False),
+                onnx=cfg.gliner_onnx,
             )
-        if gliner_config and ner_backend in GLINER_BACKENDS:
+        if ner_backend in GLINER_BACKENDS:
             onnx_gliner = self._gliner_pipe is not None and self._gliner_pipe._onnx
-            self._provenance['GLINER'] = {
-                'key': 'GLINER', 'id': gliner_config['model'],
-                'revision': gliner_config.get('revision'),
+            self.provenance['GLINER'] = {
+                'key': 'GLINER', 'id': cfg.gliner_model,
+                'revision': cfg.gliner_revision,
                 'provider': 'onnx' if onnx_gliner else self._torch_device,
             }
 
-        if ner_backend != 'presidio_gliner' and ner_chunk_overlap:
+        if ner_backend != 'presidio_gliner' and cfg.ner_chunk_overlap:
             self._check_overlap(self._chunk_budget())
 
     def _check_overlap(self, budget: int) -> None:
         """Reject an overlap that leaves no core inside a *budget*-token window."""
-        overlap = self._ner_chunk_overlap
+        overlap = self.cfg.ner_chunk_overlap
         if not 0 < 2 * overlap < budget // 2:
             raise ValueError(
                 f"ner_chunk_overlap must be >= 0 and 2 * overlap < {budget // 2} "
@@ -330,34 +238,32 @@ class GeneralNER:
                     self._inference_locks[model_key] = threading.Lock()
         return self._inference_locks[model_key]
 
-    def _init_presidio_gliner(self, gliner_config):
+    def _init_presidio_gliner(self):
         """Initialize Presidio with GLiNERRecognizer (experimental beta backend)."""
+        cfg = self.cfg
         try:
             from presidio_analyzer import AnalyzerEngine  # noqa: S404
-        except ImportError:
+        except ImportError as exc:
             raise ImportError(
                 "presidio-analyzer is required for presidio_gliner backend. "
-                "Install with: pip install presidio-analyzer"
-            )
+                "Install with: pip install squeakycleantext[presidio]"
+            ) from exc
         self._analyzer = AnalyzerEngine()
-        self._presidio_types = _presidio_type_map(gliner_config)
+        self._presidio_types = _presidio_type_map(cfg.legacy_type_names, cfg.gliner_label_map)
         try:
             from presidio_analyzer.predefined_recognizers import GLiNERRecognizer  # noqa: S404
             gliner_recognizer = GLiNERRecognizer(
-                model_name=gliner_config['model'],
-                supported_entities=[
-                    label.upper()
-                    for label in gliner_config.get('labels', ['person', 'organization', 'location'])
-                ],
-                threshold=gliner_config.get('threshold', 0.4),
+                model_name=cfg.gliner_model,
+                supported_entities=[label.upper() for label in cfg.gliner_labels],
+                threshold=cfg.effective_gliner_threshold,
                 map_location=self._torch_device,  # Presidio loads GLiNER in torch
             )
             self._analyzer.registry.add_recognizer(gliner_recognizer)
-        except ImportError:
+        except ImportError as exc:
             raise ImportError(
                 "GLiNERRecognizer requires presidio-analyzer with GLiNER support. "
-                "Install with: pip install presidio-analyzer gliner"
-            )
+                "Install with: pip install squeakycleantext[presidio]"
+            ) from exc
 
     def _get_ensemble_keys(self, language: str) -> tuple:
         """Return ordered model keys to run for the given language."""
@@ -374,11 +280,7 @@ class GeneralNER:
         """
         if language == 'MULTILINGUAL' or language not in self._model_names:
             return False
-        if self._ner_backend in TORCH_BACKENDS:
-            from sct.config import DEFAULT_TORCH_NER_MODELS
-            defaults = DEFAULT_TORCH_NER_MODELS
-        else:
-            defaults = DEFAULT_NER_MODELS
+        defaults = DEFAULT_TORCH_NER_MODELS if self.cfg.ner_backend in TORCH_BACKENDS else DEFAULT_NER_MODELS
         return self._model_names[language] != defaults.get(language)
 
     def uses_fallback_models(self, language: Optional[str]) -> bool:
@@ -395,9 +297,9 @@ class GeneralNER:
 
     def _model_key(self, lang_key: str) -> ModelKey:
         """(model name, revision) for a language key; same key = same loaded model."""
-        revisions = (self._torch_model_revisions
-                     if self._ner_backend in TORCH_BACKENDS
-                     else self._model_revisions)
+        revisions = (self.cfg.torch_ner_model_revisions
+                     if self.cfg.ner_backend in TORCH_BACKENDS
+                     else self.cfg.ner_model_revisions)
         return self._model_names.get(lang_key, lang_key), revisions.get(lang_key)
 
     def _get_model_name(self, lang_key: str) -> str:
@@ -438,38 +340,35 @@ class GeneralNER:
                 return
             try:
                 pipeline_obj: object
-                if self._ner_backend in TORCH_BACKENDS:
+                if self.cfg.ner_backend in TORCH_BACKENDS:
                     from sct.utils.torch_pipeline import load_torch_ner_model
                     pipeline_obj, tok = load_torch_ner_model(
                         model_name, device=self._torch_device,
-                        cache_dir=self._cache_args.get("cache_dir"),
-                        revision=self._torch_model_revisions.get(lang_key),
+                        revision=self.cfg.torch_ner_model_revisions.get(lang_key),
                     )
                 else:
                     from sct.utils.onnx_pipeline import load_onnx_ner_model
                     pipeline_obj, tok = load_onnx_ner_model(
                         model_name,
                         device=self.device,
-                        cache_dir=self._cache_args.get("cache_dir"),
-                        revision=self._model_revisions.get(lang_key),
-                        intra_op_threads=self._onnx_intra_op_threads,
-                        inter_op_threads=self._onnx_inter_op_threads,
-                        cuda_device_id=self._cuda_device_id,
-                        cuda_provider_options=self._onnx_cuda_provider_options,
+                        revision=self.cfg.ner_model_revisions.get(lang_key),
+                        intra_op_threads=self.cfg.onnx_intra_op_threads,
+                        inter_op_threads=self.cfg.onnx_inter_op_threads,
+                        cuda_device_id=self.cfg.cuda_device_id,
+                        cuda_provider_options=dict(self.cfg.onnx_cuda_provider_options or {}),
                     )
                 self._tokenizers[lang_key] = tok
                 self._record_provenance(lang_key, pipeline_obj)
                 self._pipelines[lang_key] = pipeline_obj
-            except Exception as e:
-                logger.error("Failed to load model for %s: %s", lang_key, e)
+            except Exception as e:  # a missing extra too: docs/API.md promises this type, the message names the install
                 raise ModelLoadError(
                     f"Model loading failed for {lang_key} ({model_name}): {e}"
-                )
+                ) from e
 
     def _record_provenance(self, lang_key: str, pipe) -> None:
         """Remember which model, revision and provider *lang_key* runs (own dict per key)."""
         model_name, revision = self._model_key(lang_key)
-        self._provenance[lang_key] = {
+        self.provenance[lang_key] = {
             'key': lang_key,
             'id': model_name,
             'revision': getattr(pipe, 'revision', None) or revision,
@@ -480,12 +379,12 @@ class GeneralNER:
     def models_for(self, language: Optional[str]) -> List[Dict[str, Optional[str]]]:
         """Provenance of the loaded models that NER runs for *language* (copies)."""
         keys: tuple = ()
-        if self._ner_backend in TOKEN_MODEL_BACKENDS:
+        if self.cfg.ner_backend in TOKEN_MODEL_BACKENDS:
             # tuple(): a configured list route must not grow on every call.
             keys = tuple(self._get_ensemble_keys(language or 'MULTILINGUAL'))
-        if 'GLINER' in self._provenance:
+        if 'GLINER' in self.provenance:
             keys += ('GLINER',)
-        return [dict(self._provenance[k]) for k in keys if k in self._provenance]
+        return [dict(self.provenance[k]) for k in keys if k in self.provenance]
 
     def entities_with_position_key(self, results, labels):
         """Keep the entities whose group is in *labels*, with collision-safe position keys."""
@@ -525,8 +424,7 @@ class GeneralNER:
             return self._anonymize_reversible(text, filtered_data, anon_map)
 
         if replacement_mode == 'synthetic':
-            result_text = self._synthetic_replacer.generate_for_entities(text, filtered_data)
-            return AnonymizeResult(text=result_text)
+            return self._synthetic_replacer.generate_for_entities(text, filtered_data)
 
         if has_custom:
             # Mixed labels: right-to-left string replacement (preserves offsets)
@@ -534,7 +432,7 @@ class GeneralNER:
             for items in sorted_data:
                 tag = ENTITY_TYPE_MAP.get(items['entity_group'], items['entity_group'])
                 text = text[:items['start']] + f"<{tag}>" + text[items['end']:]
-            return AnonymizeResult(text=text)
+            return text
         else:
             # Standard entities only: use Presidio (existing behavior)
             from presidio_anonymizer.entities import RecognizerResult
@@ -555,8 +453,7 @@ class GeneralNER:
                 if 0 <= entry.start < text_length and 0 < entry.end <= text_length
             ]
 
-            engine_result = self.engine.anonymize(text=text, analyzer_results=analyzer_result)
-            return AnonymizeResult(text=engine_result.text)
+            return self.engine.anonymize(text=text, analyzer_results=analyzer_result).text
 
     @property
     def engine(self):
@@ -570,7 +467,7 @@ class GeneralNER:
         """Replace entities with indexed placeholders and populate the map.
 
         Uses right-to-left replacement to preserve character offsets.
-        Returns an ``AnonymizeResult`` with the anonymized ``.text``.
+        Returns the anonymized text.
         """
         if anon_map is None:
             anon_map = AnonymizationMap()
@@ -589,7 +486,7 @@ class GeneralNER:
             )
             text = text[:item['start']] + placeholder + text[item['end']:]
 
-        return AnonymizeResult(text=text)
+        return text
 
     def vote_entities(self, entities, threshold):
         """Apply ensemble voting across multiple model results.
@@ -605,25 +502,32 @@ class GeneralNER:
         for entity in entities:
             ner_keys[entity['key']].append(entity['score'])
 
-        vote = max if self._ner_ensemble_vote == 'max' else (lambda s: sum(s) / len(s))
+        vote = max if self.cfg.ner_ensemble_vote == 'max' else (lambda s: sum(s) / len(s))
         passing_keys = [key for key, scores in ner_keys.items() if vote(scores) >= threshold]
         kept_entities = self.filter_ner_data(entities, passing_keys)
         kept_entities.sort(key=lambda x: x['start'])
         return kept_entities
 
+    def _tags_and_cut(self, positional_tags, ner_confidence_threshold) -> tuple:
+        """A direct caller's tags and score cut, else the config's."""
+        tags = self.cfg.positional_tags if positional_tags is None else positional_tags
+        if not tags:
+            raise ValueError("Must provide at least one positional tag")
+        cut = ner_confidence_threshold
+        return tags, self.cfg.effective_ner_confidence_threshold if cut is None else cut
+
     def ner_process_detailed(
         self,
         text: str,
-        positional_tags: Sequence[str],
+        positional_tags: Optional[Sequence[str]] = None,
         ner_confidence_threshold: Optional[float] = None,
         language: Optional[str] = None,
         anon_map: Optional['AnonymizationMap'] = None,
-        privacy_policy: Optional[PrivacyPolicy] = None,
         source_markers: Optional[Collection[Any]] = None,
     ) -> NERProcessingResult:
         """Process text and return transformed text with entity findings.
 
-        Routes to ONNX, Torch, GLiNER, or ensemble depending on self._ner_backend.
+        Routes to ONNX, Torch, GLiNER, or ensemble depending on ``cfg.ner_backend``.
 
         When *anon_map* is provided (reversible mode), entity-to-placeholder
         mappings are recorded in it for later deanonymization.
@@ -631,14 +535,10 @@ class GeneralNER:
         Finding and map-entry offsets index *text* as passed in, i.e. the text
         after the regex replacement stages (post-regex), not the raw input.
         """
-        if not positional_tags:
-            raise ValueError("Must provide at least one positional tag")
+        positional_tags, ner_confidence_threshold = self._tags_and_cut(positional_tags, ner_confidence_threshold)
 
-        if ner_confidence_threshold is None:
-            ner_confidence_threshold = DEFAULT_NER_CONFIDENCE
-
-        if self._ner_backend == 'presidio_gliner':
-            return self._process_presidio(text, language, anon_map, privacy_policy)
+        if self.cfg.ner_backend == 'presidio_gliner':
+            return self._process_presidio(text, language, anon_map)
 
         self._load_models([language])
         windows = self._plan_windows(text, self._window_keys(language))
@@ -647,12 +547,9 @@ class GeneralNER:
         window_results = self._detect(
             [window[0] for window in windows], [language] * len(windows), positional_tags,
         )
-        return self._finalize(
-            text, windows, window_results, ner_confidence_threshold, anon_map, privacy_policy,
-            source_markers,
-        )
+        return self._finalize(text, windows, window_results, ner_confidence_threshold, anon_map, source_markers)
 
-    def _process_presidio(self, text, language, anon_map, privacy_policy) -> NERProcessingResult:
+    def _process_presidio(self, text, language, anon_map) -> NERProcessingResult:
         """The presidio_gliner backend: Presidio detects; the replacement mode replaces.
 
         Presidio's own analyzer decides what is found: the caller's tags, confidence threshold
@@ -685,27 +582,27 @@ class GeneralNER:
         )
 
         def anonymize():
-            if self._replacement_mode == 'placeholder':
+            if self.cfg.replacement_mode == 'placeholder':
                 return self.engine.anonymize(text=text, analyzer_results=analyzer_results).text
             spans = [
                 {'entity_group': e.entity_type, 'score': e.score, 'word': e.text, 'start': e.start,
                  'end': e.end, 'key': f"{e.start}:{e.end}"}
                 for e in entities
             ]
-            return self.anonymize_text(text, spans, self._replacement_mode, anon_map=anon_map).text
-        return self._policy_or_default(text, entities, privacy_policy, anonymize)
+            return self.anonymize_text(text, spans, self.cfg.replacement_mode, anon_map=anon_map)
+        return self._policy_or_default(text, entities, anonymize)
 
-    def _policy_or_default(self, text, entities, privacy_policy, anonymize) -> NERProcessingResult:
-        """Apply *privacy_policy* to *entities*; without one, replace them through *anonymize()*."""
-        if privacy_policy is not None:
-            findings = privacy_policy.evaluate(entities)
+    def _policy_or_default(self, text, entities, anonymize) -> NERProcessingResult:
+        """Apply the privacy policy to *entities*; without one, replace them through *anonymize()*."""
+        if self._privacy_policy is not None:
+            findings = self._privacy_policy.evaluate(entities)
             return NERProcessingResult(
-                text=privacy_policy.transform(text, findings),
+                text=self._privacy_policy.transform(text, findings),
                 findings=findings,
             )
         anonymized = anonymize()
         findings = tuple(
-            EntityFinding(entity, self._replacement_mode, 'detector-threshold')
+            EntityFinding(entity, self.cfg.replacement_mode, 'detector-threshold')
             for entity in entities
         )
         return NERProcessingResult(text=anonymized, findings=findings)
@@ -714,10 +611,9 @@ class GeneralNER:
         self,
         texts: Sequence[str],
         languages: Sequence[Optional[str]],
-        positional_tags: Sequence[str],
+        positional_tags: Optional[Sequence[str]] = None,
         ner_confidence_threshold: Optional[float] = None,
         anon_maps: Optional[Sequence[Optional['AnonymizationMap']]] = None,
-        privacy_policy: Optional[PrivacyPolicy] = None,
         before_finalize=None,
         max_workers: int = 1,
         source_markers: Optional[Sequence[Optional[Collection[Any]]]] = None,
@@ -730,20 +626,16 @@ class GeneralNER:
         document *i* is replaced (TextCleaner restores its synthetic cache there).
         *max_workers* ONNX batches run at once.
         """
-        if not positional_tags:
-            raise ValueError("Must provide at least one positional tag")
-        if ner_confidence_threshold is None:
-            ner_confidence_threshold = DEFAULT_NER_CONFIDENCE
+        positional_tags, ner_confidence_threshold = self._tags_and_cut(positional_tags, ner_confidence_threshold)
         anon_maps = anon_maps if anon_maps is not None else [None] * len(texts)
         source_markers = source_markers if source_markers is not None else [None] * len(texts)
-        if self._ner_backend == 'presidio_gliner':
+        if self.cfg.ner_backend == 'presidio_gliner':
             results = []
             for i, text in enumerate(texts):
                 if before_finalize is not None:
                     before_finalize(i)
                 results.append(self.ner_process_detailed(
-                    text, positional_tags, ner_confidence_threshold, languages[i],
-                    anon_maps[i], privacy_policy,
+                    text, positional_tags, ner_confidence_threshold, languages[i], anon_maps[i],
                 ))
             return results
 
@@ -769,14 +661,13 @@ class GeneralNER:
                 results.append(NERProcessingResult(text=text, findings=()))
                 continue
             results.append(self._finalize(
-                text, windows, window_results, ner_confidence_threshold,
-                anon_maps[i], privacy_policy, source_markers[i],
+                text, windows, window_results, ner_confidence_threshold, anon_maps[i], source_markers[i],
             ))
         return results
 
     def _load_models(self, languages) -> None:
         """Load every model these languages route to, so windows are sized for all of them."""
-        if self._ner_backend in TOKEN_MODEL_BACKENDS:
+        if self.cfg.ner_backend in TOKEN_MODEL_BACKENDS:
             for language in dict.fromkeys(languages):
                 for key in self._get_ensemble_keys(language or 'MULTILINGUAL'):
                     self._ensure_loaded(key)
@@ -833,7 +724,7 @@ class GeneralNER:
         kept only when no owned span covers it. With overlap 0 windows are the
         0.7.1 chunks and own everything.
         """
-        overlap = self._ner_chunk_overlap
+        overlap = self.cfg.ner_chunk_overlap
         budget = self._chunk_budget(keys)
         if overlap:
             self._check_overlap(budget)  # a model loaded after construction can shrink it
@@ -913,7 +804,7 @@ class GeneralNER:
         chunk_keys: List[tuple] = [()] * len(chunks)
 
         # Primary backend: ONNX or Torch — run each key in the ensemble
-        if self._ner_backend in TOKEN_MODEL_BACKENDS:
+        if self.cfg.ner_backend in TOKEN_MODEL_BACKENDS:
             chunk_keys = [
                 self._get_ensemble_keys(language or 'MULTILINGUAL') for language in languages
             ]
@@ -921,15 +812,15 @@ class GeneralNER:
                 indices = [i for i, keys in enumerate(chunk_keys) if key in keys]
                 self._ensure_loaded(key)
                 key_chunks = [chunks[i] for i in indices]
-                if self._ner_backend in ('onnx', 'ensemble_onnx'):
+                if self.cfg.ner_backend in ONNX_BACKENDS:
                     batch = self._pipelines[key](
-                        key_chunks, batch_size=self._ner_batch_size, max_workers=max_workers,
-                        subword_widen=self._ner_subword_widen,
-                        subword_same_script=self._ner_subword_widen_same_script,
+                        key_chunks, batch_size=self.cfg.ner_batch_size, max_workers=max_workers,
+                        subword_widen=self.cfg.ner_subword_widen,
+                        subword_same_script=self.cfg.ner_subword_widen_same_script,
                     )
                 else:
                     with self._get_lock(self._model_key(key)):
-                        batch = self._pipelines[key](key_chunks, batch_size=self._ner_batch_size)
+                        batch = self._pipelines[key](key_chunks, batch_size=self.cfg.ner_batch_size)
                 for i, data in zip(indices, batch):
                     per_key[i][key] = [
                         {**item, 'model': key} for item in self.entities_with_position_key(data, positional_tags)
@@ -941,18 +832,17 @@ class GeneralNER:
         ]
 
         # GLiNER backend
-        if self._ner_backend in ('gliner', 'ensemble_onnx', 'ensemble_torch') \
-                and self._gliner_pipe and chunks:
+        if self.cfg.ner_backend in GLINER_ADAPTER_BACKENDS and self._gliner_pipe and chunks:
             # GLiNER-only keeps every label it was given; ensembles keep positional_tags.
             gliner_tags = set(positional_tags)
-            if self._ner_backend == 'gliner':
+            if self.cfg.ner_backend == 'gliner':
                 gliner_tags.update(self._gliner_pipe.label_map.values())
                 gliner_tags.update(
                     label.upper() for label in self._gliner_pipe.labels
                     if label not in self._gliner_pipe.label_map
                 )
             with self._get_lock('gliner'):
-                gliner_batch = self._gliner_pipe(chunks, batch_size=self._ner_batch_size)
+                gliner_batch = self._gliner_pipe(chunks, batch_size=self.cfg.ner_batch_size)
             for i, data in enumerate(gliner_batch):
                 results[i].extend({**item, 'model': 'gliner'} for item in self.entities_with_position_key(data, gliner_tags))
         return results
@@ -964,7 +854,6 @@ class GeneralNER:
         window_results: List[list],
         ner_confidence_threshold: float,
         anon_map: Optional['AnonymizationMap'],
-        privacy_policy: Optional[PrivacyPolicy],
         source_markers: Optional[Collection[Any]] = None,
     ) -> NERProcessingResult:
         """Merge window spans in document coordinates, vote, and replace once."""
@@ -973,9 +862,9 @@ class GeneralNER:
             for item in ner_results:
                 start = win_start + offsets[item['start']]
                 end = win_start + offsets[item['end']]
-                if self._ner_snap_word_edges:
+                if self.cfg.ner_snap_word_edges:
                     start, end = snap_word_edges(
-                        text, start, end, self._ner_subword_widen, self._ner_subword_widen_same_script)
+                        text, start, end, self.cfg.ner_subword_widen, self.cfg.ner_subword_widen_same_script)
                 span = {**item, 'start': start, 'end': end,
                         'word': text[start:end], 'key': f"{start}:{end}"}
                 (spans if own_start <= start < own_end else foreign).append(span)
@@ -994,8 +883,8 @@ class GeneralNER:
             # A neighbour's copy counts only where an eligible owned span covering it is concealed.
             covers = [
                 o for o in spans
-                if privacy_policy is None
-                or privacy_policy.evaluate((self._entity(o),))[0].action in ('placeholder', 'redact')
+                if self._privacy_policy is None
+                or self._privacy_policy.evaluate((self._entity(o),))[0].action in ('placeholder', 'redact')
             ]
             spans += [
                 span for span in foreign
@@ -1009,7 +898,7 @@ class GeneralNER:
         def emitted(m):
             return m.group() not in source_markers and not any(
                 a <= m.start() and m.end() <= b for a, b in source_spans)
-        markers = [m.span() for m in _PLACEHOLDER_TOKEN.finditer(text) if emitted(m)]
+        markers = [m.span() for m in PLACEHOLDER_TOKEN.finditer(text) if emitted(m)]
         if self._synthetic_replacer:  # None outside synthetic mode
             # Fakes the regex steps inserted (emails, phones...) are protected like placeholders.
             for fake in set(self._synthetic_replacer._get_cache().values()):
@@ -1030,20 +919,18 @@ class GeneralNER:
                         start, end = min(start, a), max(end, b)
                 if (start, end) != (item['start'], item['end']):
                     ensemble_results[index] = {**item, 'start': start, 'end': end, 'word': text[start:end]}
-        if self._ner_propagate_masked:
-            ensemble_results = propagate(text, ensemble_results, markers, self._ner_propagate_min_score)
-        if self._ner_merge_location_gap:
+        if self.cfg.ner_propagate_masked:
+            ensemble_results = propagate(text, ensemble_results, markers, self.cfg.ner_propagate_min_score)
+        if self.cfg.ner_merge_location_gap:
             ensemble_results = merge_location_gaps(
-                text, ensemble_results, markers, self._ner_merge_location_gap)
+                text, ensemble_results, markers, self.cfg.ner_merge_location_gap)
         ensemble_results = drop_allowed(self._allow_regex, text, ensemble_results, lambda item: (item['start'], item['end']))
         if not ensemble_results:
             return NERProcessingResult(text=text, findings=())
         entities = tuple(self._entity(item) for item in ensemble_results)
         return self._policy_or_default(
-            text, entities, privacy_policy,
-            lambda: self.anonymize_text(
-                text, ensemble_results, self._replacement_mode, anon_map=anon_map,
-            ).text,
+            text, entities,
+            lambda: self.anonymize_text(text, ensemble_results, self.cfg.replacement_mode, anon_map=anon_map),
         )
 
     @staticmethod
@@ -1059,7 +946,7 @@ class GeneralNER:
     def ner_process(
         self,
         text: str,
-        positional_tags: Sequence[str],
+        positional_tags: Optional[Sequence[str]] = None,
         ner_confidence_threshold: Optional[float] = None,
         language: Optional[str] = None,
         anon_map: Optional['AnonymizationMap'] = None,
@@ -1076,13 +963,13 @@ class GeneralNER:
     def ner_process_batch(
         self,
         texts: List[str],
-        positional_tags: Sequence[str],
+        positional_tags: Optional[Sequence[str]] = None,
         batch_size: Optional[int] = None,
         ner_confidence_threshold: Optional[float] = None,
         language: Optional[str] = None
     ) -> List[str]:
         """Process multiple texts, *batch_size* documents per batched model call."""
-        batch_size = batch_size if batch_size is not None else self._ner_batch_size
+        batch_size = batch_size if batch_size is not None else self.cfg.ner_batch_size
         results = []
         for i in range(0, len(texts), batch_size):
             batch = texts[i:i + batch_size]

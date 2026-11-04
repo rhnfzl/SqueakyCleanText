@@ -57,7 +57,7 @@ def test_models_for_leaves_a_list_route_unchanged(monkeypatch):
     route = {"ENGLISH": ["ENGLISH", "MULTILINGUAL"]}
     ner = TextCleaner(cfg=TextCleanerConfig(
         ner_backend="ensemble_onnx", gliner_model="x/y", ner_ensemble=route)).GeneralNER
-    ner._provenance["GLINER"] = {"key": "GLINER", "id": "x/y", "revision": None, "provider": None}
+    ner.provenance["GLINER"] = {"key": "GLINER", "id": "x/y", "revision": None, "provider": None}
     first = ner.models_for("ENGLISH")
     assert ner.models_for("ENGLISH") == first
     assert route["ENGLISH"] == ["ENGLISH", "MULTILINGUAL"]

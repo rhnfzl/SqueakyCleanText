@@ -2,10 +2,11 @@
 
 import math
 import threading
+from dataclasses import replace
 
 import pytest
 
-from tests.ner_helpers import bare_ner
+from tests.ner_helpers import bare_ner, set_cfg
 from sct.config import TextCleanerConfig
 from sct.sct import TextCleaner
 from sct.utils.gliner_adapter import GLiNERAdapter
@@ -36,14 +37,14 @@ class _CountingSession:
 
 @pytest.fixture(scope="module")
 def onnx_ner():
-    return GeneralNER(model_names=TEST_NER_MODELS)
+    return GeneralNER(TextCleanerConfig(ner_models=TEST_NER_MODELS))
 
 
 def test_onnx_batch_runs_once_per_slice(onnx_ner, monkeypatch):
     pipe = onnx_ner._pipelines['ENGLISH']
     counter = _CountingSession(pipe._session)
     monkeypatch.setattr(pipe, '_session', counter)
-    monkeypatch.setattr(onnx_ner, '_ner_batch_size', 4)
+    monkeypatch.setattr(onnx_ner, 'cfg', replace(onnx_ner.cfg, ner_batch_size=4))
     text = DOCS[3] * 2
     chunks = onnx_ner._plan_windows(text)
     assert len(chunks) >= 5
@@ -127,8 +128,8 @@ def test_gliner_gets_one_batched_call_under_its_lock():
             return [[] for _ in texts]
 
     ner = bare_ner()
-    ner._ner_backend = 'gliner'
-    ner._ner_batch_size = 16
+    set_cfg(ner, ner_backend='gliner')
+    set_cfg(ner, ner_batch_size=16)
     ner._gliner_pipe = FakeGLiNER()
     ner._inference_locks = {}
     ner._locks_lock = threading.Lock()

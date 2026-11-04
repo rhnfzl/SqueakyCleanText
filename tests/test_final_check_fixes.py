@@ -4,7 +4,7 @@ import types
 import numpy as np
 import pytest
 
-from tests.ner_helpers import bare_ner
+from tests.ner_helpers import bare_ner, set_cfg
 from sct import TextCleaner, TextCleanerConfig
 from sct.utils import constants
 from sct.utils.onnx_pipeline import ONNXNERPipeline
@@ -128,7 +128,7 @@ def test_ensemble_agreement_never_drops_a_strong_single_model_hit():
     weak = {**strong, 'score': 0.60, 'model': 'b'}
     assert ner.vote_entities([strong, weak], 0.85) == [strong]
     assert ner.vote_entities([{**weak, 'score': 0.5}], 0.85) == []
-    ner._ner_ensemble_vote = 'mean'
+    set_cfg(ner, ner_ensemble_vote='mean')
     assert ner.vote_entities([strong, weak], 0.85) == []
 
 
@@ -146,9 +146,7 @@ def _finalize_spans(text, spans, **attrs):
     # One window over the whole text; spans are (start, end, group, score) from one model.
 
     ner = bare_ner()
-    ner._replacement_mode = attrs.pop('mode', 'placeholder')
-    for name, value in attrs.items():
-        setattr(ner, name, value)
+    set_cfg(ner, replacement_mode=attrs.pop('mode', 'placeholder'), **attrs)
     items = [{'entity_group': g, 'score': s, 'start': a, 'end': b, 'model': 'm'} for a, b, g, s in spans]
     windows = [(text, 0, list(range(len(text) + 1)), 0, len(text))]
     return ner, windows, [items]
@@ -158,21 +156,21 @@ def test_masked_value_is_masked_at_its_other_whole_word_occurrences():
     # F2: a masked surname stayed visible at its other occurrences in the same document
     text = "Dear Okonkwo, thanks. Okonkwo\nOkonkwos and okonkwo by Okonkwo."
     ner, windows, results = _finalize_spans(text, [(5, 12, 'PER', 0.99)])
-    out = ner._finalize(text, windows, results, 0.85, None, None).text
+    out = ner._finalize(text, windows, results, 0.85, None).text
     # whole-word, case-sensitive: a longer word and a lowercase variant stay
     assert out == "Dear <PERSON>, thanks. <PERSON>\nOkonkwos and okonkwo by <PERSON>."
-    ner._ner_propagate_masked = False
-    assert ner._finalize(text, windows, results, 0.85, None, None).text.count("<PERSON>") == 1
+    set_cfg(ner, ner_propagate_masked=False)
+    assert ner._finalize(text, windows, results, 0.85, None).text.count("<PERSON>") == 1
 
 
 def test_propagation_skips_short_letterless_and_low_score_values():
     text = "A. went to Rome, Rome. -- and -- again A."
     spans = [(0, 2, 'PER', 0.99), (11, 15, 'LOC', 0.90), (23, 25, 'ORG', 0.99)]
     ner, windows, results = _finalize_spans(text, spans)
-    assert ner._finalize(text, windows, results, 0.85, None, None).text == \
+    assert ner._finalize(text, windows, results, 0.85, None).text == \
         "<PERSON> went to <LOCATION>, <LOCATION>. <ORGANISATION> and -- again <PERSON>"
-    ner._ner_propagate_min_score = 0.95
-    assert ner._finalize(text, windows, results, 0.85, None, None).text == \
+    set_cfg(ner, ner_propagate_min_score=0.95)
+    assert ner._finalize(text, windows, results, 0.85, None).text == \
         "<PERSON> went to <LOCATION>, Rome. <ORGANISATION> and -- again <PERSON>"
 
 
@@ -183,7 +181,7 @@ def test_propagation_reversible_restores_exactly():
     ner, windows, results = _finalize_spans(
         text, [(0, 13, 'PER', 0.99), (18, 22, 'ORG', 0.99)], mode='reversible')
     anon_map = AnonymizationMap()
-    out = ner._finalize(text, windows, results, 0.85, anon_map, None).text
+    out = ner._finalize(text, windows, results, 0.85, anon_map).text
     assert "Petersen" not in out and "Acme" not in out
     assert anon_map.deanonymize(out) == text
 
@@ -210,15 +208,15 @@ def test_location_gap_merge_joins_address_parts():
     text = "Ship to <NUMBER> Elm Street, Apt 5B, Springfield, IL <NUMBER>, USA. Then Paris.\nRome"
     ner, windows, results = _finalize_spans(
         text, _loc_spans(text, "Elm Street", "Springfield", "USA", "Paris", "Rome"))
-    out = ner._finalize(text, windows, results, 0.85, None, None).text
+    out = ner._finalize(text, windows, results, 0.85, None).text
     assert out == ("Ship to <NUMBER> <LOCATION>, Apt 5B, <LOCATION>, IL <NUMBER>, <LOCATION>. "
                    "Then <LOCATION>.\n<LOCATION>")  # 0 = off, 0.8.0 output
-    ner._ner_merge_location_gap = 12
-    out = ner._finalize(text, windows, results, 0.85, None, None).text
+    set_cfg(ner, ner_merge_location_gap=12)
+    out = ner._finalize(text, windows, results, 0.85, None).text
     # placeholders in the gap do not count; a sentence end or a line break stops the merge
     assert out == "Ship to <NUMBER> <LOCATION>. Then <LOCATION>.\n<LOCATION>"
-    ner._ner_merge_location_gap = 7
-    out = ner._finalize(text, windows, results, 0.85, None, None).text
+    set_cfg(ner, ner_merge_location_gap=7)
+    out = ner._finalize(text, windows, results, 0.85, None).text
     assert out == "Ship to <NUMBER> <LOCATION>, Apt 5B, <LOCATION>. Then <LOCATION>.\n<LOCATION>"
 
 
@@ -229,8 +227,8 @@ def test_location_gap_merge_reversible_restores_exactly():
     anon_map.add('<NUMBER_0>', '62704', 'NUMBER', 0, 0)
     text = "Springfield, IL <NUMBER_0>, USA"
     ner, windows, results = _finalize_spans(
-        text, _loc_spans(text, "Springfield", "USA"), mode='reversible', _ner_merge_location_gap=12)
-    out = ner._finalize(text, windows, results, 0.85, anon_map, None).text
+        text, _loc_spans(text, "Springfield", "USA"), mode='reversible', ner_merge_location_gap=12)
+    out = ner._finalize(text, windows, results, 0.85, anon_map).text
     assert out == "<LOCATION_0>"
     assert anon_map.deanonymize(out) == "Springfield, IL 62704, USA"
 
@@ -257,10 +255,10 @@ def test_location_gap_config_and_legacy_global(monkeypatch):
 def test_span_edges_snap_to_the_whole_word(text, word, expected):
     start = text.index(word)
     ner, windows, results = _finalize_spans(
-        text, [(start, start + len(word), 'PER', 0.99)], _ner_propagate_masked=False)
-    assert ner._finalize(text, windows, results, 0.85, None, None).text == expected
-    ner._ner_snap_word_edges = False  # 0.8.0: the span is replaced as tagged
-    assert ner._finalize(text, windows, results, 0.85, None, None).text == \
+        text, [(start, start + len(word), 'PER', 0.99)], ner_propagate_masked=False)
+    assert ner._finalize(text, windows, results, 0.85, None).text == expected
+    set_cfg(ner, ner_snap_word_edges=False)  # 0.8.0: the span is replaced as tagged
+    assert ner._finalize(text, windows, results, 0.85, None).text == \
         text[:start] + "<PERSON>" + text[start + len(word):]
 
 

@@ -3,13 +3,15 @@ as independent models, neighbour suppression ahead of the privacy policy, and a
 pipeline published before its tokenizer."""
 
 from sct.privacy import EntityRule, PrivacyPolicy
+from sct.config import TextCleanerConfig
 from sct.utils.ner import GeneralNER
 from tests.test_chunking import _FakeRunDetector, _word_ner, _words
 
 KWARGS = {"positional_tags": ("PER", "LOC"), "ner_confidence_threshold": 0.85}
 
 
-def _both_paths(ner, text, **kwargs):
+def _both_paths(ner, text, privacy_policy=None, **kwargs):
+    ner._privacy_policy = privacy_policy
     single = ner.ner_process_detailed(text, **KWARGS, **kwargs)
     batch = ner.ner_process_batch_detailed([text, text], [None, None], **KWARGS, **kwargs)
     return [single] + batch
@@ -87,7 +89,7 @@ class _FakeTok:
 
 def test_tokenizer_is_published_before_its_pipeline(monkeypatch):
     monkeypatch.setattr("sct.utils.onnx_pipeline.load_onnx_ner_model", lambda *a, **k: (object(), _FakeTok()))
-    ner = GeneralNER(model_names={"ENGLISH": "a", "MULTILINGUAL": "b", "DUTCH": "d", "GERMAN": "d"})
+    ner = GeneralNER(TextCleanerConfig(ner_models={"ENGLISH": "a", "MULTILINGUAL": "b", "DUTCH": "d", "GERMAN": "d"}))
 
     class Pipelines(dict):
         def __setitem__(self, key, value):

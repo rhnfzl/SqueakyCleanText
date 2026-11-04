@@ -16,7 +16,7 @@ from typing import Any, Callable, Dict, List, NamedTuple, Optional, Tuple, cast
 
 import regex
 
-from sct.config import TextCleanerConfig, GLINER_BACKENDS, _config_from_module_globals
+from sct.config import GLICLASS_DEFAULT_MODEL, TextCleanerConfig, _config_from_module_globals
 from sct.privacy import PrivacyPolicy, ProcessingMetrics, TokenStore
 from sct.utils import constants, contact, datetime, ner, normtext, resources, special, stopwords
 from sct.utils.anonymization_map import AnonymizationMap
@@ -112,6 +112,16 @@ def _renamed_attribute(old: str, new: str) -> property:
 
 
 class TextCleaner:
+    """Runs one configured cleaning pipeline; ``process`` and ``process_batch`` return ``ProcessResult``s.
+
+    ``ProcessResult.metadata`` always has source_chars, regex_counts, entity_counts, language_confidence,
+    language_source, warnings and provenance. These options add keys:
+
+    - ``replacement_mode='reversible'``: anon_map, or anon_map_reference when a *token_store* is given.
+    - ``check_classify_document``: classes.
+    - *privacy_policy*: policy and findings.
+    - *include_entities*: findings.
+    """
 
     NormaliseText = _renamed_attribute('NormaliseText', '_text_normaliser')
     ProcessStopwords = _renamed_attribute('ProcessStopwords', '_stopword_remover')
@@ -133,6 +143,12 @@ class TextCleaner:
         Args:
             cfg: Immutable configuration. If None, reads from module-level
                  config variables (backward compatible).
+            privacy_policy: Chooses each NER entity's action in place of the replacement; adds the policy and
+                findings metadata keys. Requires ``replacement_mode='placeholder'`` (ValueError otherwise).
+            token_store: Reversible mode saves each map here, and metadata has anon_map_reference
+                in place of anon_map.
+            include_entities: Add findings, which hold entity text, to metadata.
+            metrics_callback: Called with value-free ProcessingMetrics after each document.
         """
         self.cfg = cfg or _config_from_module_globals()
         names = constants.LEGACY_TYPE_NAMES if self.cfg.legacy_type_names else {}
@@ -236,8 +252,8 @@ class TextCleaner:
                              if allow_terms else None)
         # Markers that are not <TAG>-shaped ("EMAIL"): NER protects them like <EMAIL> (ner.regex_markers).
         self._custom_markers = tuple(sorted({
-            tag for tag in self._tags.values() if tag and not ner._PLACEHOLDER_TOKEN.fullmatch(tag)}))
-        self._marker_regex = re.compile('|'.join([ner._PLACEHOLDER_TOKEN.pattern, *map(
+            tag for tag in self._tags.values() if tag and not ner.PLACEHOLDER_TOKEN.fullmatch(tag)}))
+        self._marker_regex = re.compile('|'.join([ner.PLACEHOLDER_TOKEN.pattern, *map(
             re.escape, sorted(self._custom_markers, key=len, reverse=True))]))
 
     def _build_detector(self):
@@ -275,78 +291,16 @@ class TextCleaner:
             if self.cfg.fold_styled_characters else self._date_masker._date_regex)
 
     def _build_ner(self) -> ner.GeneralNER:
-        # Build GLiNER config dict (if needed)
-        gliner_config = None
-        needs_gliner = self.cfg.ner_backend in GLINER_BACKENDS
-        if needs_gliner:
-            gliner_config = {
-                'model': self.cfg.gliner_model,
-                'revision': self.cfg.gliner_revision,
-                'variant': self.cfg.gliner_variant,
-                'labels': self.cfg.gliner_labels,
-                'threshold': self.cfg.effective_gliner_threshold,
-                'label_map': (
-                    dict(self.cfg.gliner_label_map)
-                    if self.cfg.gliner_label_map else None
-                ),
-                'label_descriptions': (
-                    dict(self.cfg.gliner_label_descriptions)
-                    if self.cfg.gliner_label_descriptions else None
-                ),
-                'onnx': self.cfg.gliner_onnx,
-                'legacy_type_names': self.cfg.legacy_type_names,
-            }
-
-        # Determine torch model names (if needed)
-        torch_model_names = None
-        if self.cfg.ner_backend in ('torch', 'ensemble_torch'):
-            torch_model_names = dict(self.cfg.torch_ner_models) if self.cfg.torch_ner_models else None
-
         return ner.GeneralNER(
-            device=self.cfg.ner_device,
-            cuda_device_id=self.cfg.cuda_device_id,
-            onnx_cuda_provider_options=(
-                dict(self.cfg.onnx_cuda_provider_options)
-                if self.cfg.onnx_cuda_provider_options else None
-            ),
-            model_names=dict(self.cfg.ner_models) if self.cfg.ner_models else None,
-            model_revisions=(
-                dict(self.cfg.ner_model_revisions)
-                if self.cfg.ner_model_revisions else None
-            ),
-            ner_backend=self.cfg.ner_backend,
-            gliner_config=gliner_config,
-            torch_model_names=torch_model_names,
-            torch_model_revisions=(
-                dict(self.cfg.torch_ner_model_revisions)
-                if self.cfg.torch_ner_model_revisions else None
-            ),
-            ner_batch_size=self.cfg.ner_batch_size,
-            ner_subword_widen=self.cfg.ner_subword_widen,
-            ner_subword_widen_same_script=self.cfg.ner_subword_widen_same_script,
-            ensemble_models=dict(self.cfg.ner_ensemble) if self.cfg.ner_ensemble is not None else None,
-            ensemble_default_keys=(
-                tuple(self.cfg.ner_ensemble_default_keys)
-                if self.cfg.ner_ensemble_default_keys is not None
-                else None
-            ),
-            replacement_mode=self.cfg.replacement_mode,
+            self.cfg,
             synthetic_replacer=self._synthetic_replacer,
             regex_markers=self._custom_markers,
-            onnx_intra_op_threads=self.cfg.onnx_intra_op_threads,
-            onnx_inter_op_threads=self.cfg.onnx_inter_op_threads,
-            ner_chunk_overlap=self.cfg.ner_chunk_overlap,
-            ner_ensemble_vote=self.cfg.ner_ensemble_vote,
-            ner_propagate_masked=self.cfg.ner_propagate_masked,
-            ner_propagate_min_score=self.cfg.ner_propagate_min_score,
-            ner_merge_location_gap=self.cfg.ner_merge_location_gap,
-            ner_snap_word_edges=self.cfg.ner_snap_word_edges,
             allow_regex=self._allow_regex,
+            privacy_policy=self._privacy_policy,
         )
 
     def _build_gliclass(self):
         from sct.utils.gliclass_adapter import GLiClassAdapter
-        from sct.config import GLICLASS_DEFAULT_MODEL
         return GLiClassAdapter(
             model_id=self.cfg.gliclass_model or GLICLASS_DEFAULT_MODEL,
             revision=self.cfg.gliclass_revision,
@@ -504,11 +458,8 @@ class TextCleaner:
         if self.GeneralNER is not None:
             detailed = self.GeneralNER.ner_process_detailed(
                 current_text,
-                positional_tags=self.cfg.positional_tags,
-                ner_confidence_threshold=self.cfg.effective_ner_confidence_threshold,
                 language=state.language,
                 anon_map=state.anon_map,
-                privacy_policy=self._privacy_policy,
                 source_markers=state.source_markers,
             )
             current_text = detailed.text
@@ -571,8 +522,8 @@ class TextCleaner:
         # Placeholder spellings the source holds, raw or once normalised ("＜LONDON＞",
         # "&lt;LONDON&gt;"): NER gives them no protection and reversible mode never
         # allocates them.
-        source_markers = frozenset(ner._PLACEHOLDER_TOKEN.findall(text)) | frozenset(
-            ner._PLACEHOLDER_TOKEN.findall(normtext.unescape_markup(current_text))) | frozenset(
+        source_markers = frozenset(ner.PLACEHOLDER_TOKEN.findall(text)) | frozenset(
+            ner.PLACEHOLDER_TOKEN.findall(normtext.unescape_markup(current_text))) | frozenset(
             tag for tag in self._custom_markers if tag in text or tag in current_text)
         if anon_map is not None:
             anon_map.reserved.update(source_markers)
@@ -723,10 +674,7 @@ class TextCleaner:
             ner_results = self.GeneralNER.ner_process_batch_detailed(
                 [state.text for state in states],
                 [state.language for state in states],
-                positional_tags=self.cfg.positional_tags,
-                ner_confidence_threshold=self.cfg.effective_ner_confidence_threshold,
                 anon_maps=[state.anon_map for state in states],
-                privacy_policy=self._privacy_policy,
                 before_finalize=restore_synthetic,
                 max_workers=max_workers,
                 source_markers=[state.source_markers for state in states],

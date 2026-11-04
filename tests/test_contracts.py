@@ -4,7 +4,7 @@ import warnings
 
 import pytest
 
-from tests.ner_helpers import bare_ner
+from tests.ner_helpers import bare_ner, set_cfg
 from sct import EntityRule, PrivacyPolicy, TextCleaner, TextCleanerConfig
 from sct.utils import constants
 from sct.utils.normtext import NormaliseText
@@ -59,7 +59,7 @@ def test_presidio_backend_uses_detected_language():
             return []
 
     ner = bare_ner()
-    ner._ner_backend = "presidio_gliner"
+    set_cfg(ner, ner_backend="presidio_gliner")
     ner._analyzer = FakeAnalyzer()
     policy = PrivacyPolicy(
         name="strict",
@@ -67,11 +67,11 @@ def test_presidio_backend_uses_detected_language():
         rules={"PERSON": EntityRule()},
     )
 
+    ner._privacy_policy = policy
     ner.ner_process_detailed(
         "Piet woont hier.",
         positional_tags=("PER",),
         language="DUTCH",
-        privacy_policy=policy,
     )
 
     assert calls == [("Piet woont hier.", "nl")]
@@ -79,7 +79,7 @@ def test_presidio_backend_uses_detected_language():
     # A detected language the analyzer has no NLP engine for falls back to English.
     FakeAnalyzer.supported_languages = ["en", "nl"]
     ner.ner_process_detailed(
-        "Namaste.", positional_tags=("PER",), language="HINDI", privacy_policy=policy,
+        "Namaste.", positional_tags=("PER",), language="HINDI",
     )
     assert calls[-1] == ("Namaste.", "en")
 
@@ -106,16 +106,16 @@ def test_general_ner_passes_pinned_revision_to_model_loader(monkeypatch):
     class FakeTokenizer:
         max_len_single_sentence = 510
 
-    def fake_loader(model_name, *, device, cache_dir, revision, **thread_kwargs):
+    def fake_loader(model_name, *, device, revision, **thread_kwargs):
         calls.append((model_name, revision))
         return object(), FakeTokenizer()
 
     monkeypatch.setattr("sct.utils.onnx_pipeline.load_onnx_ner_model", fake_loader)
 
-    GeneralNER(
-        model_names={"ENGLISH": "org/en", "MULTILINGUAL": "org/multi"},
-        model_revisions={"ENGLISH": "sha-en", "MULTILINGUAL": "sha-multi"},
-    )
+    GeneralNER(TextCleanerConfig(
+        ner_models={"ENGLISH": "org/en", "MULTILINGUAL": "org/multi"},
+        ner_model_revisions={"ENGLISH": "sha-en", "MULTILINGUAL": "sha-multi"},
+    ))
 
     assert calls == [("org/en", "sha-en"), ("org/multi", "sha-multi")]
 

@@ -64,9 +64,10 @@ jobs:
     - name: Check the test NER model loads
       run: |
         python -c "
+        from sct.config import TextCleanerConfig
         from sct.utils.ner import GeneralNER
         from tests.conftest import TEST_NER_MODELS
-        ner = GeneralNER(device='cpu', model_names=TEST_NER_MODELS)
+        ner = GeneralNER(TextCleanerConfig(ner_device='cpu', ner_models=TEST_NER_MODELS))
         ner.ner_process('Test sentence.', positional_tags=['PER', 'ORG', 'LOC'], ner_confidence_threshold=0.85)
         assert 'ENGLISH' in ner._pipelines
         "

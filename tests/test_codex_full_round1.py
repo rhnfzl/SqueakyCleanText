@@ -160,7 +160,7 @@ def test_presidio_gliner_gets_device_and_torch_provenance(monkeypatch):
                         types.SimpleNamespace(GLiNERRecognizer=Recognizer))
     from sct.utils.ner import GeneralNER
 
-    ner = GeneralNER(ner_backend="presidio_gliner", device="cuda", cuda_device_id=2,
-                     gliner_config={"model": "m"})
+    ner = GeneralNER(TextCleanerConfig(ner_backend="presidio_gliner", ner_device="cuda", cuda_device_id=2,
+                                       gliner_model="m"))
     assert seen["map_location"] == "cuda:2"
-    assert ner._provenance["GLINER"]["provider"] == "cuda:2"
+    assert ner.provenance["GLINER"]["provider"] == "cuda:2"

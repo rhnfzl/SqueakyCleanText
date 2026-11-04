@@ -2,6 +2,7 @@
 windows voting twice, overlap splitting a document that fits one window, and
 revision cache dirs that alias on case-insensitive filesystems."""
 
+from tests.ner_helpers import set_cfg
 from sct.privacy import EntityRule, PrivacyPolicy
 from tests.test_chunking import _FakeRunDetector, _gliner_ner, _word_ner
 from tests.test_review_round3 import _both_paths
@@ -55,7 +56,7 @@ def test_overlap_keeps_a_fitting_document_in_one_window():
 
 def test_overlap_keeps_a_fitting_document_in_one_window_gliner_only():
     ner = _gliner_ner("placeholder")
-    ner._ner_chunk_overlap = 10
+    set_cfg(ner, ner_chunk_overlap=10)
     text = "x" * (ner._chunk_budget() * 2)
     assert [w[0] for w in ner._plan_windows(text)] == [text]
     assert len(ner._plan_windows(text + "x")) > 1

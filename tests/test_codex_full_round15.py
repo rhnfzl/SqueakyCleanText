@@ -9,7 +9,7 @@ from pathlib import Path
 
 import pytest
 
-from tests.ner_helpers import bare_ner
+from tests.ner_helpers import bare_ner, set_cfg
 from sct import TextCleaner, TextCleanerConfig
 from sct.privacy import EntityRule, PrivacyPolicy
 from sct.utils import synthetic
@@ -107,12 +107,13 @@ def test_presidio_types_mapped(legacy, phone):
             return [_Result("PHONE_NUMBER", 5, 15), _Result("NAME", 0, 4)]
 
     ner = bare_ner()
-    ner._ner_backend = "presidio_gliner"
+    set_cfg(ner, ner_backend="presidio_gliner")
     ner._analyzer = Analyzer()
-    ner._presidio_types = _presidio_type_map({"legacy_type_names": legacy, "label_map": {"name": "PER"}})
+    ner._presidio_types = _presidio_type_map(legacy, {"name": "PER"})
     policy = PrivacyPolicy(name="p", version="1", rules={phone: EntityRule(action="redact")},
                            default_rule=EntityRule(action="keep"))
-    result = ner.ner_process_detailed("Anna 0612345678 now", positional_tags=("PER",), privacy_policy=policy)
+    ner._privacy_policy = policy
+    result = ner.ner_process_detailed("Anna 0612345678 now", positional_tags=("PER",))
     assert "0612345678" not in result.text
     assert {f.entity.entity_type for f in result.findings} == {phone, "PERSON"}  # PER alias -> canonical (round 17)
 

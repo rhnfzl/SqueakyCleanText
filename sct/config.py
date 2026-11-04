@@ -36,6 +36,11 @@ OnPatternTimeout = Literal['raise', 'warn']
 
 VALID_NER_BACKENDS = frozenset(get_args(NerBackend))
 GLINER_BACKENDS = frozenset({'gliner', 'ensemble_onnx', 'ensemble_torch', 'presidio_gliner'})
+# Backends that run SCT's own GLiNER adapter; presidio_gliner loads GLiNER through Presidio.
+GLINER_ADAPTER_BACKENDS = GLINER_BACKENDS - {'presidio_gliner'}
+ONNX_BACKENDS = frozenset({'onnx', 'ensemble_onnx'})
+TORCH_BACKENDS = frozenset({'torch', 'ensemble_torch'})
+TOKEN_MODEL_BACKENDS = ONNX_BACKENDS | TORCH_BACKENDS
 
 DEFAULT_NER_MODELS: dict[str, str] = {
     'ENGLISH': 'rhnfzl/xlm-roberta-large-conll03-english-onnx',
@@ -750,7 +755,7 @@ def _reconcile_torch_models(cfg):
             )
         merged = {**DEFAULT_TORCH_NER_MODELS, **cfg.torch_ner_models}
         object.__setattr__(cfg, 'torch_ner_models', MappingProxyType(merged))
-    elif cfg.ner_backend in ('torch', 'ensemble_torch'):
+    elif cfg.ner_backend in TORCH_BACKENDS:
         object.__setattr__(cfg, 'torch_ner_models',
                            MappingProxyType(dict(DEFAULT_TORCH_NER_MODELS)))
     if cfg.torch_ner_models is not None:

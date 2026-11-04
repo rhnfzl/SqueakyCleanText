@@ -10,9 +10,10 @@ from hypothesis import given, settings
 from hypothesis import strategies as st
 from presidio_anonymizer import AnonymizerEngine
 
-from tests.ner_helpers import bare_ner
+from tests.ner_helpers import bare_ner, set_cfg
 from sct.utils.ner_chunking import align_chunk, simple_chunk, split_text, token_count
 from sct.utils.anonymization_map import AnonymizationMap
+from sct.config import TextCleanerConfig
 from sct.utils.ner import GeneralNER
 
 BUDGET = 384  # simple_chunk max_tokens -> 768 chars
@@ -136,9 +137,9 @@ class _FakeGLiNER:
 
 def _gliner_ner(mode):
     ner = _ner()
-    ner._ner_backend = "gliner"
+    set_cfg(ner, ner_backend="gliner")
     ner._gliner_pipe = _FakeGLiNER()
-    ner._replacement_mode = mode
+    set_cfg(ner, replacement_mode=mode)
     ner._synthetic_replacer = None
     ner._inference_locks = {}
     ner._locks_lock = threading.Lock()
@@ -215,7 +216,7 @@ def _word_ner(overlap, detector, budget=12, mode="placeholder"):
     ner._gliner_pipe = detector
     ner.tokenizer = _word_tokenizer
     ner.min_token_length = budget
-    ner._ner_chunk_overlap = overlap
+    set_cfg(ner, ner_chunk_overlap=overlap)
     ner._engine = AnonymizerEngine()
     return ner
 
@@ -271,7 +272,7 @@ def test_overlap_windows_fit_the_budget_at_hard_cuts():
     assert owned[0][0] == 0 and all(a[1] == b[0] for a, b in zip(owned, owned[1:]))
 
     gliner = _gliner_ner("placeholder")
-    gliner._ner_chunk_overlap = 10
+    set_cfg(gliner, ner_chunk_overlap=10)
     budget = gliner._chunk_budget()
     windows = gliner._plan_windows("张" * 2841)
     assert len(windows) > 1 and all(len(w[0]) <= budget * 2 for w in windows)
@@ -290,7 +291,7 @@ def _finalize_071(ner, text, threshold):
             {**item, "start": offsets[item["start"]], "end": offsets[item["end"]]}
             for item in ner.vote_entities(results, threshold)
         ]
-        out.append(ner.anonymize_text(source_chunk, voted).text if voted else source_chunk)
+        out.append(ner.anonymize_text(source_chunk, voted) if voted else source_chunk)
         findings += [(i["start"] + chunk_start, i["end"] + chunk_start) for i in voted]
     out.append(text[search_start:])
     return "".join(out), findings
@@ -324,7 +325,6 @@ def test_whole_document_replacement_merges_names_across_chunk_boundary():
 
 def test_overlap_config_validation_and_module_global(monkeypatch):
     from sct import config
-    from sct.config import TextCleanerConfig
 
     with pytest.raises(ValueError, match="ner_chunk_overlap"):
         TextCleanerConfig(check_ner_process=False, ner_chunk_overlap=-1)
@@ -339,9 +339,9 @@ def test_overlap_with_real_tokenizer():
     from tests.conftest import TEST_NER_MODELS
 
     with pytest.raises(ValueError, match="ner_chunk_overlap"):
-        GeneralNER(model_names=TEST_NER_MODELS, ner_chunk_overlap=200)
-    ner = GeneralNER(model_names=TEST_NER_MODELS, ner_chunk_overlap=32,
-                     replacement_mode="reversible")
+        GeneralNER(TextCleanerConfig(ner_models=TEST_NER_MODELS, ner_chunk_overlap=200))
+    ner = GeneralNER(TextCleanerConfig(ner_models=TEST_NER_MODELS, ner_chunk_overlap=32,
+                                       replacement_mode="reversible"))
     text = "Marie Curie worked in Paris with Pierre Curie. " * 80
     windows = ner._plan_windows(text)
     assert len(windows) > 1

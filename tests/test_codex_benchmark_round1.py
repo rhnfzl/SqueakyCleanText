@@ -46,7 +46,7 @@ def test_c2_json_with_replaced_number_is_kept(cleaner):
 def test_c3_propagation_does_not_match_inside_a_word_with_combining_mark():
     text = "राज met राजा, राज."
     ner, windows, results = _finalize_spans(text, [(0, 3, 'PER', 0.99)])
-    assert ner._finalize(text, windows, results, 0.85, None, None).text == "<PERSON> met राजा, <PERSON>."
+    assert ner._finalize(text, windows, results, 0.85, None).text == "<PERSON> met राजा, <PERSON>."
 
 
 @pytest.mark.parametrize("text, expected", [

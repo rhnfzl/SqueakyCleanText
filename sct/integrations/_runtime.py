@@ -10,7 +10,7 @@ import threading
 from dataclasses import replace
 from typing import Any, Mapping, Optional, Sequence, Union
 
-from sct.config import TextCleanerConfig
+from sct.config import ONNX_BACKENDS, TextCleanerConfig
 from sct.presets import preset_config
 from sct.sct import TextCleaner
 
@@ -42,9 +42,9 @@ def resolve_config(config: Union[TextCleanerConfig, str, None]) -> TextCleanerCo
 def _pin_loaded_revisions(cleaner: Optional[TextCleaner], config: TextCleanerConfig) -> TextCleanerConfig:
     """Pin unpinned ONNX models to the commits *cleaner* loaded, so workers skip the Hub."""
     ner = getattr(cleaner, "GeneralNER", None)
-    if ner is None or config.ner_backend not in ("onnx", "ensemble_onnx"):
+    if ner is None or config.ner_backend not in ONNX_BACKENDS:
         return config
-    loaded = {key: p["revision"] for key, p in ner._provenance.items() if p.get("revision")}
+    loaded = {key: p["revision"] for key, p in ner.provenance.items() if p.get("revision")}
     if not loaded.keys() - config.ner_model_revisions.keys():
         return config
     return replace(config, ner_model_revisions={**loaded, **config.ner_model_revisions})
