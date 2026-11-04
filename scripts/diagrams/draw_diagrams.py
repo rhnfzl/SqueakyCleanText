@@ -64,24 +64,26 @@ class Diagram:
         self.text(x + 12, y + 46, sub, 15, color=MUTED, mono=mono)
 
     # ---------- checks ----------
+    def _box_around(self, x, y):
+        """The smallest box holding (x, y), or the canvas."""
+        inside = [r for r in self.rects if r[1] <= x <= r[1] + r[3] and r[2] <= y <= r[2] + r[4]]
+        return min(inside, key=lambda r: r[3] * r[4])[1:5] if inside else (0, 0, W, self.h)
+
     def check(self):
         errors = []
-
-        def width(s, size, bold, mono):  # conservative Helvetica / monospace estimate
-            return len(s) * size * (0.6 if mono else 0.59 if bold else 0.54)
-
-        for i, x, y, s, size, bold, _, anchor, mono in self.texts:
+        for _, x, y, s, size, bold, _, anchor, mono in self.texts:
             if size * 900 / W < 13:
                 errors.append(f"too small: {s!r}")
-            w = width(s, size, bold, mono)
+            # conservative Helvetica / monospace estimate
+            w = len(s) * size * (0.6 if mono else 0.59 if bold else 0.54)
             x0 = x - w / 2 if anchor == "middle" else x - w if anchor == "end" else x
-            inside = [r for r in self.rects if r[1] <= x <= r[1] + r[3] and r[2] <= y <= r[2] + r[4]]
-            rx, ry, rw, rh = min(inside, key=lambda r: r[3] * r[4])[1:5] if inside else (0, 0, W, self.h)
+            rx, ry, rw, rh = self._box_around(x, y)
             if not (rx + 4 <= x0 and x0 + w <= rx + rw - 4 and ry <= y - size and y + 4 <= ry + rh):
                 errors.append(f"overflows its box by {x0 + w - (rx + rw - 4):.0f} px: {s!r}")
         errors += [f"off canvas: {r}" for r in self.rects
                    if r[1] < 0 or r[2] < 0 or r[1] + r[3] > W or r[2] + r[4] > self.h]
-        assert not errors, f"{self.name}:\n  " + "\n  ".join(errors)
+        if errors:
+            raise ValueError(f"{self.name}:\n  " + "\n  ".join(errors))
 
     # ---------- SVG ----------
     def svg(self):
@@ -132,7 +134,7 @@ class Diagram:
             a.update({"points": rel, "startBinding": None, "endBinding": None, "startArrowhead": None,
                       "endArrowhead": "arrow" if head else None, "elbowed": False})
             els.append(a)
-        for i, x, y, s, size, bold, color, anchor, mono in self.texts:
+        for i, x, y, s, size, _, color, anchor, mono in self.texts:
             w = round(len(s) * size * (0.6 if mono else 0.55))
             x = x - w / 2 if anchor == "middle" else x - w if anchor == "end" else x
             e = base(i, "text", x, y - size, w, round(size * 1.25), color)

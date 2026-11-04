@@ -19,15 +19,16 @@ Only the dataset labels are scored; other predicted labels (NUMBER, DATE, ...) a
 
 import argparse
 from datetime import date
-import hashlib
 import json
 import time
 from pathlib import Path
 
 from benchmarks.score import predicted_spans
-from scripts.benchmark_release import CORRECTNESS_OVERRIDES, run_header
+from scripts.benchmark_release import CORRECTNESS_OVERRIDES, dataset_header, write_atomic
 from scripts.build_multilingual_eval import LABELS, OUTPUT as DATASET
+from sct.config import TextCleanerConfig
 from sct.evaluation import EntitySpan, evaluate_pii, load_evaluation_jsonl
+from sct.sct import TextCleaner
 
 RESULTS = DATASET.parent / "results"
 DEFAULT_MODELS = ("sct-default", "gliner:urchade/gliner_multi-v2.1", "gliner:urchade/gliner_multi_pii-v1")
@@ -47,9 +48,6 @@ def keep_labels(spans) -> tuple[EntitySpan, ...]:
 
 
 def predict_sct(examples) -> tuple[dict, dict]:
-    from sct.config import TextCleanerConfig
-    from sct.sct import TextCleaner
-
     cleaner = TextCleaner(cfg=TextCleanerConfig(**CORRECTNESS_OVERRIDES))
     predictions = {}
     for example in examples:
@@ -104,13 +102,7 @@ def run(dataset: Path, models: list[str], threshold: float) -> dict:
                 key: [span.__dict__ for span in spans] for key, spans in predictions.items()
             },
         }
-    return {
-        **run_header(dataset),
-        "dataset_sha256": hashlib.sha256(dataset.read_bytes()).hexdigest(),
-        "documents": len(examples),
-        "entities": sum(len(e.expected) for e in examples),
-        "models": reports,
-    }
+    return {**dataset_header(dataset, examples), "models": reports}
 
 
 def to_markdown(result: dict) -> str:
@@ -141,7 +133,7 @@ def main() -> None:
     args = parser.parse_args()
     result = run(args.dataset, args.models, args.threshold)
     args.output.parent.mkdir(parents=True, exist_ok=True)
-    args.output.write_text(json.dumps(result, indent=2, ensure_ascii=False, sort_keys=True) + "\n", encoding="utf-8")
+    write_atomic(args.output, json.dumps(result, indent=2, ensure_ascii=False, sort_keys=True) + "\n")
     print(to_markdown(result))
 
 

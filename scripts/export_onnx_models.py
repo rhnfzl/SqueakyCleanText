@@ -162,6 +162,7 @@ def main():
 
     args.output_base.mkdir(parents=True, exist_ok=True)
 
+    failed = []
     for source_model, onnx_repo in models.items():
         safe_name = source_model.replace("/", "__")
         output_dir = args.output_base / safe_name
@@ -169,13 +170,15 @@ def main():
         try:
             export_model(source_model, output_dir)
             upload_model(output_dir, onnx_repo, dry_run=args.dry_run)
-        except Exception as e:
+        except Exception as e:  # one model's export or Hub failure must not stop the others
             print(f"  FAILED: {e}")
-            continue
+            failed.append(source_model)
         finally:
             if not args.keep_exports and output_dir.exists():
                 shutil.rmtree(output_dir)
 
+    if failed:
+        sys.exit(f"\nFailed: {failed}")
     print("\nDone!")
 
 

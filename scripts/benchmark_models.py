@@ -39,10 +39,12 @@ def main() -> None:
     )
     output = Path(args.output)
     output.parent.mkdir(parents=True, exist_ok=True)
-    output.write_text(
+    temporary = output.with_name(output.name + ".tmp")
+    temporary.write_text(
         json.dumps(benchmark.to_dict(), indent=2, sort_keys=True) + "\n",
         encoding="utf-8",
     )
+    temporary.replace(output)
 
 
 if __name__ == "__main__":

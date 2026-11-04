@@ -26,9 +26,13 @@ import subprocess
 import sys
 import time
 from pathlib import Path
+from typing import Any
 
 from benchmarks.score import PLACEHOLDER, predicted_spans
+import sct
+from sct.config import TextCleanerConfig
 from sct.evaluation import evaluate_pii, load_evaluation_jsonl
+from sct.sct import TextCleaner
 
 ROOT = Path(__file__).resolve().parents[1]
 DATASET = ROOT / "evaluation" / "release_benchmark.jsonl"
@@ -87,10 +91,8 @@ def _git_commit() -> str | None:
         return None
 
 
-def run_header(dataset: Path) -> dict:
+def run_header(dataset: Path) -> dict[str, str | None]:
     """Run metadata every result file starts with."""
-    import sct
-
     return {
         "sct_version": sct.__version__,
         "git_commit": _git_commit(),
@@ -100,10 +102,24 @@ def run_header(dataset: Path) -> dict:
     }
 
 
-def run(dataset: Path) -> dict:
-    from sct.config import TextCleanerConfig
-    from sct.sct import TextCleaner
+def dataset_header(dataset: Path, examples: list) -> dict[str, str | int | None]:
+    """``run_header`` plus what pins a scored dataset."""
+    return {
+        **run_header(dataset),
+        "dataset_sha256": hashlib.sha256(dataset.read_bytes()).hexdigest(),
+        "documents": len(examples),
+        "entities": sum(len(e.expected) for e in examples),
+    }
 
+
+def write_atomic(path: Path, text: str) -> None:
+    """Write through a temporary file, so a failed write leaves an earlier result whole."""
+    temporary = path.with_name(path.name + ".tmp")
+    temporary.write_text(text, encoding="utf-8")
+    temporary.replace(path)
+
+
+def run(dataset: Path) -> dict[str, Any]:
     examples = load_evaluation_jsonl(dataset)
 
     cleaner = TextCleaner(cfg=TextCleanerConfig(**CORRECTNESS_OVERRIDES))
@@ -139,10 +155,7 @@ def run(dataset: Path) -> dict:
     cfg = speed_cleaner.cfg
 
     return {
-        **run_header(dataset),
-        "dataset_sha256": hashlib.sha256(dataset.read_bytes()).hexdigest(),
-        "documents": len(examples),
-        "entities": sum(len(e.expected) for e in examples),
+        **dataset_header(dataset, examples),
         "models": {
             "ner_backend": cfg.ner_backend,
             "ner_models": dict(cfg.ner_models or {}),
@@ -191,11 +204,8 @@ def run_batch(
     repeats: int,
     long: bool,
     **cfg_overrides,
-) -> dict:
+) -> dict[str, Any]:
     """Time ``process_batch`` over *documents* docs (the dataset cycled) after one warmup call."""
-    from sct.config import TextCleanerConfig
-    from sct.sct import TextCleaner
-
     texts = [example.text for example in load_evaluation_jsonl(dataset)]
     if long:
         texts = long_documents(texts)
@@ -295,17 +305,15 @@ def main() -> None:
             f"benchmark-{result['sct_version']}-batch{'-long' if args.long else ''}"
             f"-N{args.batch}-B{args.batch_size}-K{args.ner_batch_size}-T{args.intra_op_threads}.json"
         )
-        (args.output_dir / name).write_text(
-            json.dumps(result, indent=2, sort_keys=True) + "\n", encoding="utf-8",
-        )
+        write_atomic(args.output_dir / name, json.dumps(result, indent=2, sort_keys=True) + "\n")
         return
     result = run(args.dataset)
     stem = args.output_dir / f"benchmark-{result['sct_version']}"
-    stem.with_name(stem.name + ".json").write_text(
+    write_atomic(
+        stem.with_name(stem.name + ".json"),
         json.dumps(result, indent=2, ensure_ascii=False, sort_keys=True) + "\n",
-        encoding="utf-8",
     )
-    stem.with_name(stem.name + ".md").write_text(to_markdown(result), encoding="utf-8")
+    write_atomic(stem.with_name(stem.name + ".md"), to_markdown(result))
 
 
 if __name__ == "__main__":
