@@ -18,6 +18,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+from huggingface_hub import HfApi
+
 # Source → ONNX repo mapping
 #
 # Naming convention for target repos: rhnfzl/xlm-roberta-large-ner-{language}-onnx
@@ -103,8 +105,6 @@ def upload_model(output_dir: Path, repo_id: str, dry_run: bool = False) -> None:
     if dry_run:
         print(f"  DRY RUN: Would upload {output_dir} → {repo_id}")
         return
-
-    from huggingface_hub import HfApi
 
     api = HfApi()
 
