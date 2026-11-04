@@ -450,303 +450,17 @@ class TextCleanerConfig:
     def __post_init__(self):
         if self.synthetic_reference_date is not None:
             date.fromisoformat(self.synthetic_reference_date)  # ValueError on a bad date
-        if self.gliclass_onnx:
-            raise ValueError(
-                "GLiClass ONNX is not supported by the gliclass package. "
-                "Use gliclass_onnx=False."
-            )
-        if (
-            self.gliclass_model in (None, GLICLASS_DEFAULT_MODEL)
-            and self.gliclass_revision is None
-        ):
-            object.__setattr__(
-                self,
-                'gliclass_revision',
-                GLICLASS_DEFAULT_REVISION,
-            )
-
-        # Convert mutable collections to immutable for frozen safety
-        if isinstance(self.positional_tags, list):
-            object.__setattr__(self, 'positional_tags', tuple(self.positional_tags))
-        if isinstance(self.ner_models_list, list):
-            object.__setattr__(self, 'ner_models_list', tuple(self.ner_models_list))
-        if isinstance(self.custom_pipeline_steps, list):
-            object.__setattr__(self, 'custom_pipeline_steps', tuple(self.custom_pipeline_steps))
-        for step in self.custom_pipeline_steps:
-            if not callable(step):
-                raise ValueError(
-                    f"custom_pipeline_steps must contain callables, got: {type(step)!r}"
-                )
-
-        # --- NER mode + replacement mode validation ---
-        if self.ner_mode not in VALID_NER_MODES:
-            raise ValueError(
-                f"ner_mode must be one of {sorted(VALID_NER_MODES)}, got: {self.ner_mode!r}"
-            )
-        if self.replacement_mode not in VALID_REPLACEMENT_MODES:
-            raise ValueError(
-                f"replacement_mode must be one of {sorted(VALID_REPLACEMENT_MODES)}, "
-                f"got: {self.replacement_mode!r}"
-            )
-        if self.json_key_cleaning not in VALID_JSON_KEY_CLEANING:
-            raise ValueError(
-                f"json_key_cleaning must be one of {sorted(VALID_JSON_KEY_CLEANING)}, "
-                f"got: {self.json_key_cleaning!r}"
-            )
-        if (
-            self.replacement_mode == 'reversible'
-            and self.check_fuzzy_replace_dates
-        ):
-            raise ValueError(
-                "reversible mode does not support fuzzy date replacement"
-            )
-
-        # PII mode auto-configuration: sets GLiNER defaults for PII detection.
-        # User-provided values take priority (checked via default comparisons).
-        if self.ner_mode == 'pii':
-            if self.ner_backend == 'onnx':
-                object.__setattr__(self, 'ner_backend', 'gliner')
-                # Use ONNX-loaded GLiNER when available (pre-built ONNX on Hub)
-                if not self.gliner_onnx:
-                    object.__setattr__(self, 'gliner_onnx', True)
-            if not self.gliner_model:
-                object.__setattr__(self, 'gliner_model', PII_DEFAULT_MODEL)
-            if (
-                self.gliner_model == PII_DEFAULT_MODEL
-                and self.gliner_revision is None
-            ):
-                object.__setattr__(
-                    self,
-                    'gliner_revision',
-                    PII_DEFAULT_REVISION,
-                )
-            if self.gliner_labels == ('person', 'organization', 'location'):
-                object.__setattr__(self, 'gliner_labels', PII_LABELS)
-            pii_tags = set(self.positional_tags)
-            # Derived maps are shared objects, so a dataclasses.replace() clone re-derives them
-            # (and drops the other naming's phone/IP tags) when legacy_type_names changes.
-            if self.gliner_label_map is _PII_MAPS[True] or self.gliner_label_map is _PII_MAPS[False]:
-                pii_tags -= {'PHONE', 'IP', 'PHONE_NUMBER', 'IP_ADDRESS'}
-                object.__setattr__(self, 'gliner_label_map', None)
-            if self.gliner_label_map is None:
-                object.__setattr__(self, 'gliner_label_map', _PII_MAPS[self.legacy_type_names])
-            # Expand positional_tags to include all PII label tags
-            for label in self.gliner_labels:
-                pii_tags.add(self.gliner_label_map.get(label, label.upper()))
-            object.__setattr__(self, 'positional_tags', tuple(sorted(pii_tags)))
-
-        # --- NER backend validation ---
-        if self.ner_backend not in VALID_NER_BACKENDS:
-            raise ValueError(
-                f"ner_backend must be one of {sorted(VALID_NER_BACKENDS)}, "
-                f"got: {self.ner_backend!r}"
-            )
-
-        # ner_batch_size must be positive
-        if self.ner_batch_size <= 0:
-            raise ValueError(
-                f"ner_batch_size must be >= 1, got {self.ner_batch_size}"
-            )
-        for name in ('onnx_intra_op_threads', 'onnx_inter_op_threads'):
-            value = getattr(self, name)
-            if value is not None and value < 1:
-                raise ValueError(f"{name} must be None or >= 1, got {value}")
-        if self.ner_chunk_overlap < 0:
-            raise ValueError(f"ner_chunk_overlap must be >= 0, got {self.ner_chunk_overlap}")
-        if self.ner_device not in (None, 'cpu', 'cuda', 'mps'):
-            raise ValueError(f"ner_device must be None, 'cpu', 'cuda' or 'mps', got {self.ner_device!r}")
-        if self.cuda_device_id < 0:
-            raise ValueError(f"cuda_device_id must be >= 0, got {self.cuda_device_id}")
-        if self.onnx_cuda_provider_options is not None:
-            object.__setattr__(self, 'onnx_cuda_provider_options',
-                               MappingProxyType(dict(self.onnx_cuda_provider_options)))
-        for name in ('ner_confidence_threshold', 'gliner_threshold'):
-            value = getattr(self, name)
-            if value is not None and not 0.0 <= value <= 1.0:
-                raise ValueError(f"{name} must be None or in [0, 1], got {value}")
-        if self.ner_ensemble_vote not in ('max', 'mean'):
-            raise ValueError(f"ner_ensemble_vote must be 'max' or 'mean', got {self.ner_ensemble_vote!r}")
-        if self.replace_numbers_mode not in ('identifiers', 'all'):
-            raise ValueError(f"replace_numbers_mode must be 'identifiers' or 'all', got {self.replace_numbers_mode!r}")
-        if isinstance(self.replace_numbers_min_digits, bool) or not isinstance(self.replace_numbers_min_digits, int) \
-                or self.replace_numbers_min_digits < 1:
-            raise ValueError(f"replace_numbers_min_digits must be an int >= 1, got {self.replace_numbers_min_digits!r}")
-        if self.ner_merge_location_gap < 0:
-            raise ValueError(f"ner_merge_location_gap must be >= 0, got {self.ner_merge_location_gap}")
-        if self.ner_propagate_min_score is not None and not 0.0 <= self.ner_propagate_min_score <= 1.0:
-            raise ValueError(f"ner_propagate_min_score must be None or in [0, 1], got {self.ner_propagate_min_score}")
-        if self.ner_subword_widen is not None and self.ner_subword_widen < 0:
-            raise ValueError(f"ner_subword_widen must be None or >= 0, got {self.ner_subword_widen}")
-        if not 0.0 <= self.language_confidence_warning <= 1.0:
-            raise ValueError(
-                "language_confidence_warning must be in [0, 1], "
-                f"got {self.language_confidence_warning}"
-            )
-        if not 0.0 <= self.language_margin_warning <= 1.0:
-            raise ValueError(
-                f"language_margin_warning must be in [0, 1], got {self.language_margin_warning}"
-            )
-
-        # GLiNER fields required for gliner/ensemble backends
-        needs_gliner = self.ner_backend in GLINER_BACKENDS
-        if needs_gliner:
-            if not self.gliner_model:
-                raise ValueError(
-                    f"gliner_model is required when ner_backend='{self.ner_backend}'. "
-                    f"Provide a HuggingFace model ID (e.g. 'urchade/gliner_large-v2.1')."
-                )
-            if self.gliner_variant not in ('gliner', 'gliner2'):
-                raise ValueError(
-                    f"gliner_variant must be 'gliner' or 'gliner2', "
-                    f"got: {self.gliner_variant!r}"
-                )
-
-        # Freeze gliner_label_map
-        if self.gliner_label_map is not None and not any(self.gliner_label_map is m for m in _PII_MAPS.values()):
-            object.__setattr__(self, 'gliner_label_map',
-                               MappingProxyType(dict(self.gliner_label_map)))
-
-        # Freeze gliner_label_descriptions
-        if self.gliner_label_descriptions is not None:
-            object.__setattr__(self, 'gliner_label_descriptions',
-                               MappingProxyType(dict(self.gliner_label_descriptions)))
-
-        # Reconcile torch_ner_models
-        if self.torch_ner_models is not None:
-            missing = REQUIRED_NER_KEYS - set(self.torch_ner_models)
-            if missing:
-                raise ValueError(
-                    f"torch_ner_models must include {sorted(REQUIRED_NER_KEYS)}, "
-                    f"missing: {sorted(missing)}"
-                )
-            merged = {**DEFAULT_TORCH_NER_MODELS, **self.torch_ner_models}
-            object.__setattr__(self, 'torch_ner_models', MappingProxyType(merged))
-        elif self.ner_backend in ('torch', 'ensemble_torch'):
-            object.__setattr__(self, 'torch_ner_models',
-                               MappingProxyType(dict(DEFAULT_TORCH_NER_MODELS)))
-        if self.torch_ner_models is not None:
-            torch_revisions = {
-                key: revision
-                for key, revision in DEFAULT_TORCH_NER_REVISIONS.items()
-                if self.torch_ner_models.get(key) == DEFAULT_TORCH_NER_MODELS.get(key)
-            }
-            if self.torch_ner_model_revisions is not None:
-                torch_revisions.update(self.torch_ner_model_revisions)
-            object.__setattr__(
-                self,
-                'torch_ner_model_revisions',
-                MappingProxyType(torch_revisions),
-            )
-
-        # Reconcile ner_models (dict, preferred) and ner_models_list (tuple, deprecated).
-        # After this block, both fields are guaranteed populated.
-        if self.ner_models is not None:
-            # Dict API used — validate required keys, fill defaults, freeze
-            missing = REQUIRED_NER_KEYS - set(self.ner_models)
-            if missing:
-                raise ValueError(
-                    f"ner_models must include {sorted(REQUIRED_NER_KEYS)}, "
-                    f"missing: {sorted(missing)}"
-                )
-            # A map of exactly LANG_KEYS matching ner_models_list is a normalized
-            # legacy/default config (replace(), copy): keep it exact. Decided by
-            # content only, so a dict and a mapping proxy give the same config.
-            derived = (
-                set(self.ner_models) == set(LANG_KEYS)
-                and tuple(self.ner_models[k] for k in LANG_KEYS) == self.ner_models_list
-            )
-            merged = (
-                dict(self.ner_models) if derived
-                else {**DEFAULT_NER_MODELS, **self.ner_models}
-            )
-            object.__setattr__(self, 'ner_models', MappingProxyType(merged))
-            object.__setattr__(
-                self, 'ner_models_list',
-                tuple(merged[k] for k in LANG_KEYS),
-            )
-        else:
-            # No dict provided — derive from ner_models_list (may be default or custom)
-            default_models_list = tuple(DEFAULT_NER_MODELS[k] for k in LANG_KEYS)
-            if self.ner_models_list != default_models_list:
-                import warnings
-                warnings.warn(
-                    "ner_models_list is deprecated. Use ner_models dict instead.",
-                    DeprecationWarning,
-                    stacklevel=2,
-                )
-            models_dict = dict(zip(LANG_KEYS, self.ner_models_list))
-            object.__setattr__(self, 'ner_models', MappingProxyType(models_dict))
-
-        pinned_revisions = {
-            key: revision
-            for key, revision in DEFAULT_NER_REVISIONS.items()
-            if self.ner_models.get(key) == DEFAULT_NER_MODELS.get(key)
-        }
-        if self.ner_model_revisions is not None:
-            pinned_revisions.update(self.ner_model_revisions)
-        object.__setattr__(
-            self,
-            'ner_model_revisions',
-            MappingProxyType(pinned_revisions),
-        )
-
-        # --- Language validation and supported_languages computation ---
-        from sct.utils.resources import resolve_language
-
-        # Resolve language (str or tuple of str) via ISO code / name lookup
-        if self.language is not None:
-            if isinstance(self.language, str):
-                object.__setattr__(self, 'language', resolve_language(self.language))
-            elif isinstance(self.language, (list, tuple)):
-                resolved = tuple(resolve_language(lang) for lang in self.language)
-                object.__setattr__(self, 'language', resolved)
-
-        # Coerce extra_languages to tuple and resolve each entry
-        if isinstance(self.extra_languages, list):
-            object.__setattr__(self, 'extra_languages', tuple(self.extra_languages))
-        if self.extra_languages:
-            resolved_extra = tuple(resolve_language(lang) for lang in self.extra_languages)
-            object.__setattr__(self, 'extra_languages', resolved_extra)
-
-        # Validate and freeze custom_stopwords (keys must be valid language names)
-        if self.custom_stopwords:
-            resolved_sw = {resolve_language(k): frozenset(v) for k, v in self.custom_stopwords.items()}
-            object.__setattr__(self, 'custom_stopwords',
-                               MappingProxyType(resolved_sw))
-
-        if self.date_builtin_month_languages is not None:
-            from sct.utils.constants import MONTH_NAMES_MULTILINGUAL
-            codes = tuple(self.date_builtin_month_languages)
-            unknown = set(codes) - set().union(*MONTH_NAMES_MULTILINGUAL.values())
-            if isinstance(self.date_builtin_month_languages, str) or unknown:
-                raise ValueError(f"date_builtin_month_languages must be a tuple of built-in month ISO codes, "
-                                 f"got {self.date_builtin_month_languages!r}")
-            object.__setattr__(self, 'date_builtin_month_languages', codes)
-
-        # Validate and freeze custom_month_names
-        if self.custom_month_names:
-            resolved_mn = {resolve_language(k): tuple(v) for k, v in self.custom_month_names.items()}
-            object.__setattr__(self, 'custom_month_names',
-                               MappingProxyType(resolved_mn))
-
+        _apply_gliclass_defaults(self)
+        _freeze_sequences(self)
+        _validate_modes(self)
+        _apply_pii_defaults(self)
+        _validate_ner_settings(self)
+        _validate_gliner(self)
+        _reconcile_torch_models(self)
+        _reconcile_ner_models(self)
+        _resolve_languages(self)
         _validate_user_terms(self)
-
-        # Compute supported_languages: union of all sources
-        langs = set(DEFAULT_LANGUAGES)
-        langs.update(self.extra_languages)
-        # Add ner_models keys (minus MULTILINGUAL — it's a model, not a spoken language)
-        if self.ner_models:
-            langs.update(k for k in self.ner_models if k != 'MULTILINGUAL')
-        if self.custom_stopwords:
-            langs.update(self.custom_stopwords.keys())
-        if self.custom_month_names:
-            langs.update(self.custom_month_names.keys())
-        # Add languages from tuple-of-languages config
-        if isinstance(self.language, tuple):
-            langs.update(self.language)
-        # Any Lingua language is a valid pin (resolve_language raised above otherwise);
-        # supported_languages only means "has stopwords/dates/NER key".
-        object.__setattr__(self, 'supported_languages', frozenset(langs))
+        _compute_supported_languages(self)
 
     @property
     def effective_gliner_threshold(self) -> float:
@@ -851,6 +565,326 @@ def _validate_user_terms(cfg):
             if any(m.group() == '' for probe in ('', ' ', 'a', '0', 'a b', 'A-1.') for m in compiled.finditer(probe)):
                 raise ValueError(f"custom_patterns[{label!r}] can match the empty string: {pattern!r}")
         object.__setattr__(cfg, 'custom_patterns', MappingProxyType(dict(cfg.custom_patterns)))
+
+
+def _apply_gliclass_defaults(cfg):
+    if cfg.gliclass_onnx:
+        raise ValueError(
+            "GLiClass ONNX is not supported by the gliclass package. "
+            "Use gliclass_onnx=False."
+        )
+    if (
+        cfg.gliclass_model in (None, GLICLASS_DEFAULT_MODEL)
+        and cfg.gliclass_revision is None
+    ):
+        object.__setattr__(
+            cfg,
+            'gliclass_revision',
+            GLICLASS_DEFAULT_REVISION,
+        )
+
+
+def _freeze_sequences(cfg):
+    """Tuple the list-typed fields and check the custom steps."""
+    # Convert mutable collections to immutable for frozen safety
+    if isinstance(cfg.positional_tags, list):
+        object.__setattr__(cfg, 'positional_tags', tuple(cfg.positional_tags))
+    if isinstance(cfg.ner_models_list, list):
+        object.__setattr__(cfg, 'ner_models_list', tuple(cfg.ner_models_list))
+    if isinstance(cfg.custom_pipeline_steps, list):
+        object.__setattr__(cfg, 'custom_pipeline_steps', tuple(cfg.custom_pipeline_steps))
+    for step in cfg.custom_pipeline_steps:
+        if not callable(step):
+            raise ValueError(
+                f"custom_pipeline_steps must contain callables, got: {type(step)!r}"
+            )
+
+
+def _validate_modes(cfg):
+    # --- NER mode + replacement mode validation ---
+    if cfg.ner_mode not in VALID_NER_MODES:
+        raise ValueError(
+            f"ner_mode must be one of {sorted(VALID_NER_MODES)}, got: {cfg.ner_mode!r}"
+        )
+    if cfg.replacement_mode not in VALID_REPLACEMENT_MODES:
+        raise ValueError(
+            f"replacement_mode must be one of {sorted(VALID_REPLACEMENT_MODES)}, "
+            f"got: {cfg.replacement_mode!r}"
+        )
+    if cfg.json_key_cleaning not in VALID_JSON_KEY_CLEANING:
+        raise ValueError(
+            f"json_key_cleaning must be one of {sorted(VALID_JSON_KEY_CLEANING)}, "
+            f"got: {cfg.json_key_cleaning!r}"
+        )
+    if (
+        cfg.replacement_mode == 'reversible'
+        and cfg.check_fuzzy_replace_dates
+    ):
+        raise ValueError(
+            "reversible mode does not support fuzzy date replacement"
+        )
+
+
+def _apply_pii_defaults(cfg):
+    # PII mode auto-configuration: sets GLiNER defaults for PII detection.
+    # User-provided values take priority (checked via default comparisons).
+    if cfg.ner_mode == 'pii':
+        if cfg.ner_backend == 'onnx':
+            object.__setattr__(cfg, 'ner_backend', 'gliner')
+            # Use ONNX-loaded GLiNER when available (pre-built ONNX on Hub)
+            if not cfg.gliner_onnx:
+                object.__setattr__(cfg, 'gliner_onnx', True)
+        if not cfg.gliner_model:
+            object.__setattr__(cfg, 'gliner_model', PII_DEFAULT_MODEL)
+        if (
+            cfg.gliner_model == PII_DEFAULT_MODEL
+            and cfg.gliner_revision is None
+        ):
+            object.__setattr__(
+                cfg,
+                'gliner_revision',
+                PII_DEFAULT_REVISION,
+            )
+        if cfg.gliner_labels == ('person', 'organization', 'location'):
+            object.__setattr__(cfg, 'gliner_labels', PII_LABELS)
+        pii_tags = set(cfg.positional_tags)
+        # Derived maps are shared objects, so a dataclasses.replace() clone re-derives them
+        # (and drops the other naming's phone/IP tags) when legacy_type_names changes.
+        if cfg.gliner_label_map is _PII_MAPS[True] or cfg.gliner_label_map is _PII_MAPS[False]:
+            pii_tags -= {'PHONE', 'IP', 'PHONE_NUMBER', 'IP_ADDRESS'}
+            object.__setattr__(cfg, 'gliner_label_map', None)
+        if cfg.gliner_label_map is None:
+            object.__setattr__(cfg, 'gliner_label_map', _PII_MAPS[cfg.legacy_type_names])
+        # Expand positional_tags to include all PII label tags
+        for label in cfg.gliner_labels:
+            pii_tags.add(cfg.gliner_label_map.get(label, label.upper()))
+        object.__setattr__(cfg, 'positional_tags', tuple(sorted(pii_tags)))
+
+
+def _validate_ner_settings(cfg):
+    """Runs after _apply_pii_defaults, which can change ner_backend."""
+    # --- NER backend validation ---
+    if cfg.ner_backend not in VALID_NER_BACKENDS:
+        raise ValueError(
+            f"ner_backend must be one of {sorted(VALID_NER_BACKENDS)}, "
+            f"got: {cfg.ner_backend!r}"
+        )
+
+    # ner_batch_size must be positive
+    if cfg.ner_batch_size <= 0:
+        raise ValueError(
+            f"ner_batch_size must be >= 1, got {cfg.ner_batch_size}"
+        )
+    for name in ('onnx_intra_op_threads', 'onnx_inter_op_threads'):
+        value = getattr(cfg, name)
+        if value is not None and value < 1:
+            raise ValueError(f"{name} must be None or >= 1, got {value}")
+    if cfg.ner_chunk_overlap < 0:
+        raise ValueError(f"ner_chunk_overlap must be >= 0, got {cfg.ner_chunk_overlap}")
+    if cfg.ner_device not in (None, 'cpu', 'cuda', 'mps'):
+        raise ValueError(f"ner_device must be None, 'cpu', 'cuda' or 'mps', got {cfg.ner_device!r}")
+    if cfg.cuda_device_id < 0:
+        raise ValueError(f"cuda_device_id must be >= 0, got {cfg.cuda_device_id}")
+    if cfg.onnx_cuda_provider_options is not None:
+        object.__setattr__(cfg, 'onnx_cuda_provider_options',
+                           MappingProxyType(dict(cfg.onnx_cuda_provider_options)))
+    for name in ('ner_confidence_threshold', 'gliner_threshold'):
+        value = getattr(cfg, name)
+        if value is not None and not 0.0 <= value <= 1.0:
+            raise ValueError(f"{name} must be None or in [0, 1], got {value}")
+    if cfg.ner_ensemble_vote not in ('max', 'mean'):
+        raise ValueError(f"ner_ensemble_vote must be 'max' or 'mean', got {cfg.ner_ensemble_vote!r}")
+    if cfg.replace_numbers_mode not in ('identifiers', 'all'):
+        raise ValueError(f"replace_numbers_mode must be 'identifiers' or 'all', got {cfg.replace_numbers_mode!r}")
+    if isinstance(cfg.replace_numbers_min_digits, bool) or not isinstance(cfg.replace_numbers_min_digits, int) \
+            or cfg.replace_numbers_min_digits < 1:
+        raise ValueError(f"replace_numbers_min_digits must be an int >= 1, got {cfg.replace_numbers_min_digits!r}")
+    if cfg.ner_merge_location_gap < 0:
+        raise ValueError(f"ner_merge_location_gap must be >= 0, got {cfg.ner_merge_location_gap}")
+    if cfg.ner_propagate_min_score is not None and not 0.0 <= cfg.ner_propagate_min_score <= 1.0:
+        raise ValueError(f"ner_propagate_min_score must be None or in [0, 1], got {cfg.ner_propagate_min_score}")
+    if cfg.ner_subword_widen is not None and cfg.ner_subword_widen < 0:
+        raise ValueError(f"ner_subword_widen must be None or >= 0, got {cfg.ner_subword_widen}")
+    if not 0.0 <= cfg.language_confidence_warning <= 1.0:
+        raise ValueError(
+            "language_confidence_warning must be in [0, 1], "
+            f"got {cfg.language_confidence_warning}"
+        )
+    if not 0.0 <= cfg.language_margin_warning <= 1.0:
+        raise ValueError(
+            f"language_margin_warning must be in [0, 1], got {cfg.language_margin_warning}"
+        )
+
+
+def _validate_gliner(cfg):
+    """Require the GLiNER fields the backend needs and freeze its maps."""
+    # GLiNER fields required for gliner/ensemble backends
+    needs_gliner = cfg.ner_backend in GLINER_BACKENDS
+    if needs_gliner:
+        if not cfg.gliner_model:
+            raise ValueError(
+                f"gliner_model is required when ner_backend='{cfg.ner_backend}'. "
+                f"Provide a HuggingFace model ID (e.g. 'urchade/gliner_large-v2.1')."
+            )
+        if cfg.gliner_variant not in ('gliner', 'gliner2'):
+            raise ValueError(
+                f"gliner_variant must be 'gliner' or 'gliner2', "
+                f"got: {cfg.gliner_variant!r}"
+            )
+
+    # Freeze gliner_label_map
+    if cfg.gliner_label_map is not None and not any(cfg.gliner_label_map is m for m in _PII_MAPS.values()):
+        object.__setattr__(cfg, 'gliner_label_map',
+                           MappingProxyType(dict(cfg.gliner_label_map)))
+
+    # Freeze gliner_label_descriptions
+    if cfg.gliner_label_descriptions is not None:
+        object.__setattr__(cfg, 'gliner_label_descriptions',
+                           MappingProxyType(dict(cfg.gliner_label_descriptions)))
+
+
+def _reconcile_torch_models(cfg):
+    # Reconcile torch_ner_models
+    if cfg.torch_ner_models is not None:
+        missing = REQUIRED_NER_KEYS - set(cfg.torch_ner_models)
+        if missing:
+            raise ValueError(
+                f"torch_ner_models must include {sorted(REQUIRED_NER_KEYS)}, "
+                f"missing: {sorted(missing)}"
+            )
+        merged = {**DEFAULT_TORCH_NER_MODELS, **cfg.torch_ner_models}
+        object.__setattr__(cfg, 'torch_ner_models', MappingProxyType(merged))
+    elif cfg.ner_backend in ('torch', 'ensemble_torch'):
+        object.__setattr__(cfg, 'torch_ner_models',
+                           MappingProxyType(dict(DEFAULT_TORCH_NER_MODELS)))
+    if cfg.torch_ner_models is not None:
+        torch_revisions = {
+            key: revision
+            for key, revision in DEFAULT_TORCH_NER_REVISIONS.items()
+            if cfg.torch_ner_models.get(key) == DEFAULT_TORCH_NER_MODELS.get(key)
+        }
+        if cfg.torch_ner_model_revisions is not None:
+            torch_revisions.update(cfg.torch_ner_model_revisions)
+        object.__setattr__(
+            cfg,
+            'torch_ner_model_revisions',
+            MappingProxyType(torch_revisions),
+        )
+
+
+def _reconcile_ner_models(cfg):
+    # Reconcile ner_models (dict, preferred) and ner_models_list (tuple, deprecated).
+    # After this block, both fields are guaranteed populated.
+    if cfg.ner_models is not None:
+        # Dict API used — validate required keys, fill defaults, freeze
+        missing = REQUIRED_NER_KEYS - set(cfg.ner_models)
+        if missing:
+            raise ValueError(
+                f"ner_models must include {sorted(REQUIRED_NER_KEYS)}, "
+                f"missing: {sorted(missing)}"
+            )
+        # A map of exactly LANG_KEYS matching ner_models_list is a normalized
+        # legacy/default config (replace(), copy): keep it exact. Decided by
+        # content only, so a dict and a mapping proxy give the same config.
+        derived = (
+            set(cfg.ner_models) == set(LANG_KEYS)
+            and tuple(cfg.ner_models[k] for k in LANG_KEYS) == cfg.ner_models_list
+        )
+        merged = (
+            dict(cfg.ner_models) if derived
+            else {**DEFAULT_NER_MODELS, **cfg.ner_models}
+        )
+        object.__setattr__(cfg, 'ner_models', MappingProxyType(merged))
+        object.__setattr__(
+            cfg, 'ner_models_list',
+            tuple(merged[k] for k in LANG_KEYS),
+        )
+    else:
+        # No dict provided — derive from ner_models_list (may be default or custom)
+        default_models_list = tuple(DEFAULT_NER_MODELS[k] for k in LANG_KEYS)
+        if cfg.ner_models_list != default_models_list:
+            import warnings
+            warnings.warn(
+                "ner_models_list is deprecated. Use ner_models dict instead.",
+                DeprecationWarning,
+                stacklevel=3,
+            )
+        models_dict = dict(zip(LANG_KEYS, cfg.ner_models_list))
+        object.__setattr__(cfg, 'ner_models', MappingProxyType(models_dict))
+
+    pinned_revisions = {
+        key: revision
+        for key, revision in DEFAULT_NER_REVISIONS.items()
+        if cfg.ner_models.get(key) == DEFAULT_NER_MODELS.get(key)
+    }
+    if cfg.ner_model_revisions is not None:
+        pinned_revisions.update(cfg.ner_model_revisions)
+    object.__setattr__(
+        cfg,
+        'ner_model_revisions',
+        MappingProxyType(pinned_revisions),
+    )
+
+
+def _resolve_languages(cfg):
+    """Canonicalise the language fields and freeze their maps."""
+    # --- Language validation and supported_languages computation ---
+    from sct.utils.resources import resolve_language
+
+    # Resolve language (str or tuple of str) via ISO code / name lookup
+    if cfg.language is not None:
+        if isinstance(cfg.language, str):
+            object.__setattr__(cfg, 'language', resolve_language(cfg.language))
+        elif isinstance(cfg.language, (list, tuple)):
+            resolved = tuple(resolve_language(lang) for lang in cfg.language)
+            object.__setattr__(cfg, 'language', resolved)
+
+    # Coerce extra_languages to tuple and resolve each entry
+    if isinstance(cfg.extra_languages, list):
+        object.__setattr__(cfg, 'extra_languages', tuple(cfg.extra_languages))
+    if cfg.extra_languages:
+        resolved_extra = tuple(resolve_language(lang) for lang in cfg.extra_languages)
+        object.__setattr__(cfg, 'extra_languages', resolved_extra)
+
+    # Validate and freeze custom_stopwords (keys must be valid language names)
+    if cfg.custom_stopwords:
+        resolved_sw = {resolve_language(k): frozenset(v) for k, v in cfg.custom_stopwords.items()}
+        object.__setattr__(cfg, 'custom_stopwords',
+                           MappingProxyType(resolved_sw))
+
+    if cfg.date_builtin_month_languages is not None:
+        from sct.utils.constants import MONTH_NAMES_MULTILINGUAL
+        codes = tuple(cfg.date_builtin_month_languages)
+        unknown = set(codes) - set().union(*MONTH_NAMES_MULTILINGUAL.values())
+        if isinstance(cfg.date_builtin_month_languages, str) or unknown:
+            raise ValueError(f"date_builtin_month_languages must be a tuple of built-in month ISO codes, "
+                             f"got {cfg.date_builtin_month_languages!r}")
+        object.__setattr__(cfg, 'date_builtin_month_languages', codes)
+
+    # Validate and freeze custom_month_names
+    if cfg.custom_month_names:
+        resolved_mn = {resolve_language(k): tuple(v) for k, v in cfg.custom_month_names.items()}
+        object.__setattr__(cfg, 'custom_month_names',
+                           MappingProxyType(resolved_mn))
+
+
+def _compute_supported_languages(cfg):
+    # Compute supported_languages: union of all sources
+    langs = set(DEFAULT_LANGUAGES)
+    langs.update(cfg.extra_languages)
+    # Add ner_models keys (minus MULTILINGUAL — it's a model, not a spoken language)
+    if cfg.ner_models:
+        langs.update(k for k in cfg.ner_models if k != 'MULTILINGUAL')
+    if cfg.custom_stopwords:
+        langs.update(cfg.custom_stopwords.keys())
+    if cfg.custom_month_names:
+        langs.update(cfg.custom_month_names.keys())
+    # Add languages from tuple-of-languages config
+    if isinstance(cfg.language, tuple):
+        langs.update(cfg.language)
+    # Any Lingua language is a valid pin (resolve_language raised above otherwise);
+    # supported_languages only means "has stopwords/dates/NER key".
+    object.__setattr__(cfg, 'supported_languages', frozenset(langs))
 
 
 def _config_from_module_globals() -> TextCleanerConfig:
