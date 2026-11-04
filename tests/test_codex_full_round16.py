@@ -4,11 +4,12 @@ import datetime
 
 import pytest
 
+from tests.ner_helpers import bare_ner
 from sct import TextCleaner, TextCleanerConfig
 from sct.browser import build_browser_manifest
 from sct.privacy import EntityRule, PrivacyPolicy
 from sct.streaming import WindowedStreamingRedactor
-from sct.utils.ner import GeneralNER, _presidio_type_map
+from sct.utils.ner import _presidio_type_map
 from sct.utils.synthetic import SyntheticReplacer
 
 # --- 1: native-digit phones are not split between stream windows ---
@@ -43,7 +44,7 @@ class _Analyzer:
 
 
 def test_empty_presidio_type_map_keeps_legacy_names():
-    ner = object.__new__(GeneralNER)
+    ner = bare_ner()
     ner._ner_backend, ner._analyzer = "presidio_gliner", _Analyzer()
     ner._presidio_types = _presidio_type_map({"legacy_type_names": True, "label_map": None})
     assert ner._presidio_types == {}

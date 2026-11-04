@@ -116,7 +116,7 @@ def test_onnx_loader_gets_device_id_and_options(monkeypatch):
         seen.append((kwargs["device"], kwargs["cuda_device_id"], kwargs["cuda_provider_options"]))
         return object(), Tok()
 
-    monkeypatch.setattr(ner_module, "load_onnx_ner_model", fake_load)
+    monkeypatch.setattr("sct.utils.onnx_pipeline.load_onnx_ner_model", fake_load)
     GeneralNER(device="cuda", cuda_device_id=3, onnx_cuda_provider_options={"a": 1},
                model_names={"ENGLISH": "a", "MULTILINGUAL": "b"})
     assert seen == [("cuda", 3, {"a": 1})] * 2

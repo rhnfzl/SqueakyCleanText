@@ -4,6 +4,7 @@ import types
 import numpy as np
 import pytest
 
+from tests.ner_helpers import bare_ner
 from sct import TextCleaner, TextCleanerConfig
 from sct.utils import constants
 from sct.utils.onnx_pipeline import ONNXNERPipeline
@@ -121,15 +122,14 @@ def test_widen_same_script_config_and_legacy_global(monkeypatch):
 
 def test_ensemble_agreement_never_drops_a_strong_single_model_hit():
     # F1: XLM-R 1.0 + wikineural 0.40 on the same widened span averaged to 0.70 < 0.85
-    from sct.utils.ner import GeneralNER
 
-    ner = object.__new__(GeneralNER)
+    ner = bare_ner()
     strong = {'entity_group': 'LOC', 'score': 0.95, 'key': '0:5', 'start': 0, 'end': 5, 'model': 'a'}
     weak = {**strong, 'score': 0.60, 'model': 'b'}
-    assert ner.ner_ensemble([strong, weak], 0.85) == [strong]
-    assert ner.ner_ensemble([{**weak, 'score': 0.5}], 0.85) == []
+    assert ner.vote_entities([strong, weak], 0.85) == [strong]
+    assert ner.vote_entities([{**weak, 'score': 0.5}], 0.85) == []
     ner._ner_ensemble_vote = 'mean'
-    assert ner.ner_ensemble([strong, weak], 0.85) == []
+    assert ner.vote_entities([strong, weak], 0.85) == []
 
 
 def test_ensemble_vote_config_and_legacy_global(monkeypatch):
@@ -144,9 +144,8 @@ def test_ensemble_vote_config_and_legacy_global(monkeypatch):
 
 def _finalize_spans(text, spans, **attrs):
     # One window over the whole text; spans are (start, end, group, score) from one model.
-    from sct.utils.ner import GeneralNER
 
-    ner = object.__new__(GeneralNER)
+    ner = bare_ner()
     ner._replacement_mode = attrs.pop('mode', 'placeholder')
     for name, value in attrs.items():
         setattr(ner, name, value)

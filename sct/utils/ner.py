@@ -7,22 +7,30 @@ import re
 import threading
 from collections import defaultdict
 import logging
-from typing import Any, Collection, Dict, List, Optional, Sequence, Union
+from typing import Any, Collection, Dict, List, Optional, Sequence, Tuple, Union
 
-import regex
 from pathlib import Path
-
-import onnxruntime as ort
-
 
 from typing import NamedTuple as _NamedTuple
 
 from sct.utils import constants, resources
 from sct.utils.anonymization_map import AnonymizationMap
-import unicodedata
-
-from sct.utils.onnx_pipeline import _letter_scripts, load_onnx_ner_model
-from sct.config import DEFAULT_NER_MODELS, DEFAULT_NER_ENSEMBLE, NER_ENSEMBLE_DEFAULT_KEYS, LANG_KEYS
+from sct.utils.ner_chunking import align_chunk, simple_chunk, split_text, token_count
+from sct.utils.ner_spans import (
+    ENTITY_TYPE_MAP,
+    drop_allowed,
+    merge_location_gaps,
+    merge_overlaps,
+    propagate,
+    snap_word_edges,
+)
+from sct.config import (
+    DEFAULT_NER_MODELS,
+    DEFAULT_NER_ENSEMBLE,
+    GLINER_BACKENDS,
+    NER_ENSEMBLE_DEFAULT_KEYS,
+    LANG_KEYS,
+)
 from sct.privacy import (
     DetectedEntity,
     EntityFinding,
@@ -35,17 +43,19 @@ class AnonymizeResult(_NamedTuple):
     """Result of text anonymization — lightweight typed container."""
     text: str
 
-ort.set_default_logger_severity(3)  # Silence ONNX Runtime warnings
-
 logger = logging.getLogger(__name__)
 
-# Entity group to Presidio entity type mapping
-ENTITY_TYPE_MAP = {
-    'PER': 'PERSON',
-    'LOC': 'LOCATION',
-    'ORG': 'ORGANISATION',
-    'MISC': 'MISC',
-}
+# Final NER score cut when the caller passes none.
+DEFAULT_NER_CONFIDENCE = 0.85
+
+ONNX_BACKENDS = frozenset({'onnx', 'ensemble_onnx'})
+TORCH_BACKENDS = frozenset({'torch', 'ensemble_torch'})
+TOKEN_MODEL_BACKENDS = ONNX_BACKENDS | TORCH_BACKENDS
+# Backends that run SCT's own GLiNER adapter; presidio_gliner loads GLiNER through Presidio.
+GLINER_ADAPTER_BACKENDS = GLINER_BACKENDS - {'presidio_gliner'}
+
+# An inference lock's key: 'gliner', or a token model's (name, revision).
+ModelKey = Tuple[str, Optional[str]]
 
 # A regex step's placeholder (<PHONE>, <EMAIL_0>); NER spans inside one are dropped,
 # so "call <PHONE>" never becomes "call <<MISC>>". Marker-shaped text already in the
@@ -53,8 +63,6 @@ ENTITY_TYPE_MAP = {
 # so an emitted marker of the same text keeps its protection) gets none, so it cannot hide PII.
 # Custom replace_with_* markers ("EMAIL") are protected the same way through *regex_markers*.
 _PLACEHOLDER_TOKEN = re.compile(r"<[A-Z][A-Z0-9_]*>")
-# Ends a LOCATION merge gap: a line break or a sentence end (format only, no words).
-_GAP_BREAK = re.compile(r"[\n\r\u2028\u2029]|[.!?;:]\s|[。！？]")
 
 
 # Freeing an inherited ONNX session in a forked child crashes or hangs, so children pin every live
@@ -84,35 +92,6 @@ def _presidio_type_map(gliner_config):
     return types
 
 
-def _snap_word_edges(text, start, end, ratio, same_script):
-    """Move span edges that fall inside a word out to the word edges ("Salut" + "e").
-
-    A word is a run of Unicode letters and marks; wide (CJK) characters never join, since
-    those scripts write no spaces. With *same_script* an added letter must share the script
-    of the span's edge letter. When the added text is over *ratio* times the span (an
-    unspaced Thai clause), the span stays as tagged; *ratio* None = no cap.
-    """
-    if start >= end:
-        return start, end
-    scripts = _letter_scripts(text[start:end]) if same_script else None
-
-    def joins(char, script):
-        if unicodedata.category(char)[0] not in 'LM' or unicodedata.east_asian_width(char) in 'WF':
-            return False
-        return not script or set(_letter_scripts(char)) <= {script}
-
-    new_start, new_end = start, end
-    if joins(text[start], None):
-        while new_start > 0 and joins(text[new_start - 1], scripts and scripts[0]):
-            new_start -= 1
-    if joins(text[end - 1], None):
-        while new_end < len(text) and joins(text[new_end], scripts and scripts[-1]):
-            new_end += 1
-    if ratio is not None and (new_end - new_start) - (end - start) > ratio * (end - start):
-        return start, end
-    return new_start, new_end
-
-
 def _mps_available() -> bool:
     try:
         import torch  # noqa: S404
@@ -131,16 +110,6 @@ class GeneralNER:
         ensemble_onnx  — ONNX + GLiNER combined via ensemble voting
         ensemble_torch — Torch + GLiNER combined via ensemble voting
     """
-
-    _ner_batch_size = 8  # chunks per model call; __init__ sets the configured value
-    _ner_chunk_overlap = 0  # tokens of context each window adds per side; __init__ sets it
-    _ner_ensemble_vote = 'max'  # 'max' or 'mean' (0.8.0); __init__ sets it
-    _ner_propagate_masked = True  # mask other whole-word copies of a masked PER/ORG/LOC value
-    _ner_propagate_min_score = None  # None = the NER cut; __init__ sets both
-    _ner_merge_location_gap = 0  # max chars between two LOCATION spans joined into one; 0 = off
-    _ner_snap_word_edges = True  # move span edges cut inside a word out to the word edges
-    _ner_subword_widen = 1.0  # widening cap (added chars <= ratio * span); __init__ sets it
-    _ner_subword_widen_same_script = True
 
     def __init__(self, cache_dir: Optional[Path] = None, device: Optional[str] = None,
                  model_names: Optional[Union[Dict[str, str], List[str]]] = None,
@@ -236,16 +205,15 @@ class GeneralNER:
         # Device detection
         if device:
             self.device = device
-        elif ner_backend in ('torch', 'ensemble_torch'):
+        elif ner_backend in TORCH_BACKENDS:
             try:
                 import torch  # noqa: S404
                 self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
             except ImportError:
                 self.device = 'cpu'
-        elif 'CUDAExecutionProvider' in ort.get_available_providers():
-            self.device = 'cuda'
         else:
-            self.device = 'cpu'
+            import onnxruntime as ort
+            self.device = 'cuda' if 'CUDAExecutionProvider' in ort.get_available_providers() else 'cpu'
         # Torch and GLiNER take an indexed device string; ONNX gets the index as a provider option.
         self._torch_device = f"cuda:{cuda_device_id}" if self.device == 'cuda' else self.device
         # 'mps' (Apple GPU) moves torch and GLiNER only; ONNX models stay on CPU.
@@ -263,12 +231,12 @@ class GeneralNER:
         self._load_lock = threading.Lock()
         # Per-model inference locks for torch models and GLiNER. ONNX runs lock-free:
         # InferenceSession.run and the Rust tokenizer are thread-safe.
-        self._inference_locks: Dict[str, threading.Lock] = {}
+        self._inference_locks: Dict[Union[str, ModelKey], threading.Lock] = {}
         self._locks_lock = threading.Lock()  # Guards creation of per-model locks
 
         # --- Backend-specific initialization ---
 
-        if ner_backend in ('onnx', 'ensemble_onnx'):
+        if ner_backend in ONNX_BACKENDS:
             # ONNX backend: build model mapping from dict, list, or defaults
             if model_names is None:
                 self._model_names = dict(DEFAULT_NER_MODELS)
@@ -281,7 +249,7 @@ class GeneralNER:
             self._ensure_loaded('MULTILINGUAL')
             self._init_tokenizer_props()
 
-        elif ner_backend in ('torch', 'ensemble_torch'):
+        elif ner_backend in TORCH_BACKENDS:
             # Torch backend
             if torch_model_names is None:
                 from sct.config import DEFAULT_TORCH_NER_MODELS
@@ -308,7 +276,7 @@ class GeneralNER:
                 self._init_presidio_gliner(gliner_config)
 
         # --- GLiNER pipeline (for gliner/ensemble modes) ---
-        if ner_backend in ('gliner', 'ensemble_onnx', 'ensemble_torch') and gliner_config:
+        if ner_backend in GLINER_ADAPTER_BACKENDS and gliner_config:
             from sct.utils.gliner_adapter import GLiNERAdapter
             self._gliner_pipe = GLiNERAdapter(
                 model_id=gliner_config['model'],
@@ -321,8 +289,7 @@ class GeneralNER:
                 device=self._torch_device,
                 onnx=gliner_config.get('onnx', False),
             )
-        if gliner_config and ner_backend in ('gliner', 'ensemble_onnx', 'ensemble_torch',
-                                             'presidio_gliner'):
+        if gliner_config and ner_backend in GLINER_BACKENDS:
             onnx_gliner = self._gliner_pipe is not None and self._gliner_pipe._onnx
             self._provenance['GLINER'] = {
                 'key': 'GLINER', 'id': gliner_config['model'],
@@ -355,13 +322,13 @@ class GeneralNER:
             en_tok.max_len_single_sentence <= multi_tok.max_len_single_sentence
         ) else multi_tok
 
-    def _get_lock(self, lang_key: str) -> threading.Lock:
+    def _get_lock(self, model_key: Union[str, ModelKey]) -> threading.Lock:
         """Get or create a per-model inference lock (double-checked locking)."""
-        if lang_key not in self._inference_locks:
+        if model_key not in self._inference_locks:
             with self._locks_lock:
-                if lang_key not in self._inference_locks:
-                    self._inference_locks[lang_key] = threading.Lock()
-        return self._inference_locks[lang_key]
+                if model_key not in self._inference_locks:
+                    self._inference_locks[model_key] = threading.Lock()
+        return self._inference_locks[model_key]
 
     def _init_presidio_gliner(self, gliner_config):
         """Initialize Presidio with GLiNERRecognizer (experimental beta backend)."""
@@ -400,14 +367,14 @@ class GeneralNER:
             return (language,)
         return self._ensemble_default_keys
 
-    def _has_own_model(self, language: str) -> bool:
+    def _has_own_model(self, language: Optional[str]) -> bool:
         """True when the user brought a model for *language* (e.g. ``ner_models={"HINDI": ...}``).
 
         Built-in FR/PT/IT keys point at the default multilingual model and keep the fallback.
         """
         if language == 'MULTILINGUAL' or language not in self._model_names:
             return False
-        if self._ner_backend in ('torch', 'ensemble_torch'):
+        if self._ner_backend in TORCH_BACKENDS:
             from sct.config import DEFAULT_TORCH_NER_MODELS
             defaults = DEFAULT_TORCH_NER_MODELS
         else:
@@ -426,10 +393,10 @@ class GeneralNER:
         """Pre-load NER model for the given language key (stable public API)."""
         self._ensure_loaded(lang_key)
 
-    def _model_key(self, lang_key: str) -> tuple:
+    def _model_key(self, lang_key: str) -> ModelKey:
         """(model name, revision) for a language key; same key = same loaded model."""
         revisions = (self._torch_model_revisions
-                     if self._ner_backend in ('torch', 'ensemble_torch')
+                     if self._ner_backend in TORCH_BACKENDS
                      else self._model_revisions)
         return self._model_names.get(lang_key, lang_key), revisions.get(lang_key)
 
@@ -471,7 +438,7 @@ class GeneralNER:
                 return
             try:
                 pipeline_obj: object
-                if self._ner_backend in ('torch', 'ensemble_torch'):
+                if self._ner_backend in TORCH_BACKENDS:
                     from sct.utils.torch_pipeline import load_torch_ner_model
                     pipeline_obj, tok = load_torch_ner_model(
                         model_name, device=self._torch_device,
@@ -479,6 +446,7 @@ class GeneralNER:
                         revision=self._torch_model_revisions.get(lang_key),
                     )
                 else:
+                    from sct.utils.onnx_pipeline import load_onnx_ner_model
                     pipeline_obj, tok = load_onnx_ner_model(
                         model_name,
                         device=self.device,
@@ -512,20 +480,15 @@ class GeneralNER:
     def models_for(self, language: Optional[str]) -> List[Dict[str, Optional[str]]]:
         """Provenance of the loaded models that NER runs for *language* (copies)."""
         keys: tuple = ()
-        if self._ner_backend in ('onnx', 'torch', 'ensemble_onnx', 'ensemble_torch'):
+        if self._ner_backend in TOKEN_MODEL_BACKENDS:
             # tuple(): a configured list route must not grow on every call.
             keys = tuple(self._get_ensemble_keys(language or 'MULTILINGUAL'))
         if 'GLINER' in self._provenance:
             keys += ('GLINER',)
         return [dict(self._provenance[k]) for k in keys if k in self._provenance]
 
-    def _get_pipeline(self, lang_key: str):
-        """Get the NER pipeline for a language, loading it if needed."""
-        self._ensure_loaded(lang_key)
-        return self._pipelines[lang_key]
-
-    def ner_data(self, data, pos):
-        """Format NER results with collision-safe keys."""
+    def entities_with_position_key(self, results, labels):
+        """Keep the entities whose group is in *labels*, with collision-safe position keys."""
         return [
             {
                 'entity_group': ix['entity_group'],
@@ -535,7 +498,7 @@ class GeneralNER:
                 'start': ix['start'],
                 'end': ix['end'],
             }
-            for ix in data if ix['entity_group'] in pos
+            for ix in results if ix['entity_group'] in labels
         ]
 
     def filter_ner_data(self, data, keys):
@@ -556,7 +519,7 @@ class GeneralNER:
         )
         if has_custom or replacement_mode in ('reversible', 'synthetic'):
             # Right-to-left slicing keeps offsets only for disjoint spans.
-            filtered_data = self._merge_overlaps(text, filtered_data)
+            filtered_data = merge_overlaps(text, filtered_data)
 
         if replacement_mode == 'reversible':
             return self._anonymize_reversible(text, filtered_data, anon_map)
@@ -598,29 +561,10 @@ class GeneralNER:
     @property
     def engine(self):
         # Lazy: presidio_anonymizer imports presidio_analyzer (and torch via GLiNER) when installed.
-        if getattr(self, '_engine', None) is None:
+        if self._engine is None:
             from presidio_anonymizer import AnonymizerEngine
             self._engine = AnonymizerEngine()
         return self._engine
-
-    @staticmethod
-    def _merge_overlaps(text, filtered_data):
-        """Merge overlapping spans into their union, labelled by the highest score.
-
-        Same rule as ``PrivacyPolicy.transform``, so no part of a nested or
-        partly overlapping entity stays visible.
-        """
-        merged = []
-        for item in sorted(filtered_data, key=lambda x: (x['start'], -x['end'])):
-            if merged and item['start'] < merged[-1]['end']:
-                last = merged[-1]
-                best = last if last['score'] >= item['score'] else item
-                start, end = last['start'], max(last['end'], item['end'])
-                merged[-1] = {**best, 'start': start, 'end': end,
-                              'word': text[start:end], 'key': f"{start}:{end}"}
-            else:
-                merged.append(item)
-        return merged
 
     def _anonymize_reversible(self, text, filtered_data, anon_map=None):
         """Replace entities with indexed placeholders and populate the map.
@@ -647,126 +591,30 @@ class GeneralNER:
 
         return AnonymizeResult(text=text)
 
-    def ner_ensemble(self, ner_results, t):
+    def vote_entities(self, entities, threshold):
         """Apply ensemble voting across multiple model results.
 
-        Groups entities by position key and keeps a key whose vote passes threshold *t*:
+        Groups entities by position key and keeps a key whose vote passes *threshold*:
         the best model score ('max'), or the mean score ('mean', 0.8.0, where a second
         weak vote can sink a strong one). Returns the highest-scoring entity per position.
         """
-        if not ner_results:
+        if not entities:
             return []
 
         ner_keys = defaultdict(list)
-        for entity in ner_results:
+        for entity in entities:
             ner_keys[entity['key']].append(entity['score'])
 
         vote = max if self._ner_ensemble_vote == 'max' else (lambda s: sum(s) / len(s))
-        passing_keys = [key for key, scores in ner_keys.items() if vote(scores) >= t]
-        filter_ner_results = self.filter_ner_data(ner_results, passing_keys)
-        filter_ner_results.sort(key=lambda x: x['start'])
-        return filter_ner_results
-
-    def _simple_chunk(self, text: str, max_tokens: int = 384) -> List[str]:
-        """Split text into chunks of at most ``max_tokens * 2`` characters for GLiNER.
-
-        Used for GLiNER-only mode where no ONNX/torch tokenizer is available.
-        Every chunk fits the budget: oversized pieces are split again with
-        finer delimiters, and runs without any delimiter are cut hard.
-        """
-        max_chars = max_tokens * 2  # conservative: CJK=1, Arabic=2-3, Latin=4 chars/token
-        if len(text) <= max_chars:
-            return [text]
-
-        for delimiter in constants.CHUNK_DELIMITERS:
-            pieces = self._split_pieces(delimiter, text)
-            if len(pieces) <= 1:
-                continue
-            chunks: List[str] = []
-            for chunk in self._merge_pieces(pieces, lambda c: len(c) <= max_chars):
-                chunks.extend(self._simple_chunk(chunk, max_tokens))
-            return chunks
-
-        # shortcut: hard cut can split an entity; ner_chunk_overlap > 0 covers it
-        return [text[i:i + max_chars] for i in range(0, len(text), max_chars)]
-
-    @staticmethod
-    def _split_pieces(pattern, text: str) -> List[tuple]:
-        """Split *text* on *pattern* into ``(separator_before, piece)`` pairs.
-
-        Keeping the matched separator lets chunks be rejoined exactly as in
-        the source (no invented spaces between CJK sentences). Empty pieces
-        are dropped; their separators fold into the next piece's separator.
-        """
-        pieces = []
-        last = 0
-        separator = ''
-        for match in pattern.finditer(text):
-            if match.start() > last:
-                pieces.append((separator, text[last:match.start()]))
-                separator = ''
-            separator += match.group()
-            last = max(last, match.end())
-        if last < len(text):
-            pieces.append((separator, text[last:]))
-        return pieces
-
-    @staticmethod
-    def _align_chunk(
-        source: str,
-        chunk: str,
-        search_start: int,
-    ) -> tuple[str, int, list[int]]:
-        """Locate a whitespace-normalized chunk and map its offsets to source."""
-        # Chunks are normally exact source slices; a greedy \s+ match would eat
-        # whitespace that belongs to the next chunk (hard cuts, blank chunks).
-        start = source.find(chunk, search_start)
-        if start >= 0:
-            return chunk, start, list(range(len(chunk) + 1))
-        parts = re.split(r'(\s+)', chunk)
-        pattern = ''.join(
-            r'\s+' if part.isspace() else re.escape(part)
-            for part in parts if part
-        )
-        match = re.compile(pattern).search(source, search_start)
-        if match is None:
-            raise RuntimeError("Could not align NER chunk to its source text")
-
-        source_chunk = match.group()
-        offsets = [0] * (len(chunk) + 1)
-        chunk_index = 0
-        source_index = 0
-        while chunk_index < len(chunk):
-            if chunk[chunk_index].isspace():
-                chunk_end = chunk_index
-                while chunk_end < len(chunk) and chunk[chunk_end].isspace():
-                    chunk_end += 1
-                source_end = source_index
-                while (
-                    source_end < len(source_chunk)
-                    and source_chunk[source_end].isspace()
-                ):
-                    source_end += 1
-                chunk_width = chunk_end - chunk_index
-                source_width = source_end - source_index
-                for offset in range(chunk_width + 1):
-                    offsets[chunk_index + offset] = (
-                        source_index
-                        + (offset * source_width // chunk_width)
-                    )
-                chunk_index = chunk_end
-                source_index = source_end
-            else:
-                offsets[chunk_index] = source_index
-                chunk_index += 1
-                source_index += 1
-        offsets[len(chunk)] = len(source_chunk)
-        return source_chunk, match.start(), offsets
+        passing_keys = [key for key, scores in ner_keys.items() if vote(scores) >= threshold]
+        kept_entities = self.filter_ner_data(entities, passing_keys)
+        kept_entities.sort(key=lambda x: x['start'])
+        return kept_entities
 
     def ner_process_detailed(
         self,
         text: str,
-        positional_tags: Optional[Sequence[str]] = None,
+        positional_tags: Sequence[str],
         ner_confidence_threshold: Optional[float] = None,
         language: Optional[str] = None,
         anon_map: Optional['AnonymizationMap'] = None,
@@ -787,51 +635,10 @@ class GeneralNER:
             raise ValueError("Must provide at least one positional tag")
 
         if ner_confidence_threshold is None:
-            ner_confidence_threshold = 0.85
+            ner_confidence_threshold = DEFAULT_NER_CONFIDENCE
 
-        # --- Presidio GLiNER backend: delegates everything to Presidio ---
         if self._ner_backend == 'presidio_gliner':
-            analyzer_language = resources.language_to_iso(language) if language else 'en'
-            # Detection covers 75 languages; Presidio only analyzes those its NLP engine has.
-            supported = getattr(self._analyzer, 'supported_languages', None)
-            if supported is not None and analyzer_language not in supported:
-                analyzer_language = 'en'
-            analyzer_results = self._analyzer.analyze(
-                text=text,
-                language=analyzer_language,
-            )
-            # Analyzer names (PHONE_NUMBER, a label's upper case) -> the configured type names.
-            # An empty map (legacy names) is a valid map; only a missing one falls back.
-            types = getattr(self, '_presidio_types', None)
-            if types is None:
-                types = _presidio_type_map({})
-            # then aliases (PER/LOC/ORG) to canonical names, as the other backends do
-            analyzer_results = self._drop_allowed(text, analyzer_results, lambda r: (r.start, r.end))
-            for result in analyzer_results:
-                entity_type = types.get(result.entity_type, result.entity_type)
-                result.entity_type = ENTITY_TYPE_MAP.get(entity_type, entity_type)
-            entities = tuple(
-                DetectedEntity(
-                    entity_type=result.entity_type,
-                    score=result.score,
-                    text=text[result.start:result.end],
-                    start=result.start,
-                    end=result.end,
-                )
-                for result in analyzer_results
-            )
-            if privacy_policy is not None:
-                findings = privacy_policy.evaluate(entities)
-                return NERProcessingResult(
-                    text=privacy_policy.transform(text, findings),
-                    findings=findings,
-                )
-            result = self.engine.anonymize(text=text, analyzer_results=analyzer_results)
-            findings = tuple(
-                EntityFinding(entity, self._replacement_mode, 'detector-threshold')
-                for entity in entities
-            )
-            return NERProcessingResult(text=result.text, findings=findings)
+            return self._process_presidio(text, language, anon_map, privacy_policy)
 
         self._load_models([language])
         windows = self._plan_windows(text, self._window_keys(language))
@@ -845,11 +652,69 @@ class GeneralNER:
             source_markers,
         )
 
+    def _process_presidio(self, text, language, anon_map, privacy_policy) -> NERProcessingResult:
+        """The presidio_gliner backend: Presidio detects; the replacement mode replaces.
+
+        Presidio's own analyzer decides what is found: the caller's tags, confidence threshold
+        and source markers do not filter its results (filtering would mask less than today).
+        """
+        analyzer_language = resources.language_to_iso(language) if language else 'en'
+        # Detection covers 75 languages; Presidio only analyzes those its NLP engine has.
+        supported = getattr(self._analyzer, 'supported_languages', None)
+        if supported is not None and analyzer_language not in supported:
+            analyzer_language = 'en'
+        analyzer_results = self._analyzer.analyze(
+            text=text,
+            language=analyzer_language,
+        )
+        # Analyzer names (PHONE_NUMBER, a label's upper case) -> the configured type names,
+        # then aliases (PER/LOC/ORG) to canonical names, as the other backends do.
+        analyzer_results = drop_allowed(self._allow_regex, text, analyzer_results, lambda r: (r.start, r.end))
+        for result in analyzer_results:
+            entity_type = self._presidio_types.get(result.entity_type, result.entity_type)
+            result.entity_type = ENTITY_TYPE_MAP.get(entity_type, entity_type)
+        entities = tuple(
+            DetectedEntity(
+                entity_type=result.entity_type,
+                score=result.score,
+                text=text[result.start:result.end],
+                start=result.start,
+                end=result.end,
+            )
+            for result in analyzer_results
+        )
+
+        def anonymize():
+            if self._replacement_mode == 'placeholder':
+                return self.engine.anonymize(text=text, analyzer_results=analyzer_results).text
+            spans = [
+                {'entity_group': e.entity_type, 'score': e.score, 'word': e.text, 'start': e.start,
+                 'end': e.end, 'key': f"{e.start}:{e.end}"}
+                for e in entities
+            ]
+            return self.anonymize_text(text, spans, self._replacement_mode, anon_map=anon_map).text
+        return self._policy_or_default(text, entities, privacy_policy, anonymize)
+
+    def _policy_or_default(self, text, entities, privacy_policy, anonymize) -> NERProcessingResult:
+        """Apply *privacy_policy* to *entities*; without one, replace them through *anonymize()*."""
+        if privacy_policy is not None:
+            findings = privacy_policy.evaluate(entities)
+            return NERProcessingResult(
+                text=privacy_policy.transform(text, findings),
+                findings=findings,
+            )
+        anonymized = anonymize()
+        findings = tuple(
+            EntityFinding(entity, self._replacement_mode, 'detector-threshold')
+            for entity in entities
+        )
+        return NERProcessingResult(text=anonymized, findings=findings)
+
     def ner_process_batch_detailed(
         self,
         texts: Sequence[str],
         languages: Sequence[Optional[str]],
-        positional_tags: Optional[Sequence[str]] = None,
+        positional_tags: Sequence[str],
         ner_confidence_threshold: Optional[float] = None,
         anon_maps: Optional[Sequence[Optional['AnonymizationMap']]] = None,
         privacy_policy: Optional[PrivacyPolicy] = None,
@@ -868,7 +733,7 @@ class GeneralNER:
         if not positional_tags:
             raise ValueError("Must provide at least one positional tag")
         if ner_confidence_threshold is None:
-            ner_confidence_threshold = 0.85
+            ner_confidence_threshold = DEFAULT_NER_CONFIDENCE
         anon_maps = anon_maps if anon_maps is not None else [None] * len(texts)
         source_markers = source_markers if source_markers is not None else [None] * len(texts)
         if self._ner_backend == 'presidio_gliner':
@@ -911,7 +776,7 @@ class GeneralNER:
 
     def _load_models(self, languages) -> None:
         """Load every model these languages route to, so windows are sized for all of them."""
-        if self._ner_backend in ('onnx', 'torch', 'ensemble_onnx', 'ensemble_torch'):
+        if self._ner_backend in TOKEN_MODEL_BACKENDS:
             for language in dict.fromkeys(languages):
                 for key in self._get_ensemble_keys(language or 'MULTILINGUAL'):
                     self._ensure_loaded(key)
@@ -922,7 +787,7 @@ class GeneralNER:
 
     def _model_tokenizers(self, keys=None) -> list:
         """Distinct tokenizers of the loaded models for *keys* (None: every loaded model)."""
-        loaded = getattr(self, '_tokenizers', {})
+        loaded = self._tokenizers
         if keys is not None:
             loaded = {key: loaded[key] for key in keys if key in loaded}
         return list({id(tok): tok for tok in loaded.values()}.values())
@@ -962,7 +827,7 @@ class GeneralNER:
         chunks come from the chunker with ``2 * ner_chunk_overlap`` tokens less
         budget; each window adds up to ``ner_chunk_overlap`` tokens of the
         neighbouring text on both sides (GLiNER-only: 2 chars per token, as in
-        ``_simple_chunk``). ``win_start + offsets[i]`` is the document position of
+        ``simple_chunk``). ``win_start + offsets[i]`` is the document position of
         window position *i*. A span belongs to the window whose core owns its
         start (``own_start <= start < own_end``); a copy seen by another window is
         kept only when no owned span covers it. With overlap 0 windows are the
@@ -977,20 +842,20 @@ class GeneralNER:
             counter = self._window_tokenizer(keys)
         # A document that fits one window is never split: overlap applies only when chunking.
         if overlap and (
-            self._token_count(text, counter) <= budget if self.tokenizer is not None
+            token_count(text, counter) <= budget if self.tokenizer is not None
             else len(text) <= budget * 2
         ):
             overlap = 0
         budget -= 2 * overlap
         if self.tokenizer is not None:
-            chunks = self.split_text(text, budget, counter)
+            chunks = split_text(text, budget, counter)
         else:
-            chunks = self._simple_chunk(text, max_tokens=budget)
+            chunks = simple_chunk(text, max_tokens=budget)
 
         cores = []
         search_start = 0
         for chunk in chunks:
-            source_chunk, start, offsets = self._align_chunk(text, chunk, search_start)
+            source_chunk, start, offsets = align_chunk(text, chunk, search_start)
             search_start = start + len(source_chunk)
             cores.append((chunk, start, start + len(source_chunk), offsets))
         if not overlap:
@@ -1015,7 +880,7 @@ class GeneralNER:
                     max(core_end, ends[min(len(ends), after + overlap) - 1])
                     if after < len(ends) else core_end
                 )
-                if self._token_count(text[win_start:win_end], counter) > budget + 2 * overlap:
+                if token_count(text[win_start:win_end], counter) > budget + 2 * overlap:
                     win_start, win_end = core_start, core_end  # overlap would truncate another model
             else:
                 win_start = max(0, core_start - overlap * 2)
@@ -1048,7 +913,7 @@ class GeneralNER:
         chunk_keys: List[tuple] = [()] * len(chunks)
 
         # Primary backend: ONNX or Torch — run each key in the ensemble
-        if self._ner_backend in ('onnx', 'torch', 'ensemble_onnx', 'ensemble_torch'):
+        if self._ner_backend in TOKEN_MODEL_BACKENDS:
             chunk_keys = [
                 self._get_ensemble_keys(language or 'MULTILINGUAL') for language in languages
             ]
@@ -1067,7 +932,7 @@ class GeneralNER:
                         batch = self._pipelines[key](key_chunks, batch_size=self._ner_batch_size)
                 for i, data in zip(indices, batch):
                     per_key[i][key] = [
-                        {**item, 'model': key} for item in self.ner_data(data, positional_tags)
+                        {**item, 'model': key} for item in self.entities_with_position_key(data, positional_tags)
                     ]
 
         results = [
@@ -1089,7 +954,7 @@ class GeneralNER:
             with self._get_lock('gliner'):
                 gliner_batch = self._gliner_pipe(chunks, batch_size=self._ner_batch_size)
             for i, data in enumerate(gliner_batch):
-                results[i].extend({**item, 'model': 'gliner'} for item in self.ner_data(data, gliner_tags))
+                results[i].extend({**item, 'model': 'gliner'} for item in self.entities_with_position_key(data, gliner_tags))
         return results
 
     def _finalize(
@@ -1109,7 +974,7 @@ class GeneralNER:
                 start = win_start + offsets[item['start']]
                 end = win_start + offsets[item['end']]
                 if self._ner_snap_word_edges:
-                    start, end = _snap_word_edges(
+                    start, end = snap_word_edges(
                         text, start, end, self._ner_subword_widen, self._ner_subword_widen_same_script)
                 span = {**item, 'start': start, 'end': end,
                         'word': text[start:end], 'key': f"{start}:{end}"}
@@ -1125,7 +990,7 @@ class GeneralNER:
         foreign = [span for vote, span in best.items() if vote not in owned]
         spans = [span for vote, span in best.items() if vote in owned]
         if foreign:
-            spans = self.ner_ensemble(spans, ner_confidence_threshold)
+            spans = self.vote_entities(spans, ner_confidence_threshold)
             # A neighbour's copy counts only where an eligible owned span covering it is concealed.
             covers = [
                 o for o in spans
@@ -1137,7 +1002,7 @@ class GeneralNER:
                 if not any(o['start'] <= span['start'] and span['end'] <= o['end'] for o in covers)
             ]
 
-        ensemble_results = self.ner_ensemble(spans, ner_confidence_threshold)
+        ensemble_results = self.vote_entities(spans, ner_confidence_threshold)
         source_markers = source_markers or ()
         source_spans = [s for s in source_markers if isinstance(s, tuple)]
 
@@ -1145,11 +1010,11 @@ class GeneralNER:
             return m.group() not in source_markers and not any(
                 a <= m.start() and m.end() <= b for a, b in source_spans)
         markers = [m.span() for m in _PLACEHOLDER_TOKEN.finditer(text) if emitted(m)]
-        if getattr(self, '_synthetic_replacer', None):  # set only in synthetic mode
+        if self._synthetic_replacer:  # None outside synthetic mode
             # Fakes the regex steps inserted (emails, phones...) are protected like placeholders.
             for fake in set(self._synthetic_replacer._get_cache().values()):
                 markers += [m.span() for m in re.finditer(re.escape(fake), text)]
-        for marker in getattr(self, '_regex_markers', ()):
+        for marker in self._regex_markers:
             markers += [m.span() for m in re.finditer(re.escape(marker), text) if emitted(m)]
         if markers:
             ensemble_results = [
@@ -1166,88 +1031,20 @@ class GeneralNER:
                 if (start, end) != (item['start'], item['end']):
                     ensemble_results[index] = {**item, 'start': start, 'end': end, 'word': text[start:end]}
         if self._ner_propagate_masked:
-            ensemble_results = self._propagate(text, ensemble_results, markers)
+            ensemble_results = propagate(text, ensemble_results, markers, self._ner_propagate_min_score)
         if self._ner_merge_location_gap:
-            ensemble_results = self._merge_location_gaps(
+            ensemble_results = merge_location_gaps(
                 text, ensemble_results, markers, self._ner_merge_location_gap)
-        ensemble_results = self._drop_allowed(text, ensemble_results, lambda item: (item['start'], item['end']))
+        ensemble_results = drop_allowed(self._allow_regex, text, ensemble_results, lambda item: (item['start'], item['end']))
         if not ensemble_results:
             return NERProcessingResult(text=text, findings=())
         entities = tuple(self._entity(item) for item in ensemble_results)
-        if privacy_policy is not None:
-            findings = privacy_policy.evaluate(entities)
-            return NERProcessingResult(
-                text=privacy_policy.transform(text, findings),
-                findings=findings,
-            )
-        result = self.anonymize_text(
-            text, ensemble_results, self._replacement_mode, anon_map=anon_map,
+        return self._policy_or_default(
+            text, entities, privacy_policy,
+            lambda: self.anonymize_text(
+                text, ensemble_results, self._replacement_mode, anon_map=anon_map,
+            ).text,
         )
-        findings = tuple(
-            EntityFinding(entity, self._replacement_mode, 'detector-threshold')
-            for entity in entities
-        )
-        return NERProcessingResult(text=result.text, findings=findings)
-
-    def _drop_allowed(self, text, items, span):
-        """*items* without those equal to or inside a custom_allow_terms occurrence (applied last)."""
-        allow = getattr(self, '_allow_regex', None)
-        if allow is None or not items:
-            return items
-        allowed = [m.span() for m in allow.finditer(text)]
-        return [item for item in items
-                if not any(a <= span(item)[0] and span(item)[1] <= b for a, b in allowed)]
-
-    @staticmethod
-    def _merge_location_gaps(text, spans, markers, max_gap):
-        """Join neighbouring LOCATION spans into one, so an address is one span.
-
-        Format rule only: the gap between them may hold at most *max_gap* characters outside
-        placeholders (``<NUMBER>`` in ``IL <NUMBER>,`` is not counted and is taken in), no line
-        break and no sentence end (``.!?;:`` before whitespace, or ``。！？``).
-        """
-        merged = []
-        for item in sorted(spans, key=lambda x: (x['start'], -x['end'])):
-            last = merged[-1] if merged else None
-            if last and ENTITY_TYPE_MAP.get(last['entity_group']) == 'LOCATION' \
-                    and ENTITY_TYPE_MAP.get(item['entity_group']) == 'LOCATION':
-                a, b = last['end'], item['start']
-                gap = text[a:b]
-                visible = sum(1 for i in range(a, b) if not any(s <= i < e for s, e in markers))
-                if visible <= max_gap and not _GAP_BREAK.search(gap):
-                    best = last if last['score'] >= item['score'] else item
-                    start, end = last['start'], max(last['end'], item['end'])
-                    merged[-1] = {**best, 'start': start, 'end': end,
-                                  'word': text[start:end], 'key': f"{start}:{end}"}
-                    continue
-            merged.append(item)
-        return merged
-
-    def _propagate(self, text, spans, markers):
-        """Add a span at every other whole-word, case-sensitive copy of a masked PER/ORG/LOC value.
-
-        The values come from the models' own spans; a span below ``_ner_propagate_min_score``,
-        shorter than 2 characters or without a letter is not spread. Copies that overlap a
-        span or a marker are skipped, longest value first, so added spans stay disjoint.
-        """
-        cut = self._ner_propagate_min_score
-        sources = {}
-        for item in spans:
-            value = text[item['start']:item['end']]
-            if (item['entity_group'] in ('PER', 'ORG', 'LOC') and (cut is None or item['score'] >= cut)
-                    and len(value) >= 2 and any(ch.isalpha() for ch in value)
-                    and (value not in sources or item['score'] > sources[value]['score'])):
-                sources[value] = item
-        taken = [(s['start'], s['end']) for s in spans] + list(markers)
-        added = []
-        for value in sorted(sources, key=len, reverse=True):
-            # \p{M}: a combining mark (Hindi ा, Thai ิ) continues the word, though stdlib \w excludes it.
-            for m in regex.finditer(rf"(?<![\w\p{{M}}]){regex.escape(value)}(?![\w\p{{M}}])", text):
-                a, b = m.span()
-                if not any(x < b and a < y for x, y in taken):
-                    taken.append((a, b))
-                    added.append({**sources[value], 'start': a, 'end': b, 'word': value, 'key': f"{a}:{b}"})
-        return sorted(spans + added, key=lambda x: x['start']) if added else spans
 
     @staticmethod
     def _entity(item) -> DetectedEntity:
@@ -1262,7 +1059,7 @@ class GeneralNER:
     def ner_process(
         self,
         text: str,
-        positional_tags: Optional[Sequence[str]] = None,
+        positional_tags: Sequence[str],
         ner_confidence_threshold: Optional[float] = None,
         language: Optional[str] = None,
         anon_map: Optional['AnonymizationMap'] = None,
@@ -1276,114 +1073,11 @@ class GeneralNER:
             anon_map=anon_map,
         ).text
 
-    def _token_count(self, text: str, tokenizer) -> int:
-        """Count tokens in text."""
-        return len(tokenizer(text).input_ids)
-
-    @staticmethod
-    def _merge_pieces(pieces: List[tuple], fits) -> List[str]:
-        """Greedily merge adjacent ``(separator, piece)`` pairs while ``fits(chunk)``.
-
-        Pieces inside a chunk are rejoined with their original separator.
-        """
-        if not pieces:
-            return []
-        chunks = []
-        current = pieces[0][1]
-        for separator, piece in pieces[1:]:
-            merged = current + separator + piece
-            if fits(merged):
-                current = merged
-            else:
-                if current:
-                    chunks.append(current)
-                current = piece
-        if current:
-            chunks.append(current)
-        return chunks
-
-    def split_text(self, text: str, max_tokens: int, tokenizer) -> List[str]:
-        """Split text into token-bounded chunks using a delimiter hierarchy.
-
-        Tries sentence boundaries first (preferred: respects sentence integrity),
-        then falls back to CHUNK_DELIMITERS from coarsest (paragraph) to finest
-        (whitespace). Recurses on oversized chunks. Falls back to character-level
-        splitting via token offsets as last resort.
-        """
-        if self._token_count(text, tokenizer) <= max_tokens:
-            return [text]
-
-        # Prefer sentence-boundary splits to avoid fragmenting entities mid-sentence
-        def fits(chunk):
-            return self._token_count(chunk, tokenizer) <= max_tokens
-
-        sentence_pieces = self._split_pieces(constants.SENTENCE_BOUNDARY_PATTERN, text)
-        if len(sentence_pieces) > 1:
-            merged = self._merge_pieces(sentence_pieces, fits)
-            result = []
-            for chunk in merged:
-                if self._token_count(chunk, tokenizer) > max_tokens:
-                    result.extend(self.split_text(chunk, max_tokens, tokenizer))
-                else:
-                    result.append(chunk)
-            return result
-
-        # Try each delimiter in priority order
-        for delimiter in constants.CHUNK_DELIMITERS:
-            pieces = self._split_pieces(delimiter, text)
-            if len(pieces) <= 1:
-                continue
-
-            # Greedily merge small adjacent pieces
-            merged = self._merge_pieces(pieces, fits)
-
-            # Recurse on any chunk that still exceeds the limit
-            result = []
-            for chunk in merged:
-                if self._token_count(chunk, tokenizer) > max_tokens:
-                    result.extend(self.split_text(chunk, max_tokens, tokenizer))
-                else:
-                    result.append(chunk)
-            return result
-
-        # Last resort: character-level splitting via token offsets
-        tokenized = tokenizer(text, return_offsets_mapping=True)
-        offsets = tokenized.offset_mapping
-        # Reserve room for the special tokens ([CLS]/[SEP]) each chunk gets back.
-        budget = max(1, max_tokens - self._token_count('', tokenizer))
-        chunks = []
-        last_end = 0
-        current_tokens = 0
-
-        for start, end in offsets:
-            if end <= start:
-                continue  # special token, no source text
-            if current_tokens >= budget:
-                chunks.append(text[last_end:start])
-                last_end = start
-                current_tokens = 0
-            current_tokens += 1
-
-        if last_end < len(text):
-            chunks.append(text[last_end:])
-
-        # Re-tokenizing a slice can add tokens (word-start markers), so halve any
-        # slice that still does not fit until it does.
-        result = []
-        for chunk in chunks:
-            if len(chunk) > 1 and not fits(chunk):
-                mid = len(chunk) // 2
-                result.extend(self.split_text(chunk[:mid], max_tokens, tokenizer))
-                result.extend(self.split_text(chunk[mid:], max_tokens, tokenizer))
-            else:
-                result.append(chunk)
-        return result
-
-    def process_batch(
+    def ner_process_batch(
         self,
         texts: List[str],
+        positional_tags: Sequence[str],
         batch_size: Optional[int] = None,
-        positional_tags: Optional[List[str]] = None,
         ner_confidence_threshold: Optional[float] = None,
         language: Optional[str] = None
     ) -> List[str]:

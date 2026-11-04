@@ -5,6 +5,8 @@ from types import MappingProxyType
 from hypothesis import given, settings
 from hypothesis.strategies import text, from_regex
 from faker import Faker
+from tests.ner_helpers import bare_ner
+from sct.utils.ner_chunking import simple_chunk, split_text, token_count
 from sct import config
 from sct.config import (
     TextCleanerConfig,
@@ -433,7 +435,7 @@ class TextCleanerTest(unittest.TestCase):
             {'entity_group': 'PER', 'score': 0.90, 'word': 'Smith',
              'start': 12, 'end': 3},
         ]
-        results = self.ner.ner_data(mock_data, ['PER'])
+        results = self.ner.entities_with_position_key(mock_data, ['PER'])
         keys = [r['key'] for r in results]
         self.assertEqual(keys[0], "1:23")
         self.assertEqual(keys[1], "12:3")
@@ -446,7 +448,7 @@ class TextCleanerTest(unittest.TestCase):
             {'entity_group': 'PER', 'score': 0.90, 'word': 'John', 'key': '0:4', 'start': 0, 'end': 4},
             {'entity_group': 'PER', 'score': 0.85, 'word': 'John', 'key': '0:4', 'start': 0, 'end': 4},
         ]
-        ensemble = self.ner.ner_ensemble(mock_results, 0.80)
+        ensemble = self.ner.vote_entities(mock_results, 0.80)
         self.assertEqual(len(ensemble), 1)
         self.assertEqual(ensemble[0]['key'], '0:4')
 
@@ -465,10 +467,10 @@ class TextCleanerTest(unittest.TestCase):
             "Sarah lives in London.",
             "The quick brown fox.",
         ]
-        results = self.ner.process_batch(
+        results = self.ner.ner_process_batch(
             texts,
+            ['PER', 'ORG', 'LOC'],
             batch_size=2,
-            positional_tags=['PER', 'ORG', 'LOC'],
             ner_confidence_threshold=0.85,
         )
         self.assertEqual(len(results), len(texts))
@@ -649,7 +651,7 @@ class TextCleanerTest(unittest.TestCase):
         chunk2_text = "Sarah Johnson lives in Berlin and works at Google. "
         long_text = chunk1_text * 30 + chunk2_text * 30  # ~60 repetitions, forces splitting
 
-        chunks = self.ner.split_text(long_text, self.ner.min_token_length, self.ner.tokenizer)
+        chunks = split_text(long_text, self.ner.min_token_length, self.ner.tokenizer)
         self.assertGreater(len(chunks), 1, "Text should split into multiple chunks")
 
         processed = self.ner.ner_process(
@@ -737,7 +739,7 @@ class TextCleanerTest(unittest.TestCase):
     def test_split_text_short_text_no_split(self):
         """Text under max_tokens returns as a single chunk."""
         text = "Hello world."
-        chunks = self.ner.split_text(text, 50, self.ner.tokenizer)
+        chunks = split_text(text, 50, self.ner.tokenizer)
         self.assertEqual(chunks, [text])
 
     @requires_ner
@@ -749,10 +751,10 @@ class TextCleanerTest(unittest.TestCase):
         text = f"{para1.strip()}\n\n{para2.strip()}\n\n{para3.strip()}"
 
         # Set max_tokens so that each paragraph fits but two don't
-        tokens_per_para = self.ner._token_count(para1.strip(), self.ner.tokenizer)
+        tokens_per_para = token_count(para1.strip(), self.ner.tokenizer)
         max_tokens = int(tokens_per_para * 1.5)
 
-        chunks = self.ner.split_text(text, max_tokens, self.ner.tokenizer)
+        chunks = split_text(text, max_tokens, self.ner.tokenizer)
         self.assertGreaterEqual(len(chunks), 2)
         # Chunks are exact source slices (original breaks kept) ending at a boundary
         for chunk in chunks:
@@ -771,10 +773,10 @@ class TextCleanerTest(unittest.TestCase):
         ]
         text = " ".join(s for s in sentences * 4)  # Repeat to ensure length
 
-        total_tokens = self.ner._token_count(text, self.ner.tokenizer)
+        total_tokens = token_count(text, self.ner.tokenizer)
         max_tokens = total_tokens // 3
 
-        chunks = self.ner.split_text(text, max_tokens, self.ner.tokenizer)
+        chunks = split_text(text, max_tokens, self.ner.tokenizer)
         self.assertGreater(len(chunks), 1)
         # Each chunk except the last should end at a sentence boundary
         for chunk in chunks[:-1]:
@@ -789,10 +791,10 @@ class TextCleanerTest(unittest.TestCase):
         clauses = [f"clause number {i} of the text" for i in range(30)]
         text = "; ".join(clauses)
 
-        total_tokens = self.ner._token_count(text, self.ner.tokenizer)
+        total_tokens = token_count(text, self.ner.tokenizer)
         max_tokens = total_tokens // 3
 
-        chunks = self.ner.split_text(text, max_tokens, self.ner.tokenizer)
+        chunks = split_text(text, max_tokens, self.ner.tokenizer)
         self.assertGreater(len(chunks), 1)
 
     @requires_ner
@@ -800,10 +802,10 @@ class TextCleanerTest(unittest.TestCase):
         """Long text without punctuation splits at word boundaries."""
         text = " ".join(["word"] * 200)
 
-        total_tokens = self.ner._token_count(text, self.ner.tokenizer)
+        total_tokens = token_count(text, self.ner.tokenizer)
         max_tokens = total_tokens // 4
 
-        chunks = self.ner.split_text(text, max_tokens, self.ner.tokenizer)
+        chunks = split_text(text, max_tokens, self.ner.tokenizer)
         self.assertGreater(len(chunks), 1)
         # No chunk should start or end with whitespace
         for chunk in chunks:
@@ -817,10 +819,10 @@ class TextCleanerTest(unittest.TestCase):
             "Third sentence here. Fourth sentence here."
         )
 
-        total_tokens = self.ner._token_count(text, self.ner.tokenizer)
+        total_tokens = token_count(text, self.ner.tokenizer)
         max_tokens = int(total_tokens * 0.6)
 
-        chunks = self.ner.split_text(text, max_tokens, self.ner.tokenizer)
+        chunks = split_text(text, max_tokens, self.ner.tokenizer)
         if len(chunks) == 2:
             # Should have split at paragraph break, not sentence break
             self.assertIn("First sentence", chunks[0])
@@ -834,12 +836,12 @@ class TextCleanerTest(unittest.TestCase):
         text = "The quick brown fox jumps. " * 100
         max_tokens = 30
 
-        chunks = self.ner.split_text(text, max_tokens, self.ner.tokenizer)
+        chunks = split_text(text, max_tokens, self.ner.tokenizer)
         for i, chunk in enumerate(chunks):
-            token_count = self.ner._token_count(chunk, self.ner.tokenizer)
+            tokens = token_count(chunk, self.ner.tokenizer)
             self.assertLessEqual(
-                token_count, max_tokens,
-                f"Chunk {i} has {token_count} tokens, exceeds limit {max_tokens}"
+                tokens, max_tokens,
+                f"Chunk {i} has {tokens} tokens, exceeds limit {max_tokens}"
             )
 
     @requires_ner
@@ -849,7 +851,7 @@ class TextCleanerTest(unittest.TestCase):
         text = "Hello world. This is a test. With multiple sentences.\n\nAnd paragraphs too."
         max_tokens = 15
 
-        chunks = self.ner.split_text(text, max_tokens, self.ner.tokenizer)
+        chunks = split_text(text, max_tokens, self.ner.tokenizer)
 
         # Normalize whitespace in original and joined chunks for comparison
         original_normalized = _re.sub(r'\s+', ' ', text).strip()
@@ -861,9 +863,9 @@ class TextCleanerTest(unittest.TestCase):
         """BERT maps long no-whitespace strings to [UNK] (1 token), returns single chunk."""
         text = "abcdefghij" * 100  # 1000 chars, no delimiters
         # BERT tokenizer produces [CLS] [UNK] [SEP] = 3 tokens
-        token_count = self.ner._token_count(text, self.ner.tokenizer)
-        self.assertLessEqual(token_count, 5, "Expected BERT to map to [UNK]")
-        chunks = self.ner.split_text(text, 50, self.ner.tokenizer)
+        tokens = token_count(text, self.ner.tokenizer)
+        self.assertLessEqual(tokens, 5, "Expected BERT to map to [UNK]")
+        chunks = split_text(text, 50, self.ner.tokenizer)
         self.assertEqual(len(chunks), 1)  # Under token limit, no split needed
         self.assertEqual(chunks[0], text)
 
@@ -887,7 +889,7 @@ class TextCleanerTest(unittest.TestCase):
         text = "x" * 100  # 100 chars, no delimiters
         max_tokens = 20
 
-        chunks = self.ner.split_text(text, max_tokens, mock_tokenizer)
+        chunks = split_text(text, max_tokens, mock_tokenizer)
         self.assertGreater(len(chunks), 1)
         self.assertEqual(''.join(chunks), text)
         # Each chunk should be at most max_tokens characters (1 char = 1 token)
@@ -902,7 +904,7 @@ class TextCleanerTest(unittest.TestCase):
         segment = "John Smith works at Microsoft in Seattle. Sarah Johnson lives in Berlin. "
         text = segment * 50  # Repeat to force multiple chunks
 
-        chunks = self.ner.split_text(text, self.ner.min_token_length, self.ner.tokenizer)
+        chunks = split_text(text, self.ner.min_token_length, self.ner.tokenizer)
         self.assertGreater(len(chunks), 1, "Text should require multiple chunks")
 
         processed = self.ner.ner_process(
@@ -960,7 +962,7 @@ class TextCleanerTest(unittest.TestCase):
     def test_simple_chunk_conservative_ratio(self):
         """_simple_chunk uses 2 chars/token (not 4) to handle CJK/Arabic safely."""
         import inspect
-        src = inspect.getsource(GeneralNER._simple_chunk)
+        src = inspect.getsource(simple_chunk)
         self.assertIn('max_tokens * 2', src)
         self.assertNotIn('max_tokens * 4', src)
 
@@ -2043,7 +2045,7 @@ class ReversibleAnonymizationTest(unittest.TestCase):
     def test_ner_anonymize_reversible(self):
         """GeneralNER._anonymize_reversible should produce indexed placeholders."""
         from sct.utils.anonymization_map import AnonymizationMap
-        ner_obj = GeneralNER.__new__(GeneralNER)
+        ner_obj = bare_ner()
 
         amap = AnonymizationMap()
         text = "Alice works at ACME in Paris."

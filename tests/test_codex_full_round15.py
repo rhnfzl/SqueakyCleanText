@@ -9,10 +9,10 @@ from pathlib import Path
 
 import pytest
 
+from tests.ner_helpers import bare_ner
 from sct import TextCleaner, TextCleanerConfig
 from sct.privacy import EntityRule, PrivacyPolicy
 from sct.utils import synthetic
-from sct.utils.ner import GeneralNER
 from tests.conftest import TEST_NER_MODELS
 
 MODES = ["placeholder", "synthetic", "reversible"]
@@ -106,7 +106,7 @@ def test_presidio_types_mapped(legacy, phone):
         def analyze(self, *, text, language):
             return [_Result("PHONE_NUMBER", 5, 15), _Result("NAME", 0, 4)]
 
-    ner = object.__new__(GeneralNER)
+    ner = bare_ner()
     ner._ner_backend = "presidio_gliner"
     ner._analyzer = Analyzer()
     ner._presidio_types = _presidio_type_map({"legacy_type_names": legacy, "label_map": {"name": "PER"}})

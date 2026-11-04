@@ -4,6 +4,7 @@ overlap checked against models loaded after construction."""
 
 import pytest
 
+from sct.utils.ner_chunking import token_count
 from tests.test_chunking import _FakeRunDetector, _word_ner, _words
 from tests.test_review_round1 import _Tok
 
@@ -52,7 +53,7 @@ def test_unrelated_loaded_model_does_not_change_a_document():
     assert batch[0].text == expected
     # The Dutch document is still sized for the Dutch tokenizer.
     windows = ner._plan_windows(text, ner._get_ensemble_keys("DUTCH"))
-    assert all(ner._token_count(w[0], _Tok(2)) <= 12 for w in windows)
+    assert all(token_count(w[0], _Tok(2)) <= 12 for w in windows)
 
 
 def test_overlap_rechecked_after_a_smaller_model_loads():
