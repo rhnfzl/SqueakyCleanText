@@ -3,6 +3,10 @@
 This directory holds reviewed ground truth for measuring sensitive-data detection.
 Use it to compare models before changing a production default.
 
+These sets are small and committed to the repo. The tools that score them live in
+`scripts/`, with results in `evaluation/results/`. For scores on large downloaded datasets,
+with results in `benchmarks/results/`, see [benchmarks/](../benchmarks/README.md).
+
 `pii_starter.jsonl` is a synthetic smoke fixture. It checks the evaluation path
 and common labels. It is not large enough to support accuracy or compliance claims.
 

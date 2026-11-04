@@ -69,7 +69,7 @@ def load(config: dict):
 
     from sct.utils.normtext import unescape_markup
 
-    from scripts.benchmark_release import predicted_spans
+    from benchmarks.score import predicted_spans
 
     base = dict(SCORING)
     if config.get("mode", "default") == "gliner":
