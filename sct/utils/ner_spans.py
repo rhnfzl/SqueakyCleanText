@@ -38,10 +38,10 @@ def _joins_word(char: str, script: str | None) -> bool:
 def _word_bounds(text: str, start: int, end: int, scripts: list[str] | None) -> tuple[int, int]:
     new_start, new_end = start, end
     if _joins_word(text[start], None):
-        while new_start > 0 and _joins_word(text[new_start - 1], scripts and scripts[0]):
+        while new_start > 0 and _joins_word(text[new_start - 1], scripts[0] if scripts else None):
             new_start -= 1
     if _joins_word(text[end - 1], None):
-        while new_end < len(text) and _joins_word(text[new_end], scripts and scripts[-1]):
+        while new_end < len(text) and _joins_word(text[new_end], scripts[-1] if scripts else None):
             new_end += 1
     return new_start, new_end
 

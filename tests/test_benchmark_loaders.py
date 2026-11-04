@@ -116,12 +116,14 @@ def test_thainer_joins_words_with_no_separator_and_decodes_tag_ids(monkeypatch, 
 def test_fineweb2_samples_per_directory_from_the_seed(monkeypatch, parquet):
     pinned(fineweb2, monkeypatch, lambda name: name)
     parquet.rows = lambda path: [{"id": f"{path.split('/')[1]}-{i}", "text": f"t{i}"} for i in range(5)]
-    picked = fineweb2.load(2, 13, dirs=("nld_Latn", "rus_Cyrl"))
+    monkeypatch.setattr(fineweb2, "DIRS", ("nld_Latn", "rus_Cyrl"))
+    picked = fineweb2.load(2, 13)
     assert [r["lang"] for r in picked] == ["nld_Latn"] * 2 + ["rus_Cyrl"] * 2
-    assert picked == fineweb2.load(2, 13, dirs=("nld_Latn", "rus_Cyrl"))
+    assert picked == fineweb2.load(2, 13)
     assert all(r["id"].startswith(r["lang"]) and r["spans"] == [] for r in picked)
-    assert len(fineweb2.load(None, 13, dirs=("nld_Latn",))) == 5
-    assert len(fineweb2.load(99, 13, dirs=("nld_Latn",))) == 5
+    monkeypatch.setattr(fineweb2, "DIRS", ("nld_Latn",))
+    assert len(fineweb2.load(None, 13)) == 5
+    assert len(fineweb2.load(99, 13)) == 5
     assert parquet.columns[0] == ["id", "text"]
 
 

@@ -161,13 +161,13 @@ def test_upload_sends_only_files_that_exist(exporter, tmp_path, monkeypatch):
     uploads = []
     api = SimpleNamespace(create_repo=lambda *a, **k: None,
                           upload_file=lambda **k: uploads.append((k["path_in_repo"], k["repo_id"])))
-    monkeypatch.setattr("huggingface_hub.HfApi", lambda: api)
+    monkeypatch.setattr(exporter, "HfApi", lambda: api)
     exporter.upload_model(tmp_path, "me/repo")
     assert uploads == [("model.onnx", "me/repo")]
 
 
 def test_dry_run_touches_no_hub(exporter, tmp_path, monkeypatch, capsys):
-    monkeypatch.setattr("huggingface_hub.HfApi", lambda: pytest.fail("no hub call in a dry run"))
+    monkeypatch.setattr(exporter, "HfApi", lambda: pytest.fail("no hub call in a dry run"))
     exporter.upload_model(tmp_path, "me/repo", dry_run=True)
     assert "DRY RUN" in capsys.readouterr().out
 
@@ -192,7 +192,8 @@ def test_main_keeps_going_after_a_failure_and_cleans_up(exporter, tmp_path, monk
     monkeypatch.setattr(exporter, "upload_model", lambda path, repo, dry_run: uploaded.append((repo, dry_run)))
     monkeypatch.setattr(sys, "argv", ["x", "--dry-run", "--output-base", str(tmp_path), "--models",
                                       "dslim/bert-base-NER", "Babelscape/wikineural-multilingual-ner"])
-    exporter.main()
+    with pytest.raises(SystemExit, match="bert-base-NER"):
+        exporter.main()
     assert uploaded == [("rhnfzl/wikineural-multilingual-ner-onnx", True)]
     assert "FAILED: no disk" in capsys.readouterr().out
     assert len(exported) == 2 and not any(path.exists() for path in exported)
@@ -224,7 +225,7 @@ def test_diagram_check_rejects_overflow_tiny_text_and_off_canvas(diagrams):
     off = diagrams.Diagram("d", 100, "t")
     off.rect(0, 0, 50, 500, "grey")
     for diagram, message in ((wide, "overflows"), (tiny, "too small"), (off, "off canvas")):
-        with pytest.raises(AssertionError, match=message):
+        with pytest.raises(ValueError, match=message):
             diagram.check()
 
 

@@ -1,10 +1,15 @@
 """MkDocs hooks: README links point at GitHub (for GitHub and PyPI); on the site, keep readers on the site."""
 
-import re
+from __future__ import annotations
 
-from mkdocs.structure.files import Files
-from mkdocs.structure.pages import Page
+import re
+from typing import TYPE_CHECKING
+
 from mkdocs.utils import get_relative_url
+
+if TYPE_CHECKING:
+    from mkdocs.structure.files import Files
+    from mkdocs.structure.pages import Page
 
 _REPO = "https://github.com/rhnfzl/SqueakyCleanText/"
 _HREF = re.compile(r'href="' + re.escape(_REPO) + r'(?:blob|tree)/main/([^"#]+)(#[^"]*)?"')
