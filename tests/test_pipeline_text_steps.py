@@ -1,5 +1,6 @@
 """Pipeline text steps: JSON spans, HTML comments, isolated symbols, JSON keys, language confidence."""
 
+import re
 import types
 
 import pytest
@@ -60,6 +61,12 @@ def test_html_comment_ends_at_close_marker(cleaner, text, expected):
 
 def test_many_unclosed_comments_stay_linear():
     assert_near_linear(lambda text: constants.HTML_REGEX.sub('', text), lambda n: '<!--' * n, 50000)
+
+
+def test_linearity_check_catches_a_quadratic_regex():
+    # restarts the letter run at every position
+    with pytest.raises(AssertionError):
+        assert_near_linear(re.compile(r"[ab]*c").search, lambda n: "ab" * n, 16000, repeats=1)
 
 
 FAST = preset_config("training", check_ner_process=False)
