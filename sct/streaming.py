@@ -224,17 +224,21 @@ class WindowedStreamingRedactor:
         self._overlap_chars = overlap_chars
         self._buffer = ""
         self._pending = ""  # the separator after the last emitted text, held until more text follows it
+        self._ready: list[str] = []  # processed windows not yet returned; they outlive a BufferError
         self._finished = False
 
     def feed(self, chunk: str) -> str:
-        """Process stable prefixes until the buffer fits max_buffer_chars, retaining a trailing overlap window."""
+        """Process stable prefixes until the buffer fits max_buffer_chars, retaining a trailing overlap window.
+
+        Text processed before a BufferError comes back from the next successful feed or finish.
+        """
         if self._finished:
             raise RuntimeError("Cannot feed a finished stream")
         self._buffer += chunk
-        out = []
         while len(self._buffer) > self._max_buffer_chars:  # one feed may hold many windows
-            out.append(self._split())
-        return "".join(out)
+            self._ready.append(self._split())
+        out, self._ready = "".join(self._ready), []
+        return out
 
     def _emit(self, text: str, separator: str) -> str:
         """*text* after the held separator; with whitespace normalised, empty text adds no separator, as the
@@ -284,4 +288,5 @@ class WindowedStreamingRedactor:
         if self._finished:
             raise RuntimeError("Stream is already finished")
         self._finished = True
-        return self._emit(self._cleaner.process(self._buffer).lm_text, "")
+        out, self._ready = "".join(self._ready) + self._emit(self._cleaner.process(self._buffer).lm_text, ""), []
+        return out

@@ -148,6 +148,15 @@ def test_one_feed_keeps_the_buffer_bounded():
     assert (out + redactor.finish()).split() == cleaner.process(text).lm_text.split()
 
 
+def test_buffer_error_keeps_the_windows_already_processed():
+    cleaner = TextCleaner(preset_config("training", check_ner_process=False))
+    text = "alpha beta gamma delta epsilon zeta eta theta iota kappa lambda mu nu xi omicron " + "z" * 200
+    redactor = WindowedStreamingRedactor(cleaner, max_buffer_chars=40, overlap_chars=16)
+    with pytest.raises(BufferError):
+        redactor.feed(text)
+    assert redactor.finish() == cleaner.process(text).lm_text
+
+
 @pytest.mark.parametrize("text", ["hello " + " " * 100 + "world", " " * 60 + "hello", "hello" + " " * 60])
 def test_whitespace_only_windows_add_no_space(text):
     cleaner = _cleaner("sct")
