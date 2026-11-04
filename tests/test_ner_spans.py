@@ -92,7 +92,8 @@ def test_location_gap_needs_two_locations():
 def test_propagate_adds_whole_word_case_sensitive_copies():
     text = "Maria met Maria, Marian and maria."
     result = propagate(text, [span(0, 5, text=text)], (), None)
-    assert [(s["start"], s["end"], s["word"], s["key"]) for s in result] == [(0, 5, "Maria", "0:5"), (10, 15, "Maria", "10:15")]
+    assert [(s["start"], s["end"], s["word"], s["key"]) for s in result] == [
+        (0, 5, "Maria", "0:5"), (10, 15, "Maria", "10:15")]
 
 
 def test_propagate_treats_a_combining_mark_as_part_of_the_word():
