@@ -8,6 +8,7 @@ import sys
 import time
 from importlib import metadata
 from pathlib import Path
+from typing import Any
 
 from benchmarks.score import dominant_script
 
@@ -15,6 +16,13 @@ ROOT = Path(__file__).resolve().parents[1]
 PACKAGES = ("SqueakyCleanText", "onnxruntime", "onnxruntime-gpu", "tokenizers", "lingua-language-detector",
             "huggingface-hub", "numpy", "regex", "ftfy", "emoji", "presidio_anonymizer", "pyarrow")
 WARMUP_DOCS = 4
+
+
+def write_atomic(path: Path, text: str) -> None:
+    """Replace *path* in one step, so an interrupted run never leaves a truncated result."""
+    tmp = path.with_name(path.name + ".tmp")
+    tmp.write_text(text, encoding="utf-8")
+    tmp.replace(path)
 
 
 def run_batch(cleaner, texts: list[str], workers: int, chunk: int = 64):
@@ -27,13 +35,13 @@ def run_batch(cleaner, texts: list[str], workers: int, chunk: int = 64):
     return results, seconds
 
 
-def rates(docs: int, chars: int, seconds: float) -> dict:
+def rates(docs: int, chars: int, seconds: float) -> dict[str, float | None]:
     return {"documents": docs, "chars": chars, "seconds": round(seconds, 3),
             "docs_per_second": round(docs / seconds, 3) if seconds else None,
             "chars_per_second": round(chars / seconds, 1) if seconds else None}
 
 
-def measure(cleaner, records: list[dict], workers: int) -> dict:
+def measure(cleaner, records: list[dict], workers: int) -> dict[str, Any]:
     """docs/s and chars/s per script (and in total), after a short warmup."""
     texts = [r["text"] for r in records]
     cleaner.process_batch(texts[:WARMUP_DOCS], batch_size=workers)
@@ -68,7 +76,7 @@ def _cpu_model() -> str | None:
     return platform.processor() or None
 
 
-def environment() -> dict:
+def environment() -> dict[str, Any]:
     """Hardware, software and git state for the result files."""
     versions = {}
     for name in PACKAGES:

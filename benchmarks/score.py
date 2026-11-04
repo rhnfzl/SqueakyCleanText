@@ -26,6 +26,7 @@ prediction that only overlaps out-of-scope gold is ignored.
 import re
 import unicodedata
 from collections import Counter, defaultdict
+from typing import Any
 
 import regex
 
@@ -34,6 +35,8 @@ from sct.utils.constants import LEGACY_TYPE_NAMES
 
 from benchmarks.labels import DATE, PRED_ALIASES, normalise_gold
 
+# What scoring needs from TextCleaner: each placeholder must map back to the value it replaced.
+SCORING = {"replacement_mode": "reversible", "check_to_ascii_unicode": False}
 LEAK_WORD = regex.compile(r"[\w\p{M}]+")  # \w alone splits Devanagari/Tamil at vowel signs
 # Same characters as sct.utils.ner._PLACEHOLDER_TOKEN. A local copy: adapter venvs pin an sct release.
 PLACEHOLDER = re.compile(r"<[A-Z][A-Z0-9_]*>")
@@ -154,7 +157,7 @@ def _leak_metrics(c: Counter) -> dict:
 
 
 def score_pii(records: list[dict], predictions: dict[str, list[dict]], outputs: dict[str, str],
-              mapping: dict[str, str]) -> dict:
+              mapping: dict[str, str]) -> dict[str, Any]:
     """Score one dataset under one config. *predictions* and *outputs* are keyed by record id."""
     examples, strict_preds = [], {}
     partial: dict[str, dict[str, Counter]] = {"overall": defaultdict(Counter), "by_label": defaultdict(Counter),
@@ -216,7 +219,7 @@ def score_pii(records: list[dict], predictions: dict[str, list[dict]], outputs: 
     }
 
 
-def masking_recall(records: list[dict], predictions: dict[str, list[dict]]) -> dict:
+def masking_recall(records: list[dict], predictions: dict[str, list[dict]]) -> dict[str, Any]:
     """TAB-style recall: share of DIRECT / QUASI mentions whose letters and digits are all inside predicted spans.
 
     Type does not matter (masking is what counts); a leftover ``/`` or space reveals nothing. Recall is computed per annotator
@@ -256,7 +259,7 @@ def dominant_script(text: str) -> str:
     return counts.most_common(1)[0][0] if counts else "NONE"
 
 
-def score_lid(records: list[dict], predicted: dict[str, str | None], in_set: set[str]) -> dict:
+def score_lid(records: list[dict], predicted: dict[str, str | None], in_set: set[str]) -> dict[str, Any]:
     """Language ID: accuracy per language and script for in-set languages; any answer for out-of-set text."""
     by_lang: dict[str, Counter] = defaultdict(Counter)
     by_script: dict[str, Counter] = defaultdict(Counter)
@@ -314,7 +317,7 @@ def inject_noise(text: str, rng) -> tuple[str, list[dict]]:
     return " ".join(words), items
 
 
-def score_noise(items: dict[str, list[dict]], outputs: dict[str, str]) -> dict:
+def score_noise(items: dict[str, list[dict]], outputs: dict[str, str]) -> dict[str, dict[str, float]]:
     """Share of injected noise items (by kind) no longer in the output."""
     counts: dict[str, Counter] = defaultdict(Counter)
     for doc_id, doc_items in items.items():

@@ -13,6 +13,8 @@ import random
 import urllib.request
 from pathlib import Path
 
+from huggingface_hub import hf_hub_download
+
 CACHE = Path(__file__).resolve().parents[1] / ".cache"
 
 MODULES = (
@@ -30,8 +32,6 @@ def get(name: str):
 
 def hf_file(repo: str, path: str, revision: str) -> Path:
     """Download one file of a HF dataset repo at a pinned revision (cached)."""
-    from huggingface_hub import hf_hub_download
-
     return Path(hf_hub_download(repo, path, repo_type="dataset", revision=revision, cache_dir=CACHE / "hf"))
 
 

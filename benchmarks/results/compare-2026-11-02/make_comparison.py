@@ -44,7 +44,7 @@ def mr(track, entry, dataset, without=False, metric="masked_recall"):
     return report.claimed_macro(res(track, entry, dataset, without)["views"]["full"]["compare"], entry, metric)
 
 
-def left_clean():
+def left_clean() -> list[str]:
     rows = ["| entry | privacy-synthetic | privacy-real | NER | claimed languages | round 1 status |",
             "|---|---|---|---|---|---|"]
     for e in ENTRIES:

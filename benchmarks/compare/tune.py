@@ -16,6 +16,7 @@ import argparse
 import json
 import sys
 from pathlib import Path
+from typing import Any
 
 from benchmarks.compare import runner, scorer
 
@@ -42,7 +43,7 @@ PHONE_REGIONS = ("US", "GB", "DE", "FR", "IL", "IN", "CA", "BR", "AE", "BD", "BG
 OPF_B = (-1.0, -0.5, 0.0, 0.5, 1.0, 2.0)
 
 
-def opf_preset(b: float) -> dict:
+def opf_preset(b: float) -> dict[str, dict[str, float]]:
     return {"biases": {"transition_bias_background_stay": -b, "transition_bias_background_to_start": b,
                        "transition_bias_inside_to_continue": b}}
 
@@ -72,7 +73,7 @@ def candidates(entry: str) -> list[tuple[str, float | None]]:
     return out
 
 
-def frozen_config(entry: str, run: str, threshold: float | None) -> dict:
+def frozen_config(entry: str, run: str, threshold: float | None) -> dict[str, Any]:
     """Adapter config overrides for the chosen candidate (a filtered threshold becomes the run's threshold)."""
     grid = GRID[entry]
     config = dict(grid["runs"][run])
@@ -83,15 +84,15 @@ def frozen_config(entry: str, run: str, threshold: float | None) -> dict:
     return config
 
 
-def row_at(rows: list[dict], threshold: float | None) -> dict:
+def row_at(rows: list[dict], threshold: float | None) -> dict[str, float | None]:
     match = [r for r in rows if r["threshold"] == threshold]
     if not match:
         raise ValueError(f"no tuning row at threshold {threshold}")
     return match[0]
 
 
-def select(entry: str, root: Path, datasets=PRIVACY) -> dict:
-    """Score every candidate of *entry* from its run results; return the frozen choice and the grid."""
+def select(entry: str, root: Path, datasets=PRIVACY) -> tuple[dict[str, Any], dict[str, Any]]:
+    """Score every candidate of *entry* from its run results; return the frozen choice and the per-run curves."""
     results = {}
     for run in GRID[entry]["runs"]:
         found = {d: json.loads(p.read_text()) for d in datasets

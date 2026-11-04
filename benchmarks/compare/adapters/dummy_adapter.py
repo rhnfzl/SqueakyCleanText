@@ -10,7 +10,9 @@ out-of-range span).
 import os
 import re
 import time
+from collections.abc import Callable
 from pathlib import Path
+from typing import Any
 
 from _protocol import serve
 
@@ -18,8 +20,8 @@ EMAIL = re.compile(r"[\w.+-]+@[\w-]+(?:\.[\w-]+)+")
 DIGITS = re.compile(r"\d+")
 
 
-def load(config: dict):
-    def one(doc: dict) -> dict:
+def load(config: dict[str, Any]) -> Callable[[list[dict]], list[dict]]:
+    def one(doc: dict) -> dict[str, list[dict]]:
         doc_id = doc["id"]
         time.sleep(config.get("sleep", {}).get(doc_id, 0))
         if doc_id in config.get("crash", ()):

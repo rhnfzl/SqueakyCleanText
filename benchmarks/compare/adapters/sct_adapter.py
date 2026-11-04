@@ -10,15 +10,18 @@ Config: ``mode`` (default|gliner), ``language`` (``gold``: one cleaner per gold 
 ``device`` (cpu|cuda), ``gpu_mem_gb``, ``overrides`` (extra TextCleanerConfig fields).
 """
 
+import difflib
+import re
 import sys
+import unicodedata
+from collections.abc import Callable
 from pathlib import Path
+from typing import Any
 
 # Repo root goes AFTER site-packages: the venv's pinned sct wins over the checkout's sources.
 sys.path.append(str(Path(__file__).resolve().parents[3]))
 
 from _protocol import serve  # noqa: E402
-
-SCORING = {"replacement_mode": "reversible", "check_to_ascii_unicode": False}
 
 
 def sct_language(lang: str | None) -> str | None:
@@ -44,10 +47,6 @@ def sct_view(source: str, normalise) -> tuple[str, list[int]]:
     shortcut: the alignment is difflib's, so a token rewritten beyond recognition maps its view chars
     to the start of the changed run; fine for decoding and dropping chars, revisit if a step reorders text.
     """
-    import difflib
-    import re
-    import unicodedata
-
     pieces, offsets = [], []
     for match in re.finditer(r"\S+|\s+", source):
         token, at = match.group(), match.start()
@@ -63,13 +62,9 @@ def sct_view(source: str, normalise) -> tuple[str, list[int]]:
     return "".join(pieces), offsets
 
 
-def load(config: dict):
-    from sct.config import TextCleanerConfig
-    from sct.sct import TextCleaner
-
-    from sct.utils.normtext import unescape_markup
-
-    from benchmarks.score import predicted_spans
+def cleaner_fields(config: dict[str, Any]) -> dict[str, Any]:
+    """Adapter config -> TextCleanerConfig fields."""
+    from benchmarks.score import SCORING
 
     base = dict(SCORING)
     if config.get("mode", "default") == "gliner":
@@ -81,12 +76,23 @@ def load(config: dict):
     if config.get("device") == "cuda" and config.get("gpu_mem_gb"):
         base["onnx_cuda_provider_options"] = {"gpu_mem_limit": int(config["gpu_mem_gb"] * 2**30)}
     base.update(config.get("overrides", {}))
+    return base
+
+
+def load(config: dict[str, Any]) -> Callable[[list[dict]], list[dict]]:
+    from sct.config import TextCleanerConfig
+    from sct.sct import TextCleaner
+
+    from sct.utils.normtext import unescape_markup
+
+    from benchmarks.score import predicted_spans
+
     gold = config.get("language", "gold") == "gold"
     workers = config.get("workers")
     # One cleaner for every language: a pinned ``language`` is only read when a doc is
     # processed (sct.TextCleaner._detect_language), so switching it per batch equals a
     # cleaner per language without loading the NER models once per language.
-    model = TextCleaner(cfg=TextCleanerConfig(**base))
+    model = TextCleaner(cfg=TextCleanerConfig(**cleaner_fields(config)))
 
     def normalise(token: str) -> str:
         return unescape_markup(model.normalise(token))
