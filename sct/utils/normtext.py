@@ -7,7 +7,7 @@ from ftfy import fix_text
 from ftfy.chardata import HTML_ENTITY_RE
 from ftfy.fixes import unescape_html
 from unidecode import unidecode
-from emoji import demojize, replace_emoji
+from emoji import replace_emoji
 from sct.utils import constants
 
 logger = logging.getLogger(__name__)
@@ -254,9 +254,6 @@ def fold_styled(text):
 
 class NormaliseText:
 
-    def __init__(self):
-        pass
-
     def fix_bad_unicode(self, text, normalization="NFC", decode_escapes=True, fix_character_width=False,
                         fold_styled_characters=True):
         """
@@ -293,17 +290,11 @@ class NormaliseText:
         text = constants.DOUBLE_QUOTE_REGEX.sub('"', text)
         return text
 
-    def to_ascii_unicode(self, text, no_emoji=True):
+    def to_ascii_unicode(self, text):
         """
         Convert non-ASCII characters into their closest ASCII equivalents.
         """
-        text = self.fix_strange_quotes(text)
-
-        if not no_emoji:
-            text = demojize(text, use_aliases=True)
-
-        text = unidecode(text)
-        return text
+        return unidecode(self.fix_strange_quotes(text))
 
     def remove_emoji(self, text):
         """Remove all emoji characters from text."""
@@ -328,16 +319,8 @@ class NormaliseText:
         result = []
         for token in tokens:
             alpha = ''.join(c for c in token if c.isalpha())
-            if not alpha:
-                result.append(token.casefold())
-            elif alpha.casefold() in stop_words:
-                result.append(token.casefold())
-            elif alpha.isupper():
-                result.append(token)
-            elif self._has_camelcase(token):
-                result.append(token)
-            else:
-                result.append(token.casefold())
+            keep = alpha and alpha.casefold() not in stop_words and (alpha.isupper() or self._has_camelcase(token))
+            result.append(token if keep else token.casefold())
         return ' '.join(result)
 
     def normalize_whitespace(self, text, strip_lines=True, no_line_breaks=False, keep_two_line_breaks=False):
