@@ -344,52 +344,38 @@ class TextCleaner:
         self._pipeline.extend(self._normalising_steps())
         # Steps before this index only normalise; markers they surface are source text.
         self._normalise_steps = len(self._pipeline)
-        if cfg.check_fix_bad_unicode:  # escaped "<b>" stays text: decoded after the view, hidden from tags
-            self._pipeline.append(self._unescape_markup)
-        if self._user_rules:
-            self._pipeline.append(self._replace_user_terms)
-        if cfg.check_replace_html:
-            self._pipeline.append(self._replace_html)
-        if cfg.check_fix_bad_unicode:  # brackets hide from the tag step only; contacts see "john<at>x.com"
-            self._pipeline.append(self._restore_brackets)
-        if cfg.check_replace_urls:
-            self._pipeline.append(self._replace_urls)
-        if cfg.check_replace_emails:
-            self._pipeline.append(self._replace_emails)
-        if cfg.check_replace_ips:
-            self._pipeline.append(self._replace_ips)
-        if cfg.check_replace_dates:
-            self._pipeline.append(self._replace_dates)
-        if cfg.check_fuzzy_replace_dates:
-            self._pipeline.append(self._replace_fuzzy_dates)
-        # Phones before years, so a year step cannot split "+31 6 1234 2019".
-        # Checksum-valid IBANs/cards and identifier tokens before phones, so a phone cannot take their digits.
-        if cfg.check_replace_iban_cards:
-            self._pipeline.append(self._replace_iban_cards)
-        if cfg.check_replace_identifiers:
-            self._pipeline.append(self._replace_identifiers)
-        if cfg.check_replace_phone_numbers:
-            self._pipeline.append(self._replace_phone_numbers)
-        if cfg.check_replace_years:
-            self._pipeline.append(self._replace_years)
-        if cfg.check_replace_numbers:
-            self._pipeline.append(self._replace_numbers)
-        if cfg.check_replace_currency_symbols:
-            self._pipeline.append(self._replace_currency_symbols)
-        # Emitted tokens and kept IPs are hidden from the steps above; put them back.
-        self._pipeline.append(self._restore_protected)
-        if cfg.check_remove_isolated_letters:
-            self._pipeline.append(self._symbol_masker.remove_isolated_letters)
-        if cfg.check_remove_isolated_special_symbols:
-            self._pipeline.append(self._remove_isolated_special_symbols)
-        if cfg.check_normalize_whitespace:
-            self._pipeline.append(self._normalize_whitespace)
-        # Deferred values stay hidden through the cleanup above, so a tag it would remove
-        # ("[EMAIL]" under bracket removal) still carries its value to the swap after NER.
-        self._pipeline.append(self._restore_deferred)
+        rows = (
+            # escaped "<b>" stays text: decoded after the view, hidden from tags
+            (cfg.check_fix_bad_unicode, self._unescape_markup),
+            (bool(self._user_rules), self._replace_user_terms),
+            (cfg.check_replace_html, self._replace_html),
+            # brackets hide from the tag step only; contacts see "john<at>x.com"
+            (cfg.check_fix_bad_unicode, self._restore_brackets),
+            (cfg.check_replace_urls, self._replace_urls),
+            (cfg.check_replace_emails, self._replace_emails),
+            (cfg.check_replace_ips, self._replace_ips),
+            (cfg.check_replace_dates, self._replace_dates),
+            (cfg.check_fuzzy_replace_dates, self._replace_fuzzy_dates),
+            # Phones before years, so a year step cannot split "+31 6 1234 2019".
+            # Checksum-valid IBANs/cards and identifier tokens before phones, so a phone cannot take their digits.
+            (cfg.check_replace_iban_cards, self._replace_iban_cards),
+            (cfg.check_replace_identifiers, self._replace_identifiers),
+            (cfg.check_replace_phone_numbers, self._replace_phone_numbers),
+            (cfg.check_replace_years, self._replace_years),
+            (cfg.check_replace_numbers, self._replace_numbers),
+            (cfg.check_replace_currency_symbols, self._replace_currency_symbols),
+            # Emitted tokens and kept IPs are hidden from the steps above; put them back.
+            (True, self._restore_protected),
+            (cfg.check_remove_isolated_letters, self._symbol_masker.remove_isolated_letters),
+            (cfg.check_remove_isolated_special_symbols, self._remove_isolated_special_symbols),
+            (cfg.check_normalize_whitespace, self._normalize_whitespace),
+            # Deferred values stay hidden through the cleanup above, so a tag it would remove
+            # ("[EMAIL]" under bracket removal) still carries its value to the swap after NER.
+            (True, self._restore_deferred),
+        )
+        self._pipeline.extend(step for on, step in rows if on)
         # User-provided custom steps: after the built-in pre-NER steps, before NER and _after_ner
-        for step_fn in cfg.custom_pipeline_steps:
-            self._pipeline.append(step_fn)
+        self._pipeline.extend(cfg.custom_pipeline_steps)
 
     def _detect_language(self, text: str) -> tuple[str | None, float | None, str, float | None]:
         """Detect language as a pure function (no instance mutation).
@@ -547,12 +533,14 @@ class TextCleaner:
             warnings.add('language_fallback')
         if self._language_low_confidence(state.language_source, state.language_confidence, state.language_margin):
             warnings.add('language_low_confidence')
-        if self.GeneralNER is not None and self.GeneralNER.uses_fallback_models(state.language):
+        general_ner = self.GeneralNER
+        if general_ner is None:
+            return warnings
+        if general_ner.uses_fallback_models(state.language):
             warnings.add('ner_fallback_models')
-        if self.GeneralNER is not None and any(m['provider'] == 'CPUExecutionProvider' for m in models) \
-                and self.GeneralNER.device == 'cuda':
+        if any(m['provider'] == 'CPUExecutionProvider' for m in models) and general_ner.device == 'cuda':
             warnings.add('cuda_fallback')
-        if self.GeneralNER is not None and any(m['provider'] == 'cpu' for m in models) and self.GeneralNER.device == 'mps':
+        if any(m['provider'] == 'cpu' for m in models) and general_ner.device == 'mps':
             warnings.add('mps_fallback')
         return warnings
 
