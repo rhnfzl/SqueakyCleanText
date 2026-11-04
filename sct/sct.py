@@ -88,7 +88,8 @@ class _DocumentContext(threading.local):
     anon_map: Any = None
     protected: Any = None
     regex_counts: Any = None
-    deferred: Any = None
+    deferred_tags: dict[str, str] | None = None  # protected key -> tag NER reads
+    deferred_order: list | None = None  # (tag, value or None) in text order
     warnings: Any = None
     language: Any = None
     marker_order: Any = None
@@ -482,9 +483,9 @@ class TextCleaner:
         self._document_context.regex_counts = regex_counts
         doc_warnings: set = set()  # step warnings ('custom_pattern_timeout'), travel in the state like the counts
         self._document_context.warnings = doc_warnings
-        # (protected key -> tag NER reads, [(tag, value or None) in text order])
-        deferred: tuple[dict, list] | None = ({}, []) if self._defer_tags else None
-        self._document_context.deferred = deferred
+        deferred_order: list | None = [] if self._defer_tags else None
+        self._document_context.deferred_tags = {} if self._defer_tags else None
+        self._document_context.deferred_order = deferred_order
 
         # Document-level classification (before any text modification)
         doc_classes = None
@@ -519,9 +520,11 @@ class TextCleaner:
             current_text = step(current_text)
         source_markers = self._source_marker_spans(current_text, source_markers)
 
-        return _DocumentState(current_text, language, anon_map, doc_classes, started_at, regex_counts,
-                              language_confidence, language_source, len(text), source_markers, language_margin,
-                              deferred[1] if deferred else None, doc_warnings)
+        return _DocumentState(
+            text=current_text, language=language, anon_map=anon_map, doc_classes=doc_classes, started_at=started_at,
+            regex_counts=regex_counts, language_confidence=language_confidence, language_source=language_source,
+            source_chars=len(text), source_markers=source_markers, language_margin=language_margin,
+            deferred=deferred_order, warnings=doc_warnings)
 
     def _document_warnings(self, state: _DocumentState, models) -> set:
         """The warning codes of a processed document; *models* are the NER models it ran."""
@@ -742,13 +745,13 @@ class TextCleaner:
             entry['count'] += 1
             entry['chars'] += len(original)
         key = self._protect(value)
-        deferred = self._document_context.deferred
-        if deferred is not None:
+        tags = self._document_context.deferred_tags
+        if tags is not None:
             tag = (constants.CURRENCIES.get(original)
                    if entity_type == 'CURRENCY' and self.cfg.replace_with_currency_symbols is None
                    else self._tags.get(entity_type))
             if tag and tag != value:
-                deferred[0][key] = tag
+                tags[key] = tag
         return key
 
     def _allowed(self, original):
@@ -840,8 +843,7 @@ class TextCleaner:
 
     def _restore_protected(self, text):
         protected = self._document_context.protected or {}
-        deferred = self._document_context.deferred
-        tags = deferred[0] if deferred else {}
+        tags = self._document_context.deferred_tags or {}
         order = self._document_context.marker_order
         if order is not None:
             order += self._marker_occurrences(text, protected, tags)
@@ -879,12 +881,11 @@ class TextCleaner:
 
     def _restore_deferred(self, text):
         protected = self._document_context.protected or {}
-        deferred = self._document_context.deferred
-        if not deferred or not deferred[0]:
+        tags, order = self._document_context.deferred_tags, self._document_context.deferred_order
+        if not tags:
             return text
         # Deferred keys become their tag; every tag occurrence is recorded in order
         # (source text and plain tag emits as None) so _swap_deferred can pair them up.
-        tags, order = deferred
         values = {key: value for value, key in protected.items() if key in tags}
         tracked = set(tags.values())
         pattern = re.compile('|'.join(map(re.escape, sorted({*values, *tracked}, key=len, reverse=True))))
