@@ -15,6 +15,10 @@ from sct.mcp_server import ToolError, read_under_root, sanitize_json, sanitize_t
 from sct.report_cli import main as report_main
 from sct.score import SCORE_A_COLUMNS, score_records
 from sct.signals import PUBLIC_VIEW_KEYS, public_view
+import ast
+import dataclasses
+import re
+from pathlib import Path
 
 
 def _regex_cleaner(**overrides):
@@ -198,3 +202,15 @@ def test_anon_map_loads_payload_without_reserved():
     ]}
 
     assert AnonymizationMap.from_dict(payload).next_placeholder("EMAIL") == "<EMAIL_4>"
+
+
+# --- llms.txt lists the current defaults ---
+def test_llms_txt_defaults_match_config():
+    defaults = {f.name: f.default for f in dataclasses.fields(TextCleanerConfig)}
+    listed = {}
+    for line in (Path(__file__).parent.parent / "llms.txt").read_text().splitlines():
+        m = re.match(r"^(\w+)=(.+?)\s+#", line)
+        if m and m.group(1) in defaults:
+            listed[m.group(1)] = ast.literal_eval(m.group(2))
+    assert {"check_replace_dates", "language_confidence_warning", "language_margin_warning"} <= set(listed)
+    assert {k: v for k, v in listed.items() if v != defaults[k]} == {}

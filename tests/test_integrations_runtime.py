@@ -7,6 +7,8 @@ import pytest
 from sct.integrations import _runtime
 from sct.integrations._runtime import CleanerHandle, clean_columns, clean_records
 from sct.presets import preset_config
+import threading
+import time
 
 EMAIL = "mail john@example.com now"
 FAST = preset_config("training", check_ner_process=False)
@@ -95,3 +97,26 @@ def test_clean_records_text_and_metadata():
     assert new[0][0] == EMAIL
     assert new[0][1]["body_clean"] == "mail <EMAIL> now"
     assert new[0][1]["author_clean"] == "mail <EMAIL> now" and new[0][1]["author"] == EMAIL
+
+
+# --- threads sharing a handle build one cleaner ---
+def test_handle_builds_one_cleaner_across_threads(monkeypatch):
+    from sct.integrations import _runtime as rt
+
+    built = []
+
+    def slow_cleaner(cfg):
+        time.sleep(0.2)
+        built.append(cfg)
+        return object()
+
+    monkeypatch.setattr(rt, "TextCleaner", slow_cleaner)
+    handle = rt.CleanerHandle(preset_config("training", check_ner_process=False))
+    got = []
+    threads = [threading.Thread(target=lambda: got.append(handle.get())) for _ in range(4)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+    assert len(built) == 1
+    assert len({id(c) for c in got}) == 1

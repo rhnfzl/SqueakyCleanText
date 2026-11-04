@@ -12,6 +12,7 @@ from sct.sct import TextCleaner
 from sct.utils.gliner_adapter import GLiNERAdapter
 from sct.utils.ner import GeneralNER
 from tests.conftest import TEST_NER_MODELS
+from types import SimpleNamespace
 
 TAGS = ('PER', 'LOC', 'ORG', 'MISC')
 
@@ -185,3 +186,48 @@ def test_gliner_adapter_batches_only_when_asked(bi_encoder):
     name = 'with_embeds' if bi_encoder else 'inference'
     assert batched_calls == [(name, 3, 8)]
     assert len(adapter.model.calls) == 3  # batch_size=1 keeps one call per text
+
+
+def test_fixed_batch_one_model_runs_one_row_per_call():
+    from sct.utils.onnx_pipeline import ONNXNERPipeline, TokenizerWrapper
+    from tokenizers import Tokenizer, models, pre_tokenizers
+
+    tok = Tokenizer(models.WordLevel({"[UNK]": 0, "John": 1, "Smith": 2}, unk_token="[UNK]"))  # noqa: S106
+    tok.pre_tokenizer = pre_tokenizers.Whitespace()
+    rows = []
+
+    class Session:
+        def get_inputs(self):
+            return [SimpleNamespace(name=n, shape=[1, "sequence"])
+                    for n in ("input_ids", "attention_mask")]
+
+        def run(self, _, feeds):
+            rows.append(feeds["input_ids"].shape[0])
+            assert feeds["input_ids"].shape[0] == 1, "fixed batch dimension"
+            import numpy as np
+            return [np.zeros((1, feeds["input_ids"].shape[1], 2), dtype=np.float32)]
+
+    pipe = ONNXNERPipeline(Session(), TokenizerWrapper(tok, 512), {0: "O", 1: "B-PER"})
+    assert pipe(["John", "Smith", "John Smith"], batch_size=8) == [[], [], []]
+    assert rows == [1, 1, 1]
+
+
+def test_synthetic_value_shared_between_regex_and_ner_stages(monkeypatch):
+
+    text = "Call 2025550147 or _2025550147_."
+    outputs = []
+    for size in (1, 8):
+        cleaner = _cleaner(ner_batch_size=size, replacement_mode="synthetic")
+
+        def detect(chunks, *args, **kwargs):
+            return [
+                [{"entity_group": "PHONE_NUMBER", "score": 0.99, "word": "2025550147",
+                  "start": i, "end": i + 10, "key": f"{i}:{i + 10}"}]
+                if (i := chunk.find("2025550147")) != -1 else []
+                for chunk in chunks
+            ]
+
+        monkeypatch.setattr(cleaner.GeneralNER, "_detect", detect)
+        outputs.append(cleaner.process(text).lm_text)
+    assert "2025550147" not in outputs[1]
+    assert outputs[1] == outputs[0]

@@ -1,41 +1,40 @@
-"""Regressions found by the final 0.8.0 multilingual eval re-run."""
+"""NER span repair: word-piece widening, ensemble votes, value propagation, gap merge, edge snapping."""
+
 import types
 
 import numpy as np
 import pytest
 
-from tests.helpers import bare_ner, finalize_spans, set_cfg
-from sct import TextCleaner, TextCleanerConfig
-from sct.utils import constants
+from sct import TextCleanerConfig
+from sct.utils.anonymization_map import AnonymizationMap
 from sct.utils.onnx_pipeline import ONNXNERPipeline
+from sct.utils.synthetic import SyntheticReplacer
+
+from tests.conftest import TEST_NER_MODELS
+from tests.helpers import bare_ner, FakeRunDetector, finalize_spans, set_cfg, word_ner
 
 
-@pytest.mark.parametrize("text, email", [
-    ("お問い合わせはseikyu@example.com（担当：鈴木花子）まで。", "seikyu@example.com"),
-    ("联系 a@b.cn。谢谢", "a@b.cn"),
-    ("write a@b.com“quoted”", "a@b.com"),
-    ("mail info@例え.jp now", "info@例え.jp"),
-    ("user@उदाहरण.भारत ok", "user@उदाहरण.भारत"),
-])
-def test_email_domain_stops_at_cjk_and_fullwidth_punctuation(text, email):
-    assert [m.group() for m in constants.EMAIL_REGEX.finditer(text)][0].endswith(email)
+def test_propagation_does_not_match_inside_a_word_with_combining_mark():
+    text = "राज met राजा, राज."
+    ner, windows, results = finalize_spans(text, [(0, 3, 'PER', 0.99)])
+    assert ner._finalize(text, windows, results, 0.85, None).text == "<PERSON> met राजा, <PERSON>."
 
 
-def test_email_keeps_the_name_after_fullwidth_bracket_visible_to_ner():
-    cleaner = TextCleaner(cfg=TextCleanerConfig(check_ner_process=False))
-    assert cleaner.process("seikyu@example.com（担当：鈴木花子）").lm_text == "<EMAIL>（担当：鈴木花子）"
+# --- one model's two labels for a widened span are one vote, its best ---
+class _TwoLabelDetector(FakeRunDetector):
+    """Like a widened "Do" + "##e": PER 0.99 and MISC 0.60 over the same word."""
+
+    def __call__(self, texts, batch_size=1):
+        return [[{**span, "entity_group": group, "score": score}
+                 for span in found for group, score in (("PER", 0.99), ("MISC", 0.60))]
+                for found in super().__call__(texts, batch_size)]
 
 
-@pytest.mark.parametrize("text, expected", [
-    ("তানিয়া ইসলাম-এর অভিযোগ", "তানিয়া ইসলাম-এর অভিযোগ"),
-    ("東京-大阪", "東京-大阪"),
-    ("कर्म-योग", "कर्म-योग"),
-    ("l'été", "l'été"),
-    ("東京 - 大阪", "東京 大阪"),
-])
-def test_hyphen_between_letters_of_any_script_is_kept(text, expected):
-    cleaner = TextCleaner(cfg=TextCleanerConfig(check_ner_process=False))
-    assert cleaner.process(text).lm_text == expected
+def test_same_model_two_labels_do_not_average_below_threshold():
+    ner = word_ner(0, _TwoLabelDetector())
+    result = ner.ner_process_detailed("w0 w1 Doe w3", positional_tags=("PER", "MISC"),
+                                      ner_confidence_threshold=0.85)
+    assert result.text == "w0 w1 <PERSON> w3"
 
 
 def _aggregate(text, tokens, offsets, tagged):
@@ -258,3 +257,57 @@ def test_snap_word_edges_config_and_legacy_global(monkeypatch):
     assert TextCleanerConfig().ner_snap_word_edges is True
     monkeypatch.setattr(cfg_module, "NER_SNAP_WORD_EDGES", False)
     assert cfg_module._config_from_module_globals().ner_snap_word_edges is False
+
+
+# --- NER does not rewrite the synthetic fake a regex step inserted ---
+def test_ner_leaves_regex_synthetic_fakes_alone():
+    from sct.utils.synthetic import SyntheticReplacer
+    from tests.helpers import FakeRunDetector, word_ner
+
+    ner = word_ner(0, FakeRunDetector(), mode="synthetic")
+    ner._synthetic_replacer = SyntheticReplacer()
+    ner._synthetic_replacer.reset_cache()
+    fake = ner._synthetic_replacer.get_replacement("EMAIL", "anna@beispiel.de")
+    # The fake detector tags capitalised words, like the real models tag pieces of the fake email.
+    fake = fake[0].upper() + fake[1:]
+    ner._synthetic_replacer._get_cache()[("EMAIL", "anna@beispiel.de")] = fake
+    result = ner.ner_process_detailed(
+        f"Write to {fake} today, Angela.", positional_tags=("PER",), ner_confidence_threshold=0.5)
+    assert fake in result.text
+    assert "Angela" not in result.text
+
+
+# --- WordPiece entities cover the whole word, not "John Do" + a visible "e" ---
+def test_wordpiece_entity_ends_on_a_whole_word():
+    from sct.utils.onnx_pipeline import load_onnx_ner_model
+
+    pipe, _ = load_onnx_ner_model(TEST_NER_MODELS["ENGLISH"])
+    text = "Contact John Doe today."
+    spans = [(e["start"], e["end"]) for e in pipe(text)[0] if e["entity_group"] == "PER"]
+    assert spans and all(text[end] in " ." for _, end in spans)
+    assert any(text[s:e].endswith("Doe") for s, e in spans)
+
+
+TEXT = "John Paul Smith. " + "filler " * 25 + "email=a@b.com"
+
+
+NESTED = [
+    {"entity_group": "PER", "score": 0.99, "word": "John Paul Smith", "start": 0, "end": 15},
+    {"entity_group": "PER", "score": 0.95, "word": "Paul", "start": 5, "end": 9},
+    {"entity_group": "EMAIL", "score": 0.99, "word": "a@b.com",
+     "start": len(TEXT) - 7, "end": len(TEXT)},
+]
+
+
+@pytest.mark.parametrize("mode", ["placeholder", "reversible", "synthetic"])
+def test_nested_spans_leave_no_part_of_the_entity(mode):
+    ner = word_ner(0, FakeRunDetector(), mode=mode)
+    ner._synthetic_replacer = SyntheticReplacer()
+    anon_map = AnonymizationMap()
+    text = ner.anonymize_text(TEXT, [dict(d) for d in NESTED], mode, anon_map=anon_map)
+    assert "Smith" not in text and "Paul" not in text
+    assert "a@b.com" not in text
+    if mode == "placeholder":
+        assert text.startswith("<PERSON>. ")
+    if mode == "reversible":
+        assert anon_map.deanonymize(text) == TEXT

@@ -183,7 +183,7 @@ def test_stopwords_unsupported_language_does_not_crash():
     assert sw.get_stop_words("THAI") == set()
 
 
-# --- Review round 1 regressions ---
+# --- IPv6 and other values replaced whole ---
 
 @pytest.mark.parametrize("ip", [
     "::abcd:192.0.2.1",

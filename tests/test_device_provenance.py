@@ -11,6 +11,8 @@ from sct.config import TextCleanerConfig
 from sct.utils import ner as ner_module
 from sct.utils.ner import GeneralNER
 from tests.conftest import TEST_NER_MODELS
+import sys
+import types
 
 CPU = 'CPUExecutionProvider'
 CUDA = 'CUDAExecutionProvider'
@@ -209,3 +211,60 @@ def test_real_torch_model_on_mps_matches_cpu():
         assert {m["provider"] for m in result.metadata["provenance"]["models"]} == {device}
         assert "mps_fallback" not in result.metadata["warnings"]
     assert outs["mps"] == outs["cpu"]
+
+
+# --- GLiNER device follows the effective backend; Presidio gets the device ---
+class _Model:
+    def __init__(self):
+        self.moved = None
+
+    def to(self, device):
+        self.moved = device
+        return self
+
+
+def _fake_gliner(monkeypatch):
+    class GLiNER:
+        @staticmethod
+        def from_pretrained(model_id, load_onnx_model=False, **kwargs):
+            if load_onnx_model:
+                raise FileNotFoundError("no model.onnx")
+            return _Model()
+
+    class GLiNER2:
+        @staticmethod
+        def from_pretrained(model_id, **kwargs):
+            return _Model()
+
+    monkeypatch.setitem(sys.modules, "gliner", types.SimpleNamespace(GLiNER=GLiNER))
+    monkeypatch.setitem(sys.modules, "gliner2", types.SimpleNamespace(GLiNER2=GLiNER2))
+
+
+def test_gliner_onnx_fallback_and_gliner2_move_to_cuda(monkeypatch):
+    _fake_gliner(monkeypatch)
+    from sct.utils.gliner_adapter import GLiNERAdapter
+
+    fallback = GLiNERAdapter("m", device="cuda:2", onnx=True)
+    assert fallback._onnx is False and fallback.model.moved == "cuda:2"
+    assert GLiNERAdapter("m", variant="gliner2", device="cuda:2", onnx=True).model.moved == "cuda:2"
+
+
+def test_presidio_gliner_gets_device_and_torch_provenance(monkeypatch):
+    seen = {}
+
+    class Recognizer:
+        def __init__(self, **kwargs):
+            seen.update(kwargs)
+
+    class Engine:
+        registry = types.SimpleNamespace(add_recognizer=lambda r: None)
+
+    monkeypatch.setitem(sys.modules, "presidio_analyzer", types.SimpleNamespace(AnalyzerEngine=Engine))
+    monkeypatch.setitem(sys.modules, "presidio_analyzer.predefined_recognizers",
+                        types.SimpleNamespace(GLiNERRecognizer=Recognizer))
+    from sct.utils.ner import GeneralNER
+
+    ner = GeneralNER(TextCleanerConfig(ner_backend="presidio_gliner", ner_device="cuda", cuda_device_id=2,
+                                       gliner_model="m"))
+    assert seen["map_location"] == "cuda:2"
+    assert ner.provenance["GLINER"]["provider"] == "cuda:2"

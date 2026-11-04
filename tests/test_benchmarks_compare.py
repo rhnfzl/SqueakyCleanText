@@ -371,7 +371,7 @@ def test_adapter_label_tables_match_the_frozen_entries():
         assert all(labels[k] == v for k, v in reg.GLINER_PROMPTS.items()), name
 
 
-# --- Codex review round 1 fixes (C1-C13) ---
+# --- Scoring and report edge cases ---
 
 def test_c1_full_miss_scores_f1_zero_not_na_in_the_macro():
     record = gold_record(spans=[span(0, 7, "person")])

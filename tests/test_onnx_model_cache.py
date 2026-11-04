@@ -1,67 +1,16 @@
-"""Codex 0.8.0 full review, round 5: ids 1, 2, 3."""
+"""ONNX model cache: quantized directories, revisions, and loading without a Hub request."""
 
 import json
 import sys
-import threading
-import time
 import types
 from pathlib import Path
 
 import pytest
 
-from sct import TextCleaner
-from sct.presets import preset_config
-from sct.streaming import WindowedStreamingRedactor
+from tests.conftest import TEST_NER_MODELS
 
 
-# --- 1: a phone cut off by a feed boundary is held back until it completes ---
-
-@pytest.mark.parametrize("chunks", [
-    ["aaaa aaaa aaaa Call 06 12 34", " 56 78 tail"],
-    ["aaaa aaaa aaaa Call ０６ １２ ３４", " ５６ ７８ tail"],
-    ["aaaa aaaa aaaa Call 06", " 12", " 34", " 56", " 78 tail"],
-])
-def test_window_holds_an_incomplete_phone(chunks):
-    cleaner = TextCleaner(cfg=preset_config(
-        "training", check_ner_process=False, check_replace_numbers=False))
-    stream = WindowedStreamingRedactor(cleaner, max_buffer_chars=24, overlap_chars=4)
-    out = "".join(stream.feed(c) for c in chunks) + stream.finish()
-    assert out == cleaner.process("".join(chunks)).lm_text
-    assert "<PHONE>" in out
-
-
-def test_window_still_splits_a_long_number_table():
-    cleaner = TextCleaner(cfg=preset_config("training", check_ner_process=False))
-    stream = WindowedStreamingRedactor(cleaner, max_buffer_chars=48, overlap_chars=4)
-    assert stream.feed("1 " * 40) != ""  # a digit tail holds back at most a phone's length
-
-
-# --- 2: threads sharing a handle build one cleaner ---
-
-def test_handle_builds_one_cleaner_across_threads(monkeypatch):
-    from sct.integrations import _runtime as rt
-
-    built = []
-
-    def slow_cleaner(cfg):
-        time.sleep(0.2)
-        built.append(cfg)
-        return object()
-
-    monkeypatch.setattr(rt, "TextCleaner", slow_cleaner)
-    handle = rt.CleanerHandle(preset_config("training", check_ner_process=False))
-    got = []
-    threads = [threading.Thread(target=lambda: got.append(handle.get())) for _ in range(4)]
-    for t in threads:
-        t.start()
-    for t in threads:
-        t.join()
-    assert len(built) == 1
-    assert len({id(c) for c in got}) == 1
-
-
-# --- 3: the quantized cache is keyed by the resolved commit, not the branch name ---
-
+# --- the quantized cache is keyed by the resolved commit, not the branch name ---
 def test_quantized_cache_follows_the_moving_branch(monkeypatch, tmp_path):
     import sct.utils.onnx_pipeline as op
 
@@ -122,3 +71,33 @@ def test_quantize_without_the_onnx_package_names_the_extra(monkeypatch, tmp_path
     monkeypatch.setattr(op, "TokenizerWrapper", lambda tok, model_max_length: None)
     with pytest.raises(ImportError, match=r"squeakycleantext\[quantize\]"):
         op.load_onnx_ner_model("org/m", revision="main", quantize=True)
+
+
+# --- a worker rebuilding the cleaner makes no Hub request from a warm cache ---
+def test_onnx_load_from_warm_cache_makes_no_hub_request(monkeypatch):
+    import huggingface_hub.file_download as fd
+    from sct.utils.onnx_pipeline import load_onnx_ner_model
+
+    model = TEST_NER_MODELS["ENGLISH"]
+    pipe, _ = load_onnx_ner_model(model)  # warms the cache, records the missing model.onnx_data
+    calls = []
+    monkeypatch.setattr(fd, "get_hf_file_metadata", lambda *a, **k: calls.append(a) or 1 / 0)
+    load_onnx_ner_model(model, revision=pipe.revision)
+    assert calls == []
+
+
+def test_quantized_cache_dirs_do_not_collide():
+    from sct.utils.onnx_pipeline import _quantized_dir
+
+    assert _quantized_dir("org/model", None) == "org__model"  # 0.7.1 layout kept
+    assert _quantized_dir("org/model", "abc123").startswith("org__model@")
+    assert _quantized_dir("o/m", "release/v1") != _quantized_dir("o/m", "release__v1")
+    assert _quantized_dir("a/b__c", None) != _quantized_dir("a__b/c", None)
+    assert _quantized_dir("a__b", None) != _quantized_dir("a/b", None)
+
+
+def test_revision_cache_dirs_differ_ignoring_case():
+    from sct.utils.onnx_pipeline import _quantized_dir
+
+    assert _quantized_dir("o/m", "Release").lower() != _quantized_dir("o/m", "release").lower()
+    assert _quantized_dir("o/m", None) == "o__m"  # 0.7.1 layout kept

@@ -107,3 +107,15 @@ def test_report_cli_end_to_end_real_cleaner_ner_off(tmp_path):
     assert report["summary"]["records"] == 3
     assert report["summary"]["pii_types"] == {"EMAIL": 2}
     assert report["ner"] is False
+
+
+# --- k-anonymity keeps values of different types in separate classes ---
+@pytest.mark.parametrize("a,b", [([1], "[1]"), (True, 1)])
+def test_report_cli_k_anonymity_distinct_types(tmp_path, a, b):
+    src = tmp_path / "a.jsonl"
+    src.write_text("".join(json.dumps({"text": t, "q": v}) + "\n" for t, v in [("x", a), ("y", b)]))
+    out = tmp_path / "r.json"
+    assert report_cli.main([str(src), "--no-ner", "--quasi-identifiers", "q", "--k", "2",
+                            "--out", str(out)]) == 0
+    k = json.loads(out.read_text())["k_anonymity"]
+    assert k["minimum_k"] == 1 and k["at_risk_records"] == 2

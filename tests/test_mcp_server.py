@@ -14,6 +14,9 @@ from sct.mcp_server import (
 from sct.privacy import DetectedEntity, EntityFinding
 from sct.utils.process_result import ProcessResult
 from tests.helpers import client_call
+import asyncio
+import threading
+import time
 
 SIGNAL_KEYS = [
     "language", "language_confidence", "language_source", "chars",
@@ -225,3 +228,43 @@ def test_preset_picks_the_built_in_cleaner_config(monkeypatch):
     monkeypatch.setenv("SCT_MCP_PRESET", "training")
     client_call(create_mcp_server(), lambda c: c.call_tool("clean_text", {"text": "x"}))
     assert seen[0].check_to_ascii_unicode is False
+
+
+# --- concurrent first MCP calls build one cleaner ---
+def test_concurrent_first_calls_build_one_cleaner(monkeypatch):
+    pytest.importorskip("fastmcp")
+    from fastmcp import Client
+
+    import sct.mcp_server as mcp_module
+
+    built = []
+    real = TextCleaner(cfg=TextCleanerConfig(
+        check_ner_process=False, check_detect_language=False,
+        check_statistical_model_processing=False))
+
+    def slow_cleaner(cfg, **_):
+        built.append(threading.get_ident())
+        time.sleep(0.3)
+        return real
+
+    monkeypatch.setattr(mcp_module, "TextCleaner", slow_cleaner)
+    server = mcp_module.create_mcp_server()
+
+    async def run():
+        async with Client(server) as client:
+            return await asyncio.gather(*[
+                client.call_tool("clean_text", {"text": "hi"}) for _ in range(4)])
+
+    results = asyncio.run(run())
+    assert len(built) == 1
+    assert all(r.structured_content["text"] == "hi" for r in results)
+
+
+# --- an MCP root that does not exist fails at start-up, not on every call ---
+def test_mcp_missing_root_fails_at_start(tmp_path):
+    pytest.importorskip("fastmcp")
+    from sct.mcp_server import create_mcp_server
+
+    with pytest.raises(ValueError, match="SCT_MCP_ROOT"):
+        create_mcp_server(TextCleaner(TextCleanerConfig(check_ner_process=False)),
+                          root=str(tmp_path / "missing"))

@@ -1,6 +1,9 @@
 from benchmarks.score import predicted_spans
 from scripts.benchmark_release import find_leaks
 from sct.evaluation import EntitySpan, EvaluationExample
+import builtins
+import importlib
+import sys
 
 
 def test_digits_in_a_user_label_are_a_placeholder():
@@ -97,10 +100,24 @@ def test_run_batch_reports_throughput_keys(tmp_path):
 
 
 def test_predicted_spans_map_unicode_folded_value_to_source_offsets():
-    # Codex bench round 1 #1: SCT folds full-width text before replacing it.
+    # SCT folds full-width text before replacing it.
     source = "Mail Ａｎｎａ＠ｅｘａｍｐｌｅ．ｃｏｍ ok"
     assert predicted_spans(source, "Mail <EMAIL_0> ok", {"<EMAIL_0>": "Anna@example.com"}) == [
         EntitySpan("EMAIL", 5, 21)]
     # A combining accent stays with its letter; a ligature maps to its one source char.
     assert predicted_spans("René met ﬁ", "<PERSON_0> met <X_0>", {"<PERSON_0>": "René", "<X_0>": "fi"}) == [
         EntitySpan("PERSON", 0, 5), EntitySpan("X", 10, 11)]
+
+
+def test_benchmark_imports_without_resource_module(monkeypatch):
+    real_import = builtins.__import__
+
+    def no_resource(name, *args, **kwargs):
+        if name == "resource":
+            raise ImportError("No module named 'resource'")
+        return real_import(name, *args, **kwargs)
+
+    monkeypatch.delitem(sys.modules, "scripts.benchmark_release", raising=False)
+    monkeypatch.setattr(builtins, "__import__", no_resource)
+    module = importlib.import_module("scripts.benchmark_release")
+    assert module._peak_rss_mb() is None

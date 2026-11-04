@@ -67,7 +67,7 @@ def test_cut_escape_at_buffer_end_does_not_hide_a_date():
 
 
 def test_split_jump_maps_expanding_characters_back_to_the_source():
-    # Codex round 34: "⑫" normalises to "12", so the view distance to the phone start overshot in the source
+    # "⑫" normalises to "12", so the view distance to the phone start overshot in the source
     # and the jump skipped the safe split after "Call" (BufferError)
     cleaner = TextCleaner(cfg=preset_config("training", check_ner_process=False))
     text = "Call 06 ⑫㉞ ⑤⑥⑦⑧ now please."
