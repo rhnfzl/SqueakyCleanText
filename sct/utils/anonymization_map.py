@@ -88,12 +88,21 @@ class AnonymizationMap:
                 }
                 for e in self.entries
             ],
+            'reserved': sorted(self.reserved),
         }
 
     @classmethod
     def from_dict(cls, data: dict) -> 'AnonymizationMap':
-        """Deserialize from a dict (inverse of ``to_dict()``)."""
-        obj = cls(session_id=data['session_id'])
+        """Deserialize from a dict (inverse of ``to_dict()``).
+
+        New placeholders continue after the restored ones. Older payloads have no
+        ``reserved``, so it starts empty.
+        """
+        obj = cls(session_id=data['session_id'], reserved=set(data.get('reserved', ())))
         for e in data.get('entries', []):
-            obj.entries.append(MapEntry(**e))
+            entry = MapEntry(**e)
+            obj.entries.append(entry)
+            index = entry.placeholder.removeprefix(f"<{entry.entity_type}_").removesuffix(">")
+            if index.isdecimal():
+                obj._counter[entry.entity_type] = max(obj._counter.get(entry.entity_type, 0), int(index) + 1)
         return obj

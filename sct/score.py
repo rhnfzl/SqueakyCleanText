@@ -16,10 +16,12 @@ from typing import Any, Iterable, Optional, Protocol, Sequence, Union
 
 import regex
 
-SCORE_A_COLUMNS = (
-    "sct_language", "sct_language_score", "sct_pii_count",
-    "sct_pii_share", "sct_pii_types", "sct_warnings",
-)
+# Column -> Arrow type name; a list means a list of that type.
+SCORE_A_TYPES = {
+    "sct_language": "string", "sct_language_score": "float64", "sct_pii_count": "int64",
+    "sct_pii_share": "float64", "sct_pii_types": ["string"], "sct_warnings": ["string"],
+}
+SCORE_A_COLUMNS = tuple(SCORE_A_TYPES)
 SCORE_B_COLUMNS = ("sct_quality", "sct_minhash")
 
 # Placeholders count as one token; reversible ``<PERSON_3>`` normalises to ``<PERSON>``.
@@ -157,11 +159,15 @@ def score_records(
     *,
     scorer: Optional[QualityScorer] = None,
 ) -> list[dict[str, Any]]:
-    """Score a batch; the quality scorer runs once over all originals."""
+    """Score a batch; the quality scorer runs once over all originals.
+
+    Passing ``scorer`` turns quality on, as ``ScoreConfig(quality=True)`` does.
+    """
     if len(results) != len(originals):
         raise ValueError("results and originals must have the same length")
     qualities: list[Optional[float]] = [None] * len(results)
-    if config.quality:
+    quality_on = config.quality or scorer is not None
+    if quality_on:
         if scorer is None:
             if not config.quality_model:
                 raise ValueError("quality=True needs quality_model or a scorer")
@@ -169,7 +175,7 @@ def score_records(
                 config.quality_model, revision=config.quality_revision,
             )
         qualities = list(scorer(list(originals))) if originals else []
-    b_on = config.quality or config.minhash
+    b_on = quality_on or config.minhash
     rows = []
     for result, original, q in zip(results, originals, qualities):
         row = score_record(result, minhash=config if config.minhash else None)

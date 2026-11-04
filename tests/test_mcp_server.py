@@ -194,7 +194,7 @@ def test_tools_declare_output_schema_and_annotations():
         assert notes.read_only_hint is True
         assert notes.destructive_hint is False
         assert notes.idempotent_hint is True
-        assert notes.open_world_hint is False
+        assert notes.open_world_hint is True  # a cold cache downloads models
         schema = tool.output_schema
         assert set(schema["required"]) >= {"warnings", "summary", "signals"}
         assert "findings" in schema["properties"]

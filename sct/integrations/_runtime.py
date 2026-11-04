@@ -83,6 +83,11 @@ def as_columns(columns) -> tuple:
     return (columns,) if isinstance(columns, str) else tuple(columns)
 
 
+def output_column(col: str, output: str) -> str:
+    """The column that ``output`` writes the cleaned ``col`` to."""
+    return col if output == "overwrite" else f"{col}_clean"
+
+
 def _clean(handle: CleanerHandle, batch: Mapping[str, Sequence], columns, output: str):
     """Return (new batch, ProcessResult-or-None per row of the first column)."""
     if output not in OUTPUTS:
@@ -102,7 +107,7 @@ def _clean(handle: CleanerHandle, batch: Mapping[str, Sequence], columns, output
         results: list = [None] * len(values)
         for i, result in zip(idx, cleaner.process_batch([values[i] for i in idx])):
             results[i] = result
-        out[col if output == "overwrite" else f"{col}_clean"] = [
+        out[output_column(col, output)] = [
             v if r is None else r.lm_text for v, r in zip(values, results)
         ]
         if first is None:
@@ -126,7 +131,7 @@ def clean_columns(
     out, results = _clean(handle, batch, columns, output)
     if score:
         from sct.score import SCORE_A_COLUMNS, score_record
-        first = columns if isinstance(columns, str) else columns[0]
+        first = as_columns(columns)[0]
         records = [
             None if r is None else score_record(r, original=t)
             for r, t in zip(results, batch[first])
@@ -158,7 +163,7 @@ def clean_records(
         for col in columns:
             if batch[col][i] is None:
                 continue
-            key = col if output == "overwrite" else f"{col}_clean"
+            key = output_column(col, output)
             if key == text_key:
                 text = out[key][i]
             else:

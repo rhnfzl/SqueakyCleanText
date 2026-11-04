@@ -3,8 +3,8 @@
 from dataclasses import dataclass
 from typing import Any, Protocol, Sequence
 
-from sct.adapters import is_sensitive_result
 from sct.sct import TextCleaner
+from sct.signals import is_sensitive_result
 
 
 @dataclass(frozen=True)

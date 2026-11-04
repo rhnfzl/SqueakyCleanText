@@ -4,7 +4,7 @@ from typing import Any, Optional, Sequence, Union
 
 import sct
 from sct.config import TextCleanerConfig
-from sct.integrations._runtime import CleanerHandle, as_columns, clean_columns
+from sct.integrations._runtime import CleanerHandle, as_columns, clean_columns, output_column
 
 
 class SCTMap:
@@ -27,7 +27,7 @@ class SCTMap:
         # HF merges the returned columns back after remove_columns, so return only the
         # columns SCT wrote: pass-through columns would resurrect dropped raw text, and
         # dropping a written column would keep a stale same-named input column.
-        produced = [c if self.output == "overwrite" else f"{c}_clean" for c in self.columns]
+        produced = [output_column(c, self.output) for c in self.columns]
         if self.score:
             from sct.score import SCORE_A_COLUMNS
             produced += SCORE_A_COLUMNS
@@ -40,12 +40,12 @@ def _output_features(features: Any, fn: SCTMap, remove_columns: Any) -> Any:
     out = Features({k: v for k, v in features.items() if k not in removed})
     for col in fn.columns:
         # Non-str cells pass through, so a written column keeps its source type.
-        out[col if fn.output == "overwrite" else f"{col}_clean"] = features[col]
+        out[output_column(col, fn.output)] = features[col]
     if fn.score:
+        from sct.score import SCORE_A_TYPES
         out.update({
-            "sct_language": Value("string"), "sct_language_score": Value("float64"),
-            "sct_pii_count": Value("int64"), "sct_pii_share": Value("float64"),
-            "sct_pii_types": HFSequence(Value("string")), "sct_warnings": HFSequence(Value("string")),
+            name: HFSequence(Value(kind[0])) if isinstance(kind, list) else Value(kind)
+            for name, kind in SCORE_A_TYPES.items()
         })
     return out
 

@@ -19,10 +19,10 @@ import stat
 import threading
 from typing import Any, Literal, NotRequired, Optional, TypedDict
 
-from sct.adapters import process_json
+from sct.adapters import _DuplicateKeyError, process_json
 from sct.presets import preset_config
 from sct.sct import TextCleaner
-from sct.signals import public_view
+from sct.signals import Signals, public_view
 
 try:
     from fastmcp.exceptions import ToolError
@@ -54,7 +54,7 @@ class TextOutput(TypedDict):
     warnings: list[str]
     summary: str
     text: str
-    signals: dict[str, Any]
+    signals: Signals
     findings: NotRequired[list[Finding]]
 
 
@@ -62,7 +62,7 @@ class JsonOutput(TypedDict):
     warnings: list[str]
     summary: str
     value: Any
-    signals: dict[str, Any]
+    signals: Signals
     findings: NotRequired[list[JsonFinding]]
 
 
@@ -78,7 +78,14 @@ def _public_finding(finding) -> Finding:
     }
 
 
-def summarize(signals: dict[str, Any]) -> str:
+def _full_warnings(signals: Signals, findings: list) -> list[str]:
+    """Warn when entities were counted but the cleaner did not collect their findings."""
+    if signals["entity_counts"] and not findings:
+        return sorted({*signals["warnings"], "findings_not_collected"})
+    return signals["warnings"]
+
+
+def summarize(signals: Signals) -> str:
     """One value-free sentence, e.g. ``2 PII items (EMAIL, PERSON), 4% of text, language HINDI 0.93``."""
     count = signals["pii_count"]
     if count:
@@ -112,8 +119,9 @@ def sanitize_text(
     if detail == "full":
         output["findings"] = [
             _public_finding(finding)
-            for finding in (result.metadata or {}).get("findings", ())
+            for finding in result.metadata.get("findings", ())
         ]
+        output["warnings"] = _full_warnings(signals, output["findings"])
     return output
 
 
@@ -125,8 +133,10 @@ def sanitize_json(
     """Clean every string in a JSON value; key findings use the ``@key`` index path."""
     try:
         result = process_json(cleaner, value)
-    except ValueError as exc:
+    except _DuplicateKeyError as exc:
         raise ToolError(f"{exc}. Pass a JSON value whose keys stay unique after cleaning.") from None
+    except ValueError as exc:
+        raise ToolError(str(exc)) from None
     signals = result.signals
     output: JsonOutput = {
         "warnings": signals["warnings"],
@@ -139,6 +149,7 @@ def sanitize_json(
             {"path": list(item.path), **_public_finding(item.finding)}
             for item in result.findings
         ]
+        output["warnings"] = _full_warnings(signals, output["findings"])
     return output
 
 
@@ -156,7 +167,10 @@ def read_under_root(root: str, path: str, max_bytes: int = DEFAULT_MAX_BYTES) ->
         raise ToolError(
             "path must be relative to SCT_MCP_ROOT, with no empty, hidden, '.' or '..' parts."
         )
-    dir_fd = os.open(root, os.O_RDONLY | os.O_DIRECTORY)
+    try:
+        dir_fd = os.open(root, os.O_RDONLY | os.O_DIRECTORY)
+    except OSError:
+        raise ToolError("SCT_MCP_ROOT cannot be opened. Check that the folder exists and is readable.") from None
     try:
         for part in parts[:-1]:
             next_fd = os.open(part, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=dir_fd)
@@ -194,7 +208,7 @@ _ANNOTATIONS = {
     "readOnlyHint": True,
     "destructiveHint": False,
     "idempotentHint": True,
-    "openWorldHint": False,
+    "openWorldHint": True,  # a cold cache downloads NER models from the Hugging Face Hub
 }
 
 
