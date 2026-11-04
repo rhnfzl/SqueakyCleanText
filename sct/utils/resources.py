@@ -46,35 +46,13 @@ def resolve_language(value: str) -> str:
     )
 
 
-# ---- Supported languages (also used for language-to-NER-model mapping)
-LANGUAGES = [Language.DUTCH, Language.ENGLISH, Language.GERMAN, Language.SPANISH]
-LANGUAGE_NAME = [(language.name).lower() for language in LANGUAGES]
+DEFAULT_LANGUAGES = frozenset({'ENGLISH', 'DUTCH', 'GERMAN', 'SPANISH'})
 
-# Lazy language detector: built on first use, not at import time
-_detector = None
 _detector_lock = threading.Lock()
 if hasattr(os, "register_at_fork"):
     # A child forked while another thread built a detector must not inherit the lock held.
     os.register_at_fork(after_in_child=lambda: globals().update(_detector_lock=threading.Lock()))
 
-
-def _get_detector():
-    global _detector
-    if _detector is None:
-        with _detector_lock:
-            if _detector is None:
-                _detector = LanguageDetectorBuilder.from_languages(*LANGUAGES).build()
-    return _detector
-
-
-class _LazyDetectorProxy:
-    """Proxy that behaves like the detector but builds it lazily."""
-
-    def __getattr__(self, name):
-        return getattr(_get_detector(), name)
-
-
-DETECTOR = _LazyDetectorProxy()
 
 # ---------------------------------------------------------------------------
 # Language extensibility utilities (used by TextCleanerConfig and TextCleaner)
@@ -87,8 +65,6 @@ def build_detector(supported_languages: frozenset):
     Filters out 'MULTILINGUAL' (not a real Lingua language).
     Returns a Lingua LanguageDetector instance.
     """
-    from sct.config import DEFAULT_LANGUAGES  # lazy: avoids circular import with config.py
-
     lingua_langs = []
     for name in supported_languages:
         if name == 'MULTILINGUAL':
