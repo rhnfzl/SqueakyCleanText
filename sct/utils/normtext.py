@@ -23,7 +23,7 @@ _FULLWIDTH_JOINER_REGEX = re.compile(r'(?<=[0-9A-Za-z])[＠．－＿＋\u3000](?
                                      rf'|{_WORD_END}＠(?=[^\W_])|{_WORD_END}．(?=[0-9A-Za-z])|(?<=[0-9A-Za-z])．(?=[^\W_])')
 _FULLWIDTH_JOINER = {'＠': '@', '．': '.', '－': '-', '＿': '_', '＋': '+', '\u3000': ' '}
 # Invisible format characters (category Cf: ZWNJ/ZWJ, ZWSP, soft hyphen, bidi marks).
-_FORMAT_CHARS = re.escape(''.join(chr(cp) for cp in range(0x110000) if unicodedata.category(chr(cp)) == 'Cf'))
+_FORMAT_CHARS = re.escape(constants.CATEGORY_CHARS['Cf'])
 # Inside an address-shaped run (word characters around an @), full-width . - _ + fold whatever
 # script sits beside them (john@例え．テスト, josé＿smith@...); prose without an @ keeps them.
 # Format characters inside a word (ZWNJ in نامه\u200cای, ZWJ in क्\u200dष) continue the run and stay.
@@ -48,12 +48,11 @@ def _fold_email_runs(text):
 def _nfkc_ascii_alnum(tags):
     """Characters with one of the Unicode decomposition ``tags`` whose NFKC form is ASCII alnum."""
     table = {}
-    for cp in range(0x20000):  # BMP + SMP hold every such character (Unicode 15)
-        ch = chr(cp)
-        if unicodedata.decomposition(ch).split(' ', 1)[0] in tags:
+    for ch, decomposition in constants.DECOMPOSITIONS.items():
+        if decomposition.split(' ', 1)[0] in tags:
             folded = unicodedata.normalize('NFKC', ch)
             if folded.isascii() and folded.isalnum():
-                table[cp] = folded
+                table[ord(ch)] = folded
     return table
 
 
@@ -67,8 +66,8 @@ _CIRCLED_ALNUM = {**_nfkc_ascii_alnum({'<circle>'}),
 _CIRCLED_RUN_REGEX = re.compile('[%s]+' % ''.join(map(chr, _CIRCLED_ALNUM)))
 # Contact punctuation in every compatibility form (full-width ＠, small ﹫, font ﬩ for +), picked by
 # decomposition tag and NFKC value so every rule below folds the same set; ideographic space too.
-_COMPAT_PUNCT = {ch: unicodedata.normalize('NFKC', ch) for ch in map(chr, range(0x20000))
-                 if unicodedata.decomposition(ch).split(' ', 1)[0] in ('<wide>', '<small>', '<font>')
+_COMPAT_PUNCT = {ch: unicodedata.normalize('NFKC', ch) for ch, decomposition in constants.DECOMPOSITIONS.items()
+                 if decomposition.split(' ', 1)[0] in ('<wide>', '<small>', '<font>')
                  and unicodedata.normalize('NFKC', ch) in "@.-_+:/?=&#%~ !$'*"}
 _STYLED_SEP = {ch: plain for ch, plain in _COMPAT_PUNCT.items() if plain in '@.-_+:/?=&#%~ '}
 
@@ -81,16 +80,16 @@ def _forms(ascii_chars, table=_STYLED_SEP):
 _STYLED_PUNCT = _forms('@.-_+:/?=&#%~ ')
 # IDNA label separators (。 ｡ ．, as Python's idna codec reads them) are a dot in a mail domain or URL
 # host when an ASCII letter or digit follows (example。com); before other text 。 ends a CJK sentence.
-_IDNA_DOTS = re.escape(''.join(ch for ch in map(chr, range(0x80, 0x10000)) if _idna_dots.fullmatch(ch)))
+_IDNA_DOTS = re.escape(''.join(_idna_dots.findall(''.join(map(chr, range(0x80, 0x10000))))))
 _IDNA_DOT = f'[{_IDNA_DOTS}](?=[0-9A-Za-z])'
 _IDNA_DOT_REGEX = re.compile(_IDNA_DOT)
 _PUNCT_ANY = _STYLED_PUNCT + re.escape('@.-_+:/?=&#%~')
 # Dashes of any form (Pd: hyphen, non-breaking hyphen, en dash) join phone groups like "-" (06\u2011 12).
-_DASHES = re.escape(''.join(chr(cp) for cp in range(0x110000) if unicodedata.category(chr(cp)) == 'Pd'))
+_DASHES = re.escape(constants.CATEGORY_CHARS['Pd'])
 # In a URL host or mail domain any dash is a label hyphen and any character whose NFKC form is "." a label
 # dot (my\u2010site, a\u2024b.com, as copied from typeset text).
-_HOST_SEP = {cp: '-' if unicodedata.category(chr(cp)) == 'Pd' else '.' for cp in range(0x80, 0x110000)
-             if unicodedata.category(chr(cp)) == 'Pd' or unicodedata.normalize('NFKC', chr(cp)) == '.'}
+_HOST_SEP = {ord(ch): '-' if unicodedata.category(ch) == 'Pd' else '.'
+             for ch in sorted(constants.CATEGORY_CHARS['Pd'].lstrip('-') + constants.NFKC_DOTS)}
 _HOST_SEP_CHARS = re.escape(''.join(map(chr, _HOST_SEP)))
 _HOST_DOTS = re.escape(''.join(chr(cp) for cp, plain in _HOST_SEP.items() if plain == '.'))
 # A circled run folds beside ASCII alnum, a letter of the Latin script it folds to (ⓓé: décembre), any decimal
@@ -154,8 +153,7 @@ _STYLED_EMAIL_RUN_JOINER = {**str.maketrans({ch: plain for ch, plain in _COMPAT_
                             **_CIRCLED_ALNUM}
 # In the domain every format character but the join controls (ZWNJ/ZWJ, which spell words) is a
 # copied layout hint (例\u200bえ.jp), whatever script sits beside it.
-_DOMAIN_HINTS = {cp: None for cp in range(0x110000)
-                 if unicodedata.category(chr(cp)) == 'Cf' and chr(cp) not in '\u200c\u200d'}
+_DOMAIN_HINTS = {ord(ch): None for ch in constants.CATEGORY_CHARS['Cf'] if ch not in '\u200c\u200d'}
 
 
 def _fold_styled_email_run(m):
@@ -192,7 +190,7 @@ def _drop_invisible(m):
 # them (06 73 86 88 ㊺) is one group of them; a lone one before a number (① 2024年) is a list marker.
 _DIGIT_GROUP = '(?:\\d|[%s])' % ''.join(chr(cp) for cp, plain in _CIRCLED_ALNUM.items() if plain.isdigit())
 # Groups may be set off by any space (Zs: no-break, thin, narrow no-break, ideographic), as the phone view reads them.
-_SPACE = '[%s]' % ''.join(chr(cp) for cp in range(0x110000) if unicodedata.category(chr(cp)) == 'Zs')
+_SPACE = '[%s]' % constants.CATEGORY_CHARS['Zs']
 _DIGIT_BEFORE, _DIGIT_AFTER = re.compile(_DIGIT_GROUP + _SPACE), re.compile(_SPACE + _DIGIT_GROUP)
 _GROUPS_BEFORE = re.compile(rf'(?:{_DIGIT_GROUP}+{_SPACE}){{2,}}\Z')
 # An IDNA dot after a decimal digit is a host label dot (𖭗𖭗｡⑫｡15.example), so a circled run after it folds.

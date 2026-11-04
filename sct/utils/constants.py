@@ -50,6 +50,30 @@ LEGACY_TYPE_NAMES = {'PHONE': 'PHONE_NUMBER', 'IP': 'IP_ADDRESS'}
 _CJK_SYMBOL_LETTERS = ''.join(chr(c) for c in range(0x3000, 0x3040) if unicodedata.category(chr(c))[0] in 'LN')
 
 
+def _scan_unicode():
+    """One pass over Unicode: {general category: its characters in code point order} and {character: decomposition}.
+    Unassigned, private-use and surrogate code points are left out: no class is built from them, none decomposes."""
+    by_category, decompositions = {}, {}
+    for ch in map(chr, range(0x110000)):
+        category = unicodedata.category(ch)
+        if category not in ('Cn', 'Co', 'Cs'):
+            by_category.setdefault(category, []).append(ch)
+            if decomposition := unicodedata.decomposition(ch):
+                decompositions[ch] = decomposition
+    return {category: ''.join(chars) for category, chars in by_category.items()}, decompositions
+
+
+# Read by every character class here and in normtext.py and contact.py, so none rescans Unicode at import.
+CATEGORY_CHARS, DECOMPOSITIONS = _scan_unicode()
+# Characters whose NFKC form is "." (U+2024, small and full-width dots).
+NFKC_DOTS = ''.join(ch for ch in DECOMPOSITIONS if unicodedata.normalize('NFKC', ch) == '.')
+
+
+def category_chars(*prefixes):
+    """Characters, in code point order, of the general categories starting with one of *prefixes*."""
+    return sorted(''.join(chars for category, chars in CATEGORY_CHARS.items() if category.startswith(prefixes)))
+
+
 def _class_ranges(categories, *spans):
     """Character-class body (literal ranges) of the code points in *spans* whose category starts with one of *categories*."""
     out, start = [], None
@@ -67,39 +91,32 @@ def _class_ranges(categories, *spans):
     return ''.join(out)
 
 
-def _cp_spans(cps):
-    """(first, last) spans of consecutive code points in the ascending iterable *cps*."""
+def _ranges(chars):
+    """Character-class body (literal ranges) of the ascending iterable *chars*."""
     spans = []
-    for cp in cps:
+    for cp in map(ord, chars):
         if spans and spans[-1][1] == cp - 1:
             spans[-1][1] = cp
         else:
             spans.append([cp, cp])
-    return spans
+    return ''.join(f"{chr(lo)}-{chr(hi)}" if hi > lo else chr(lo) for lo, hi in spans)
 
 
 # Combining marks of every script (Mn/Mc/Me: the vowel signs of প্রিয়া, संपर्क), which \w leaves out.
-MARKS = _class_ranges('M', (0x300, 0x3FFFF), (0xE0000, 0xE0FFF))
+MARKS = _ranges(category_chars('M'))
 # Letters, marks and digits beyond the BMP (𠮷野.jp): the BMP ranges below stop at U+FFFF.
-_SUPPLEMENTARY_ALNUM = _class_ranges('LMN', (0x10000, 0x3FFFF))
+_SUPPLEMENTARY_ALNUM = _ranges(ch for ch in category_chars('L', 'M', 'N') if '\U00010000' <= ch <= '\U0003FFFF')
 # Latin, Greek and Cyrillic letters, which sit between spaces in prose.
 _SPACED_LETTERS = "A-Za-z\u00C0-\u024F\u0370-\u03FF\u0400-\u04FF"
 # Letters of the Latin script (Script=Latin, any block: é, ŀ, ḁ), which styled letters fold to.
-LATIN_LETTERS = ''.join(
-    f"{chr(lo)}-{chr(hi)}" if hi > lo else chr(lo) for lo, hi in _cp_spans(
-        cp for cp in range(0x110000)
-        if unicodedata.category(chr(cp))[0] == 'L' and regex.match(r'\p{Script=Latin}', chr(cp))))
+LATIN_LETTERS = _ranges(regex.findall(r'\p{Script=Latin}', ''.join(category_chars('L'))))
 # Letters and marks of scripts written without spaces between words (Thai, Lao, Khmer, Myanmar, CJK, kana:
 # Unicode line-break class SA, ID or CJ; not full-width Latin). Where one touches a Latin/Greek/Cyrillic letter or a digit, a
 # word ends, so prose glued to an address ("ดูa@b.jpกขค", "https://x.com/aปถว06 10") stays outside it.
 _SPACELESS_CHAR = regex.compile(r'(?V1)[[\p{Line_Break=SA}\p{Line_Break=ID}\p{Line_Break=CJ}]--\p{Script=Latin}]')
-_SPACELESS = ''.join(
-    f"{chr(lo)}-{chr(hi)}" if hi > lo else chr(lo) for lo, hi in _cp_spans(
-        cp for cp in range(0x110000)
-        if unicodedata.category(chr(cp))[0] in 'LM' and _SPACELESS_CHAR.match(chr(cp))))
+_SPACELESS = _ranges(_SPACELESS_CHAR.findall(''.join(category_chars('L', 'M'))))
 # A percent escape is one character (?email=a%40ตัวอย่าง.ไทย, its digits in any script), so it glues to nothing.
-_DECIMAL = ''.join(f"{chr(lo)}-{chr(hi)}" if hi > lo else chr(lo) for lo, hi in _cp_spans(
-    cp for cp in range(0x110000) if unicodedata.category(chr(cp)) == 'Nd'))
+_DECIMAL = _ranges(CATEGORY_CHARS['Nd'])
 _GLUE = (rf"(?<=[0-9{_SPACED_LETTERS}])(?<!%[{_DECIMAL}A-Fa-f]{{2}})[{_SPACELESS}]"
          rf"|(?<=[{_SPACELESS}])[0-9{_SPACED_LETTERS}]")
 # Before each character of a local part, TLD or URL path: it does not start a new word.
@@ -119,8 +136,8 @@ _MIDDLE_DOT = "(?<=l)\u00b7(?=l)"
 def _script_class(*scripts):
     """Character-class body of the code points of *scripts* (Unicode Script property)."""
     script = regex.compile('[%s]' % ''.join(rf'\p{{Script={name}}}' for name in scripts))
-    return ''.join(f"{chr(lo)}-{chr(hi)}" if hi > lo else chr(lo)
-                   for lo, hi in _cp_spans(cp for cp in range(0x110000) if script.match(chr(cp))))
+    # Every code point: regex has its own Unicode tables, which may assign what unicodedata does not.
+    return _ranges(script.findall(''.join(map(chr, range(0x110000)))))
 
 
 # The other CONTEXTO punctuation of RFC 5892 (A.4, A.5, A.7): Hebrew geresh and gershayim after a Hebrew character
@@ -154,8 +171,8 @@ EMAIL_GATE = re.compile(r"@|[(<{\[]at[)>}\]]", re.IGNORECASE)
 
 # Area-code parentheses in compatibility form (full-width （ ）, small ﹙ ﹚): the phone view reads them as
 # "(" ")" (+49（30）123456) and the styled fold treats them as phone punctuation.
-PHONE_PARENS = {ch: unicodedata.normalize('NFKC', ch) for ch in map(chr, range(0x80, 0x20000))
-                if unicodedata.decomposition(ch).split(' ', 1)[0] in ('<wide>', '<small>')
+PHONE_PARENS = {ch: unicodedata.normalize('NFKC', ch) for ch, decomposition in DECOMPOSITIONS.items()
+                if decomposition.split(' ', 1)[0] in ('<wide>', '<small>')
                 and unicodedata.normalize('NFKC', ch) in '()'}
 
 # Digit boundaries are "not next to a digit", so numbers glued to letters of
@@ -257,7 +274,7 @@ PART_JOINERS = r"\-\u2010-\u2015/+*._|,"
 # \U00100000..\U00100001 key for an emitted value), so "INV-<YEAR>-107683" keeps its tail instead of a
 # second, partial mask.
 _LEFT_EDGE, _RIGHT_EDGE = ">\U00100001", "<\U00100000"
-CURRENCY_SIGNS = ''.join(ch for ch in map(chr, range(0x110000)) if unicodedata.category(ch) == 'Sc')
+CURRENCY_SIGNS = CATEGORY_CHARS['Sc']
 
 
 def token_glue(in_words=False):
@@ -606,10 +623,13 @@ _DATE_START = r'(?<![\d_' + _SPACED_LETTERS + r'])'
 _DATE_END = r'(?![\d_' + _SPACED_LETTERS + r'])'
 
 
+_HAN_NUMERIC = {ch: value for ch in map(chr, range(0x3000, 0x2FA20))
+                if (value := unicodedata.numeric(ch, None)) is not None and regex.match(r'\p{Script=Han}', ch)}
+
+
 def _han_numerals(*values):
     """Han-script numerals (〇 一 十 廿, financial forms) whose Unicode numeric value is in *values*."""
-    return ''.join(chr(cp) for cp in range(0x3000, 0x2FA20) if unicodedata.numeric(chr(cp), None) in values
-                   and regex.match(r'\p{Script=Han}', chr(cp)))
+    return ''.join(ch for ch, value in _HAN_NUMERIC.items() if value in values)
 
 
 _HAN_DIGIT, _HAN_1_9 = f'[{_han_numerals(*range(10))}]', f'[{_han_numerals(*range(1, 10))}]'
