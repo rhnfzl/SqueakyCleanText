@@ -66,7 +66,7 @@ fuzzy = [
 ]
 torch = [
     "torch>=2.6.0",
-    "transformers>=4.48",
+    "transformers>=5.0",
 ]
 gliner = [
     "gliner>=0.2.25,<1.0",
@@ -79,15 +79,16 @@ synthetic = [
 ]
 presidio = [
     "presidio-analyzer>=2.2.360",
+    "gliner>=0.2.25,<1.0",
 ]
 classify = [
     "gliclass>=0.1.16",
 ]
 all-ner = [
-    "torch>=2.6.0",
-    "transformers>=4.48",
-    "gliner>=0.2.25,<1.0",
-    "gliner2>=1.0,<2.0",
+    "SqueakyCleanText[torch,gliner,gliner2]",
+]
+quantize = [
+    "onnx>=1.19",
 ]
 dev = [
     "hypothesis>=6.130",
@@ -130,6 +131,9 @@ version = {attr = "sct.__version__"}
 [tool.setuptools.packages.find]
 include = ["sct*"]
 exclude = ["tests*"]
+
+[tool.setuptools.package-data]
+sct = ["py.typed"]
 
 [tool.pytest.ini_options]
 timeout = 1200

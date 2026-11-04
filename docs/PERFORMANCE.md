@@ -35,8 +35,18 @@ than about 16 workers lowered throughput.
 
 ## GPU
 
-Install: `pip install "squeakycleantext[gpu]"` and `pip install "onnxruntime-gpu[cuda,cudnn]"`.
-The onnxruntime-gpu build must match your NVIDIA driver: recent PyPI wheels need CUDA 13
+Install:
+
+```sh
+pip install "squeakycleantext[gpu]"
+# onnxruntime and onnxruntime-gpu install the same package, so keep only the GPU one
+pip uninstall -y onnxruntime onnxruntime-gpu
+pip install "onnxruntime-gpu[cuda,cudnn]"
+python -c "import onnxruntime as ort; print(ort.get_available_providers())"  # lists CUDAExecutionProvider
+```
+
+Upgrading or reinstalling SqueakyCleanText can bring `onnxruntime` back; repeat the uninstall
+and install steps if it does. The onnxruntime-gpu build must match your NVIDIA driver: recent PyPI wheels need CUDA 13
 (driver 580 or newer); for CUDA 12 use the onnxruntime CUDA 12 package index. Call
 `onnxruntime.preload_dlls()` before creating the cleaner when CUDA comes from pip packages.
 

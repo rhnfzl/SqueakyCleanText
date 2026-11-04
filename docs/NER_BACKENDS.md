@@ -34,7 +34,7 @@ SqueakyCleanText supports six NER backends, selectable via the `ner_backend` con
 | `gliner` | GLiNER zero-shot NER with custom entity labels | `[gliner]` or `[gliner2]` extra | Custom entity types, PII detection, bi-encoder models |
 | `ensemble_onnx` | ONNX + GLiNER ensemble voting | `[gliner]` extra | Maximum recall with custom entities |
 | `ensemble_torch` | Torch + GLiNER ensemble voting | `[torch,gliner]` extra | Maximum recall with PyTorch |
-| `presidio_gliner` | Presidio + GLiNER recognizer (beta) | `presidio-analyzer`, `[gliner]` | Context-aware NER via Presidio's pipeline |
+| `presidio_gliner` | Presidio + GLiNER recognizer (beta) | `[presidio]` extra | Context-aware NER via Presidio's pipeline |
 
 ## Default NER Models (ONNX)
 

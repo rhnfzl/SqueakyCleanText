@@ -12,13 +12,14 @@ The base install uses **ONNX Runtime** for NER inference - no PyTorch or Transfo
 
 | Extra | Command | What it adds |
 |-------|---------|--------------|
-| GPU | `pip install SqueakyCleanText[gpu]` | CUDA-accelerated ONNX inference (see [docs/PERFORMANCE.md](PERFORMANCE.md) for CUDA setup and speed by hardware) |
+| GPU | `pip install SqueakyCleanText[gpu]` | CUDA-accelerated ONNX inference; needs the extra install steps in [docs/PERFORMANCE.md](PERFORMANCE.md), which also covers speed by hardware |
+| Quantize | `pip install SqueakyCleanText[quantize]` | `onnx`, needed by `load_onnx_ner_model(quantize=True)` |
 | Fuzzy dates | `pip install SqueakyCleanText[fuzzy]` | Fuzzy month name matching ([rapidfuzz](https://github.com/rapidfuzz/RapidFuzz)) |
 | PyTorch NER | `pip install SqueakyCleanText[torch]` | PyTorch/Transformers NER backend |
 | GLiNER | `pip install SqueakyCleanText[gliner]` | [GLiNER](https://github.com/urchade/GLiNER) zero-shot NER |
 | GLiNER2 | `pip install SqueakyCleanText[gliner2]` | [GLiNER2](https://github.com/fastino-ai/GLiNER2) (Fastino AI) backend |
 | Synthetic | `pip install SqueakyCleanText[synthetic]` | Faker-based synthetic replacement (realistic fake values instead of `<TAG>` tokens) |
-| Presidio | `pip install SqueakyCleanText[presidio]` | Presidio-analyzer for `presidio_gliner` backend |
+| Presidio | `pip install SqueakyCleanText[presidio]` | Presidio-analyzer and GLiNER for `presidio_gliner` backend |
 | Classify | `pip install SqueakyCleanText[classify]` | GLiClass document-level pre-classification |
 | MCP | `pip install SqueakyCleanText[mcp]` | FastMCP server with text and JSON cleaning tools |
 | Datasets | `pip install SqueakyCleanText[datasets]` | Hugging Face `datasets` adapter ([docs/INTEGRATIONS.md](INTEGRATIONS.md)) |
@@ -27,7 +28,7 @@ The base install uses **ONNX Runtime** for NER inference - no PyTorch or Transfo
 | Haystack | `pip install SqueakyCleanText[haystack]` | Haystack document cleaner component |
 | Score | `pip install SqueakyCleanText[score]` | MinHash signatures for score columns and `sct-report` ([docs/SCORE.md](SCORE.md)) |
 | OCR | `pip install SqueakyCleanText[ocr]` | Pillow image redaction and Tesseract OCR adapter |
-| All NER | `pip install SqueakyCleanText[all-ner]` | All NER backends combined |
+| All NER | `pip install SqueakyCleanText[all-ner]` | PyTorch, GLiNER and GLiNER2 backends combined (`presidio_gliner` needs `[presidio]` as well) |
 | Development | `pip install SqueakyCleanText[dev]` | Testing and linting tools |
 | Test | `pip install SqueakyCleanText[test]` | Coverage tools for the test suite |
 
