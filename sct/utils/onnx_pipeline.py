@@ -13,7 +13,6 @@ import os
 import re
 import shutil
 import sys
-import unicodedata
 import uuid
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
@@ -23,14 +22,17 @@ from urllib.parse import quote
 import numpy as np
 import onnxruntime as ort
 from huggingface_hub import hf_hub_download, try_to_load_from_cache
+from huggingface_hub.errors import EntryNotFoundError
 from tokenizers import Tokenizer
+
+from sct.utils.ner_spans import _letter_scripts
 
 logger = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
 # TokenizerWrapper — adapts ``tokenizers.Tokenizer`` to the interface that
-# ``split_text()`` and ``_token_count()`` in ner.py expect.
+# ``split_text()`` and ``token_count()`` in ner_chunking.py expect.
 # ---------------------------------------------------------------------------
 
 class _EncodingResult:
@@ -51,7 +53,7 @@ class _EncodingResult:
 
 class TokenizerWrapper:
     """Wraps ``tokenizers.Tokenizer`` to expose the subset of the HF
-    ``AutoTokenizer`` interface used by ``split_text()`` and ``_token_count()``.
+    ``AutoTokenizer`` interface used by ``split_text()`` and ``token_count()``.
 
     Key mappings:
         encoding.ids → result.input_ids
@@ -284,7 +286,6 @@ class ONNXNERPipeline:
 
         groups.append(current_group)
 
-        # Convert groups to output entities
         entities = []
         for group in groups:
             entity_type = group[0]['entity_type']
@@ -323,16 +324,6 @@ class ONNXNERPipeline:
             })
 
         return entities
-
-
-def _letter_scripts(text: str) -> List[str]:
-    """Script of each letter, from its Unicode name after NFKC ("LATIN", "HIRAGANA", "THAI").
-
-    Marks, digits, punctuation and modifier letters (ー, ๆ) belong to no script here.
-    """
-    return [unicodedata.name(c, ' ').split(' ', 1)[0]
-            for c in unicodedata.normalize('NFKC', text)
-            if unicodedata.category(c) in ('Lu', 'Ll', 'Lt', 'Lo')]
 
 
 # ---------------------------------------------------------------------------
@@ -413,6 +404,52 @@ def _colocate_external_data(model_path: str, data_path: str, link_dir: Path) -> 
     return str(link_dir / 'model.onnx')
 
 
+def _read_model_max_length(config_path: Optional[str]) -> int:
+    """``model_max_length`` of a tokenizer_config.json; 512 when absent, unreadable or unusable."""
+    if config_path is None:
+        return 512
+    try:
+        with open(config_path) as f:
+            value = json.load(f).get('model_max_length')
+    except (OSError, ValueError, AttributeError) as e:
+        logger.warning("Cannot read %s (%s), using max_length=512", config_path, e)
+        return 512
+    # Some models set absurdly large values (e.g. 1e30), null or a non-number.
+    return value if isinstance(value, (int, float)) and value <= 100_000 else 512
+
+
+def _create_session(
+    model_path: str,
+    device: str,
+    intra_op_threads: Optional[int],
+    inter_op_threads: Optional[int],
+    cuda_device_id: int,
+    cuda_provider_options: Optional[Dict[str, Any]],
+) -> Tuple[ort.InferenceSession, bool]:
+    """ONNX session on the requested providers, and whether CUDA was requested."""
+    providers: List[Any] = []
+    cuda_requested = device == 'cuda' and 'CUDAExecutionProvider' in ort.get_available_providers()
+    if cuda_requested:
+        providers.append(('CUDAExecutionProvider',
+                          {'device_id': cuda_device_id, **(cuda_provider_options or {})}))
+    providers.append('CPUExecutionProvider')
+
+    session_options = ort.SessionOptions()
+    session_options.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
+    session_options.log_severity_level = 3  # errors only, for this session alone
+    if intra_op_threads is not None:
+        session_options.intra_op_num_threads = intra_op_threads
+    if inter_op_threads is not None:
+        session_options.inter_op_num_threads = inter_op_threads
+
+    session = ort.InferenceSession(
+        model_path,
+        sess_options=session_options,
+        providers=providers,
+    )
+    return session, cuda_requested
+
+
 def load_onnx_ner_model(
     model_name: str,
     device: str = 'cpu',
@@ -460,28 +497,32 @@ def load_onnx_ner_model(
     model_path = hf_hub_download(model_name, 'model.onnx', **download_kwargs)
     # hub cache layout: .../snapshots/<commit>/model.onnx
     commit = Path(model_path).parent.name
-    if re.fullmatch(r'[0-9a-f]{40}', commit):
+    is_snapshot = re.fullmatch(r'[0-9a-f]{40}', commit) is not None
+    if is_snapshot:
         # The rest comes from this snapshot: a commit hash is served from the cache with no
         # HTTP, so a forked worker does not resolve DNS (which can hang after fork).
         download_kwargs['revision'] = commit
 
     def optional_download(filename):
+        """Path of an optional repo file, None when the repo lacks it; other Hub errors propagate."""
         # The Hub's cached "no such file" answer counts too, so the probe needs no HEAD request.
         cached = try_to_load_from_cache(
             model_name, filename, cache_dir=cache_dir, revision=download_kwargs.get('revision'))
         if cached is not None and not isinstance(cached, str):
-            raise FileNotFoundError(filename)
-        return cached or hf_hub_download(model_name, filename, **download_kwargs)
+            return None
+        try:
+            return cached or hf_hub_download(model_name, filename, **download_kwargs)
+        # Includes LocalEntryNotFoundError: offline, a file never cached counts as absent.
+        except (FileNotFoundError, EntryNotFoundError):
+            return None
+
     config_path = hf_hub_download(model_name, 'config.json', **download_kwargs)
     tokenizer_path = hf_hub_download(model_name, 'tokenizer.json', **download_kwargs)
 
     # Large models (XLM-RoBERTa-large ~2.1GB) store weights in an external
     # data file. ONNX Runtime needs it in the real directory of model.onnx.
-    try:
-        data_path = optional_download('model.onnx_data')
-    except Exception:  # noqa: S110
-        pass  # Smaller models don't have this file
-    else:
+    data_path = optional_download('model.onnx_data')
+    if data_path is not None:
         link_base = Path(cache_dir) if cache_dir else Path.home() / ".cache"
         model_path = _colocate_external_data(
             model_path, data_path,
@@ -489,25 +530,12 @@ def load_onnx_ner_model(
             link_base / "sct_linked" / _quantized_dir(model_name, commit),
         )
 
-    # Try to get tokenizer_config.json for model_max_length
-    model_max_length = 512  # safe default
-    try:
-        tok_config_path = optional_download('tokenizer_config.json')
-        with open(tok_config_path) as f:
-            tok_config = json.load(f)
-        model_max_length = tok_config.get('model_max_length', 512)
-        # Some models set absurdly large values (e.g. 1e30)
-        if model_max_length > 100_000:
-            model_max_length = 512
-    except Exception:
-        logger.debug("tokenizer_config.json not found, using default max_length=512")
+    model_max_length = _read_model_max_length(optional_download('tokenizer_config.json'))
 
-    # Load id2label from config.json
     with open(config_path) as f:
         model_config = json.load(f)
     id2label = {int(k): v for k, v in model_config['id2label'].items()}
 
-    # Load tokenizer
     tokenizer = Tokenizer.from_file(tokenizer_path)
     wrapper = TokenizerWrapper(tokenizer, model_max_length=model_max_length)
 
@@ -523,26 +551,8 @@ def load_onnx_ner_model(
             quantize_dynamic(model_path, str(quantized_path), weight_type=QuantType.QInt8)
         model_path = str(quantized_path)
 
-    # Create ONNX session with appropriate providers
-    providers: List[Any] = []
-    cuda_requested = device == 'cuda' and 'CUDAExecutionProvider' in ort.get_available_providers()
-    if cuda_requested:
-        providers.append(('CUDAExecutionProvider',
-                          {'device_id': cuda_device_id, **(cuda_provider_options or {})}))
-    providers.append('CPUExecutionProvider')
-
-    session_options = ort.SessionOptions()
-    session_options.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
-    if intra_op_threads is not None:
-        session_options.intra_op_num_threads = intra_op_threads
-    if inter_op_threads is not None:
-        session_options.inter_op_num_threads = inter_op_threads
-
-    session = ort.InferenceSession(
-        model_path,
-        sess_options=session_options,
-        providers=providers,
-    )
+    session, cuda_requested = _create_session(
+        model_path, device, intra_op_threads, inter_op_threads, cuda_device_id, cuda_provider_options)
 
     # Pad id for batched inference: config, else the tokenizer's pad token, else 0.
     pad_id = model_config.get('pad_token_id')
@@ -554,7 +564,7 @@ def load_onnx_ner_model(
         )
     pipeline = ONNXNERPipeline(session, wrapper, id2label, pad_id=pad_id)
     pipeline.provider = session.get_providers()[0]
-    pipeline.revision = commit if re.fullmatch(r'[0-9a-f]{40}', commit) else revision
+    pipeline.revision = commit if is_snapshot else revision
 
     if cuda_requested and pipeline.provider != 'CUDAExecutionProvider':
         # ORT drops CUDA silently when the CUDA/cuDNN libraries or the driver do not match.
