@@ -6,7 +6,7 @@ import pytest
 
 from sct import TextCleaner, TextCleanerConfig
 from sct.browser import build_browser_manifest
-from sct.utils import constants
+from sct.utils import constants, contact
 from sct.utils.contact import ProcessContacts
 from sct.utils.stopwords import ProcessStopwords
 
@@ -35,7 +35,7 @@ def _cleaner(**overrides):
     "Tel9876543210",     # Latin
 ])
 def test_phone_glued_to_letters_any_script(text):
-    assert "9876543210" not in CONTACTS.replace_phone_numbers(text)
+    assert "9876543210" not in contact.PHONE_VIEW.sub("<PHONE>", text)
 
 
 @pytest.mark.parametrize("text, expected", [
@@ -45,7 +45,7 @@ def test_phone_glued_to_letters_any_script(text):
     ("+49 (30) 1234567", "<PHONE>"),
 ])
 def test_international_phone_keeps_closing_paren_of_sentence(text, expected):
-    assert CONTACTS.replace_phone_numbers(text) == expected
+    assert contact.PHONE_VIEW.sub("<PHONE>", text) == expected
 
 
 @pytest.mark.parametrize("text, expected", [
@@ -53,7 +53,7 @@ def test_international_phone_keeps_closing_paren_of_sentence(text, expected):
     ("金额5000元", "金额<NUMBER>元"),
 ])
 def test_number_glued_to_letters_any_script(text, expected):
-    assert CONTACTS.replace_numbers(text) == expected
+    assert contact.numbers_regex().sub("<NUMBER>", text) == expected
 
 
 @pytest.mark.parametrize("text, expected", [
@@ -75,7 +75,7 @@ def test_year_glued_to_letters_any_script(text, expected):
     "+49 30 12345678",
 ])
 def test_international_and_indian_phones(phone):
-    assert CONTACTS.replace_phone_numbers(f"Call {phone} now") == "Call <PHONE> now"
+    assert contact.PHONE_VIEW.sub("<PHONE>", f"Call {phone} now") == "Call <PHONE> now"
 
 
 @pytest.mark.parametrize("text", [
@@ -86,7 +86,7 @@ def test_international_and_indian_phones(phone):
     "zip 1012 AB",
 ])
 def test_non_phones_not_detected(text):
-    assert CONTACTS.replace_phone_numbers(text) == text
+    assert contact.PHONE_VIEW.sub("<PHONE>", text) == text
 
 
 @pytest.mark.parametrize("text, expected", [
@@ -102,12 +102,12 @@ def test_pipeline_ips_then_phones_then_years(text, expected):
 
 @pytest.mark.parametrize("text", ["std::vector", "at 12:30:45", "v1.2.3.4.5", "256.1.1.1"])
 def test_ip_regex_skips_non_ips(text):
-    assert CONTACTS.replace_ips(text) == text
+    assert CONTACTS.replace_ips_with_fn(text, lambda _: "<IP>") == text
 
 
 def test_ips_public_only_keeps_private_addresses():
     text = "Host 192.168.1.20 and 8.8.8.8 and 2001:4860:4860::8888"
-    assert CONTACTS.replace_ips(text, public_only=True) == (
+    assert CONTACTS.replace_ips_with_fn(text, lambda _: "<IP>", public_only=True) == (
         "Host 192.168.1.20 and <IP> and <IP>"
     )
     cleaner = _cleaner(
@@ -208,7 +208,7 @@ def test_ipv6_replaced_whole_in_every_mode(ip, mode):
 @pytest.mark.parametrize("text", ["1:2:3:4:5:6::7:8", "a::b::c", "x :: y"])
 def test_ip_regex_rejects_invalid_ipv6_like_python(text):
     # The browser uses this regex without ipaddress validation, so it must be exact.
-    assert CONTACTS.replace_ips(text) == text
+    assert CONTACTS.replace_ips_with_fn(text, lambda _: "<IP>") == text
     assert constants.IP_REGEX.search(text) is None
 
 
@@ -325,10 +325,10 @@ def test_numbers_in_words_flag_replaces_glued_digits():
 
 
 def test_numbers_in_words_default_still_replaces_spaceless_scripts():
-    assert CONTACTS.replace_numbers("金额5000元") == "金额<NUMBER>元"
-    assert CONTACTS.replace_numbers("Llama-3.1-70B") == "Llama-<NUMBER>-70B"  # same as 0.7.0
-    assert CONTACTS.replace_numbers("total EUR4500, INR5000") == "total EUR<NUMBER>, INR<NUMBER>"
-    assert CONTACTS.replace_numbers("XEUR4500") == "XEUR4500"
+    assert contact.numbers_regex().sub("<NUMBER>", "金额5000元") == "金额<NUMBER>元"
+    assert contact.numbers_regex().sub("<NUMBER>", "Llama-3.1-70B") == "Llama-<NUMBER>-70B"  # same as 0.7.0
+    assert contact.numbers_regex().sub("<NUMBER>", "total EUR4500, INR5000") == "total EUR<NUMBER>, INR<NUMBER>"
+    assert contact.numbers_regex().sub("<NUMBER>", "XEUR4500") == "XEUR4500"
 
 
 def test_numbers_in_words_legacy_global(monkeypatch):
@@ -481,6 +481,5 @@ def test_email_regex_skipped_without_separator(monkeypatch, reversible):
     cleaner = _cleaner(replacement_mode="reversible" if reversible else "placeholder")
     monkeypatch.setattr(constants, "EMAIL_REGEX", _NoSub())
     text = "A long paragraph with no address in it, only words."
-    assert CONTACTS.replace_emails(text) == text
     assert CONTACTS.replace_emails_with_fn(text, lambda s: "<EMAIL>") == text
     cleaner.process(text)

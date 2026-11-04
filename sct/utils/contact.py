@@ -6,20 +6,18 @@ from sct.utils import constants
 # Phones and IPs are matched on a view of the text where every decimal digit is ASCII and
 # full-width . - and the ideographic space are ASCII (٠٦ ١٢ ٣٤, ١٩٢．١٦٨．١．١): one code point
 # for one, so a match in the view has the same offsets in the source.
-_DIGIT_VIEW = {cp: str(unicodedata.decimal(chr(cp))) for cp in range(0x80, 0x20000)
-               if unicodedata.category(chr(cp)) == 'Nd'}
+_DIGIT_VIEW = {ord(ch): str(unicodedata.decimal(ch)) for ch in constants.CATEGORY_CHARS['Nd'] if not ch.isascii()}
 _DIGIT_VIEW.update({0xFF0E: '.', 0xFF0D: '-', 0x3000: ' '})
 # fold_styled_characters: phones also see every other space (Zs: no-break, thin, narrow no-break) as
 # " " and every dash (Pd: hyphen, non-breaking hyphen, en dash) as "-", as word processors and PDFs
 # set digit groups (06\u00a012\u00a034, 06\u201112345678), and full-width or small area-code
 # parentheses as "(" ")" (+49（30）123456); the source text keeps them.
-SEPARATOR_VIEW = {**_DIGIT_VIEW, **{cp: ' ' if unicodedata.category(chr(cp)) == 'Zs' else '-'
-                                    for cp in range(0x80, 0x20000) if unicodedata.category(chr(cp)) in ('Zs', 'Pd')},
+SEPARATOR_VIEW = {**_DIGIT_VIEW, **{ord(ch): ' ' if unicodedata.category(ch) == 'Zs' else '-'
+                                    for ch in constants.category_chars('Zs', 'Pd') if not ch.isascii()},
                   **str.maketrans(constants.PHONE_PARENS)}
 
 # Dates (fold_styled_characters) also read every character whose NFKC form is "." as "." (1990﹒ 1﹒ 15﹒).
-DATE_SEPARATOR_VIEW = {**SEPARATOR_VIEW, **{cp: '.' for cp in range(0x80, 0x20000)
-                                             if unicodedata.normalize('NFKC', chr(cp)) == '.'}}
+DATE_SEPARATOR_VIEW = {**SEPARATOR_VIEW, **dict.fromkeys(map(ord, constants.NFKC_DOTS), '.')}
 
 
 class _SourceMatch:
@@ -175,49 +173,11 @@ def is_replaceable_ip(candidate, public_only=False):
 
 class ProcessContacts:
 
-    def __init__(self):
-        pass
-
-    def replace_urls(self, text, replace_with="<URL>"):
-        """Replace all URLs in ``text`` str with ``replace_with`` str."""
-        return constants.URL_REGEX.sub(replace_with, text)
-
-    def replace_html(self, text, replace_with="<HTML>"):
-        """Replace all html tags in ``text`` str with ``replace_with`` str."""
-        return constants.HTML_REGEX.sub(replace_with, text)
-
-    def replace_emails(self, text, replace_with="<EMAIL>"):
-        """Replace all emails in ``text`` str with ``replace_with`` str."""
-        if not constants.EMAIL_GATE.search(text):
-            return text
-        return constants.EMAIL_REGEX.sub(replace_with, text)
-
-    def replace_ips(self, text, replace_with="<IP>", public_only=False):
-        """Replace IPv4/IPv6 addresses in ``text`` (only public ones if ``public_only``)."""
-        return self.replace_ips_with_fn(text, lambda orig: replace_with, public_only)
-
-    def replace_phone_numbers(self, text, replace_with="<PHONE>"):
-        """Replace all phone numbers in ``text`` str with ``replace_with`` str."""
-        return PHONE_VIEW.sub(replace_with, text)
-
-    def replace_numbers(self, text, replace_with="<NUMBER>", in_words=False):
-        """Replace all numbers in ``text`` str with ``replace_with`` str.
-
-        ``in_words=True`` also replaces digits glued to Latin/Greek/Cyrillic letters (``GPT4``).
-        """
-        return numbers_regex(in_words).sub(replace_with, text)
-
-    # --- Callable-based replacements (for synthetic mode) ---
-
     def replace_emails_with_fn(self, text, replace_fn):
         """Replace emails using a callable: replace_fn(matched_text) -> replacement."""
         if not constants.EMAIL_GATE.search(text):
             return text
         return constants.EMAIL_REGEX.sub(lambda m: replace_fn(m.group()), text)
-
-    def replace_urls_with_fn(self, text, replace_fn):
-        """Replace URLs using a callable: replace_fn(matched_text) -> replacement."""
-        return constants.URL_REGEX.sub(lambda m: replace_fn(m.group()), text)
 
     def replace_ips_with_fn(self, text, replace_fn, public_only=False):
         """Replace IPs using a callable: replace_fn(matched_text) -> replacement."""
@@ -229,7 +189,3 @@ class ProcessContacts:
     def replace_phone_numbers_with_fn(self, text, replace_fn, view=PHONE_VIEW):
         """Replace phone numbers using a callable: replace_fn(matched_text) -> replacement."""
         return view.sub(lambda m: replace_fn(m.group()), text)
-
-    def replace_numbers_with_fn(self, text, replace_fn, in_words=False):
-        """Replace numbers using a callable: replace_fn(matched_text) -> replacement."""
-        return numbers_regex(in_words).sub(lambda m: replace_fn(m.group()), text)

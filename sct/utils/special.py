@@ -67,19 +67,9 @@ def _remove_bracketed(text, remove_brackets, remove_braces, max_chars, max_words
 
 class ProcessSpecialSymbols:
 
-    def __init__(self):
-        pass
-
     def replace_currency_symbols(self, text, replace_with="<CUR>"):
-        """
-        Replace currency symbols in ``text`` str with string specified by ``replace_with`` str.
-        Args:
-            text (str): raw text
-            replace_with (str): if None (default), replace symbols with
-                their standard 3-letter abbreviations (e.g. '$' with 'USD', '£' with 'GBP');
-                otherwise, pass in a string with which to replace all symbols
-                (e.g. "*CURRENCY*")
-        """
+        """Replace runs of currency symbols with ``replace_with``, a string or a callable as ``re.sub`` takes;
+        None replaces each symbol with its ISO code ('$' with 'USD', '£' with 'GBP')."""
         if replace_with is None:
             return self.replace_currency_symbols_with_fn(text, constants.CURRENCIES.__getitem__)
         return constants.CURRENCY_REGEX.sub(replace_with, text)

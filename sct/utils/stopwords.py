@@ -1,5 +1,6 @@
 from stop_words import StopWordError, get_stop_words as _get_pkg_stop_words
 
+from sct.config import DEFAULT_LANGUAGES
 from sct.utils.resources import language_to_iso
 
 
@@ -12,8 +13,7 @@ class ProcessStopwords:
             custom_stopwords: dict mapping language name -> frozenset of stopwords.
                              Custom sets REPLACE auto-detected ones.
         """
-        # Default to original 4 for backward compat
-        languages = supported_languages or frozenset({'ENGLISH', 'DUTCH', 'GERMAN', 'SPANISH'})
+        languages = supported_languages or DEFAULT_LANGUAGES
         custom = custom_stopwords or {}
 
         self._lang_map = {}
@@ -29,20 +29,14 @@ class ProcessStopwords:
                     # stop-words package doesn't support this language
                     self._lang_map[lang] = set()
 
-        # Backward compat named attributes
-        self.STOP_WORDS_EN = self._lang_map.get('ENGLISH', set())
-        self.STOP_WORDS_NL = self._lang_map.get('DUTCH', set())
-        self.STOP_WORDS_DE = self._lang_map.get('GERMAN', set())
-        self.STOP_WORDS_ES = self._lang_map.get('SPANISH', set())
-
     def get_stop_words(self, language: str) -> set:
         """Get the stopword set for a language. Falls back to English."""
         return self._lang_map.get(language, self._lang_map.get('ENGLISH', set()))
 
-    def remove_stopwords(self, text, lan):
+    def remove_stopwords(self, text, language):
         """Remove stopwords based on the detected language.
 
         Falls back to English stopwords for unknown languages.
         """
-        stop_words = self._lang_map.get(lan, self._lang_map.get('ENGLISH', set()))
+        stop_words = self.get_stop_words(language)
         return " ".join(word for word in text.split() if word not in stop_words)

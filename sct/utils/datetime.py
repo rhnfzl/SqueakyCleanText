@@ -24,9 +24,7 @@ class ProcessDateTime:
         """
         Replaces years between 1900 to 2099 in the text with a special token.
         """
-        cleaned_string = constants.YEAR_REGEX.sub(replace_with, text)
-
-        return cleaned_string
+        return constants.YEAR_REGEX.sub(replace_with, text)
 
     def replace_dates(self, text, replace_with="<DATE>"):
         """
@@ -36,9 +34,7 @@ class ProcessDateTime:
         formats (EN, NL, DE, ES + any custom month names).
         Should be called before replace_years to avoid partial matches.
         """
-        cleaned_string = self._date_regex.sub(replace_with, text)
-
-        return cleaned_string
+        return self._date_regex.sub(replace_with, text)
 
     def fuzzy_replace_dates(self, text, replace_with="<DATE>", score_cutoff=80,
                             language=None):
