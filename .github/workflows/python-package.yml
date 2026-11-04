@@ -26,6 +26,21 @@ jobs:
         uv export --format pylock.toml --all-extras --output-file pylock.toml --locked > /dev/null
         git diff --exit-code pylock.toml
 
+  typecheck:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - uses: actions/setup-python@v5
+      with:
+        python-version: "3.12"
+
+    - name: Type-check sct with mypy
+      run: |
+        pip install uv==0.10.9
+        pip install -e . --no-cache-dir
+        uvx mypy==2.4.1 --python-executable "$(which python)"
+
   build:
 
     runs-on: ubuntu-latest
