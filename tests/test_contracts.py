@@ -4,6 +4,7 @@ import warnings
 
 import pytest
 
+from tests.ner_helpers import bare_ner
 from sct import EntityRule, PrivacyPolicy, TextCleaner, TextCleanerConfig
 from sct.utils.contact import ProcessContacts
 from sct.utils.ner import GeneralNER
@@ -54,7 +55,7 @@ def test_presidio_backend_uses_detected_language():
             calls.append((text, language))
             return []
 
-    ner = object.__new__(GeneralNER)
+    ner = bare_ner()
     ner._ner_backend = "presidio_gliner"
     ner._analyzer = FakeAnalyzer()
     policy = PrivacyPolicy(
@@ -106,7 +107,7 @@ def test_general_ner_passes_pinned_revision_to_model_loader(monkeypatch):
         calls.append((model_name, revision))
         return object(), FakeTokenizer()
 
-    monkeypatch.setattr("sct.utils.ner.load_onnx_ner_model", fake_loader)
+    monkeypatch.setattr("sct.utils.onnx_pipeline.load_onnx_ner_model", fake_loader)
 
     GeneralNER(
         model_names={"ENGLISH": "org/en", "MULTILINGUAL": "org/multi"},

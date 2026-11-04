@@ -2,7 +2,6 @@
 as independent models, neighbour suppression ahead of the privacy policy, and a
 pipeline published before its tokenizer."""
 
-import sct.utils.ner as ner_module
 from sct.privacy import EntityRule, PrivacyPolicy
 from sct.utils.ner import GeneralNER
 from tests.test_chunking import _FakeRunDetector, _word_ner, _words
@@ -87,7 +86,7 @@ class _FakeTok:
 
 
 def test_tokenizer_is_published_before_its_pipeline(monkeypatch):
-    monkeypatch.setattr(ner_module, "load_onnx_ner_model", lambda *a, **k: (object(), _FakeTok()))
+    monkeypatch.setattr("sct.utils.onnx_pipeline.load_onnx_ner_model", lambda *a, **k: (object(), _FakeTok()))
     ner = GeneralNER(model_names={"ENGLISH": "a", "MULTILINGUAL": "b", "DUTCH": "d", "GERMAN": "d"})
 
     class Pipelines(dict):

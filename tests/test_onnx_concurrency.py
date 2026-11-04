@@ -1,11 +1,13 @@
 """ONNX runs lock-free, GLiNER stays serialised, models are cached by (name, revision)."""
 
+import multiprocessing
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
 
 import pytest
 
+from tests.ner_helpers import bare_ner
 from sct import config
 from sct.config import TextCleanerConfig
 from sct.utils import ner as ner_module
@@ -68,7 +70,7 @@ def test_gliner_calls_stay_serialised():
                 state["inside"] -= 1
             return [[]]
 
-    ner = object.__new__(GeneralNER)
+    ner = bare_ner()
     ner._ner_backend = "gliner"
     ner._gliner_pipe = FakeGLiNER()
     ner._replacement_mode = "placeholder"
@@ -98,7 +100,7 @@ def test_model_cache_is_keyed_by_revision(monkeypatch, revisions, loads):
         calls.append((model_name, revision))
         return object(), _FakeTok()
 
-    monkeypatch.setattr(ner_module, "load_onnx_ner_model", fake_load)
+    monkeypatch.setattr("sct.utils.onnx_pipeline.load_onnx_ner_model", fake_load)
     ner = GeneralNER(model_names={'ENGLISH': 'm', 'MULTILINGUAL': 'm'},
                      model_revisions=revisions)
     assert calls == loads
@@ -121,7 +123,7 @@ def test_thread_knob_passed_from_general_ner(monkeypatch):
         seen.append((kwargs["intra_op_threads"], kwargs["inter_op_threads"]))
         return object(), _FakeTok()
 
-    monkeypatch.setattr(ner_module, "load_onnx_ner_model", fake_load)
+    monkeypatch.setattr("sct.utils.onnx_pipeline.load_onnx_ner_model", fake_load)
     GeneralNER(model_names={'ENGLISH': 'a', 'MULTILINGUAL': 'b'},
                onnx_intra_op_threads=2, onnx_inter_op_threads=1)
     assert seen == [(2, 1), (2, 1)]
@@ -149,3 +151,11 @@ def test_fork_child_pins_live_ner(monkeypatch):
     assert ner in ner_module._LIVE_NER
     ner_module._pin_live_ner_in_child()
     assert any(p is ner for p in ner_module._FORK_PINNED)
+
+
+def test_import_sct_leaves_onnxruntime_unloaded():
+    code = "import sys, sct; sys.exit('onnxruntime' in sys.modules)"
+    child = multiprocessing.get_context("spawn").Process(target=exec, args=(code,))  # a fresh interpreter
+    child.start()
+    child.join()
+    assert child.exitcode == 0

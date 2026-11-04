@@ -5,6 +5,7 @@ import threading
 
 import pytest
 
+from tests.ner_helpers import bare_ner
 from sct.config import TextCleanerConfig
 from sct.sct import TextCleaner
 from sct.utils.gliner_adapter import GLiNERAdapter
@@ -125,7 +126,7 @@ def test_gliner_gets_one_batched_call_under_its_lock():
             calls.append((list(texts), batch_size, ner._get_lock('gliner').locked()))
             return [[] for _ in texts]
 
-    ner = object.__new__(GeneralNER)
+    ner = bare_ner()
     ner._ner_backend = 'gliner'
     ner._ner_batch_size = 16
     ner._gliner_pipe = FakeGLiNER()

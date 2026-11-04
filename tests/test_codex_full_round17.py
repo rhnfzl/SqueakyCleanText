@@ -4,10 +4,11 @@ import dataclasses
 
 import pytest
 
+from tests.ner_helpers import bare_ner
 from sct import TextCleaner, TextCleanerConfig
 from sct.privacy import EntityRule, PrivacyPolicy
 from sct.streaming import WindowedStreamingRedactor
-from sct.utils.ner import GeneralNER, _presidio_type_map
+from sct.utils.ner import _presidio_type_map
 from tests.conftest import TEST_NER_MODELS
 
 # --- 1: multi-digit styled numbers (⑫) stay whole across stream windows ---
@@ -35,7 +36,7 @@ class _Analyzer:
 
 
 def test_presidio_aliases_use_canonical_types():
-    ner = object.__new__(GeneralNER)
+    ner = bare_ner()
     ner._ner_backend, ner._analyzer = "presidio_gliner", _Analyzer()
     ner._presidio_types = _presidio_type_map(
         {"label_map": {"person": "PER", "location": "LOC", "organization": "ORG"}})

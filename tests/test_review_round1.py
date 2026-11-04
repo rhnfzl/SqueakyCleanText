@@ -9,6 +9,7 @@ from types import SimpleNamespace
 
 import pytest
 
+from sct.utils.ner_chunking import token_count
 from sct.utils.anonymization_map import AnonymizationMap
 from sct.utils.synthetic import SyntheticReplacer
 from tests.test_chunking import _FakeRunDetector, _word_ner, _word_tokenizer, _words
@@ -78,7 +79,7 @@ def test_windows_fit_every_model_tokenizer(overlap):
     heavy = _Tok(2)
     ner._tokenizers = {"ENGLISH": _Tok(1), "MULTILINGUAL": heavy}
     windows = ner._plan_windows(_words(60, {}))
-    assert all(ner._token_count(w[0], heavy) <= 12 for w in windows)
+    assert all(token_count(w[0], heavy) <= 12 for w in windows)
 
 
 def test_window_budget_honours_a_smaller_model_limit():

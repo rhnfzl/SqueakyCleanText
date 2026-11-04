@@ -7,9 +7,9 @@ from pathlib import Path
 import pytest
 from lingua import Language, LanguageDetectorBuilder
 
+from tests.ner_helpers import bare_ner
 import sct.config as config_module
 from sct import TextCleaner, TextCleanerConfig
-from sct.utils.ner import GeneralNER
 from tests.conftest import TEST_NER_MODELS
 
 # EN/NL/DE/ES labels must not change when detection widens to 75 languages (decision 4).
@@ -203,7 +203,7 @@ def test_bring_your_own_model_routes_hindi(monkeypatch):
 
 
 def test_builtin_fallback_keys_keep_default_route():
-    ner = object.__new__(GeneralNER)
+    ner = bare_ner()
     ner._ner_backend = "onnx"
     ner._ensemble_models = config_module.DEFAULT_NER_ENSEMBLE
     ner._ensemble_default_keys = config_module.NER_ENSEMBLE_DEFAULT_KEYS
@@ -228,7 +228,7 @@ class _FakeGLiNER:
 
 def test_gliner_hindi_pin_runs(monkeypatch):
     def fake_ner(**kwargs):
-        ner = object.__new__(GeneralNER)
+        ner = bare_ner()
         ner._ner_backend = "gliner"
         ner._ner_batch_size = 1
         ner._ner_chunk_overlap = 0
