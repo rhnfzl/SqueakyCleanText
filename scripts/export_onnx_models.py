@@ -126,7 +126,7 @@ def upload_model(output_dir: Path, repo_id: str, dry_run: bool = False) -> None:
     print(f"  Uploaded to: https://huggingface.co/{repo_id}")
 
 
-def main():
+def main() -> None:
     parser = argparse.ArgumentParser(description="Export NER models to ONNX format")
     parser.add_argument(
         "--models", nargs="+",

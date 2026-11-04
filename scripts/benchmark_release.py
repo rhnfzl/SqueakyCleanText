@@ -33,6 +33,7 @@ import sct
 from sct.config import TextCleanerConfig
 from sct.evaluation import evaluate_pii, load_evaluation_jsonl
 from sct.sct import TextCleaner
+from sct.utils.atomic_file import write_text_atomic
 
 ROOT = Path(__file__).resolve().parents[1]
 DATASET = ROOT / "evaluation" / "release_benchmark.jsonl"
@@ -110,13 +111,6 @@ def dataset_header(dataset: Path, examples: list) -> dict[str, str | int | None]
         "documents": len(examples),
         "entities": sum(len(e.expected) for e in examples),
     }
-
-
-def write_atomic(path: Path, text: str) -> None:
-    """Write through a temporary file, so a failed write leaves an earlier result whole."""
-    temporary = path.with_name(path.name + ".tmp")
-    temporary.write_text(text, encoding="utf-8")
-    temporary.replace(path)
 
 
 def run(dataset: Path) -> dict[str, Any]:
@@ -305,15 +299,15 @@ def main() -> None:
             f"benchmark-{result['sct_version']}-batch{'-long' if args.long else ''}"
             f"-N{args.batch}-B{args.batch_size}-K{args.ner_batch_size}-T{args.intra_op_threads}.json"
         )
-        write_atomic(args.output_dir / name, json.dumps(result, indent=2, sort_keys=True) + "\n")
+        write_text_atomic(args.output_dir / name, json.dumps(result, indent=2, sort_keys=True) + "\n")
         return
     result = run(args.dataset)
     stem = args.output_dir / f"benchmark-{result['sct_version']}"
-    write_atomic(
+    write_text_atomic(
         stem.with_name(stem.name + ".json"),
         json.dumps(result, indent=2, ensure_ascii=False, sort_keys=True) + "\n",
     )
-    write_atomic(stem.with_name(stem.name + ".md"), to_markdown(result))
+    write_text_atomic(stem.with_name(stem.name + ".md"), to_markdown(result))
 
 
 if __name__ == "__main__":

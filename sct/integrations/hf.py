@@ -24,7 +24,7 @@ class SCTMap:
         self.score = score
         self.handle = CleanerHandle(config)
 
-    def __call__(self, batch: dict) -> dict:
+    def __call__(self, batch: dict[str, Any]) -> dict[str, Any]:
         out = clean_columns(self.handle, batch, self.columns, self.output, score=self.score)
         # HF merges the returned columns back after remove_columns, so return only the
         # columns SCT wrote: pass-through columns would resurrect dropped raw text, and

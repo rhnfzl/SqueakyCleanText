@@ -1,13 +1,10 @@
 from benchmarks.score import predicted_spans
-from scripts.benchmark_release import _git_commit, find_leaks, write_atomic
+from scripts.benchmark_release import _git_commit, find_leaks
 from sct.evaluation import EntitySpan, EvaluationExample
 import builtins
 import importlib
-from pathlib import Path
 import subprocess
 import sys
-
-import pytest
 
 
 def test_digits_in_a_user_label_are_a_placeholder():
@@ -133,17 +130,3 @@ def test_git_commit_is_none_when_git_hangs(monkeypatch):
 
     monkeypatch.setattr(subprocess, "run", hang)
     assert _git_commit() is None
-
-
-def test_write_atomic_leaves_the_old_result_whole_when_the_move_fails(tmp_path, monkeypatch):
-    target = tmp_path / "result.json"
-    write_atomic(target, "old")
-    assert target.read_text(encoding="utf-8") == "old" and [p.name for p in tmp_path.iterdir()] == ["result.json"]
-
-    def fail(self, other):
-        raise OSError("disk full")
-
-    monkeypatch.setattr(Path, "replace", fail)
-    with pytest.raises(OSError):
-        write_atomic(target, "new")
-    assert target.read_text(encoding="utf-8") == "old"

@@ -22,13 +22,17 @@ from datetime import date
 import json
 import time
 from pathlib import Path
+from typing import Any
+
+from huggingface_hub import model_info
 
 from benchmarks.score import predicted_spans
-from scripts.benchmark_release import CORRECTNESS_OVERRIDES, dataset_header, write_atomic
+from scripts.benchmark_release import CORRECTNESS_OVERRIDES, dataset_header
 from scripts.build_multilingual_eval import LABELS, OUTPUT as DATASET
 from sct.config import TextCleanerConfig
 from sct.evaluation import EntitySpan, evaluate_pii, load_evaluation_jsonl
 from sct.sct import TextCleaner
+from sct.utils.atomic_file import write_text_atomic
 
 RESULTS = DATASET.parent / "results"
 DEFAULT_MODELS = ("sct-default", "gliner:urchade/gliner_multi-v2.1", "gliner:urchade/gliner_multi_pii-v1")
@@ -74,14 +78,12 @@ def predict_gliner(examples, model_id: str, threshold: float) -> tuple[dict, dic
 
 def hub_licence(model_id: str) -> str | None:
     try:
-        from huggingface_hub import model_info
-
         return (model_info(model_id).card_data or {}).get("license")
     except Exception:  # noqa: BLE001  # offline or gated: record unknown
         return None
 
 
-def run(dataset: Path, models: list[str], threshold: float) -> dict:
+def run(dataset: Path, models: list[str], threshold: float) -> dict[str, Any]:
     examples = load_evaluation_jsonl(dataset)
     reports = {}
     for name in models:
@@ -133,7 +135,7 @@ def main() -> None:
     args = parser.parse_args()
     result = run(args.dataset, args.models, args.threshold)
     args.output.parent.mkdir(parents=True, exist_ok=True)
-    write_atomic(args.output, json.dumps(result, indent=2, ensure_ascii=False, sort_keys=True) + "\n")
+    write_text_atomic(args.output, json.dumps(result, indent=2, ensure_ascii=False, sort_keys=True) + "\n")
     print(to_markdown(result))
 
 

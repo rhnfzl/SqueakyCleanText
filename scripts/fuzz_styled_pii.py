@@ -54,6 +54,7 @@ import random
 import re
 import sys
 import time
+from typing import Any
 import unicodedata
 
 from ftfy.chardata import CONTROL_CHARS
@@ -679,7 +680,7 @@ def _make_value(rng, seed, position):
             "kinds": kinds + (["glue"] if glue else []), "glue": glue, "month": month}
 
 
-def make_case(seed: int) -> dict:
+def make_case(seed: int) -> dict[str, Any]:
     rng = random.Random(seed)  # noqa: S311  # reproducible test data, not crypto
     scripts = rng.sample(sorted(SCRIPT_RANGES), rng.choice((1, 2)))
     values = [_make_value(rng, seed, position) for position in range(rng.randint(1, 3))]
@@ -715,7 +716,7 @@ def _unescape_backslash(text):
     return text.encode("latin", "backslashreplace").decode("unicode-escape")
 
 
-def escaped_case(case, kind="escaped", encode=_escape, decode=_unescape_backslash):
+def escaped_case(case, kind="escaped", encode=_escape, decode=_unescape_backslash) -> dict[str, Any]:
     """The case with a few characters of some values written as backslash escapes (``06 12\\u0033\\x34``) or, with
     ``kind="entity"``, HTML entities (``06 12&amp;#32;34``); own RNG per value and kind, so the plain case and the
     other kind stay the same. A value already encoded by an earlier pass is left as it is."""
@@ -742,7 +743,7 @@ def escaped_case(case, kind="escaped", encode=_escape, decode=_unescape_backslas
     return dict(case, values=values)
 
 
-def render(value, disabled=frozenset()):
+def render(value, disabled=frozenset()) -> str:
     out = []
     for index, ch in enumerate(value["plain"] + "\0"):
         insert = value["inserts"].get(index)
@@ -792,7 +793,7 @@ def longest_stretch(case, disabled=None) -> int:
     return max(b - a - 1 for a, b in zip(cuts, cuts[1:]))
 
 
-def steps(value):
+def steps(value) -> dict[str, list[str]]:
     """Readable render steps: kind -> characters changed."""
     out = defaultdict(list)
     for index, slot in enumerate(value["slots"]):
@@ -844,7 +845,7 @@ def run_stream(cl, doc, max_chars, overlap, seed):
     return "".join(out) + stream.finish()
 
 
-def outputs(doc, preset, fold_styled, mode, seed):
+def outputs(doc, preset, fold_styled, mode, seed) -> dict[str, Any]:
     """Output text(s) of one mode; stream gives one per window size (None on BufferError)."""
     cl = cleaner(preset, fold_styled, mode)
     if mode != "stream":
@@ -1050,7 +1051,7 @@ def _check_run(run, context_doc, modes, cores, short):
     return failures, stream_errors
 
 
-def check_case(seed: int, modes=MODES, folds=(True, False)) -> dict:
+def check_case(seed: int, modes=MODES, folds=(True, False)) -> dict[str, Any]:
     plain_case = make_case(seed)
     context_doc = " ".join(plain_case["context"])
     failures, stream_errors = [], 0
@@ -1076,7 +1077,7 @@ def run(seeds, workers=1, modes=MODES):
     return [check(seed) for seed in seeds]
 
 
-def cluster(results):
+def cluster(results) -> dict[str, dict[str, Any]]:
     clusters = {}
     for result in results:
         for failure in result["failures"]:
@@ -1118,7 +1119,7 @@ def summary(results, clusters) -> str:
     return "\n".join(lines)
 
 
-def main(argv=None):
+def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     parser.add_argument("--seeds", type=int, default=200)
     parser.add_argument("--start", type=int, default=0)

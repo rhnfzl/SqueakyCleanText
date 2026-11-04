@@ -29,7 +29,8 @@ from benchmarks.compare import scorer, split
 from benchmarks.compare.views import rule_views
 from benchmarks.datasets import get
 from benchmarks.labels import DATASET_LABELS
-from benchmarks.speed import environment, write_atomic
+from benchmarks.speed import environment
+from sct.utils.atomic_file import write_text_atomic
 
 HERE = Path(__file__).resolve().parent
 ADAPTERS = HERE / "adapters"
@@ -70,8 +71,8 @@ def ensure_env(name: str, requirements: Path | None, envs_root: Path, python: st
     subprocess.run([uv, "pip", "install", "--python", str(py), "-r", str(requirements)], check=True)  # noqa: S603
     freeze = subprocess.run([uv, "pip", "freeze", "--python", str(py)], check=True,  # noqa: S603
                             capture_output=True, text=True, timeout=30).stdout
-    write_atomic(venv / "freeze.txt", freeze)
-    write_atomic(stamp, digest)
+    write_text_atomic(venv / "freeze.txt", freeze)
+    write_text_atomic(stamp, digest)
     return py
 
 
@@ -269,7 +270,7 @@ def _jsonable(value):
 
 def _write(path: Path, data) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    write_atomic(path, json.dumps(data, indent=1, ensure_ascii=False, sort_keys=True) + "\n")
+    write_text_atomic(path, json.dumps(data, indent=1, ensure_ascii=False, sort_keys=True) + "\n")
 
 
 def add_entry_args(parser: argparse.ArgumentParser) -> None:
@@ -382,8 +383,8 @@ def _score_dataset(run: _EntryRun, dataset: str, records: list[dict], args: argp
         outputs, process_info = supervise(run.cmd, records, args.cache / name / f"{dataset}-{args.part}", run.env,
                                           DOC_TIMEOUT.get(dataset, args.doc_timeout), args.start_timeout,
                                           args.retries, args.batch_size)
-        write_atomic(raw, "".join(json.dumps(outputs[r["id"]], ensure_ascii=False) + "\n" for r in records))
-        write_atomic(stamp, key)
+        write_text_atomic(raw, "".join(json.dumps(outputs[r["id"]], ensure_ascii=False) + "\n" for r in records))
+        write_text_atomic(stamp, key)
     views = scorer.views_for(tool["supports"], run.shared, registry.SCT_TYPES)
     result, docs = scorer.score_run(records, outputs, tool["labels"], DATASET_LABELS[dataset], views,
                                     curve_floor=curve_floor(run.config, tool),
@@ -400,7 +401,7 @@ def _score_dataset(run: _EntryRun, dataset: str, records: list[dict], args: argp
         result["failed_ids"] = sorted(r["id"] for r in records if "error" in outputs[r["id"]])
         predictions = args.out / "predictions" / name / f"{dataset}-{args.part}.jsonl"
         predictions.parent.mkdir(parents=True, exist_ok=True)
-        write_atomic(predictions, "".join(
+        write_text_atomic(predictions, "".join(
             json.dumps({"id": r["id"], "start": s["start"], "end": s["end"], "label": s["label"],
                         "score": s.get("score")}) + "\n"
             for r in records for s in outputs[r["id"]]["spans"]))
@@ -462,7 +463,7 @@ def main(argv=None) -> None:
         cmd = command(py, t["adapter"], config, args.cpus)
         (args.out / "envs").mkdir(parents=True, exist_ok=True)
         frozen = freeze(py)
-        write_atomic(args.out / "envs" / f"{name}.freeze.txt", frozen)
+        write_text_atomic(args.out / "envs" / f"{name}.freeze.txt", frozen)
         meta = {"entry": name, "entry_config": _jsonable({k: v for k, v in t.items() if k != "requirements"}),
                 "adapter_config": config, "python": str(py)}
         run = _EntryRun(name, t, cmd, env, config, frozen, shared, meta)

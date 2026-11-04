@@ -60,8 +60,7 @@ def _unicode_word(pattern: str) -> str:
     return "".join(out)
 
 
-def build_browser_manifest(config: TextCleanerConfig) -> dict[str, Any]:
-    """Describe portable rules and pinned ONNX assets for a browser client."""
+def _require_portable_config(config: TextCleanerConfig) -> None:
     if config.ner_backend != "onnx":
         raise ValueError("Browser export currently supports ner_backend='onnx' only")
     if config.replacement_mode != "placeholder":
@@ -90,28 +89,29 @@ def build_browser_manifest(config: TextCleanerConfig) -> dict[str, Any]:
             "Browser export requires replacement tokens without currency symbols"
         )
 
-    # Same reason for any token a later enabled rule would match
-    # (an HTML token holding an email or URL, a URL token holding an email).
+
+def _ordered_rules(config: TextCleanerConfig) -> list[tuple[str, Any, str, bool]]:
+    """(name, pattern, token, enabled) per rule, in the order the browser runs them."""
     html_regex = constants.HTML_REGEX if config.html_tag_strict else constants.HTML_REGEX_ANY
     url_regex = constants.URL_REGEX if config.url_trailing_punct_outside else constants.URL_REGEX_LEGACY
     month_names = resources.configured_month_names(config)
     date_regex = (constants.DATE_REGEX if month_names is None
                   else constants.build_date_regex(month_names, slash_year=config.date_month_name_slash_year))
-    number_regex = config_numbers_regex(config)
-    ordered = [
+    return [
         ("html", html_regex, config.replace_with_html, config.check_replace_html),
         ("url", url_regex, config.replace_with_url, config.check_replace_urls),
         ("email", constants.EMAIL_REGEX, config.replace_with_email, config.check_replace_emails),
         ("ip", constants.IP_REGEX, config.replace_with_ips, config.check_replace_ips),
         ("date", date_regex, config.replace_with_dates, config.check_replace_dates),
-        ("phone", constants.PHONE_REGEX, config.replace_with_phone_numbers,
-         config.check_replace_phone_numbers),
+        ("phone", constants.PHONE_REGEX, config.replace_with_phone_numbers, config.check_replace_phone_numbers),
         ("year", constants.YEAR_REGEX, config.replace_with_years, config.check_replace_years),
-        ("number", number_regex, config.replace_with_numbers,
-         config.check_replace_numbers),
-        ("currency", constants.CURRENCY_REGEX, config.replace_with_currency_symbols,
-         config.check_replace_currency_symbols),
+        ("number", config_numbers_regex(config), config.replace_with_numbers, config.check_replace_numbers),
+        ("currency", constants.CURRENCY_REGEX, config.replace_with_currency_symbols, config.check_replace_currency_symbols),
     ]
+
+
+def _require_stable_tokens(ordered: list[tuple[str, Any, str, bool]]) -> None:
+    """Reject a token a later enabled rule would match (an HTML token holding an email or URL, a URL token an email)."""
     for i, (name, _, token, enabled) in enumerate(ordered):
         for later, pattern, _, later_enabled in ordered[i + 1:]:
             if enabled and later_enabled and pattern.search(token):
@@ -120,6 +120,8 @@ def build_browser_manifest(config: TextCleanerConfig) -> dict[str, Any]:
                     f"rewritten by the later {later} rule"
                 )
 
+
+def _pinned_models(config: TextCleanerConfig) -> dict[str, dict[str, str]]:
     model_revisions = config.ner_model_revisions or {}
     unpinned_models = sorted(
         key
@@ -131,20 +133,27 @@ def build_browser_manifest(config: TextCleanerConfig) -> dict[str, Any]:
             "Browser export requires pinned revisions for models: "
             + ", ".join(unpinned_models)
         )
-
-    models = {
+    return {
         key: {
             "id": model_id,
             "revision": model_revisions[key],
         }
         for key, model_id in (config.ner_models or {}).items()
     }
+
+
+def build_browser_manifest(config: TextCleanerConfig) -> dict[str, Any]:
+    """Describe portable rules and pinned ONNX assets for a browser client."""
+    _require_portable_config(config)
+    ordered = _ordered_rules(config)
+    _require_stable_tokens(ordered)
+    models = _pinned_models(config)
     rules = {name: _rule(pattern, token, enabled) for name, pattern, token, enabled in ordered}
     for name in ("ip", "date", "phone"):
         rules[name]["fold_decimal_digits"] = True
     # identifiers mode: \d of the pattern is Unicode in Python, so the browser reads ASCII-folded digits
     if config.replace_numbers_mode == "identifiers":
-        rules["number"].update(fold_decimal_digits=True, pattern=_unicode_word(number_regex.pattern))
+        rules["number"].update(fold_decimal_digits=True, pattern=_unicode_word(rules["number"]["pattern"]))
     return {
         "format_version": 1,
         "runtime": "onnxruntime-web",

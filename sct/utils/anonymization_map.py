@@ -6,6 +6,7 @@ records the mapping so the original text can be restored.
 """
 
 from dataclasses import dataclass, field
+from typing import Any
 from uuid import uuid4
 
 
@@ -73,7 +74,7 @@ class AnonymizationMap:
             text = text.replace(entry.placeholder, entry.original)
         return text
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> dict[str, Any]:
         """Serialize to a JSON-safe dict."""
         return {
             'session_id': self.session_id,

@@ -32,7 +32,7 @@ class ProcessStopwords:
                     # stop-words package doesn't support this language
                     self._lang_map[lang] = set()
 
-    def get_stop_words(self, language: str) -> set:
+    def get_stop_words(self, language: str) -> set[str]:
         """Get the stopword set for a language. Falls back to English."""
         return self._lang_map.get(language, self._lang_map.get('ENGLISH', set()))
 

@@ -18,13 +18,6 @@ PACKAGES = ("SqueakyCleanText", "onnxruntime", "onnxruntime-gpu", "tokenizers", 
 WARMUP_DOCS = 4
 
 
-def write_atomic(path: Path, text: str) -> None:
-    """Replace *path* in one step, so an interrupted run never leaves a truncated result."""
-    tmp = path.with_name(path.name + ".tmp")
-    tmp.write_text(text, encoding="utf-8")
-    tmp.replace(path)
-
-
 def run_batch(cleaner, texts: list[str], workers: int, chunk: int = 64):
     """Process *texts* in chunks with ``process_batch``; return ``(results, seconds)``."""
     results, seconds = [], 0.0

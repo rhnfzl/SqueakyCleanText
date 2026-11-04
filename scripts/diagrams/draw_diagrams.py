@@ -153,7 +153,7 @@ class Diagram:
         (out_dir / f"{self.name}.excalidraw").write_text(json.dumps(self.excalidraw(), indent=1) + "\n")
 
 
-def overview():
+def overview() -> Diagram:
     d = Diagram("sct_overview", 600, "What SqueakyCleanText offers")
     top, row_h, gap = 20, 58, 10
     body_h = 52 + 5 * (row_h + gap) + 4
@@ -200,7 +200,7 @@ def overview():
     return d
 
 
-def flow():
+def flow() -> Diagram:
     d = Diagram("sct_flow", 766, "SqueakyCleanText pipeline, in the order the code runs it")
     d.rect(20, 20, 960, 52, "grey")
     d.text(36, 52, "Any entry point (process(), process_batch(), sct-clean, sct-mcp, the adapters) "
@@ -261,7 +261,7 @@ def flow():
     return d
 
 
-def pii_modes():
+def pii_modes() -> Diagram:
     # Real SCT 0.8.1 output: preset_config("training", replacement_mode=...).process(SENTENCE)
     sentence = "Maria Chen lives in Utrecht. Mail her at maria.chen@example.com."
     d = Diagram("sct_pii_modes", 636, "One sentence, three PII modes")

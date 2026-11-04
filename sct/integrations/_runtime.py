@@ -81,7 +81,7 @@ class CleanerHandle:
         self._pid = None
 
 
-def as_columns(columns: str | Iterable[str]) -> tuple:
+def as_columns(columns: str | Iterable[str]) -> tuple[str, ...]:
     """One column name or a sequence of them, as a tuple ("text" is not ("t", "e", "x", "t"))."""
     return (columns,) if isinstance(columns, str) else tuple(columns)
 

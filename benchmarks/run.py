@@ -21,11 +21,12 @@ from lingua import Language
 from sct.config import TextCleanerConfig
 from sct.presets import PRESETS
 from sct.sct import TextCleaner
+from sct.utils.atomic_file import write_text_atomic
 
 from benchmarks import datasets
 from benchmarks.labels import DATASET_LABELS
 from benchmarks.score import SCORING, inject_noise, masking_recall, predicted_spans, score_lid, score_noise, score_pii
-from benchmarks.speed import environment, measure, rates, run_batch, write_atomic
+from benchmarks.speed import environment, measure, rates, run_batch
 
 ROOT = Path(__file__).resolve().parent
 SUITES = {
@@ -276,10 +277,10 @@ def main(argv=None) -> None:
                 result = {"suite": suite, "error": f"{type(error).__name__}: {error}"}
                 print(f"  failed: {result['error']}", file=sys.stderr)
             result["run"] = {**run, "models": cleaners.models()}
-            write_atomic(target, json.dumps(result, indent=1, ensure_ascii=False, sort_keys=True) + "\n")
+            write_text_atomic(target, json.dumps(result, indent=1, ensure_ascii=False, sort_keys=True) + "\n")
     run.update(models=cleaners.models(), wall_seconds=round(time.perf_counter() - started, 1))
-    write_atomic(out / "run.json", json.dumps(run, indent=1, sort_keys=True) + "\n")
-    write_atomic(out / "summary.md", summary(out))
+    write_text_atomic(out / "run.json", json.dumps(run, indent=1, sort_keys=True) + "\n")
+    write_text_atomic(out / "summary.md", summary(out))
     print(out / "summary.md")
 
 

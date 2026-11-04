@@ -21,7 +21,8 @@ from sct.config import GLICLASS_DEFAULT_MODEL, TextCleanerConfig, _config_from_m
 from sct.privacy import EntityFinding, PrivacyPolicy, ProcessingMetrics, TokenStore
 from sct.utils import constants, contact, datetime, ner, normtext, resources, special, stopwords
 from sct.utils.anonymization_map import AnonymizationMap
-from sct.utils.synthetic import FAKER_GENERATORS
+from sct.utils.gliclass_adapter import GLiClassAdapter
+from sct.utils.synthetic import FAKER_GENERATORS, SyntheticReplacer
 from sct.utils.process_result import ProcessMetadata, ProcessResult
 
 logger = logging.getLogger(__name__)
@@ -196,7 +197,6 @@ class TextCleaner:
         # Synthetic replacer: shared by regex pipeline steps + NER processor
         self._synthetic_replacer = None
         if self.cfg.replacement_mode == 'synthetic':
-            from sct.utils.synthetic import SyntheticReplacer
             self._synthetic_replacer = SyntheticReplacer(
                 seed=self.cfg.synthetic_seed, per_document=self.cfg.synthetic_per_document,
                 locale=self.cfg.synthetic_locale,
@@ -301,7 +301,6 @@ class TextCleaner:
         )
 
     def _build_gliclass(self):
-        from sct.utils.gliclass_adapter import GLiClassAdapter
         return GLiClassAdapter(
             model_id=self.cfg.gliclass_model or GLICLASS_DEFAULT_MODEL,
             revision=self.cfg.gliclass_revision,
@@ -789,7 +788,7 @@ class TextCleaner:
             held = {e.placeholder: e.original for e in anon_map.entries} if anon_map is not None else {}
             return _KEY.sub(lambda k: held.get(values.get(k.group()), values.get(k.group(), k.group())), original)
 
-        def emit(match, label):
+        def emit(match, label) -> str:
             original = match.group()
             if not original or self._allowed(original):
                 return original
@@ -965,7 +964,7 @@ class TextCleaner:
         if anon_map is None:
             return None
 
-        def replace(match):
+        def replace(match) -> str:
             if self._allowed(match.group()):
                 return match.group()
             if keep is not None and keep(match.group()):

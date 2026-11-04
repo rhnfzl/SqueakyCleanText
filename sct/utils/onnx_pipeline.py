@@ -181,7 +181,7 @@ class ONNXNERPipeline:
         order = sorted(range(len(texts)), key=lambda i: len(encodings[i].ids))
         batch_size = 1 if self._single_row else max(1, batch_size)
 
-        def run_batch(rows):
+        def run_batch(rows: list[int]) -> None:
             width = max(len(encodings[i].ids) for i in rows)
             batch = [encodings[i] for i in rows]
             feeds: dict[str, np.ndarray] = {
@@ -507,7 +507,7 @@ def load_onnx_ner_model(
         # HTTP, so a forked worker does not resolve DNS (which can hang after fork).
         download_kwargs['revision'] = commit
 
-    def optional_download(filename):
+    def optional_download(filename: str) -> str | None:
         """Path of an optional repo file, None when the repo lacks it; other Hub errors propagate."""
         # The Hub's cached "no such file" answer counts too, so the probe needs no HEAD request.
         cached = try_to_load_from_cache(
