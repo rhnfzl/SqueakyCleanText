@@ -12,7 +12,9 @@ from sct.privacy import EntityRule, PrivacyPolicy
 from sct.utils.ner import GeneralNER
 from sct.utils.ner_chunking import token_count
 
-from tests.helpers import both_paths, FakeRunDetector, gliner_ner, numbered_words, set_cfg, word_ner, WordCountTokenizer
+from tests.helpers import (
+    both_paths, FakeRunDetector, gliner_ner, numbered_words, route_models, set_cfg, windows_for, word_ner, WordCountTokenizer,
+)
 
 
 # --- models_for grew a list ensemble route with GLINER on every call ---
@@ -55,17 +57,15 @@ def test_route_without_primary_counts_with_its_own_tokenizer():
     ner = word_ner(0, FakeRunDetector(min_words=2), budget=12)
     heavy = WordCountTokenizer(2)
     ner.tokenizer = heavy  # primary (ENGLISH), 2 tokens per word
-    ner._ensemble_models = {"ENGLISH": ("ENGLISH",), "HINDI": ("HINDI",)}
-    ner._tokenizers = {"ENGLISH": heavy, "HINDI": WordCountTokenizer(1)}
+    route_models(ner, {"ENGLISH": heavy, "HINDI": WordCountTokenizer(1)}, {"ENGLISH": ("ENGLISH",), "HINDI": ("HINDI",)})
     text = "a b c d e John Smith f g h"  # 10 HINDI tokens, inside the budget of 12
-    keys = ner._get_ensemble_keys("HINDI")
-    assert [w[0] for w in ner._plan_windows(text, keys)] == [text]
+    assert [w[0] for w in windows_for(ner, text, "HINDI")] == [text]
     kw = {"positional_tags": ("PER",), "ner_confidence_threshold": 0.5}
     masked = text.replace("John Smith", "<PERSON>")
     assert ner.ner_process_detailed(text, language="HINDI", **kw).text == masked
     assert [r.text for r in ner.ner_process_batch_detailed([text], ["HINDI"], **kw)] == [masked]
     # A route that does use the primary still counts with it.
-    assert len(ner._plan_windows(text, ner._get_ensemble_keys("ENGLISH"))) == 2
+    assert len(windows_for(ner, text, "ENGLISH")) == 2
 
 
 # --- overlap offsets come from the route's own tokenizer ---
@@ -77,10 +77,9 @@ def test_overlap_offsets_use_route_tokenizer():
     one_span.max_len_single_sentence = 1000
     ner = word_ner(2, FakeRunDetector(min_words=2), budget=12)
     ner.tokenizer = one_span
-    ner._ensemble_models = {"ENGLISH": ("ENGLISH",), "HINDI": ("HINDI",)}
-    ner._tokenizers = {"ENGLISH": one_span, "HINDI": WordCountTokenizer(1)}
+    route_models(ner, {"ENGLISH": one_span, "HINDI": WordCountTokenizer(1)}, {"ENGLISH": ("ENGLISH",), "HINDI": ("HINDI",)})
     text = "a b c d e f g John Smith h i j k l m n"
-    windows = [w[0] for w in ner._plan_windows(text, ner._get_ensemble_keys("HINDI"))]
+    windows = [w[0] for w in windows_for(ner, text, "HINDI")]
     assert all(len(w.split()) <= 12 for w in windows)
     assert any("John Smith" in w for w in windows)
     kw = {"positional_tags": ("PER",), "ner_confidence_threshold": 0.5}
@@ -125,8 +124,8 @@ def test_overlap_keeps_a_detection_only_a_neighbour_window_made():
 def test_windows_fit_every_model_tokenizer(overlap):
     ner = word_ner(overlap, FakeRunDetector(), budget=12)
     heavy = WordCountTokenizer(2)
-    ner._tokenizers = {"ENGLISH": WordCountTokenizer(1), "MULTILINGUAL": heavy}
-    windows = ner._plan_windows(numbered_words(60, {}))
+    route_models(ner, {"ENGLISH": WordCountTokenizer(1), "MULTILINGUAL": heavy})
+    windows = windows_for(ner, numbered_words(60, {}))
     assert all(token_count(w[0], heavy) <= 12 for w in windows)
 
 
@@ -134,7 +133,7 @@ def test_window_budget_honours_a_smaller_model_limit():
     ner = word_ner(0, FakeRunDetector(), budget=12)
     small = WordCountTokenizer(1)
     small.max_len_single_sentence = 5
-    ner._tokenizers = {"ENGLISH": WordCountTokenizer(1), "DUTCH": small}
+    route_models(ner, {"ENGLISH": WordCountTokenizer(1), "DUTCH": small})
     assert ner._chunk_budget() == 5
 
 
@@ -164,8 +163,7 @@ def test_rejected_owner_does_not_hide_an_eligible_neighbour():
 
 def _two_language_ner(overlap=0):
     ner = word_ner(overlap, FakeRunDetector(min_words=2), budget=12)
-    ner._ensemble_models = {"ENGLISH": ("ENGLISH",), "DUTCH": ("DUTCH",)}
-    ner._tokenizers = {"ENGLISH": WordCountTokenizer(1)}
+    route_models(ner, {"ENGLISH": WordCountTokenizer(1)}, {"ENGLISH": ("ENGLISH",), "DUTCH": ("DUTCH",)})
     return ner
 
 
@@ -176,12 +174,12 @@ def test_unrelated_loaded_model_does_not_change_a_document():
     ner = _two_language_ner()
     kwargs = {"positional_tags": ("PER",), "ner_confidence_threshold": 0.5}
     assert ner.ner_process_detailed(text, language="ENGLISH", **kwargs).text == expected
-    ner._tokenizers["DUTCH"] = WordCountTokenizer(2)
+    route_models(ner, {"ENGLISH": WordCountTokenizer(1), "DUTCH": WordCountTokenizer(2)})
     assert ner.ner_process_detailed(text, language="ENGLISH", **kwargs).text == expected
     batch = ner.ner_process_batch_detailed([text, text], ["ENGLISH", "DUTCH"], **kwargs)
     assert batch[0].text == expected
     # The Dutch document is still sized for the Dutch tokenizer.
-    windows = ner._plan_windows(text, ner._get_ensemble_keys("DUTCH"))
+    windows = windows_for(ner, text, "DUTCH")
     assert all(token_count(w[0], WordCountTokenizer(2)) <= 12 for w in windows)
 
 
@@ -189,7 +187,7 @@ def test_overlap_rechecked_after_a_smaller_model_loads():
     ner = _two_language_ner(overlap=2)  # 2 * 2 < 12 // 2 passes at construction
     small = WordCountTokenizer(1)
     small.max_len_single_sentence = 5
-    ner._tokenizers["DUTCH"] = small
+    route_models(ner, {"ENGLISH": WordCountTokenizer(1), "DUTCH": small})
     text = numbered_words(30, {15: "John", 16: "Smith"})
     kwargs = {"positional_tags": ("PER",), "ner_confidence_threshold": 0.5}
     with pytest.raises(ValueError, match="ner_chunk_overlap"):
@@ -325,7 +323,7 @@ class _BothMarkersDetector(FakeRunDetector):
 def test_overlap_keeps_a_fitting_document_in_one_window():
     text = "alpha w1 w2 w3 w4 Alice w6 w7 w8 w9 omega"  # 11 tokens, budget 12
     ner = word_ner(2, _BothMarkersDetector())
-    assert [w[0] for w in ner._plan_windows(text)] == [text]
+    assert [w[0] for w in windows_for(ner, text)] == [text]
     for result in both_paths(ner, text):
         assert result.text == text.replace("Alice", "<PERSON>")
 
@@ -334,5 +332,5 @@ def test_overlap_keeps_a_fitting_document_in_one_window_gliner_only():
     ner = gliner_ner("placeholder")
     set_cfg(ner, ner_chunk_overlap=10)
     text = "x" * (ner._chunk_budget() * 2)
-    assert [w[0] for w in ner._plan_windows(text)] == [text]
-    assert len(ner._plan_windows(text + "x")) > 1
+    assert [w[0] for w in windows_for(ner, text)] == [text]
+    assert len(windows_for(ner, text + "x")) > 1

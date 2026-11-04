@@ -1,12 +1,11 @@
 """ner_batch_size batches model calls; batched output equals unbatched output."""
 
 import math
-import threading
 from dataclasses import replace
 
 import pytest
 
-from tests.helpers import bare_ner, set_cfg
+from tests.helpers import gliner_ner, set_cfg, windows_for
 from sct.config import TextCleanerConfig
 from sct.sct import TextCleaner
 from sct.utils.gliner_adapter import GLiNERAdapter
@@ -47,7 +46,7 @@ def test_onnx_batch_runs_once_per_slice(onnx_ner, monkeypatch):
     monkeypatch.setattr(pipe, '_session', counter)
     monkeypatch.setattr(onnx_ner, 'cfg', replace(onnx_ner.cfg, ner_batch_size=4))
     text = DOCS[3] * 2
-    chunks = onnx_ner._plan_windows(text)
+    chunks = windows_for(onnx_ner, text)
     assert len(chunks) >= 5
     keys = onnx_ner._get_ensemble_keys('ENGLISH')
     onnx_ner.ner_process_detailed(text, TAGS, 0.85, 'ENGLISH')
@@ -128,12 +127,8 @@ def test_gliner_gets_one_batched_call_under_its_lock():
             calls.append((list(texts), batch_size, ner._get_lock('gliner').locked()))
             return [[] for _ in texts]
 
-    ner = bare_ner()
-    set_cfg(ner, ner_backend='gliner')
+    ner = gliner_ner(detector=FakeGLiNER())
     set_cfg(ner, ner_batch_size=16)
-    ner._gliner_pipe = FakeGLiNER()
-    ner._inference_locks = {}
-    ner._locks_lock = threading.Lock()
     ner.tokenizer = None
     results = ner.ner_process_batch_detailed(["Ann here.", "Bob there.", "Cy."], [None] * 3, TAGS)
     assert [r.text for r in results] == ["Ann here.", "Bob there.", "Cy."]

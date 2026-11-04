@@ -10,7 +10,7 @@ from sct import TextCleanerConfig
 from sct.privacy import EntityRule, PrivacyPolicy
 from sct.utils.ner import _presidio_type_map
 
-from tests.helpers import bare_ner, set_cfg
+from tests.helpers import bare_ner, set_cfg, set_policy
 
 
 # --- dataclasses.replace re-derives the PII label map ---
@@ -49,7 +49,7 @@ def test_presidio_types_mapped(legacy, phone):
     ner._presidio_types = _presidio_type_map(legacy, {"name": "PER"})
     policy = PrivacyPolicy(name="p", version="1", rules={phone: EntityRule(action="redact")},
                            default_rule=EntityRule(action="keep"))
-    ner._privacy_policy = policy
+    set_policy(ner, policy)
     result = ner.ner_process_detailed("Anna 0612345678 now", positional_tags=("PER",))
     assert "0612345678" not in result.text
     assert {f.entity.entity_type for f in result.findings} == {phone, "PERSON"}  # PER alias -> canonical (round 17)
@@ -68,7 +68,7 @@ def test_empty_presidio_type_map_keeps_legacy_names():
     assert ner._presidio_types == {}
     policy = PrivacyPolicy(name="p", version="1", rules={"PHONE_NUMBER": EntityRule(action="redact")},
                            default_rule=EntityRule(action="keep"))
-    ner._privacy_policy = policy
+    set_policy(ner, policy)
     result = ner.ner_process_detailed("Anna 0612345678 now", positional_tags=("PER",))
     assert "0612345678" not in result.text
     assert [f.entity.entity_type for f in result.findings] == ["PHONE_NUMBER"]
@@ -89,7 +89,7 @@ def test_presidio_aliases_use_canonical_types():
                                   "LOCATION": EntityRule(action="placeholder"),
                                   "ORGANISATION": EntityRule(action="placeholder")},
                            default_rule=EntityRule(action="keep"))
-    ner._privacy_policy = policy
+    set_policy(ner, policy)
     result = ner.ner_process_detailed("Anna Schmidt in London at Acme", positional_tags=("PER",))
     assert result.text == "<REDACTED> in <LOCATION> at <ORGANISATION>"
     assert [f.entity.entity_type for f in result.findings] == ["PERSON", "LOCATION", "ORGANISATION"]

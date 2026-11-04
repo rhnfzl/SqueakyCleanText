@@ -27,7 +27,7 @@ def requires_ner(func):
     def wrapper(self, *args, **kwargs):
         if not hasattr(self, 'ner') or self.ner is None:
             self.skipTest("NER models not loaded")
-        if not hasattr(self.ner, '_pipelines') or 'ENGLISH' not in self.ner._pipelines:
+        if 'ENGLISH' not in self.ner.provenance:
             self.skipTest("NER models not properly loaded")
         return func(self, *args, **kwargs)
     return wrapper
@@ -517,7 +517,7 @@ class TextCleanerTest(unittest.TestCase):
     def test_load_language_is_public(self):
         """load_language() is public and pre-loads the model."""
         self.ner.load_language('ENGLISH')  # already loaded — must be a no-op, not crash
-        self.assertIn('ENGLISH', self.ner._pipelines)
+        self.assertIn('ENGLISH', self.ner.provenance)
 
     @requires_ner
     def test_ensure_loaded_shares_session_for_same_model(self):
@@ -541,8 +541,8 @@ class TextCleanerTest(unittest.TestCase):
     def test_ner_lazy_loading(self):
         """Test that NER models are loaded lazily."""
         # English and multilingual should be loaded (eagerly for tokenizer)
-        self.assertIn('ENGLISH', self.ner._pipelines)
-        self.assertIn('MULTILINGUAL', self.ner._pipelines)
+        self.assertIn('ENGLISH', self.ner.provenance)
+        self.assertIn('MULTILINGUAL', self.ner.provenance)
 
     @requires_ner
     def test_ner_ensemble_key_selection(self):

@@ -7,7 +7,7 @@ from concurrent.futures import ThreadPoolExecutor
 
 import pytest
 
-from tests.helpers import bare_ner, set_cfg
+from tests.helpers import gliner_ner
 from sct import config
 from sct.config import TextCleanerConfig
 from sct.utils import ner as ner_module
@@ -70,13 +70,7 @@ def test_gliner_calls_stay_serialised():
                 state["inside"] -= 1
             return [[]]
 
-    ner = bare_ner()
-    set_cfg(ner, ner_backend="gliner")
-    ner._gliner_pipe = FakeGLiNER()
-    set_cfg(ner, replacement_mode="placeholder")
-    ner._synthetic_replacer = None
-    ner._inference_locks = {}
-    ner._locks_lock = threading.Lock()
+    ner = gliner_ner(detector=FakeGLiNER())
     ner.tokenizer = None
 
     with ThreadPoolExecutor(max_workers=4) as pool:

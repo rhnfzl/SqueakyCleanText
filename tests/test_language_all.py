@@ -1,13 +1,12 @@
 """All-75 language detection, confidence, pins and bring-your-own NER model (0.8.0)."""
 
 import json
-import threading
 from pathlib import Path
 
 import pytest
 from lingua import Language, LanguageDetectorBuilder
 
-from tests.helpers import bare_ner, set_cfg
+from tests.helpers import bare_ner, gliner_ner, set_cfg
 import sct.config as config_module
 from sct import TextCleaner, TextCleanerConfig
 from tests.conftest import TEST_NER_MODELS
@@ -194,7 +193,7 @@ def test_bring_your_own_model_routes_hindi(monkeypatch):
     monkeypatch.setattr(ner, "_ensure_loaded", lambda key: (loaded.append(key), original(key))[1])
     result = cleaner.process(OTHER_SCRIPTS["HINDI"])
     assert result.language == "HINDI"
-    assert "HINDI" in ner._pipelines
+    assert "HINDI" in ner.provenance
     assert "HINDI" in loaded and "MULTILINGUAL" not in loaded
     assert "ner_fallback_models" not in result.metadata["warnings"]
     french = cleaner.process("Bonjour, je m'appelle Marie et j'habite à Paris depuis dix ans.")
@@ -228,17 +227,9 @@ class FakeGLiNER:
 
 def test_gliner_hindi_pin_runs(monkeypatch):
     def fake_ner(cfg, **kwargs):
-        ner = bare_ner()
-        set_cfg(ner, ner_backend="gliner")
+        ner = gliner_ner(detector=FakeGLiNER())
         set_cfg(ner, ner_batch_size=1)
         set_cfg(ner, ner_chunk_overlap=0)
-        ner._gliner_pipe = FakeGLiNER()
-        set_cfg(ner, replacement_mode="placeholder")
-        ner._synthetic_replacer = None
-        ner._inference_locks = {}
-        ner._locks_lock = threading.Lock()
-        ner._ensemble_models = {}
-        ner._ensemble_default_keys = ()
         ner._model_names = {}
         ner.provenance = {}
         ner.tokenizer = None

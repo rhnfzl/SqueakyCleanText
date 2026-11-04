@@ -4,7 +4,7 @@ import warnings
 
 import pytest
 
-from tests.helpers import bare_ner, set_cfg
+from tests.helpers import bare_ner, set_cfg, set_policy
 from sct import EntityRule, PrivacyPolicy, TextCleaner, TextCleanerConfig
 from sct.utils import constants
 from sct.utils.normtext import NormaliseText
@@ -67,7 +67,7 @@ def test_presidio_backend_uses_detected_language():
         rules={"PERSON": EntityRule()},
     )
 
-    ner._privacy_policy = policy
+    set_policy(ner, policy)
     ner.ner_process_detailed(
         "Piet woont hier.",
         positional_tags=("PER",),

@@ -1,6 +1,5 @@
-import threading
 
-from tests.helpers import bare_ner, set_cfg
+from tests.helpers import bare_ner, gliner_ner, set_cfg, set_policy
 from sct.privacy import (
     DetectedEntity,
     EntityRule,
@@ -179,13 +178,7 @@ def test_general_ner_detailed_processing_returns_real_offsets():
                 "end": 5,
             }]]
 
-    ner = bare_ner()
-    set_cfg(ner, ner_backend="gliner")
-    ner._gliner_pipe = FakeGLiNER()
-    set_cfg(ner, replacement_mode="placeholder")
-    ner._synthetic_replacer = None
-    ner._inference_locks = {}
-    ner._locks_lock = threading.Lock()
+    ner = gliner_ner(detector=FakeGLiNER())
     ner.tokenizer = None
     policy = PrivacyPolicy(
         name="strict",
@@ -193,7 +186,7 @@ def test_general_ner_detailed_processing_returns_real_offsets():
         rules={"PERSON": EntityRule(action="redact")},
     )
 
-    ner._privacy_policy = policy
+    set_policy(ner, policy)
     result = ner.ner_process_detailed(
         "Maria arrived.",
         positional_tags=("PER",),
@@ -223,13 +216,7 @@ def test_detailed_processing_maps_normalized_chunk_offsets_to_source(monkeypatch
                 "end": 12,
             }]]
 
-    ner = bare_ner()
-    set_cfg(ner, ner_backend="gliner")
-    ner._gliner_pipe = FakeGLiNER()
-    set_cfg(ner, replacement_mode="placeholder")
-    ner._synthetic_replacer = None
-    ner._inference_locks = {}
-    ner._locks_lock = threading.Lock()
+    ner = gliner_ner(detector=FakeGLiNER())
     ner.tokenizer = None
     monkeypatch.setattr("sct.utils.ner.simple_chunk", lambda text, max_tokens: ["Intro. Maria"])
     policy = PrivacyPolicy(
@@ -238,7 +225,7 @@ def test_detailed_processing_maps_normalized_chunk_offsets_to_source(monkeypatch
         rules={"PERSON": EntityRule(action="redact")},
     )
 
-    ner._privacy_policy = policy
+    set_policy(ner, policy)
     result = ner.ner_process_detailed(
         "Intro.\n\nMaria",
         positional_tags=("PER",),
@@ -380,13 +367,7 @@ def _gliner_ner_with_score(score):
                 "end": 5,
             }]]
 
-    ner = bare_ner()
-    set_cfg(ner, ner_backend="gliner")
-    ner._gliner_pipe = FakeGLiNER()
-    set_cfg(ner, replacement_mode="placeholder")
-    ner._synthetic_replacer = None
-    ner._inference_locks = {}
-    ner._locks_lock = threading.Lock()
+    ner = gliner_ner(detector=FakeGLiNER())
     ner.tokenizer = None
     return ner
 
@@ -403,7 +384,7 @@ def test_pii_mode_final_threshold_keeps_what_gliner_keeps():
     assert TextCleanerConfig().effective_ner_confidence_threshold == 0.85
 
     ner = _gliner_ner_with_score(0.5)
-    ner._privacy_policy = _REDACT_PERSON
+    set_policy(ner, _REDACT_PERSON)
     result = ner.ner_process_detailed(
         "Maria arrived.",
         positional_tags=cfg.positional_tags,
@@ -416,7 +397,7 @@ def test_pii_mode_final_threshold_keeps_what_gliner_keeps():
 
 def test_zero_ner_confidence_threshold_is_not_replaced_by_default():
     ner = _gliner_ner_with_score(0.5)
-    ner._privacy_policy = _REDACT_PERSON
+    set_policy(ner, _REDACT_PERSON)
     result = ner.ner_process_detailed(
         "Maria arrived.",
         positional_tags=("PER",),

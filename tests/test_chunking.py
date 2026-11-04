@@ -8,7 +8,7 @@ import pytest
 from hypothesis import given, settings
 from hypothesis import strategies as st
 
-from tests.helpers import FakeRunDetector, bare_ner, gliner_ner, numbered_words, set_cfg, word_ner
+from tests.helpers import bare_ner, FakeRunDetector, gliner_ner, numbered_words, set_cfg, windows_for, word_ner
 from sct.utils.ner_chunking import align_chunk, simple_chunk, split_text, token_count
 from sct.utils.anonymization_map import AnonymizationMap
 from sct.config import TextCleanerConfig
@@ -191,7 +191,7 @@ def test_overlap_windows_fit_the_budget_at_hard_cuts():
 
     ner = word_ner(3, FakeRunDetector(), budget=20)
     ner.tokenizer = bert_like
-    windows = ner._plan_windows("x" * 100)
+    windows = windows_for(ner, "x" * 100)
     assert all(token_count(w[0], bert_like) <= 20 for w in windows)
     assert any(w[1] > 0 and len(w[0]) > 14 for w in windows)  # overlap was added
     owned = [(w[3], w[4]) for w in windows]
@@ -200,7 +200,7 @@ def test_overlap_windows_fit_the_budget_at_hard_cuts():
     gliner = gliner_ner("placeholder")
     set_cfg(gliner, ner_chunk_overlap=10)
     budget = gliner._chunk_budget()
-    windows = gliner._plan_windows("张" * 2841)
+    windows = windows_for(gliner, "张" * 2841)
     assert len(windows) > 1 and all(len(w[0]) <= budget * 2 for w in windows)
     assert "".join(w[0][w[3] - w[1]:w[4] - w[1]] for w in windows) == "张" * 2841
 
@@ -269,7 +269,7 @@ def test_overlap_with_real_tokenizer():
     ner = GeneralNER(TextCleanerConfig(ner_models=TEST_NER_MODELS, ner_chunk_overlap=32,
                                        replacement_mode="reversible"))
     text = "Marie Curie worked in Paris with Pierre Curie. " * 80
-    windows = ner._plan_windows(text)
+    windows = windows_for(ner, text)
     assert len(windows) > 1
     assert all(token_count(w[0], ner.tokenizer) <= ner.min_token_length for w in windows)
     anon_map = AnonymizationMap()

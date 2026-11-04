@@ -520,7 +520,7 @@ class TestNERBackends:
         # Should not raise
         tc.warmup(languages=["ENGLISH"])
         # After warmup, ENGLISH pipeline should be loaded
-        assert "ENGLISH" in tc.GeneralNER._pipelines
+        assert "ENGLISH" in tc.GeneralNER.provenance
 
 
 # =========================================================================

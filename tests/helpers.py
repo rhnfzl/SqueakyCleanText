@@ -73,10 +73,11 @@ class FakeGLiNER:
         return out
 
 
-def gliner_ner(mode):
+def gliner_ner(mode="placeholder", detector=None):
+    """GeneralNER on the GLiNER path with a fake *detector* and no models."""
     ner = bare_ner()
     set_cfg(ner, ner_backend="gliner")
-    ner._gliner_pipe = FakeGLiNER()
+    ner._gliner_pipe = detector or FakeGLiNER()
     set_cfg(ner, replacement_mode=mode)
     ner._synthetic_replacer = None
     ner._inference_locks = {}
@@ -107,13 +108,32 @@ class FakeRunDetector(FakeGLiNER):
 
 
 def word_ner(overlap, detector, budget=12, mode="placeholder"):
-    ner = gliner_ner(mode)
-    ner._gliner_pipe = detector
+    ner = gliner_ner(mode, detector)
     ner.tokenizer = word_tokenizer
     ner.min_token_length = budget
     set_cfg(ner, ner_chunk_overlap=overlap)
     ner._engine = AnonymizerEngine()
     return ner
+
+
+def route_models(ner, tokenizers, ensemble=None):
+    """Give *ner* these per-model tokenizers and, optionally, per-language ensemble routes."""
+    ner._tokenizers = tokenizers
+    if ensemble is not None:
+        ner._ensemble_models = ensemble
+
+
+def set_policy(ner, policy):
+    ner._privacy_policy = policy
+
+
+def windows_for(ner, text, language=None):
+    """The windows *ner* plans for *text*, sized for one language's models or for every loaded one."""
+    return ner._plan_windows(text, ner._get_ensemble_keys(language)) if language else ner._plan_windows(text)
+
+
+def finalized_text(ner, text, windows, results, anon_map=None):
+    return ner._finalize(text, windows, results, 0.85, anon_map).text
 
 
 def numbered_words(n, names):
@@ -139,7 +159,7 @@ class WordCountTokenizer:
 def both_paths(ner, text, privacy_policy=None, **kwargs):
     """Run *text* through the single and the batch path; one result per path run."""
     kwargs = {"positional_tags": ("PER", "LOC"), "ner_confidence_threshold": 0.85, **kwargs}
-    ner._privacy_policy = privacy_policy
+    set_policy(ner, privacy_policy)
     single = ner.ner_process_detailed(text, **kwargs)
     batch = ner.ner_process_batch_detailed([text, text], [None, None], **kwargs)
     return [single] + batch
