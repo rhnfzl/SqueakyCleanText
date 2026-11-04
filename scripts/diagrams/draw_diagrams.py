@@ -69,8 +69,12 @@ class Diagram:
         inside = [r for r in self.rects if r[1] <= x <= r[1] + r[3] and r[2] <= y <= r[2] + r[4]]
         return min(inside, key=lambda r: r[3] * r[4])[1:5] if inside else (0, 0, W, self.h)
 
-    def check(self):
-        errors = []
+    def _off_canvas(self):
+        return [f"off canvas: {r}" for r in self.rects
+                if r[1] < 0 or r[2] < 0 or r[1] + r[3] > W or r[2] + r[4] > self.h]
+
+    def check(self) -> None:
+        errors = self._off_canvas()
         for _, x, y, s, size, bold, _, anchor, mono in self.texts:
             if size * 900 / W < 13:
                 errors.append(f"too small: {s!r}")
@@ -80,13 +84,11 @@ class Diagram:
             rx, ry, rw, rh = self._box_around(x, y)
             if not (rx + 4 <= x0 and x0 + w <= rx + rw - 4 and ry <= y - size and y + 4 <= ry + rh):
                 errors.append(f"overflows its box by {x0 + w - (rx + rw - 4):.0f} px: {s!r}")
-        errors += [f"off canvas: {r}" for r in self.rects
-                   if r[1] < 0 or r[2] < 0 or r[1] + r[3] > W or r[2] + r[4] > self.h]
         if errors:
             raise ValueError(f"{self.name}:\n  " + "\n  ".join(errors))
 
     # ---------- SVG ----------
-    def svg(self):
+    def svg(self) -> str:
         out = [f'<svg xmlns="http://www.w3.org/2000/svg" width="{W}" height="{self.h}" '
                f'viewBox="0 0 {W} {self.h}" font-family="{FONT}">',
                f'<title>{escape(self.title)}</title>',
@@ -111,7 +113,7 @@ class Diagram:
         return "\n".join(out)
 
     # ---------- Excalidraw ----------
-    def excalidraw(self):
+    def excalidraw(self) -> dict[str, object]:
         def base(i, typ, x, y, w, h, stroke, fill="transparent", dashed=False):
             return {"id": f"{self.name}-{i}", "type": typ, "x": x, "y": y, "width": w, "height": h,
                     "angle": 0, "strokeColor": stroke, "backgroundColor": fill, "fillStyle": "solid",
