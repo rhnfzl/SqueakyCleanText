@@ -8,6 +8,7 @@ from sct import config as config_module
 from sct.config import TextCleanerConfig
 from sct.sct import TextCleaner
 from tests.conftest import TEST_NER_MODELS
+from tests.helpers import FakeRunDetector, word_ner
 
 pytest.importorskip("faker")
 
@@ -102,3 +103,28 @@ def test_legacy_global_flows():
     finally:
         config_module.NER_SEES_TAGS = old
     assert TextCleanerConfig().ner_sees_tags is True
+
+
+@pytest.mark.parametrize("mode, lm_text, entries", [
+    ("placeholder", "<PERSON> mailed <EMAIL> from <IP> and <IP> then <EMAIL> again.", None),
+    ("reversible", "<PERSON_0> mailed <EMAIL_0> from <IP_0> and <IP_1> then <EMAIL_1> again.", [
+        ("<EMAIL_0>", "EMAIL", "bob@example.org"), ("<EMAIL_1>", "EMAIL", "bob@example.org"),
+        ("<IP_0>", "IP", "192.168.1.10"), ("<IP_1>", "IP", "10.0.0.2"), ("<PERSON_0>", "PERSON", "Maria Jansen"),
+    ]),
+])
+def test_document_state_output_is_pinned(monkeypatch, mode, lm_text, entries):
+    def build_ner(self):
+        fake = word_ner(0, FakeRunDetector(), mode=self.cfg.replacement_mode)
+        fake._model_names, fake.provenance = {}, {}
+        return fake
+
+    monkeypatch.setattr(TextCleaner, "_build_ner", build_ner)
+    text = "Maria Jansen mailed bob@example.org from 192.168.1.10 and 10.0.0.2 then bob@example.org again."
+    cleaner = TextCleaner(TextCleanerConfig(replacement_mode=mode, check_detect_language=False, language="ENGLISH"))
+    assert cleaner._defer_tags is (mode == "reversible")
+    result = cleaner.process(text)
+    assert result.lm_text == lm_text
+    assert result.metadata["regex_counts"] == {"EMAIL": {"count": 2, "chars": 30}, "IP": {"count": 2, "chars": 20}}
+    assert result.metadata["source_chars"] == len(text)
+    anon_map = result.metadata.get("anon_map")
+    assert (anon_map and [(e.placeholder, e.entity_type, e.original) for e in anon_map.entries]) == entries
