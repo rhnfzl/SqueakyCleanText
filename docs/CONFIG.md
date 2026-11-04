@@ -240,5 +240,7 @@ config.LANGUAGE = "ENGLISH"
 cleaner = sct.TextCleaner()
 ```
 
+Every `TextCleanerConfig` field has a global with its upper-case name (`ner_backend` is `config.NER_BACKEND`), except the computed `supported_languages` and the deprecated `ner_models_list`, whose global `NER_MODELS_LIST` feeds `ner_models`; a dict in `NER_MODELS` wins over it.
+
 > **Note**: The legacy module-level configuration is not thread-safe. For concurrent processing, use `TextCleanerConfig` instead.
 

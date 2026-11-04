@@ -6,7 +6,7 @@ from types import MappingProxyType
 
 import pytest
 
-from sct import TextCleaner, TextCleanerConfig
+from sct import TextCleaner, TextCleanerConfig, config
 
 
 def _legacy_config():
@@ -119,3 +119,24 @@ def test_legacy_five_ner_models_same_for_any_mapping_type():
     assert as_dict.supported_languages == as_proxy.supported_languages
     for cfg in (as_dict, dataclasses.replace(as_dict), copy.deepcopy(as_dict)):
         assert cfg.ner_models == TextCleanerConfig().ner_models
+
+
+def test_every_field_has_a_legacy_global_with_the_field_default():
+    for f in dataclasses.fields(TextCleanerConfig):
+        if f.name not in ("supported_languages", "ner_models_list", "ner_ensemble_default_keys", "positional_tags"):
+            assert getattr(config, f.name.upper()) == f.default, f.name
+    assert config._config_from_module_globals() == TextCleanerConfig()
+
+
+def test_legacy_globals_reach_the_fields_the_builder_used_to_skip(monkeypatch):
+    monkeypatch.setattr(config, "NER_BACKEND", "gliner")
+    monkeypatch.setattr(config, "GLINER_MODEL", "x/y")
+    monkeypatch.setattr(config, "NER_ENSEMBLE_DEFAULT_KEYS", ("MULTILINGUAL",))
+    cfg = config._config_from_module_globals()
+    assert (cfg.ner_backend, cfg.gliner_model) == ("gliner", "x/y")
+    assert cfg.ner_ensemble_default_keys == ("MULTILINGUAL",)
+
+
+def test_ner_models_global_wins_over_the_positional_list(monkeypatch):
+    monkeypatch.setattr(config, "NER_MODELS", {"ENGLISH": "en-model", "MULTILINGUAL": "multi-model"})
+    assert config._config_from_module_globals().ner_models["ENGLISH"] == "en-model"

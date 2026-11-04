@@ -4,7 +4,7 @@ Configuration for the SqueakyCleanText pipeline.
 New API (thread-safe, recommended):
     from sct.config import TextCleanerConfig
     cfg = TextCleanerConfig(check_ner_process=False)
-    cleaner = TextCleaner(config=cfg)
+    cleaner = TextCleaner(cfg)
 
 Legacy API (backward compatible):
     from sct import config
@@ -15,19 +15,26 @@ Legacy API (backward compatible):
 import re
 import sys
 from collections.abc import Iterable
-from dataclasses import dataclass
+from dataclasses import dataclass, fields
 from datetime import date
 from types import MappingProxyType
-from typing import Any, Mapping, Optional, Tuple, Union
+from typing import Any, Literal, Mapping, Optional, Tuple, Union, get_args
+
+from sct.utils.resources import DEFAULT_LANGUAGES, resolve_language
 
 
 LANG_KEYS = ('ENGLISH', 'DUTCH', 'GERMAN', 'SPANISH', 'MULTILINGUAL')
 REQUIRED_NER_KEYS = frozenset({'ENGLISH', 'MULTILINGUAL'})
-DEFAULT_LANGUAGES = frozenset({'ENGLISH', 'DUTCH', 'GERMAN', 'SPANISH'})
 
-VALID_NER_BACKENDS = frozenset({
-    'onnx', 'torch', 'gliner', 'ensemble_onnx', 'ensemble_torch', 'presidio_gliner',
-})
+NerBackend = Literal['onnx', 'torch', 'gliner', 'ensemble_onnx', 'ensemble_torch', 'presidio_gliner']
+NerMode = Literal['standard', 'pii']
+ReplacementMode = Literal['placeholder', 'synthetic', 'reversible']
+JsonKeyCleaning = Literal['pii', 'pii_ner', 'full', 'off']
+NerEnsembleVote = Literal['max', 'mean']
+ReplaceNumbersMode = Literal['identifiers', 'all']
+OnPatternTimeout = Literal['raise', 'warn']
+
+VALID_NER_BACKENDS = frozenset(get_args(NerBackend))
 GLINER_BACKENDS = frozenset({'gliner', 'ensemble_onnx', 'ensemble_torch', 'presidio_gliner'})
 
 DEFAULT_NER_MODELS: dict[str, str] = {
@@ -139,9 +146,9 @@ PII_DEFAULT_MODEL = 'knowledgator/gliner-pii-base-v1.0'
 PII_DEFAULT_REVISION = '61726e0ad791dcab3e29339bbec3ad42ded65641'
 PII_DEFAULT_THRESHOLD = 0.3  # Recall > precision for PII
 
-VALID_NER_MODES = frozenset({'standard', 'pii'})
-VALID_REPLACEMENT_MODES = frozenset({'placeholder', 'synthetic', 'reversible'})
-VALID_JSON_KEY_CLEANING = frozenset({'pii', 'pii_ner', 'full', 'off'})
+VALID_NER_MODES = frozenset(get_args(NerMode))
+VALID_REPLACEMENT_MODES = frozenset(get_args(ReplacementMode))
+VALID_JSON_KEY_CLEANING = frozenset(get_args(JsonKeyCleaning))
 
 # Optional ModernBERT NER models (available when exported via export_onnx_models.py)
 MODERNBERT_NER_MODELS: dict[str, str] = {
@@ -222,12 +229,12 @@ class TextCleanerConfig:
     language: Optional[Union[str, Tuple[str, ...]]] = None
 
     # NER backend selection
-    ner_backend: str = 'onnx'  # 'onnx' | 'torch' | 'gliner' | 'ensemble_onnx' | 'ensemble_torch' | 'presidio_gliner'
+    ner_backend: NerBackend = 'onnx'
 
     # NER mode: 'standard' uses configured models, 'pii' auto-configures GLiNER for PII detection
-    ner_mode: str = 'standard'
+    ner_mode: NerMode = 'standard'
     # Replacement mode: 'placeholder' uses <TAG> tokens, 'synthetic' uses Faker-generated values
-    replacement_mode: str = 'placeholder'
+    replacement_mode: ReplacementMode = 'placeholder'
 
     # Preferred: language-keyed dict of HuggingFace ONNX model repo IDs.
     # Models must have model.onnx, config.json, tokenizer.json on Hub.
@@ -248,13 +255,7 @@ class TextCleanerConfig:
 
     # Deprecated: positional tuple (English, Dutch, German, Spanish, Multilingual).
     # Use ner_models dict instead. Kept for backward compatibility.
-    ner_models_list: Tuple[str, ...] = (
-        "rhnfzl/xlm-roberta-large-conll03-english-onnx",
-        "rhnfzl/xlm-roberta-large-conll02-dutch-onnx",
-        "rhnfzl/xlm-roberta-large-conll03-german-onnx",
-        "rhnfzl/xlm-roberta-large-conll02-spanish-onnx",
-        "rhnfzl/wikineural-multilingual-ner-onnx",
-    )
+    ner_models_list: Tuple[str, ...] = tuple(DEFAULT_NER_MODELS[k] for k in LANG_KEYS)
 
     # Torch backend models (only used when ner_backend is 'torch' or 'ensemble_torch')
     torch_ner_models: Optional[Mapping[str, str]] = None
@@ -316,7 +317,7 @@ class TextCleanerConfig:
     onnx_cuda_provider_options: Optional[Mapping[str, Any]] = None  # extra CUDAExecutionProvider options
     # process_json keys: 'pii' = regex PII steps only (NER tags lone words like 'message' out of context),
     # 'pii_ner' = PII steps plus NER, 'full' = whole config (0.7), 'off' = raw
-    json_key_cleaning: str = 'pii'
+    json_key_cleaning: JsonKeyCleaning = 'pii'
     synthetic_seed: int = 42  # base seed for replacement_mode='synthetic'
     # True: fakes seeded per document from synthetic_seed + its text (differ across documents,
     # same document -> same fakes); False = 0.7 single Faker stream per thread
@@ -362,7 +363,7 @@ class TextCleanerConfig:
     # NER ensemble vote per span: 'max' keeps a span when its best model score passes
     # ner_confidence_threshold, so a weak second model never hides a strong hit; 'mean' averages
     # the model scores (0.8.0)
-    ner_ensemble_vote: str = 'max'
+    ner_ensemble_vote: NerEnsembleVote = 'max'
     # mask every other case-sensitive whole-word copy of a masked PER/ORG/LOC value in the same
     # document (the value comes from the model's own span); False = 0.8.0 output
     ner_propagate_masked: bool = True
@@ -404,7 +405,7 @@ class TextCleanerConfig:
     # letters, digits or joined parts such as INV-2023-107683, which stays untouched; not an amount, decimal,
     # percent, time or range); 'all' = 0.8.1, every number. On the DEV split of the external benchmark the
     # 'all' rule caused 62-68% of SCT's false masks.
-    replace_numbers_mode: str = 'identifiers'
+    replace_numbers_mode: ReplaceNumbersMode = 'identifiers'
     # Fewest digits an identifier-shaped number needs. 4: on DEV (9 datasets, 4,298 docs, years/dates off,
     # phone_reject_embedded on) 4 digits gave F2 0.881 / recall 0.893 / precision 0.856, the best F2 of 4-7;
     # 7 digits gave 0.869 / precision 0.865. Shorter runs (ages, counts, list numbers) are left as they are.
@@ -442,7 +443,7 @@ class TextCleanerConfig:
     custom_patterns_timeout: Optional[float] = 2.0
     # On a timeout: 'raise' a CustomPatternTimeout (names the label, never the text), or 'warn': log it, add
     # 'custom_pattern_timeout' to metadata['warnings'] and process that document without the pattern.
-    custom_patterns_on_timeout: str = 'raise'
+    custom_patterns_on_timeout: OnPatternTimeout = 'raise'
     # replace_numbers_mode='identifiers' only: a number right before or after an uppercase ISO 4217 code, with at
     # most one space ("1250 EUR", "EUR 1250", "USD 1,250"), is an amount and stays. False: masked like any ID
     numbers_keep_currency_code_amounts: bool = True
@@ -548,7 +549,7 @@ def _validate_user_terms(cfg):
     if timeout is not None and (isinstance(timeout, bool) or not isinstance(timeout, (int, float))
                                 or not 0 < timeout < float('inf')):
         raise ValueError(f"custom_patterns_timeout must be a positive number of seconds or None, got {timeout!r}")
-    if cfg.custom_patterns_on_timeout not in ('raise', 'warn'):
+    if cfg.custom_patterns_on_timeout not in get_args(OnPatternTimeout):
         raise ValueError(f"custom_patterns_on_timeout must be 'raise' or 'warn', got {cfg.custom_patterns_on_timeout!r}")
     if cfg.custom_patterns is not None:
         if not isinstance(cfg.custom_patterns, Mapping):
@@ -692,9 +693,9 @@ def _validate_ner_settings(cfg):
         value = getattr(cfg, name)
         if value is not None and not 0.0 <= value <= 1.0:
             raise ValueError(f"{name} must be None or in [0, 1], got {value}")
-    if cfg.ner_ensemble_vote not in ('max', 'mean'):
+    if cfg.ner_ensemble_vote not in get_args(NerEnsembleVote):
         raise ValueError(f"ner_ensemble_vote must be 'max' or 'mean', got {cfg.ner_ensemble_vote!r}")
-    if cfg.replace_numbers_mode not in ('identifiers', 'all'):
+    if cfg.replace_numbers_mode not in get_args(ReplaceNumbersMode):
         raise ValueError(f"replace_numbers_mode must be 'identifiers' or 'all', got {cfg.replace_numbers_mode!r}")
     if isinstance(cfg.replace_numbers_min_digits, bool) or not isinstance(cfg.replace_numbers_min_digits, int) \
             or cfg.replace_numbers_min_digits < 1:
@@ -705,15 +706,10 @@ def _validate_ner_settings(cfg):
         raise ValueError(f"ner_propagate_min_score must be None or in [0, 1], got {cfg.ner_propagate_min_score}")
     if cfg.ner_subword_widen is not None and cfg.ner_subword_widen < 0:
         raise ValueError(f"ner_subword_widen must be None or >= 0, got {cfg.ner_subword_widen}")
-    if not 0.0 <= cfg.language_confidence_warning <= 1.0:
-        raise ValueError(
-            "language_confidence_warning must be in [0, 1], "
-            f"got {cfg.language_confidence_warning}"
-        )
-    if not 0.0 <= cfg.language_margin_warning <= 1.0:
-        raise ValueError(
-            f"language_margin_warning must be in [0, 1], got {cfg.language_margin_warning}"
-        )
+    for name in ('language_confidence_warning', 'language_margin_warning'):
+        value = getattr(cfg, name)
+        if not 0.0 <= value <= 1.0:
+            raise ValueError(f"{name} must be in [0, 1], got {value}")
 
 
 def _validate_gliner(cfg):
@@ -801,8 +797,7 @@ def _reconcile_ner_models(cfg):
         )
     else:
         # No dict provided — derive from ner_models_list (may be default or custom)
-        default_models_list = tuple(DEFAULT_NER_MODELS[k] for k in LANG_KEYS)
-        if cfg.ner_models_list != default_models_list:
+        if cfg.ner_models_list != TextCleanerConfig.ner_models_list:
             import warnings
             warnings.warn(
                 "ner_models_list is deprecated. Use ner_models dict instead.",
@@ -829,8 +824,6 @@ def _reconcile_ner_models(cfg):
 def _resolve_languages(cfg):
     """Canonicalise the language fields and freeze their maps."""
     # --- Language validation and supported_languages computation ---
-    from sct.utils.resources import resolve_language
-
     # Resolve language (str or tuple of str) via ISO code / name lookup
     if cfg.language is not None:
         if isinstance(cfg.language, str):
@@ -887,228 +880,40 @@ def _compute_supported_languages(cfg):
     object.__setattr__(cfg, 'supported_languages', frozenset(langs))
 
 
+# Fields without a plain UPPER_CASE global: ner_models_list is fed by the NER_MODELS_LIST global through
+# ner_models, supported_languages is computed, and NER_ENSEMBLE_DEFAULT_KEYS is also the built-in fallback.
+_NO_PLAIN_GLOBAL = frozenset({'ner_models_list', 'supported_languages', 'ner_ensemble_default_keys'})
+_BUILTIN_ENSEMBLE_DEFAULT_KEYS = NER_ENSEMBLE_DEFAULT_KEYS
+
+
 def _config_from_module_globals() -> TextCleanerConfig:
     """Build a TextCleanerConfig from the current module-level variable state.
 
     Supports backward compatibility with the legacy config pattern.
     """
     m = sys.modules[__name__]
-    return TextCleanerConfig(
-        check_detect_language=m.CHECK_DETECT_LANGUAGE,
-        check_fix_bad_unicode=m.CHECK_FIX_BAD_UNICODE,
-        check_to_ascii_unicode=m.CHECK_TO_ASCII_UNICODE,
-        check_replace_html=m.CHECK_REPLACE_HTML,
-        check_replace_urls=m.CHECK_REPLACE_URLS,
-        check_replace_emails=m.CHECK_REPLACE_EMAILS,
-        check_replace_ips=getattr(m, 'CHECK_REPLACE_IPS', True),
-        replace_ips_public_only=getattr(m, 'REPLACE_IPS_PUBLIC_ONLY', False),
-        check_replace_years=m.CHECK_REPLACE_YEARS,
-        check_replace_dates=getattr(m, 'CHECK_REPLACE_DATES', True),
-        check_fuzzy_replace_dates=getattr(m, 'CHECK_FUZZY_REPLACE_DATES', False),
-        fuzzy_date_score_cutoff=getattr(m, 'FUZZY_DATE_SCORE_CUTOFF', 85),
-        check_replace_phone_numbers=m.CHECK_REPLACE_PHONE_NUMBERS,
-        check_replace_numbers=m.CHECK_REPLACE_NUMBERS,
-        replace_numbers_in_words=getattr(m, 'REPLACE_NUMBERS_IN_WORDS', False),
-        onnx_intra_op_threads=getattr(m, 'ONNX_INTRA_OP_THREADS', None),
-        onnx_inter_op_threads=getattr(m, 'ONNX_INTER_OP_THREADS', None),
-        ner_batch_size=getattr(m, 'NER_BATCH_SIZE', 8),
-        ner_chunk_overlap=getattr(m, 'NER_CHUNK_OVERLAP', 0),
-        detect_all_languages=getattr(m, 'DETECT_ALL_LANGUAGES', True),
-        language_confidence_warning=getattr(m, 'LANGUAGE_CONFIDENCE_WARNING', 0.0),
-        check_decode_unicode_escapes=getattr(m, 'CHECK_DECODE_UNICODE_ESCAPES', True),
-        ner_device=getattr(m, 'NER_DEVICE', None),
-        cuda_device_id=getattr(m, 'CUDA_DEVICE_ID', 0),
-        onnx_cuda_provider_options=getattr(m, 'ONNX_CUDA_PROVIDER_OPTIONS', None),
-        json_key_cleaning=getattr(m, 'JSON_KEY_CLEANING', 'pii'),
-        synthetic_seed=getattr(m, 'SYNTHETIC_SEED', 42),
-        synthetic_per_document=getattr(m, 'SYNTHETIC_PER_DOCUMENT', True),
-        language_margin_warning=getattr(m, 'LANGUAGE_MARGIN_WARNING', 0.15),
-        fix_character_width=getattr(m, 'FIX_CHARACTER_WIDTH', False),
-        legacy_type_names=getattr(m, 'LEGACY_TYPE_NAMES', False),
-        ner_subword_widen=getattr(m, 'NER_SUBWORD_WIDEN', 1.0),
-        fold_styled_characters=getattr(m, 'FOLD_STYLED_CHARACTERS', True),
-        ner_subword_widen_same_script=getattr(m, 'NER_SUBWORD_WIDEN_SAME_SCRIPT', True),
-        synthetic_locale=getattr(m, 'SYNTHETIC_LOCALE', None),
-        ner_sees_tags=getattr(m, 'NER_SEES_TAGS', True),
-        synthetic_low_confidence_locale=getattr(m, 'SYNTHETIC_LOW_CONFIDENCE_LOCALE', 'en_US'),
-        synthetic_collapse_period=getattr(m, 'SYNTHETIC_COLLAPSE_PERIOD', True),
-        synthetic_reference_date=getattr(m, 'SYNTHETIC_REFERENCE_DATE', '2026-01-01'),
-        ner_ensemble_vote=getattr(m, 'NER_ENSEMBLE_VOTE', 'max'),
-        ner_propagate_masked=getattr(m, 'NER_PROPAGATE_MASKED', True),
-        ner_propagate_min_score=getattr(m, 'NER_PROPAGATE_MIN_SCORE', None),
-        check_replace_iban_cards=getattr(m, 'CHECK_REPLACE_IBAN_CARDS', True),
-        replace_with_iban=getattr(m, 'REPLACE_WITH_IBAN', '<IBAN>'),
-        replace_with_cards=getattr(m, 'REPLACE_WITH_CARDS', '<CARD>'),
-        check_replace_identifiers=getattr(m, 'CHECK_REPLACE_IDENTIFIERS', False),
-        replace_with_identifiers=getattr(m, 'REPLACE_WITH_IDENTIFIERS', '<ID>'),
-        bracket_content_max_chars=getattr(m, 'BRACKET_CONTENT_MAX_CHARS', 32),
-        bracket_content_max_words=getattr(m, 'BRACKET_CONTENT_MAX_WORDS', 3),
-        keep_json_braces=getattr(m, 'KEEP_JSON_BRACES', True),
-        date_month_name_slash_year=getattr(m, 'DATE_MONTH_NAME_SLASH_YEAR', True),
-        date_builtin_month_languages=getattr(m, 'DATE_BUILTIN_MONTH_LANGUAGES', None),
-        html_tag_strict=getattr(m, 'HTML_TAG_STRICT', True),
-        ner_merge_location_gap=getattr(m, 'NER_MERGE_LOCATION_GAP', 0),
-        ner_snap_word_edges=getattr(m, 'NER_SNAP_WORD_EDGES', True),
-        url_trailing_punct_outside=getattr(m, 'URL_TRAILING_PUNCT_OUTSIDE', True),
-        replace_numbers_mode=getattr(m, 'REPLACE_NUMBERS_MODE', 'identifiers'),
-        replace_numbers_min_digits=getattr(m, 'REPLACE_NUMBERS_MIN_DIGITS', 4),
-        phone_reject_embedded=getattr(m, 'PHONE_REJECT_EMBEDDED', True),
-        custom_deny_terms=getattr(m, 'CUSTOM_DENY_TERMS', None),
-        custom_allow_terms=getattr(m, 'CUSTOM_ALLOW_TERMS', ()),
-        custom_patterns=getattr(m, 'CUSTOM_PATTERNS', None),
-        custom_terms_case_sensitive=getattr(m, 'CUSTOM_TERMS_CASE_SENSITIVE', False),
-        numbers_letter_prefix_ids=getattr(m, 'NUMBERS_LETTER_PREFIX_IDS', True),
-        numbers_two_part_ids=getattr(m, 'NUMBERS_TWO_PART_IDS', True),
-        numbers_spaced_pair_ids=getattr(m, 'NUMBERS_SPACED_PAIR_IDS', True),
-        custom_patterns_timeout=getattr(m, 'CUSTOM_PATTERNS_TIMEOUT', 2.0),
-        custom_patterns_on_timeout=getattr(m, 'CUSTOM_PATTERNS_ON_TIMEOUT', 'raise'),
-        numbers_keep_currency_code_amounts=getattr(m, 'NUMBERS_KEEP_CURRENCY_CODE_AMOUNTS', True),
-        check_replace_currency_symbols=m.CHECK_REPLACE_CURRENCY_SYMBOLS,
-        check_ner_process=m.CHECK_NER_PROCESS,
-        check_remove_isolated_letters=m.CHECK_REMOVE_ISOLATED_LETTERS,
-        check_remove_isolated_special_symbols=m.CHECK_REMOVE_ISOLATED_SPECIAL_SYMBOLS,
-        check_remove_bracket_content=getattr(m, 'CHECK_REMOVE_BRACKET_CONTENT', True),
-        check_remove_brace_content=getattr(m, 'CHECK_REMOVE_BRACE_CONTENT', True),
-        check_normalize_whitespace=m.CHECK_NORMALIZE_WHITESPACE,
-        check_statistical_model_processing=m.CHECK_STATISTICAL_MODEL_PROCESSING,
-        check_casefold=m.CHECK_CASEFOLD,
-        check_smart_casefold=getattr(m, 'CHECK_SMART_CASEFOLD', False),
-        check_remove_stopwords=m.CHECK_REMOVE_STOPWORDS,
-        check_remove_punctuation=m.CHECK_REMOVE_PUNCTUATION,
-        check_remove_stext_custom_stop_words=m.CHECK_REMOVE_STEXT_CUSTOM_STOP_WORDS,
-        check_remove_emoji=getattr(m, 'CHECK_REMOVE_EMOJI', False),
-        replace_with_url=m.REPLACE_WITH_URL,
-        replace_with_html=m.REPLACE_WITH_HTML,
-        replace_with_email=m.REPLACE_WITH_EMAIL,
-        replace_with_ips=getattr(m, 'REPLACE_WITH_IPS', '<IP>'),
-        replace_with_years=m.REPLACE_WITH_YEARS,
-        replace_with_dates=getattr(m, 'REPLACE_WITH_DATES', '<DATE>'),
-        replace_with_phone_numbers=m.REPLACE_WITH_PHONE_NUMBERS,
-        replace_with_numbers=m.REPLACE_WITH_NUMBERS,
-        replace_with_currency_symbols=m.REPLACE_WITH_CURRENCY_SYMBOLS,
-        positional_tags=tuple(m.POSITIONAL_TAGS),
-        ner_confidence_threshold=getattr(m, 'NER_CONFIDENCE_THRESHOLD', None),
-        ner_mode=getattr(m, 'NER_MODE', 'standard'),
-        replacement_mode=getattr(m, 'REPLACEMENT_MODE', 'placeholder'),
-        gliner_onnx=getattr(m, 'GLINER_ONNX', False),
-        language=m.LANGUAGE,
-        ner_models=dict(zip(LANG_KEYS, m.NER_MODELS_LIST)),
-        extra_languages=(),
-        custom_stopwords=None,
-        custom_month_names=None,
-    )
+    kwargs = {
+        f.name: getattr(m, f.name.upper(), f.default)
+        for f in fields(TextCleanerConfig)
+        if f.name not in _NO_PLAIN_GLOBAL
+    }
+    kwargs['positional_tags'] = tuple(m.POSITIONAL_TAGS)
+    if kwargs['ner_models'] is None:
+        kwargs['ner_models'] = dict(zip(LANG_KEYS, m.NER_MODELS_LIST))
+    if m.NER_ENSEMBLE_DEFAULT_KEYS != _BUILTIN_ENSEMBLE_DEFAULT_KEYS:
+        kwargs['ner_ensemble_default_keys'] = m.NER_ENSEMBLE_DEFAULT_KEYS
+    return TextCleanerConfig(**kwargs)
 
 
 # ---------------------------------------------------------------------------
-# Backward-compatible module-level variables
-# Users can still do: config.CHECK_NER_PROCESS = False
+# Backward-compatible module-level variables: one per field, named in upper case, set to the field's
+# default. Users can still do: config.CHECK_NER_PROCESS = False
 # ---------------------------------------------------------------------------
-CHECK_DETECT_LANGUAGE = True
-CHECK_FIX_BAD_UNICODE = True
-CHECK_TO_ASCII_UNICODE = False
-CHECK_REPLACE_HTML = True
-CHECK_REPLACE_URLS = True
-CHECK_REPLACE_EMAILS = True
-CHECK_REPLACE_IPS = True
-REPLACE_IPS_PUBLIC_ONLY = False
-CHECK_REPLACE_YEARS = True
-CHECK_REPLACE_DATES = True
-CHECK_FUZZY_REPLACE_DATES = False
-FUZZY_DATE_SCORE_CUTOFF = 85
-CHECK_REPLACE_PHONE_NUMBERS = True
-CHECK_REPLACE_NUMBERS = True
-REPLACE_NUMBERS_IN_WORDS = False
-ONNX_INTRA_OP_THREADS = None
-ONNX_INTER_OP_THREADS = None
-NER_BATCH_SIZE = 8
-NER_CHUNK_OVERLAP = 0
-DETECT_ALL_LANGUAGES = True
-LANGUAGE_CONFIDENCE_WARNING = 0.0
-CHECK_DECODE_UNICODE_ESCAPES = True
-NER_DEVICE = None
-CUDA_DEVICE_ID = 0
-ONNX_CUDA_PROVIDER_OPTIONS = None
-JSON_KEY_CLEANING = 'pii'
-CHECK_REPLACE_CURRENCY_SYMBOLS = True
-CHECK_NER_PROCESS = True
-CHECK_REMOVE_ISOLATED_LETTERS = True
-CHECK_REMOVE_ISOLATED_SPECIAL_SYMBOLS = True
-CHECK_REMOVE_BRACKET_CONTENT = True
-CHECK_REMOVE_BRACE_CONTENT = True
-CHECK_NORMALIZE_WHITESPACE = True
-CHECK_STATISTICAL_MODEL_PROCESSING = True
-CHECK_CASEFOLD = True
-CHECK_SMART_CASEFOLD = False
-CHECK_REMOVE_STOPWORDS = True
-CHECK_REMOVE_PUNCTUATION = True
-CHECK_REMOVE_STEXT_CUSTOM_STOP_WORDS = True
-CHECK_REMOVE_EMOJI = False
+for _field in fields(TextCleanerConfig):
+    if _field.name not in _NO_PLAIN_GLOBAL:
+        globals()[_field.name.upper()] = _field.default
 
-REPLACE_WITH_URL = "<URL>"
-REPLACE_WITH_HTML = "<HTML>"
-REPLACE_WITH_EMAIL = "<EMAIL>"
-REPLACE_WITH_IPS = "<IP>"
-REPLACE_WITH_YEARS = "<YEAR>"
-REPLACE_WITH_DATES = "<DATE>"
-REPLACE_WITH_PHONE_NUMBERS = "<PHONE>"
-REPLACE_WITH_NUMBERS = "<NUMBER>"
-REPLACE_WITH_CURRENCY_SYMBOLS = None
-
-POSITIONAL_TAGS = ['PER', 'LOC', 'ORG', 'MISC']
-NER_CONFIDENCE_THRESHOLD = None  # None = 0.85, or the GLiNER threshold in PII mode
-NER_MODE = 'standard'
-REPLACEMENT_MODE = 'placeholder'
-SYNTHETIC_SEED = 42
-SYNTHETIC_PER_DOCUMENT = True
-LANGUAGE_MARGIN_WARNING = 0.15
-FIX_CHARACTER_WIDTH = False
-LEGACY_TYPE_NAMES = False
-NER_SUBWORD_WIDEN = 1.0
-FOLD_STYLED_CHARACTERS = True
-NER_SUBWORD_WIDEN_SAME_SCRIPT = True
-SYNTHETIC_LOCALE = None
-NER_SEES_TAGS = True
-SYNTHETIC_LOW_CONFIDENCE_LOCALE = 'en_US'
-SYNTHETIC_COLLAPSE_PERIOD = True
-SYNTHETIC_REFERENCE_DATE = '2026-01-01'
-NER_ENSEMBLE_VOTE = 'max'
-NER_PROPAGATE_MASKED = True
-NER_PROPAGATE_MIN_SCORE = None
-CHECK_REPLACE_IBAN_CARDS = True
-REPLACE_WITH_IBAN = "<IBAN>"
-REPLACE_WITH_CARDS = "<CARD>"
-CHECK_REPLACE_IDENTIFIERS = False
-REPLACE_WITH_IDENTIFIERS = "<ID>"
-BRACKET_CONTENT_MAX_CHARS = 32
-BRACKET_CONTENT_MAX_WORDS = 3
-KEEP_JSON_BRACES = True
-DATE_MONTH_NAME_SLASH_YEAR = True
-DATE_BUILTIN_MONTH_LANGUAGES = None
-HTML_TAG_STRICT = True
-NER_MERGE_LOCATION_GAP = 0
-NER_SNAP_WORD_EDGES = True
-URL_TRAILING_PUNCT_OUTSIDE = True
-REPLACE_NUMBERS_MODE = 'identifiers'
-REPLACE_NUMBERS_MIN_DIGITS = 4
-PHONE_REJECT_EMBEDDED = True
-CUSTOM_DENY_TERMS = None
-CUSTOM_ALLOW_TERMS = ()
-CUSTOM_PATTERNS = None
-CUSTOM_TERMS_CASE_SENSITIVE = False
-NUMBERS_LETTER_PREFIX_IDS = True
-NUMBERS_TWO_PART_IDS = True
-NUMBERS_SPACED_PAIR_IDS = True
-CUSTOM_PATTERNS_TIMEOUT = 2.0
-CUSTOM_PATTERNS_ON_TIMEOUT = 'raise'
-NUMBERS_KEEP_CURRENCY_CODE_AMOUNTS = True
-GLINER_ONNX = False
-LANGUAGE = None
-
+# Lists, as they always were, so config.POSITIONAL_TAGS.append('X') keeps working.
+POSITIONAL_TAGS = list(TextCleanerConfig.positional_tags)
 # Order: English, Dutch, German, Spanish, Multilingual
-NER_MODELS_LIST = [
-    "rhnfzl/xlm-roberta-large-conll03-english-onnx",
-    "rhnfzl/xlm-roberta-large-conll02-dutch-onnx",
-    "rhnfzl/xlm-roberta-large-conll03-german-onnx",
-    "rhnfzl/xlm-roberta-large-conll02-spanish-onnx",
-    "rhnfzl/wikineural-multilingual-ner-onnx",
-]
+NER_MODELS_LIST = list(TextCleanerConfig.ner_models_list)
