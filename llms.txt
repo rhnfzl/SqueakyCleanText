@@ -172,7 +172,7 @@ torch             — PyTorch/Transformers pipeline — pip install squeakyclean
 gliner            — Zero-shot custom entities, PII mode, bi-encoder — pip install squeakycleantext[gliner]
 ensemble_onnx     — ONNX + GLiNER voting — pip install squeakycleantext[gliner]
 ensemble_torch    — Torch + GLiNER voting — pip install squeakycleantext[torch,gliner]
-presidio_gliner   — Presidio + GLiNER recognizer (beta) — pip install presidio-analyzer squeakycleantext[gliner]
+presidio_gliner   — Presidio + GLiNER recognizer (beta) — pip install squeakycleantext[presidio]
 ```
 
 ## Replacement Modes
@@ -257,7 +257,22 @@ sct/mcp_server.py                — FastMCP server (sct-mcp)
 sct/utils/constants.py           — Pre-compiled regexes (URL, email, phone, date, currency, etc.)
 sct/utils/stopwords.py           — Language-aware stopword removal (O(1) set lookup)
 sct/utils/resources.py           — Lingua language detector (lazy singleton)
-tests/test_sct.py                — Full test suite (hypothesis, faker, pytest-timeout)
+sct/utils/contact.py             — URL, email and phone masking step
+sct/utils/datetime.py            — Date and time masking step
+sct/utils/normtext.py            — Text normalization steps
+sct/utils/special.py             — Special symbol and number handling steps
+sct/utils/torch_pipeline.py      — PyTorch/Transformers NER pipeline
+sct/adapters.py                  — Boundary adapters for structured data and retrieval pipelines
+sct/privacy.py                   — Policy and audit types for sensitive-data processing
+sct/streaming.py                 — Streaming interfaces with explicit privacy guarantees
+sct/ocr.py                       — Optional OCR and image redaction interfaces
+sct/risk.py                      — Corpus-level re-identification risk measurements
+sct/evaluation.py                — Ground-truth evaluation for PII entity detection
+sct/browser.py                   — Browser deployment manifest for ONNX Runtime Web integrations
+sct/model_benchmark.py           — Ground-truth quality and latency benchmarks for model candidates
+sct/model_candidates.py          — Pinned model candidates for repeatable PII evaluation
+sct/cli.py                       — Command-line interface for text and JSON cleaning (sct-clean)
+tests/                           — pytest suite (hypothesis, faker, pytest-timeout)
 ```
 
 ## Docs
