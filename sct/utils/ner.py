@@ -88,14 +88,6 @@ class ModelLoadError(Exception):
     pass
 
 
-def _gliner_label_map(cfg: TextCleanerConfig) -> dict[str, str]:
-    """The adapter's label map: a user's own, else on ensembles the short tags the vote keeps."""
-    if cfg.gliner_label_map is not None or cfg.ner_backend == 'gliner':
-        return dict(cfg.gliner_label_map or {})
-    # A tag already requested under its long name keeps reaching the vote under that name.
-    return {label: tag for label, tag in _ENSEMBLE_LABEL_MAP.items() if label.upper() not in cfg.positional_tags}
-
-
 def _presidio_type_map(legacy_type_names: bool, label_map: Mapping[str, str] | None) -> dict[str, str]:
     """Presidio entity type -> SCT type: the label map, and PHONE_NUMBER/IP_ADDRESS -> PHONE/IP."""
     types = {} if legacy_type_names else {old: new for new, old in constants.LEGACY_TYPE_NAMES.items()}
@@ -218,7 +210,7 @@ class GeneralNER:
                     variant=cfg.gliner_variant,
                     labels=cfg.gliner_labels,
                     threshold=cfg.effective_gliner_threshold,
-                    label_map=_gliner_label_map(cfg),
+                    label_map=dict(cfg.gliner_label_map or {}),
                     label_descriptions=dict(cfg.gliner_label_descriptions or {}),
                     device=self._torch_device,
                     onnx=cfg.gliner_onnx,
@@ -863,6 +855,13 @@ class GeneralNER:
         if self.cfg.ner_backend in GLINER_ADAPTER_BACKENDS and self._gliner_pipe and chunks:
             # GLiNER-only keeps every label it was given; ensembles keep positional_tags.
             gliner_tags = set(positional_tags)
+            short_tags: dict[str, str] = {}
+            if self.cfg.ner_backend != 'gliner' and self.cfg.gliner_label_map is None:
+                # A tag requested under its long name keeps reaching the vote under that name.
+                short_tags = {
+                    label.upper(): tag for label, tag in _ENSEMBLE_LABEL_MAP.items()
+                    if label in self._gliner_pipe.labels and label.upper() not in gliner_tags
+                }
             if self.cfg.ner_backend == 'gliner':
                 gliner_tags.update(self._gliner_pipe.label_map.values())
                 gliner_tags.update(
@@ -872,6 +871,7 @@ class GeneralNER:
             with self._get_lock('gliner'):
                 gliner_batch = self._gliner_pipe(chunks, batch_size=self.cfg.ner_batch_size)
             for i, data in enumerate(gliner_batch):
+                data = [{**item, 'entity_group': short_tags.get(item['entity_group'], item['entity_group'])} for item in data]
                 results[i].extend({**item, 'model': 'gliner'} for item in self.entities_with_position_key(data, gliner_tags))
         return results
 

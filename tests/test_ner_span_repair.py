@@ -337,13 +337,16 @@ class _SilentTokenModel:
         return word_tokenizer(text_or_texts)
 
 
-def _gliner_output(monkeypatch, **cfg):
+def _gliner_ner(monkeypatch, **cfg):
     silent = _SilentTokenModel()
     monkeypatch.setattr("sct.utils.onnx_pipeline.load_onnx_ner_model", lambda *a, **k: (silent, silent))
     monkeypatch.setattr("sct.utils.torch_pipeline.load_torch_ner_model", lambda *a, **k: (silent, silent))
     monkeypatch.setattr("sct.utils.gliner_adapter.GLiNERAdapter._load_gliner", lambda *a: _FakeGLiNERModel())
-    ner = GeneralNER(TextCleanerConfig(gliner_model="fake/gliner", ner_device="cpu", **cfg))
-    return ner.ner_process_detailed("Ann works at Acme in Paris", language="ENGLISH").text
+    return GeneralNER(TextCleanerConfig(gliner_model="fake/gliner", ner_device="cpu", **cfg))
+
+
+def _gliner_output(monkeypatch, **cfg):
+    return _gliner_ner(monkeypatch, **cfg).ner_process_detailed("Ann works at Acme in Paris", language="ENGLISH").text
 
 
 @pytest.mark.parametrize("backend", ["ensemble_onnx", "ensemble_torch"])
@@ -363,6 +366,25 @@ def test_ensemble_user_label_map_wins(monkeypatch, label_map, expected):
 def test_ensemble_keeps_a_label_requested_under_its_long_tag(monkeypatch):
     out = _gliner_output(monkeypatch, ner_backend="ensemble_onnx", positional_tags=("ORGANIZATION", "PER", "LOC"))
     assert out == "<PERSON> works at <ORGANIZATION> in <LOCATION>"
+
+
+@pytest.mark.parametrize("cfg_tags, call_tags, expected", [
+    (("PER", "LOC", "ORG", "MISC"), ("PERSON", "ORGANIZATION", "LOCATION"),
+     "<PERSON> works at <ORGANIZATION> in <LOCATION>. <PERSON> left <LOCATION>, <ORGANIZATION> stayed."),
+    (("PERSON", "ORGANIZATION", "LOCATION"), ("PER", "ORG", "LOC"),
+     "<PERSON> works at <ORGANISATION> in <LOCATION>. <PERSON> left <LOCATION>, <ORGANISATION> stayed."),
+])
+def test_ensemble_picks_short_or_long_tags_per_call(monkeypatch, cfg_tags, call_tags, expected):
+    ner = _gliner_ner(monkeypatch, ner_backend="ensemble_onnx", positional_tags=cfg_tags)
+    text = "Ann works at Acme in Paris. Ann left Paris, Acme stayed."
+    assert ner.ner_process_detailed(text, language="ENGLISH", positional_tags=call_tags).text == expected
+    assert ner.ner_process_batch_detailed([text], ["ENGLISH"], positional_tags=call_tags)[0].text == expected
+
+
+def test_ensemble_leaves_an_uppercase_gliner_label_as_written(monkeypatch):
+    monkeypatch.setitem(_FakeGLiNERModel.words, "PERSON", "Ann")
+    out = _gliner_output(monkeypatch, ner_backend="ensemble_onnx", gliner_labels=("PERSON", "location"))
+    assert out == "Ann works at Acme in <LOCATION>"
 
 
 def test_plain_gliner_backend_keeps_its_default_tokens(monkeypatch):
