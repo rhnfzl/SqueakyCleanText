@@ -27,7 +27,7 @@ class _FakeCleaner:
     def __init__(self, cfg):
         self.cfg = cfg
 
-    def process_batch(self, texts, batch_size=None):
+    def process_batch(self, texts, max_workers=None):
         out = []
         for text in texts:
             result = type("R", (), {})()

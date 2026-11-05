@@ -35,9 +35,15 @@ def _fake_result(**metadata):
 
 
 def test_one_sensitivity_rule():
-    only_findings = _fake_result(findings=["x"])
-    assert is_sensitive_result(only_findings) is True
-    assert public_view(only_findings)["sensitive"] is True
+    entry = {"count": 1, "chars": 4}
+    for metadata, expected in (
+        ({"regex_counts": {"EMAIL": entry}}, True),
+        ({"entity_counts": {"PERSON": entry}}, True),
+        ({"regex_counts": {"YEAR": entry, "HTML": entry}}, False),
+        ({"findings": ["x"]}, False),
+    ):
+        result = _fake_result(**metadata)
+        assert is_sensitive_result(result) is expected and public_view(result)["sensitive"] is expected
     assert set(public_view(_fake_result())) == set(PUBLIC_VIEW_KEYS)
 
 
@@ -134,18 +140,22 @@ def test_cli_writes_no_masked_text_when_token_map_fails(tmp_path):
     assert caught.value.code == 2 and output.getvalue() == "" and not target.exists()
 
 
-def test_cli_refuses_reversible_mode_without_fchmod_before_cleaning(tmp_path, monkeypatch):
-    monkeypatch.delattr(os, "fchmod", raising=False)
+def test_cli_refuses_reversible_mode_off_posix_before_cleaning(tmp_path, monkeypatch, capsys):
+    # Windows on Python 3.13+ has os.fchmod, so its presence must not pass the guard.
+    monkeypatch.setattr(os, "fchmod", lambda *_: None, raising=False)
+    token_map = str(tmp_path / "t.json")
     output = StringIO()
 
-    with pytest.raises(SystemExit) as caught:
+    with monkeypatch.context() as patch, pytest.raises(SystemExit) as caught:
+        patch.setattr(os, "name", "nt")
         clean_main(
-            ["--no-ner", "--replacement-mode", "reversible", "--token-map", str(tmp_path / "t.json")],
+            ["--no-ner", "--replacement-mode", "reversible", "--token-map", token_map],
             stdin=StringIO("Email maria@example.com"),
             stdout=output,
         )
 
     assert caught.value.code == 2 and output.getvalue() == ""
+    assert "POSIX" in capsys.readouterr().err
 
 
 def test_cli_reports_model_load_error_as_usage_error(monkeypatch):

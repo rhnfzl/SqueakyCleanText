@@ -27,6 +27,12 @@ print(result.metadata["findings"])
 print(result.metadata["provenance"])
 ```
 
+`metadata["findings"]` lists every decision. `entity_counts`, `pii_count` and
+`sensitive` count only `placeholder` and `redact` findings, so an entity the
+policy kept, allowed or ignored is not reported as PII. OCR redaction covers a
+region when its text had anything replaced, dates and years included, and leaves
+regions holding only exempted entities visible.
+
 Finding offsets (`start`, `end`) and NER entries in the reversible map are
 document-relative positions in the post-regex text: the text after the regex
 stages replaced URLs, emails, phones and the like. They are not offsets into the

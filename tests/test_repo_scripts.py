@@ -30,8 +30,8 @@ class FakeCleaner:
     def __init__(self):
         self.calls = []
 
-    def process_batch(self, texts, batch_size=None):
-        self.calls.append((list(texts), batch_size))
+    def process_batch(self, texts, max_workers=None):
+        self.calls.append((list(texts), max_workers))
         return [text.upper() for text in texts]
 
 

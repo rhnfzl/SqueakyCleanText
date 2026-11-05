@@ -14,7 +14,7 @@ onnxruntime 1.30/1.31 (CPU) and onnxruntime-gpu 1.29 (CUDA 12). CPU runs were pi
 
 - **Small jobs: any CPU.** One document at a time (`process`) runs at about 4 to 5 docs/s
   (about 200 ms each), on 4 cores or 64. More cores do not help a single document.
-- **Bulk on CPU: use `process_batch` with `batch_size` about 16.** Keep
+- **Bulk on CPU: use `process_batch` with `max_workers` about 16.** Keep
   `ner_batch_size=8` (default) and let ONNX use the cores you give it.
 - **Bulk and speed: use a GPU.** With an RTX 4090, single documents are about 17x faster
   and batches about 4.5x faster than 64 CPU cores.

@@ -1,3 +1,4 @@
+import asyncio
 import threading
 import time
 import warnings
@@ -12,7 +13,7 @@ from sct.utils.normtext import NormaliseText
 from sct.utils.ner import GeneralNER, ModelLoadError
 
 
-def test_process_batch_uses_batch_size_as_concurrency_limit():
+def test_process_batch_uses_max_workers_as_concurrency_limit():
     lock = threading.Lock()
     active = 0
     max_active = 0
@@ -34,7 +35,7 @@ def test_process_batch_uses_batch_size_as_concurrency_limit():
         custom_pipeline_steps=(observe_concurrency,),
     ))
 
-    results = cleaner.process_batch(["one", "two", "three"], batch_size=1)
+    results = cleaner.process_batch(["one", "two", "three"], max_workers=1)
 
     assert [result.lm_text for result in results] == ["one", "two", "three"]
     assert max_active == 1
@@ -187,3 +188,35 @@ def test_gliner_and_presidio_construction_errors(monkeypatch, backend, target, r
 
 def test_protected_key_pattern_stays_the_same():
     assert _KEY.pattern == "\U00100000[\U000F0000-\U0010FFFF]\U00100001"
+
+
+def _plain_cleaner():
+    return TextCleaner(cfg=TextCleanerConfig(
+        check_ner_process=False,
+        check_detect_language=False,
+        check_statistical_model_processing=False,
+    ))
+
+
+def test_process_batch_batch_size_is_a_deprecated_alias():
+    cleaner = _plain_cleaner()
+
+    assert [r.lm_text for r in cleaner.process_batch(["one"], 1)] == ["one"]
+    with pytest.warns(DeprecationWarning, match="max_workers") as caught:
+        assert [r.lm_text for r in cleaner.process_batch(["one"], batch_size=1)] == ["one"]
+    assert caught[0].filename == __file__
+    with pytest.raises(TypeError, match="not both"):
+        cleaner.process_batch(["one"], 1, batch_size=1)
+    with pytest.raises(ValueError, match="max_workers"):
+        cleaner.process_batch(["one"], max_workers=0)
+
+
+def test_aprocess_batch_batch_size_is_a_deprecated_alias():
+    cleaner = _plain_cleaner()
+
+    assert [r.lm_text for r in asyncio.run(cleaner.aprocess_batch(["one"], 1))] == ["one"]
+    assert [r.lm_text for r in asyncio.run(cleaner.aprocess_batch(["one"], max_workers=1))] == ["one"]
+    with pytest.warns(DeprecationWarning, match="max_workers"):
+        assert [r.lm_text for r in asyncio.run(cleaner.aprocess_batch(["one"], batch_size=1))] == ["one"]
+    with pytest.raises(TypeError, match="not both"):
+        asyncio.run(cleaner.aprocess_batch(["one"], 1, batch_size=1))

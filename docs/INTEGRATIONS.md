@@ -58,7 +58,7 @@ if __name__ == "__main__":
     ).run()
 ```
 
-The step counts `pii`, `pii_<TYPE>` and `sensitive` in the DataTrove stats.
+The step counts `pii`, `pii_<TYPE>` and `sensitive` (documents with `pii_count > 0`) in the DataTrove stats.
 
 ## LangChain
 

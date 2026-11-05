@@ -42,6 +42,10 @@ class CustomPatternTimeout(TimeoutError):
 _KEY = re.compile(f'{constants.KEY_OPEN}[\U000F0000-\U0010FFFF]{constants.KEY_CLOSE}')
 
 
+# Without a policy a finding's action is the replacement mode, which conceals the value too.
+_EXEMPT_ACTIONS = frozenset({"keep", "allow", "ignore"})
+
+
 class _DocumentState(NamedTuple):
     """One document on its way from ``_before_ner`` to ``_after_ner``."""
 
@@ -111,6 +115,16 @@ def _renamed_attribute(old: str, new: str) -> property:
         warnings.warn(message, DeprecationWarning, stacklevel=2)
         setattr(self, new, value)
     return property(read, write)
+
+
+def _resolve_max_workers(max_workers: int | None, batch_size: int | None) -> int | None:
+    """*max_workers*, or the value of its deprecated alias *batch_size*."""
+    if batch_size is None:
+        return max_workers
+    if max_workers is not None:
+        raise TypeError("pass max_workers or its deprecated alias batch_size, not both")
+    warnings.warn("batch_size is deprecated; use max_workers", DeprecationWarning, stacklevel=3)
+    return batch_size
 
 
 class TextCleaner:
@@ -570,8 +584,9 @@ class TextCleaner:
         if self.cfg.check_statistical_model_processing:
             stat_text = self._build_stat_text(current_text, language)
 
-        # Value-free counts are always present; entity text only on opt-in below.
-        entity_counts = _entity_counts(findings)
+        # Value-free counts of concealed entities are always present; metadata['findings'], on opt-in
+        # below, also lists what the policy exempted.
+        entity_counts = _entity_counts(f for f in findings if f.action not in _EXEMPT_ACTIONS)
         ner_on = self.GeneralNER is not None
         models = self.GeneralNER.models_for(language) if self.GeneralNER is not None else []
         metadata: ProcessMetadata = {
@@ -606,18 +621,22 @@ class TextCleaner:
 
         return ProcessResult(current_text, stat_text, language, metadata=metadata)
 
-    def process_batch(self, texts: list[str], batch_size: int | None = None) -> list[ProcessResult]:
+    def process_batch(
+        self, texts: list[str], max_workers: int | None = None, *, batch_size: int | None = None,
+    ) -> list[ProcessResult]:
         """Process multiple texts with bounded document concurrency.
 
         Args:
-            batch_size: Maximum number of worker threads (default ``os.cpu_count()``). Documents per NER
+            max_workers: Maximum number of worker threads (default ``os.cpu_count()``). Documents per NER
                 model call is ``cfg.ner_batch_size``.
+            batch_size: Deprecated alias of *max_workers*.
 
         Returns:
             List of ProcessResult (each unpacks as 3-tuple for backward compat).
         """
-        if batch_size is not None and batch_size <= 0:
-            raise ValueError("batch_size must be >= 1")
+        max_workers = _resolve_max_workers(max_workers, batch_size)
+        if max_workers is not None and max_workers <= 0:
+            raise ValueError("max_workers must be >= 1")
         if not texts:
             return []
         if isinstance(texts, str):
@@ -639,13 +658,13 @@ class TextCleaner:
 
         # Parallel processing: ONNX Runtime releases the GIL during C++ inference
         # ops, so threads achieve real concurrency for the NER inference bottleneck.
-        worker_limit = batch_size if batch_size is not None else (os.cpu_count() or 4)
-        max_workers = min(len(to_process), worker_limit)
+        worker_limit = max_workers if max_workers is not None else (os.cpu_count() or 4)
+        workers = min(len(to_process), worker_limit)
 
         def run(fn):
-            if max_workers <= 1:
+            if workers <= 1:
                 return [fn(text) for _, text in to_process]
-            with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            with ThreadPoolExecutor(max_workers=workers) as executor:
                 return list(executor.map(fn, [text for _, text in to_process]))
 
         if self.GeneralNER is not None and self.cfg.ner_batch_size > 1:
@@ -670,7 +689,7 @@ class TextCleaner:
                 [state.language for state in states],
                 anon_maps=[state.anon_map for state in states],
                 before_finalize=restore_synthetic,
-                max_workers=max_workers,
+                max_workers=workers,
                 source_markers=[state.source_markers for state in states],
             )
             for (i, _), state, ner_result in zip(to_process, states, ner_results, strict=True):
@@ -704,14 +723,18 @@ class TextCleaner:
             metadata['classes'] = []
         return metadata
 
-    async def aprocess_batch(self, texts: list[str], batch_size: int | None = None) -> list[ProcessResult]:
+    async def aprocess_batch(
+        self, texts: list[str], max_workers: int | None = None, *, batch_size: int | None = None,
+    ) -> list[ProcessResult]:
         """Async version of process_batch for use with asyncio-based frameworks (FastAPI, aiohttp).
 
         Runs process_batch in a thread-pool executor so it doesn't block the event loop.
-        *batch_size* is the maximum number of worker threads, as in process_batch.
+        *max_workers* is the maximum number of worker threads, as in process_batch; *batch_size* is its
+        deprecated alias.
         """
+        max_workers = _resolve_max_workers(max_workers, batch_size)
         loop = asyncio.get_running_loop()
-        return await loop.run_in_executor(None, self.process_batch, texts, batch_size)
+        return await loop.run_in_executor(None, self.process_batch, texts, max_workers)
 
     def warmup(self, languages: list[str] | None = None) -> None:
         """Pre-load the NER models each language routes to, to avoid first-request latency.

@@ -80,10 +80,8 @@ def _check_reversible_args(parser: argparse.ArgumentParser, args: argparse.Names
         parser.error("--token-map is required for reversible mode")
     if args.json_input:
         parser.error("reversible mode currently supports text input only")
-    # shortcut: Windows on Python 3.13+ has os.fchmod, but it only sets the read-only flag; refuse there too
-    # if the map must be restricted from other accounts.
-    if not hasattr(os, "fchmod"):
-        parser.error("reversible mode needs os.fchmod to restrict the token map, which this platform lacks")
+    if os.name != "posix":
+        parser.error("reversible mode is unavailable here: the token map can only be restricted on POSIX")
 
 
 def main(

@@ -21,7 +21,7 @@ cleaned_chunks = process_rag_chunks(
 A tuple key stays a tuple, with the strings inside it cleaned as keys. `json.dumps` rejects any tuple key.
 
 `findings` on these results stay empty unless the cleaner has `include_entities=True` or a privacy
-policy. `sensitive` and `signals` are always filled: `StructuredResult` and `DataFrameResult` cover every
+policy. `sensitive` (`pii_count > 0`) and `signals` are always filled: `StructuredResult` and `DataFrameResult` cover every
 processed string, and `ProcessedRAGChunk` covers text and metadata (`findings` and `metadata["sct"]` cover
 the text only, `metadata_findings` the metadata). `process_rag_chunks` writes `metadata["sensitive"]` and
 `metadata["sct"]`, replacing any caller keys with those names.

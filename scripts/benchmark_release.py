@@ -207,11 +207,11 @@ def run_batch(
     cleaner = TextCleaner(cfg=TextCleanerConfig(
         ner_batch_size=ner_batch_size, onnx_intra_op_threads=intra_op_threads, **cfg_overrides,
     ))
-    cleaner.process_batch(docs, batch_size=batch_size)
+    cleaner.process_batch(docs, max_workers=batch_size)
     seconds = []
     for _ in range(repeats):
         started_at = time.perf_counter()
-        results = cleaner.process_batch(docs, batch_size=batch_size)
+        results = cleaner.process_batch(docs, max_workers=batch_size)
         seconds.append(time.perf_counter() - started_at)
     output_hash = hashlib.sha256("\0".join(r.lm_text for r in results).encode()).hexdigest()
     return {

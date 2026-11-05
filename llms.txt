@@ -26,13 +26,13 @@ lm_text, stat_text, lang = result  # backward-compatible 3-tuple unpacking
 
 - `TextCleaner(cfg=TextCleanerConfig(...))` — main pipeline class
 - `cleaner.process(text) -> ProcessResult` — process single text (unpacks as 3-tuple)
-- `cleaner.process_batch(texts) -> List[ProcessResult]` — thread-parallel batch
-- `cleaner.aprocess_batch(texts) -> List[ProcessResult]` — async (FastAPI/aiohttp)
+- `cleaner.process_batch(texts, max_workers=None) -> List[ProcessResult]` — thread-parallel batch (`batch_size` is a deprecated alias of `max_workers`)
+- `cleaner.aprocess_batch(texts, max_workers=None) -> List[ProcessResult]` — async (FastAPI/aiohttp)
 - `cleaner.warmup(languages=None)` — pre-load NER models at startup
-- `ProcessResult.metadata` — always a dict: `regex_counts` and `entity_counts` (`{TYPE: {"count", "chars"}}`, value-free), `language_confidence` (float, 1.0 pinned, None unknown), `language_source` (`pinned`/`detected`/`fallback`/`none`), `warnings` (sorted codes: `language_unknown`, `language_fallback`, `language_low_confidence`, `ner_fallback_models`, `cuda_fallback`, `mps_fallback`), `provenance` (`{"backend", "models": [{"key", "id", "revision", "provider"}]}` of the NER models run), plus `anon_map` (reversible mode), `classes` (GLiClass), `findings` (opt-in)
+- `ProcessResult.metadata` — always a dict: `regex_counts` and `entity_counts` (`{TYPE: {"count", "chars"}}`, value-free; policy-exempted entities are not counted), `language_confidence` (float, 1.0 pinned, None unknown), `language_source` (`pinned`/`detected`/`fallback`/`none`), `warnings` (sorted codes: `language_unknown`, `language_fallback`, `language_low_confidence`, `ner_fallback_models`, `cuda_fallback`, `mps_fallback`), `provenance` (`{"backend", "models": [{"key", "id", "revision", "provider"}]}` of the NER models run), plus `anon_map` (reversible mode), `classes` (GLiClass), `findings` (opt-in)
 - `ProcessResult.signals` — value-free view, same keys for every input: `language`, `language_confidence`, `language_source`, `chars`, `pii_count`, `pii_chars`, `pii_share`, `pii_types`, `regex_counts`, `entity_counts`, `sensitive`, `warnings` (adds `ner_off`, `empty_input`), `models`. Never entity text (`sct.signals.public_view`, `merge_views`, `PUBLIC_VIEW_KEYS`)
 - `preset_config(name, **overrides)` / `TextCleanerConfig.from_preset(name, ...)` / `PRESETS` — `"training"` (PII only) or `"sct"` (library defaults)
-- `sct.adapters.is_sensitive_result(result)` — True when any regex replacement or NER finding was counted
+- `sct.adapters.is_sensitive_result(result)` — `signals["sensitive"]`: True when `pii_count > 0`; a date, year, number, currency or HTML tag alone is not sensitive
 - `AnonymizationMap.deanonymize(text)` — restore original text from reversible placeholders
 - `AnonymizationMap.to_dict()` / `.from_dict(data)` — serialization for storage
 - `sct.evaluation.evaluate_pii(examples, predictions, model=...)` — exact-span PII evaluation

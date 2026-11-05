@@ -594,7 +594,7 @@ class TextCleanerTest(unittest.TestCase):
             "Pablo vive en Madrid",
             "Willem woont in Amsterdam",
         ]
-        results = sx.process_batch(texts, batch_size=2)
+        results = sx.process_batch(texts, max_workers=2)
 
         # Check language detection
         languages = [lang for _, _, lang in results]

@@ -40,7 +40,7 @@ def results():
     out = {}
     for mode in MODES:
         cleaner = _cleaner(mode)
-        out[mode] = ([cleaner.process(d) for d in DOCS], cleaner.process_batch(DOCS, batch_size=3))
+        out[mode] = ([cleaner.process(d) for d in DOCS], cleaner.process_batch(DOCS, max_workers=3))
     return out
 
 
@@ -141,7 +141,7 @@ GLUED_TO_NAME = [
 @pytest.mark.parametrize("text, expected", GLUED_TO_NAME)
 def test_reversible_masks_a_run_left_glued_to_an_ner_placeholder(text, expected):
     cleaner = _cleaner("reversible", check_statistical_model_processing=True)
-    for result in (cleaner.process(text), cleaner.process_batch([text], batch_size=1)[0]):
+    for result in (cleaner.process(text), cleaner.process_batch([text], max_workers=1)[0]):
         assert expected in result.lm_text
         assert result.metadata["regex_counts"]["NUMBER"]["count"] == 1
         assert not re.search(r"107683|123-45", result.stat_text)

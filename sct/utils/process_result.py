@@ -41,7 +41,7 @@ class ProcessResult:
     Always present (from ``TextCleaner``; value-free):
         ``source_chars``  — ``len`` of the input text
         ``regex_counts``  — ``{TYPE: {"count": int, "chars": int}}`` per regex replacement
-        ``entity_counts`` — same shape, per NER entity type
+        ``entity_counts`` — same shape, per NER entity type, concealed entities only
         ``language_confidence``, ``language_source``, ``warnings``, ``provenance``
 
     ``.signals`` is the value-free public view of these (see :mod:`sct.signals`).

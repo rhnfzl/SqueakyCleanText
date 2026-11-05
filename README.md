@@ -169,7 +169,7 @@ Every step is a `TextCleanerConfig` field ([docs/CONFIG.md](https://github.com/r
 - `lm_text`: the cleaned text, sentences intact, for LLMs, RAG and training.
 - `stat_text`: lower-cased, without stopwords and punctuation, for classic ML models.
 - `language`: the detected language.
-- `signals`: a value-free view with the same keys for every input: language and confidence, `pii_count`, `pii_share`, `pii_types`, `sensitive`, warnings and the NER models that ran. Safe to log or store next to the text.
+- `signals`: a value-free view with the same keys for every input: language and confidence, `pii_count`, `pii_share`, `pii_types`, `sensitive` (`pii_count > 0`), warnings and the NER models that ran. Safe to log or store next to the text.
 - `metadata`: the same counts, plus raw values only when you ask for them (the reversible map, or `findings` with `include_entities=True`). Keep those out of logs.
 
 `score_record` turns a result into flat `sct_*` columns for filtering and data cards. `ScoreConfig` adds an optional quality score and a MinHash signature. Fields: [docs/API.md](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/API.md), columns: [docs/SCORE.md](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/SCORE.md).

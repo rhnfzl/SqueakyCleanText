@@ -96,7 +96,7 @@ def test_process_batch_same_output_for_any_ner_batch_size():
     for size in (8, 32):
         cleaner = _cleaner(ner_batch_size=size)
         assert [_summary(r) for r in cleaner.process_batch(DOCS)] == expected
-        assert [_summary(r) for r in cleaner.process_batch(DOCS, batch_size=1)] == expected
+        assert [_summary(r) for r in cleaner.process_batch(DOCS, max_workers=1)] == expected
         assert [_summary(cleaner.process(d)) for d in DOCS] == expected
 
 

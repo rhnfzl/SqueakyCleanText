@@ -40,21 +40,13 @@ WARNING_CODES = frozenset({
 
 
 def is_sensitive_result(result: ProcessResult) -> bool:
-    """Return whether processing found an entity or made a regex replacement.
-
-    The one sensitivity rule: ``public_view`` and OCR region selection both use it.
-    """
-    metadata = result.metadata or {}
-    return bool(
-        metadata.get("regex_counts")
-        or metadata.get("entity_counts")
-        or metadata.get("findings")
-    )
+    """Return whether the result holds concealed PII: ``signals["sensitive"]``, the ``public_view`` rule."""
+    return public_view(result)["sensitive"]
 
 
 def public_view(result: ProcessResult) -> Signals:
     """The value-free view of one result; same keys for every input."""
-    metadata = result.metadata
+    metadata = result.metadata or {}
     chars = metadata.get("source_chars", 0)
     regex_counts = {k: dict(v) for k, v in sorted(metadata.get("regex_counts", {}).items())}
     entity_counts = {k: dict(v) for k, v in sorted(metadata.get("entity_counts", {}).items())}
@@ -70,18 +62,19 @@ def public_view(result: ProcessResult) -> Signals:
         warnings.add("ner_off")
     if chars == 0:
         warnings.add("empty_input")
+    pii_count = sum(pii_types.values())
     return {
         "language": result.language,
         "language_confidence": metadata.get("language_confidence"),
         "language_source": metadata.get("language_source", "none"),
         "chars": chars,
-        "pii_count": sum(pii_types.values()),
+        "pii_count": pii_count,
         "pii_chars": pii_chars,
         "pii_share": min(1.0, pii_chars / chars) if chars else 0.0,
         "pii_types": dict(sorted(pii_types.items())),
         "regex_counts": regex_counts,
         "entity_counts": entity_counts,
-        "sensitive": is_sensitive_result(result),
+        "sensitive": pii_count > 0,
         "warnings": sorted(warnings),
         "models": [
             {k: model.get(k) for k in ("key", "id", "revision", "provider")}

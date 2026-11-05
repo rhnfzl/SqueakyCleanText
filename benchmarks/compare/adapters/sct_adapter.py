@@ -110,7 +110,7 @@ def load(config: dict[str, Any]) -> Callable[[list[dict]], list[dict]]:
         out: list = [None] * len(docs)
         for key, indices in groups.items():
             object.__setattr__(model.cfg, "language", key)
-            results = model.process_batch([docs[i]["text"] for i in indices], batch_size=workers)
+            results = model.process_batch([docs[i]["text"] for i in indices], max_workers=workers)
             for i, result in zip(indices, results, strict=True):
                 anon_map = result.metadata.get("anon_map")
                 originals = {e.placeholder: e.original for e in anon_map.entries} if anon_map else {}

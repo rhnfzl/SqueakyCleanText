@@ -93,6 +93,22 @@ def test_overlapping_findings_count_once(fast_cleaner):
     assert (view["pii_count"], view["pii_chars"]) == (1, 10)
 
 
+# --- a replacement mode conceals the value just as a policy's placeholder or redact does ---
+@pytest.mark.parametrize("action, counted", [
+    ("placeholder", True), ("redact", True), ("reversible", True), ("synthetic", True),
+    ("keep", False), ("allow", False), ("ignore", False),
+])
+def test_entity_counts_follow_the_finding_action(fast_cleaner, action, counted):
+    text = "John works here."
+    state = fast_cleaner._before_ner(text)
+    finding = EntityFinding(DetectedEntity("PERSON", 0.9, "John", 0, 4), action, "")
+
+    result = fast_cleaner._after_ner(state, text, (finding,))
+
+    assert bool(result.metadata["entity_counts"]) is counted
+    assert public_view(result)["sensitive"] is counted
+
+
 # --- Lingua confidence is rounded so workers and in-process agree ---
 def test_language_confidence_is_rounded():
     cleaner = TextCleaner(TextCleanerConfig(check_ner_process=False, check_detect_language=True))

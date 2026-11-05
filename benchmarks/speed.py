@@ -23,7 +23,7 @@ def run_batch(cleaner, texts: list[str], workers: int, chunk: int = 64):
     results, seconds = [], 0.0
     for i in range(0, len(texts), chunk):
         started = time.perf_counter()
-        results += cleaner.process_batch(texts[i:i + chunk], batch_size=workers)
+        results += cleaner.process_batch(texts[i:i + chunk], max_workers=workers)
         seconds += time.perf_counter() - started
     return results, seconds
 
@@ -37,7 +37,7 @@ def rates(docs: int, chars: int, seconds: float) -> dict[str, float | None]:
 def measure(cleaner, records: list[dict], workers: int) -> dict[str, Any]:
     """docs/s and chars/s per script (and in total), after a short warmup."""
     texts = [r["text"] for r in records]
-    cleaner.process_batch(texts[:WARMUP_DOCS], batch_size=workers)
+    cleaner.process_batch(texts[:WARMUP_DOCS], max_workers=workers)
     groups: dict[str, list[str]] = {}
     for record in records:
         groups.setdefault(f"{record['lang']} ({dominant_script(record['text'])})", []).append(record["text"])

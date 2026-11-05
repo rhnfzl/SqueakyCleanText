@@ -31,15 +31,15 @@ def _texts(results):
 
 
 def test_batch_documents_get_different_fakes():
-    texts = _texts(_regex_cleaner().process_batch(DOCS, batch_size=4))
+    texts = _texts(_regex_cleaner().process_batch(DOCS, max_workers=4))
     assert len(set(texts)) == len(DOCS)  # 0.7: every thread's first document got the same fakes
 
 
 def test_same_document_same_fakes_across_calls_workers_and_order():
-    expected = _texts(_regex_cleaner().process_batch(DOCS, batch_size=1))
+    expected = _texts(_regex_cleaner().process_batch(DOCS, max_workers=1))
     cleaner = _regex_cleaner()
     assert [cleaner.process(d).lm_text for d in reversed(DOCS)] == expected[::-1]
-    assert _texts(cleaner.process_batch(DOCS, batch_size=4)) == expected
+    assert _texts(cleaner.process_batch(DOCS, max_workers=4)) == expected
     assert _regex_cleaner().process(DOCS[3]).lm_text == expected[3]
 
 
@@ -80,7 +80,7 @@ def test_batched_ner_matches_single_document_processing():
     )
     docs = ["John Smith wrote to anna@example.com.", "Angela Merkel wrote to anna@example.com."]
     cleaner = TextCleaner(cfg)
-    batched = _texts(cleaner.process_batch(docs, batch_size=2))
+    batched = _texts(cleaner.process_batch(docs, max_workers=2))
     assert batched == [cleaner.process(d).lm_text for d in docs]
     assert "John Smith" not in batched[0] and "Angela Merkel" not in batched[1]
     assert batched[0].split()[-1] != batched[1].split()[-1]  # same email, different documents

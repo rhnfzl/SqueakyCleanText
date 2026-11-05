@@ -172,11 +172,12 @@ def test_sensitive_from_entity_counts_not_markers():
 
     # NER output as observed with ONNX models; no model download here.
     found = SimpleNamespace(
+        language=None,
         lm_text="<PERSON>",
         metadata={"regex_counts": {}, "entity_counts": {"PERSON": {"count": 1, "chars": 5}}},
     )
     assert is_sensitive_result(found) is True
-    assert is_sensitive_result(SimpleNamespace(lm_text="<PERSON>", metadata=None)) is False
+    assert is_sensitive_result(SimpleNamespace(language=None, lm_text="<PERSON>", metadata=None)) is False
 
 
 def test_process_json_keys_get_pii_steps_only_by_default():
