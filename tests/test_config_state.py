@@ -140,3 +140,19 @@ def test_legacy_globals_reach_the_fields_the_builder_used_to_skip(monkeypatch):
 def test_ner_models_global_wins_over_the_positional_list(monkeypatch):
     monkeypatch.setattr(config, "NER_MODELS", {"ENGLISH": "en-model", "MULTILINGUAL": "multi-model"})
     assert config._config_from_module_globals().ner_models["ENGLISH"] == "en-model"
+
+
+@pytest.mark.parametrize("kwargs, frozen, label_map", [
+    ({}, ["ner_models", "ner_model_revisions"], None),
+    ({"ner_mode": "pii"}, ["ner_models", "ner_model_revisions"], None),
+    ({"ner_mode": "pii", "gliner_label_map": {"person": "PER"}},
+     ["ner_models", "ner_model_revisions", "gliner_label_map"], {"person": "PER"}),
+])
+def test_pickle_state_keeps_its_shape(kwargs, frozen, label_map):
+    cfg = TextCleanerConfig(check_ner_process=False, **kwargs)
+    state, names = cfg.__getstate__()
+    assert names == frozen
+    assert list(state) == list(vars(cfg))
+    assert state["gliner_label_map"] == label_map
+    assert not any(isinstance(value, MappingProxyType) for value in state.values())
+    assert pickle.loads(pickle.dumps(cfg)) == cfg
