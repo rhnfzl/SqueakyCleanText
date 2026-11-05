@@ -26,53 +26,7 @@ SEPARATOR_VIEW = {**_DIGIT_VIEW, **{ord(ch): ' ' if unicodedata.category(ch) == 
 DATE_SEPARATOR_VIEW = {**SEPARATOR_VIEW, **dict.fromkeys(map(ord, constants.NFKC_DOTS), '.')}
 
 
-class _SourceMatch:
-    """A match found in the view, read from the source text."""
-
-    def __init__(self, match, source):
-        self._match, self._source = match, source
-
-    def group(self, *groups):
-        if groups not in ((), (0,)):
-            raise IndexError("only the whole match is read from the source")
-        return self._source[self._match.start():self._match.end()]
-
-    def start(self, *groups):
-        return self._match.start(*groups)
-
-    def end(self, *groups):
-        return self._match.end(*groups)
-
-    def span(self, *groups):
-        return self._match.span(*groups)
-
-
-class DigitView:
-    """*pattern* matched on the digit view of a text; replacements land in the source text."""
-
-    def __init__(self, pattern: re.Pattern[str], table: Mapping[int, str] = _DIGIT_VIEW):
-        self.pattern, self.table = pattern, table
-
-    def sub(self, repl: str | Callable[[Any], str], text: str) -> str:
-        view = text if text.isascii() else text.translate(self.table)
-        if view == text:
-            return self.pattern.sub(repl, text)
-        out, last = [], 0
-        for match in self.pattern.finditer(view):
-            out.append(text[last:match.start()])
-            out.append(repl(_SourceMatch(match, text)) if callable(repl) else match.expand(repl))
-            last = match.end()
-        out.append(text[last:])
-        return ''.join(out)
-
-
-PHONE_VIEW = DigitView(constants.PHONE_REGEX, SEPARATOR_VIEW)
-PHONE_DIGIT_VIEW = DigitView(constants.PHONE_REGEX)  # fold_styled_characters=False
-IP_VIEW = DigitView(constants.IP_REGEX)
-
-
-
-class _Span(_SourceMatch):
+class _Span:
     """*source*[start:end] read as a match."""
 
     def __init__(self, start, end, source):
@@ -91,6 +45,30 @@ class _Span(_SourceMatch):
 
     def span(self, *groups):
         return self._start, self._end
+
+
+class DigitView:
+    """*pattern* matched on the digit view of a text; replacements land in the source text."""
+
+    def __init__(self, pattern: re.Pattern[str], table: Mapping[int, str] = _DIGIT_VIEW):
+        self.pattern, self.table = pattern, table
+
+    def sub(self, repl: str | Callable[[Any], str], text: str) -> str:
+        view = text if text.isascii() else text.translate(self.table)
+        if view == text:
+            return self.pattern.sub(repl, text)
+        out, last = [], 0
+        for match in self.pattern.finditer(view):
+            out.append(text[last:match.start()])
+            out.append(repl(_Span(*match.span(), text)) if callable(repl) else match.expand(repl))
+            last = match.end()
+        out.append(text[last:])
+        return ''.join(out)
+
+
+PHONE_VIEW = DigitView(constants.PHONE_REGEX, SEPARATOR_VIEW)
+PHONE_DIGIT_VIEW = DigitView(constants.PHONE_REGEX)  # fold_styled_characters=False
+IP_VIEW = DigitView(constants.IP_REGEX)
 
 
 class ChecksumView:
