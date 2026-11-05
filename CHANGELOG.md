@@ -38,6 +38,10 @@ Heads-up: reversible output changes, and streaming and MCP now refuse reversible
 - MCP `detail='full'` adds the warning `findings_not_collected`, and its `outputSchema` describes the `signals` keys.
 
 ### Fixed
+- With `ner_device=None`, GLiNER and Presidio backends no longer crash at load when `onnxruntime-gpu` is installed but no GPU is usable, for example with `CUDA_VISIBLE_DEVICES` empty. GLiNER running in torch uses CPU, SCT logs a warning, `cuda_fallback` is set and provenance shows `cpu`. GLiNER in ONNX mode gets no such warning, and ONNX models still try CUDA first. An explicit `ner_device='cuda'` still fails to load.
+- With `ner_device=None`, GLiNER and Presidio backends use the GPU when torch can, even with the CPU `onnxruntime` package. They used to stay on CPU without saying so. GLiNER in ONNX mode is unchanged.
+- With `ner_device=None`, a `cuda_device_id` that torch cannot see falls back to CPU with a warning instead of failing at load.
+- `docs/PERFORMANCE.md` no longer claims a CUDA version for the `onnxruntime-gpu` 1.29 benchmark run, because the build was not recorded. It adds notes on older NVIDIA drivers and on GPU memory use on shared GPUs.
 - Synthetic mode gives each type a fake of its own kind, including Presidio's types: a company stays a company, a date stays a date, and a number stays a number. A type with no fake generator, such as your own label, is written as `<TYPE>` instead of a person name. A fake no longer contains the original value as a whole word.
 - `presidio_gliner` no longer masks inside SCT's own tags, so `<EMAIL>` stays `<EMAIL>` and is not counted as a finding. Text outside a tag and tag-shaped text from your source are still masked.
 - Without Faker, synthetic mode raises one clear `ImportError` naming `squeakycleantext[synthetic]`.

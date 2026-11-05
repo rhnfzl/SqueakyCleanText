@@ -313,6 +313,46 @@ def test_auto_presidio_follows_torch_not_the_provider_list(monkeypatch, gpus, ma
     assert ner.provenance["GLINER"]["provider"] == map_location
 
 
+def _cpu_onnx_runtime_with_a_gpu(monkeypatch):
+    _torch_sees(monkeypatch, 1)
+    monkeypatch.setattr(ort, "get_available_providers", lambda: [CPU])
+
+
+def test_auto_gliner_uses_the_gpu_with_a_cpu_onnx_runtime(monkeypatch):
+    _cpu_onnx_runtime_with_a_gpu(monkeypatch)
+    _fake_gliner(monkeypatch)
+    ner = GeneralNER(TextCleanerConfig(ner_backend="gliner", gliner_model="m"))
+    assert ner._gliner_pipe.model.moved == "cuda:0"
+    assert ner.provenance["GLINER"]["provider"] == "cuda:0"
+
+
+def test_auto_presidio_uses_the_gpu_with_a_cpu_onnx_runtime(monkeypatch):
+    _cpu_onnx_runtime_with_a_gpu(monkeypatch)
+    seen = {}
+    _fake_presidio(monkeypatch, seen)
+    GeneralNER(TextCleanerConfig(ner_backend="presidio_gliner", gliner_model="m"))
+    assert seen["map_location"] == "cuda:0"
+
+
+def test_auto_ensemble_onnx_splits_devices_with_a_cpu_onnx_runtime(monkeypatch):
+    _cpu_onnx_runtime_with_a_gpu(monkeypatch)
+    _fake_gliner(monkeypatch)
+    seen = _fake_onnx_loader(monkeypatch)
+    ner = GeneralNER(TextCleanerConfig(ner_backend="ensemble_onnx", gliner_model="m",
+                                       ner_models={"ENGLISH": "a", "MULTILINGUAL": "b"}))
+    assert seen == ["cpu", "cpu"]
+    assert ner._gliner_pipe.model.moved == "cuda:0"
+    assert ner.provenance["GLINER"]["provider"] == "cuda:0"
+
+
+def test_auto_gliner_in_onnx_mode_stays_off_the_gpu_with_a_cpu_onnx_runtime(monkeypatch):
+    _cpu_onnx_runtime_with_a_gpu(monkeypatch)
+    _fake_gliner(monkeypatch, has_onnx=True)
+    ner = GeneralNER(TextCleanerConfig(ner_mode="pii"))
+    assert ner._torch_device == "cpu"
+    assert ner.provenance["GLINER"]["provider"] == "onnx"
+
+
 def test_auto_ensemble_onnx_keeps_trying_cuda_for_onnx_only(monkeypatch):
     _torch_sees(monkeypatch, 0)
     _fake_gliner(monkeypatch)

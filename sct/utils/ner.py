@@ -178,10 +178,13 @@ class GeneralNER:
             self.device = 'cuda' if 'CUDAExecutionProvider' in ort.get_available_providers() else 'cpu'
         # Torch and GLiNER take an indexed device string; ONNX gets the index as a provider option.
         self._torch_device = f"cuda:{cfg.cuda_device_id}" if self.device == 'cuda' else self.device
-        # The provider list says what ONNX Runtime was built with, not that torch can use a GPU.
-        if (not cfg.ner_device and self.device == 'cuda' and ner_backend in GLINER_BACKENDS
-                and not _torch_cuda_usable(cfg.cuda_device_id)):
-            self._torch_device = 'cpu'
+        # The provider list says what ONNX Runtime was built with, not whether torch can use a GPU,
+        # so GLiNER in torch follows torch: down to CPU without a usable GPU, up to CUDA with one.
+        if not cfg.ner_device and ner_backend in GLINER_BACKENDS:
+            if not _torch_cuda_usable(cfg.cuda_device_id):
+                self._torch_device = 'cpu'
+            elif not cfg.gliner_onnx:
+                self._torch_device = f"cuda:{cfg.cuda_device_id}"
         # 'mps' (Apple GPU) moves torch and GLiNER only; ONNX models stay on CPU.
         if self.device == 'mps' and not _mps_available():
             logger.warning("NER runs on CPU: Apple GPU (mps) was requested but torch has no MPS backend")

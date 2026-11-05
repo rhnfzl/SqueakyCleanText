@@ -54,7 +54,8 @@ If CUDA cannot be loaded, ONNX Runtime runs on CPU. SCT logs a warning
 ("runs on CPU: CUDA was requested") and adds `cuda_fallback` to `metadata['warnings']` of
 every result. `metadata['provenance']['models']` names the provider each model ran on.
 
-With `ner_device=None`, torch and GLiNER models also run on CPU when torch cannot use the GPU, for
+With `ner_device=None`, GLiNER in torch follows torch: it uses the GPU when torch can, even with the
+CPU `onnxruntime` package. Torch and GLiNER models also run on CPU when torch cannot use the GPU, for
 example with `CUDA_VISIBLE_DEVICES` empty. With `ner_backend` `gliner`, `ensemble_onnx` or
 `presidio_gliner`, if ONNX Runtime has CUDA and GLiNER runs in torch, SCT logs a warning and adds
 `cuda_fallback`. GLiNER in ONNX mode (`gliner_onnx=True`, as in `ner_mode="pii"`) does not depend on
