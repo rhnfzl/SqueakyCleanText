@@ -145,3 +145,27 @@ def test_reversible_mode_rejects_unmapped_fuzzy_date_replacement():
             replacement_mode="reversible",
             check_fuzzy_replace_dates=True,
         )
+
+
+def _no_ner_cleaner():
+    return TextCleaner(cfg=TextCleanerConfig(
+        check_ner_process=False,
+        check_detect_language=False,
+        check_statistical_model_processing=False,
+    ))
+
+
+def test_process_batch_rejects_plain_str_but_keeps_empty():
+    cleaner = _no_ner_cleaner()
+
+    with pytest.raises(ValueError, match="list of strings"):
+        cleaner.process_batch("text")
+    assert cleaner.process_batch("") == []
+
+
+def test_blank_input_has_classes_key_when_classifying():
+    cleaner = _no_ner_cleaner()
+    assert "classes" not in cleaner.process("  ").metadata
+
+    cleaner._gliclass = object()
+    assert cleaner.process("  ").metadata["classes"] == []

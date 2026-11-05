@@ -119,3 +119,24 @@ def test_report_cli_k_anonymity_distinct_types(tmp_path, a, b):
                             "--out", str(out)]) == 0
     k = json.loads(out.read_text())["k_anonymity"]
     assert k["minimum_k"] == 1 and k["at_risk_records"] == 2
+
+
+def test_report_cli_usage_errors_instead_of_tracebacks(tmp_path, monkeypatch):
+    monkeypatch.setattr(report_cli, "TextCleaner", _FakeCleaner)
+    source, out = str(_jsonl(tmp_path)), str(tmp_path / "r.json")
+
+    for args in (
+        [source, "--no-ner", "--quality-model", str(tmp_path / "missing"), "--out", out],
+        [source, "--no-ner", "--out", "/dev/null/x.json"],
+    ):
+        with pytest.raises(SystemExit) as exit_info:
+            report_cli.main(args)
+        assert exit_info.value.code == 2
+
+    def bad_scores(*_args):
+        raise ValueError("wrong number of scores")
+
+    monkeypatch.setattr(report_cli, "score_records", bad_scores)
+    with pytest.raises(SystemExit) as exit_info:
+        report_cli.main([source, "--no-ner", "--out", out])
+    assert exit_info.value.code == 2

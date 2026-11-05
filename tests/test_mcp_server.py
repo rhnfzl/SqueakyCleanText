@@ -12,6 +12,8 @@ from sct.mcp_server import (
     summarize,
 )
 from sct.privacy import DetectedEntity, EntityFinding
+from sct.sct import CustomPatternTimeout
+from sct.utils.ner import ModelLoadError
 from sct.utils.process_result import ProcessResult
 from tests.helpers import client_call
 import asyncio
@@ -172,6 +174,13 @@ def test_bad_max_bytes_rejected():
         create_mcp_server(_cleaner(), max_bytes=-1)
 
 
+def test_non_numeric_max_bytes_names_the_setting(monkeypatch):
+    pytest.importorskip("fastmcp")
+    monkeypatch.setenv("SCT_MCP_MAX_BYTES", "1MB")
+    with pytest.raises(ValueError, match="SCT_MCP_MAX_BYTES must be a whole number"):
+        create_mcp_server(_cleaner())
+
+
 def test_tools_declare_output_schema_and_annotations():
     pytest.importorskip("fastmcp")
 
@@ -215,6 +224,37 @@ def test_tool_calls_return_structured_content_and_tool_errors():
 
     with pytest.raises(FastToolError, match="not configured for PII mode"):
         client_call(server, pii)
+
+
+@pytest.mark.parametrize("error, match", [
+    (ModelLoadError("no weights"), "no weights. Install the extra it names"),
+    (ImportError("needs gliner"), "needs gliner. Install the extra it names"),
+    (CustomPatternTimeout("ticket", 1.0), r"custom_patterns\['ticket'\]"),
+])
+def test_cleaner_failures_render_as_tool_errors(monkeypatch, error, match):
+    pytest.importorskip("fastmcp")
+    from fastmcp.exceptions import ToolError as FastToolError
+    import sct.mcp_server as mcp_module
+
+    def fail(*_args, **_kwargs):
+        raise error
+
+    async def clean_text(client):
+        return await client.call_tool("clean_text", {"text": "hello there"})
+
+    async def clean_json(client):
+        return await client.call_tool("clean_json", {"value": "hello there"})
+
+    cleaner = _cleaner()
+    monkeypatch.setattr(cleaner, "process", fail)
+    for call in (clean_text, clean_json):
+        with pytest.raises(FastToolError, match=match):
+            client_call(create_mcp_server(cleaner), call)
+
+    # A failure while building the cleaner, on first use.
+    monkeypatch.setattr(mcp_module, "TextCleaner", fail)
+    with pytest.raises(FastToolError, match=match):
+        client_call(create_mcp_server(), clean_text)
 
 
 def test_preset_picks_the_built_in_cleaner_config(monkeypatch):

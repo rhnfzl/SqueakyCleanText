@@ -100,7 +100,7 @@ sct-report data.jsonl --text-column text --preset training \
     --out report.json [--card card.md] [--scores scores.jsonl]
 ```
 
-- Input: `.jsonl`, or `.parquet` with `pyarrow` installed.
+- Input: `.jsonl`, or `.parquet` with the `[parquet]` extra (`pyarrow`).
 - `report.json`: input file name, preset, the data card (`summary`: counts,
   language distribution, records per PII type, PII share histogram, warnings,
   NER model provenance, SCT version), plus `quality`, `minhash` and

@@ -17,7 +17,7 @@ Cleans one text. It runs `process_batch([text])` and returns its one result. A
 Processes multiple texts using thread-parallel execution. Each result follows the same format as `process()`.
 `batch_size` is the maximum number of worker threads (default `os.cpu_count()`; it must be >= 1).
 Empty or whitespace-only input returns `ProcessResult("", "", None)` with the `empty_input` warning,
-and a non-string input raises `ValueError`. With NER on and `ner_batch_size > 1`, the steps before
+and a non-string item or a non-empty plain `str` for `texts` raises `ValueError`. With NER on and `ner_batch_size > 1`, the steps before
 NER run per document in threads, then one NER call batches the chunks of all documents.
 
 ### `aprocess_batch(texts: List[str], batch_size: Optional[int] = None) -> List[ProcessResult]`

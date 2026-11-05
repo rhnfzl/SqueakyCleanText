@@ -15,7 +15,7 @@ from sct.signals import Signals, is_sensitive_result, merge_views
 
 
 def _no_signals() -> Signals:
-    return cast(Signals, {})
+    return merge_views(())
 
 
 @dataclass(frozen=True)
@@ -137,7 +137,8 @@ def process_json(cleaner: TextCleaner, value: Any) -> StructuredResult:
                     processed_key = key
                 if processed_key in processed:
                     raise _DuplicateKeyError(
-                        "Cleaning JSON keys produced a duplicate key"
+                        "Cleaning JSON keys produced a duplicate key. "
+                        "Pass a JSON value whose keys stay unique after cleaning."
                     )
                 processed[processed_key] = visit(
                     child,

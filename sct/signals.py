@@ -39,7 +39,7 @@ WARNING_CODES = frozenset({
 })
 
 
-def is_sensitive_result(result: Any) -> bool:
+def is_sensitive_result(result: ProcessResult) -> bool:
     """Return whether processing found an entity or made a regex replacement.
 
     The one sensitivity rule: ``public_view`` and OCR region selection both use it.
@@ -91,7 +91,7 @@ def public_view(result: ProcessResult) -> Signals:
 
 
 def merge_views(views: Iterable[Signals]) -> Signals:
-    """Merge leaf views (e.g. every string of a JSON value) into one view."""
+    """Merge leaf views (e.g. every string of a JSON value) into one view; ``ner_off`` stays only if every leaf has it."""
     leaves: list[Any] = list(views)
     if not leaves:
         return public_view(ProcessResult("", None, None))
@@ -128,6 +128,10 @@ def merge_views(views: Iterable[Signals]) -> Signals:
     merged["pii_types"] = dict(sorted(types.items()))
     merged["pii_share"] = min(1.0, merged["pii_chars"] / merged["chars"]) if merged["chars"] else 0.0
     merged["sensitive"] = any(v["sensitive"] for v in leaves)
-    merged["warnings"] = sorted({w for v in leaves for w in v["warnings"]})
+    warnings = {w for v in leaves for w in v["warnings"]}
+    # A JSON key view runs with NER off by design, so one such leaf says nothing about the values.
+    if not all("ner_off" in v["warnings"] for v in leaves):
+        warnings.discard("ner_off")
+    merged["warnings"] = sorted(warnings)
     merged["models"] = list({m["key"]: m for v in leaves for m in v["models"]}.values())
     return cast(Signals, merged)

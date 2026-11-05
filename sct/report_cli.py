@@ -44,7 +44,7 @@ def _read_rows(path: Path, parser: argparse.ArgumentParser) -> list[dict[str, An
         try:
             import pyarrow.parquet as pq
         except ImportError:
-            parser.error("Parquet input needs pyarrow: pip install pyarrow")
+            parser.error("Parquet input needs pyarrow: pip install squeakycleantext[parquet]")
         try:
             return pq.read_table(path).to_pylist()
         except (OSError, ValueError) as exc:
@@ -119,12 +119,15 @@ def main(argv: Sequence[str] | None = None) -> int:
         quality_model=args.quality_model,
         minhash=args.minhash,
     )
+    # onnxruntime's NoSuchFile for a missing model is no OSError, so the handler below misses it.
+    if args.quality_model and not Path(args.quality_model, "model.onnx").is_file():
+        parser.error(f"no model.onnx in --quality-model folder {args.quality_model}")
     overrides = {"check_ner_process": False} if args.no_ner else {}
     try:
         cleaner = TextCleaner(cfg=preset_config(args.preset, **overrides))
         results = cleaner.process_batch(texts)
         scored = score_records(results, texts, config)
-    except (ImportError, ModelLoadError) as exc:
+    except (ImportError, ModelLoadError, OSError, ValueError) as exc:
         parser.error(str(exc))
     models = [m for result in results for m in result.signals["models"]]
 
@@ -147,13 +150,16 @@ def main(argv: Sequence[str] | None = None) -> int:
     if args.quasi_identifiers:
         report["k_anonymity"] = _k_anonymity(rows, args.quasi_identifiers, args.k, parser)
 
-    _write(args.out, json.dumps(report, indent=2, ensure_ascii=False) + "\n")
-    if args.card:
-        _write(args.card, render_data_card(report["summary"]))
-    if args.scores:
-        _write(args.scores, "".join(
-            json.dumps(row, ensure_ascii=False) + "\n" for row in scored
-        ))
+    try:
+        _write(args.out, json.dumps(report, indent=2, ensure_ascii=False) + "\n")
+        if args.card:
+            _write(args.card, render_data_card(report["summary"]))
+        if args.scores:
+            _write(args.scores, "".join(
+                json.dumps(row, ensure_ascii=False) + "\n" for row in scored
+            ))
+    except OSError as exc:
+        parser.error(f"cannot write output: {exc}")
     return 0
 
 

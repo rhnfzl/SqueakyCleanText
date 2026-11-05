@@ -151,7 +151,8 @@ class TextCleaner:
             token_store: Reversible mode saves each map here, and metadata has anon_map_reference
                 in place of anon_map.
             include_entities: Add findings, which hold entity text, to metadata.
-            metrics_callback: Called with value-free ProcessingMetrics after each document.
+            metrics_callback: Called with value-free ProcessingMetrics after each non-blank document; empty or
+                whitespace input runs nothing and does not call it.
         """
         self.cfg = cfg or _config_from_module_globals()
         names = constants.LEGACY_TYPE_NAMES if self.cfg.legacy_type_names else {}
@@ -618,6 +619,8 @@ class TextCleaner:
             raise ValueError("batch_size must be >= 1")
         if not texts:
             return []
+        if isinstance(texts, str):
+            raise ValueError("texts must be a list of strings; use process() for one text")
 
         results: list[ProcessResult | None] = [None] * len(texts)
         to_process = []
@@ -696,6 +699,8 @@ class TextCleaner:
                 metadata['anon_map_reference'] = self._token_store.save(AnonymizationMap())
             else:
                 metadata['anon_map'] = AnonymizationMap()
+        if self._gliclass is not None:
+            metadata['classes'] = []
         return metadata
 
     async def aprocess_batch(self, texts: list[str], batch_size: int | None = None) -> list[ProcessResult]:

@@ -3,10 +3,13 @@ import pytest
 from sct import TextCleaner, TextCleanerConfig
 from sct.adapters import (
     RAGChunk,
+    StructuredResult,
     process_dataframe,
     process_json,
     process_rag_chunks,
 )
+from sct.signals import PUBLIC_VIEW_KEYS
+from sct.utils.process_result import ProcessResult
 
 
 def _regex_cleaner():
@@ -150,3 +153,35 @@ def test_process_json_key_cleaning_full_and_off():
     assert off.value == {"to maria@example.com": ""}
     with pytest.raises(ValueError, match="json_key_cleaning"):
         TextCleanerConfig(json_key_cleaning="raw")
+
+
+class _StubNerCleaner:
+    """Reports *backend* for values; its key view has NER off, as the real cleaner's does."""
+
+    cfg = TextCleanerConfig(check_ner_process=False)
+
+    def __init__(self, backend):
+        self.backend = backend
+
+    def _with_config(self, cfg):
+        return _StubNerCleaner(None)
+
+    def process(self, text):
+        return ProcessResult(text, None, None, metadata={
+            "source_chars": len(text), "provenance": {"backend": self.backend},
+        })
+
+
+def test_process_json_key_view_does_not_report_ner_off():
+    on = process_json(_StubNerCleaner("onnx"), {"k": "some text"})
+    assert "ner_off" not in on.signals["warnings"]
+
+    off = process_json(_StubNerCleaner(None), {"k": "some text"})
+    assert "ner_off" in off.signals["warnings"]
+
+
+def test_structured_result_default_signals_has_every_key():
+    signals = StructuredResult(1, (), False).signals
+
+    assert signals["sensitive"] is False
+    assert tuple(signals) == PUBLIC_VIEW_KEYS

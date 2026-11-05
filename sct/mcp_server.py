@@ -17,13 +17,15 @@ Server settings come from the environment only:
 import os
 import stat
 import threading
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
+from contextlib import contextmanager
 from typing import TYPE_CHECKING, Any, Literal, NotRequired, TypedDict, cast
 
-from sct.adapters import _DuplicateKeyError, process_json
+from sct.adapters import process_json
 from sct.presets import preset_config
-from sct.sct import TextCleaner
+from sct.sct import CustomPatternTimeout, TextCleaner
 from sct.signals import Signals, public_view
+from sct.utils.ner import ModelLoadError
 
 if TYPE_CHECKING:
     from fastmcp.exceptions import ToolError
@@ -137,8 +139,6 @@ def sanitize_json(
     """Clean every string in a JSON value; key findings use the ``@key`` index path."""
     try:
         result = process_json(cleaner, value)
-    except _DuplicateKeyError as exc:
-        raise ToolError(f"{exc}. Pass a JSON value whose keys stay unique after cleaning.") from None
     except ValueError as exc:
         raise ToolError(str(exc)) from None
     signals = result.signals
@@ -231,7 +231,10 @@ def _server_settings(root: str | None, max_bytes: int | None, preset: str | None
     if root is not None and not os.path.isdir(root):
         raise ValueError("SCT_MCP_ROOT must be an existing directory")
     if max_bytes is None:
-        max_bytes = int(os.environ.get("SCT_MCP_MAX_BYTES") or DEFAULT_MAX_BYTES)
+        try:
+            max_bytes = int(os.environ.get("SCT_MCP_MAX_BYTES") or DEFAULT_MAX_BYTES)
+        except ValueError as exc:
+            raise ValueError("SCT_MCP_MAX_BYTES must be a whole number") from exc
     if max_bytes < 0:
         raise ValueError("SCT_MCP_MAX_BYTES must be zero or more")
     preset = preset or os.environ.get("SCT_MCP_PRESET") or "sct"
@@ -262,6 +265,17 @@ def _cleaner_getter(cleaner: TextCleaner | None, preset: str) -> Callable[[bool]
                     )
         return cleaners[pii]
     return get_cleaner
+
+
+@contextmanager
+def _tool_errors() -> Iterator[None]:
+    """Turn the failures the cleaner documents into tool errors the caller can act on."""
+    try:
+        yield
+    except (ImportError, ModelLoadError) as exc:
+        raise ToolError(f"{exc}. Install the extra it names or check the Hugging Face connection.") from None
+    except CustomPatternTimeout as exc:
+        raise ToolError(str(exc)) from None
 
 
 def create_mcp_server(
@@ -313,7 +327,8 @@ def create_mcp_server(
             if root is None:
                 raise ToolError("path input is off. Set SCT_MCP_ROOT to a folder to allow it, or pass text.")
             text = read_under_root(root, path, max_bytes)
-        return sanitize_text(get_cleaner(pii), cast(str, text), detail)
+        with _tool_errors():
+            return sanitize_text(get_cleaner(pii), cast(str, text), detail)
 
     @server.tool(title="Clean JSON", annotations={**_ANNOTATIONS, "title": "Clean JSON"})
     def clean_json(
@@ -322,7 +337,8 @@ def create_mcp_server(
         detail: Literal["concise", "full"] = "concise",
     ) -> JsonOutput:
         """Clean every string (keys included) in a JSON value and return value-free signals."""
-        return sanitize_json(get_cleaner(pii), value, detail)
+        with _tool_errors():
+            return sanitize_json(get_cleaner(pii), value, detail)
 
     return server
 

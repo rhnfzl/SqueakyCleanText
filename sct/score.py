@@ -181,7 +181,7 @@ def score_records(
         qualities = list(scorer(list(originals))) if originals else []
     b_on = quality_on or config.minhash
     rows = []
-    for result, q in zip(results, qualities):
+    for result, q in zip(results, qualities, strict=True):
         row = score_record(result, minhash=config if config.minhash else None)
         if b_on:
             row["sct_quality"] = None if q is None else float(q)

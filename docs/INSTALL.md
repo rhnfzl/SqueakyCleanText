@@ -27,6 +27,7 @@ The base install uses **ONNX Runtime** for NER inference - no PyTorch or Transfo
 | LangChain | `pip install SqueakyCleanText[langchain]` | LangChain document transformer |
 | Haystack | `pip install SqueakyCleanText[haystack]` | Haystack document cleaner component |
 | Score | `pip install SqueakyCleanText[score]` | MinHash signatures for score columns and `sct-report` ([docs/SCORE.md](SCORE.md)) |
+| Parquet | `pip install SqueakyCleanText[parquet]` | `.parquet` input for `sct-report` ([pyarrow](https://arrow.apache.org/docs/python/)) |
 | OCR | `pip install SqueakyCleanText[ocr]` | Pillow image redaction and Tesseract OCR adapter |
 | All NER | `pip install SqueakyCleanText[all-ner]` | PyTorch, GLiNER and GLiNER2 backends combined (`presidio_gliner` needs `[presidio]` as well) |
 | Development | `pip install SqueakyCleanText[dev]` | Testing and linting tools |

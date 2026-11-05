@@ -4347,6 +4347,9 @@ ocr = [
     { name = "pillow" },
     { name = "pytesseract" },
 ]
+parquet = [
+    { name = "pyarrow" },
+]
 presidio = [
     { name = "gliner" },
     { name = "presidio-analyzer" },
@@ -4396,6 +4399,7 @@ requires-dist = [
     { name = "pillow", marker = "extra == 'ocr'", specifier = ">=12.3.0" },
     { name = "presidio-analyzer", marker = "extra == 'presidio'", specifier = ">=2.2.360" },
     { name = "presidio-anonymizer", specifier = ">=2.2.360" },
+    { name = "pyarrow", marker = "extra == 'parquet'", specifier = ">=17" },
     { name = "pytesseract", marker = "extra == 'ocr'", specifier = ">=0.3.13" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.3" },
     { name = "pytest-cov", marker = "extra == 'test'", specifier = ">=6.0" },
@@ -4411,7 +4415,7 @@ requires-dist = [
     { name = "transformers", marker = "extra == 'torch'", specifier = ">=5.0" },
     { name = "unidecode", specifier = ">=1.4" },
 ]
-provides-extras = ["gpu", "fuzzy", "torch", "gliner", "gliner2", "synthetic", "presidio", "classify", "all-ner", "quantize", "dev", "test", "mcp", "score", "datasets", "datatrove", "langchain", "haystack", "ocr"]
+provides-extras = ["gpu", "fuzzy", "torch", "gliner", "gliner2", "synthetic", "presidio", "classify", "all-ner", "quantize", "dev", "test", "mcp", "score", "parquet", "datasets", "datatrove", "langchain", "haystack", "ocr"]
 
 [[package]]
 name = "srsly"

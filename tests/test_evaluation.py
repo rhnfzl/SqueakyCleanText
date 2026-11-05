@@ -3,7 +3,13 @@ import sys
 
 import pytest
 
-from sct.evaluation import EntitySpan, EvaluationExample, evaluate_pii
+from sct.evaluation import (
+    EntitySpan,
+    EvaluationExample,
+    evaluate_pii,
+    load_evaluation_jsonl,
+    load_predictions_jsonl,
+)
 from scripts.evaluate_pii import main as evaluate_pii_main
 
 
@@ -127,3 +133,19 @@ def test_evaluate_pii_rejects_predictions_for_unknown_documents():
             {"unknown": (EntitySpan("PERSON", 0, 2),)},
             model="candidate",
         )
+
+
+@pytest.mark.parametrize("load, good", [
+    (load_evaluation_jsonl, {"id": "a", "text": "t", "entities": [], "language": "en", "domain": "d"}),
+    (load_predictions_jsonl, {"id": "a", "entities": []}),
+])
+def test_loaders_name_the_bad_line(tmp_path, load, good):
+    path = tmp_path / "data.jsonl"
+
+    path.write_text(json.dumps(good) + "\n{not json\n")
+    with pytest.raises(json.JSONDecodeError, match="line 2"):
+        load(path)
+
+    path.write_text(json.dumps(good) + '\n{"id": "b"}\n')
+    with pytest.raises(KeyError, match="line 2.*missing field"):
+        load(path)
