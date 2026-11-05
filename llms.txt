@@ -39,7 +39,7 @@ lm_text, stat_text, lang = result  # backward-compatible 3-tuple unpacking
 - `EvaluationReport` — overall metrics plus label, language, domain, and slice metrics
 - `PrivacyPolicy` / `EntityRule` — versioned entity actions and score thresholds
 - `TokenStore` — external storage boundary for reversible token maps
-- `process_json` / `process_dataframe` / `process_rag_chunks` — boundary adapters (`process_json` also walks tuples and any `Mapping`, returned as lists and dicts)
+- `process_json` / `process_dataframe` / `process_rag_chunks` — boundary adapters (`process_json` also walks tuples and any `Mapping`, returned as lists and dicts; strings inside a tuple key are cleaned and the key stays a tuple)
 - `BufferedStreamingRedactor` / `WindowedStreamingRedactor` — streaming interfaces
 - `redact_image` / `TesseractOCRProvider` — optional OCR image redaction
 - `assess_reidentification_risk` — corpus k-anonymity summary

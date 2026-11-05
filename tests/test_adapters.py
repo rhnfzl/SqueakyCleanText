@@ -1,4 +1,5 @@
 import json
+from dataclasses import replace
 from types import MappingProxyType
 
 import pytest
@@ -56,6 +57,31 @@ def test_process_json_masks_tuples_and_mappings():
     assert type(result.value) is dict and type(result.value["nested"]) is dict
     assert result.signals["pii_types"] == {"EMAIL": 3, "PHONE": 1} and result.sensitive
     json.dumps(result.value)
+
+
+def test_process_json_masks_strings_in_tuple_keys():
+    source = {("maria@example.com", 1, ("Call +1-202-555-0147",)): "plain", (1, 2): 3}
+
+    result = process_json(_regex_cleaner(), source)
+
+    assert result.value[("<EMAIL>", 1, ("Call <PHONE>",))]
+    assert result.value[(1, 2)] == 3
+    assert result.signals["pii_types"] == {"EMAIL": 1, "PHONE": 1} and result.sensitive
+
+
+def test_process_json_tuple_keys_follow_key_mode_and_uniqueness():
+    source = {("maria@example.com", 1): 1}
+    off = TextCleaner(cfg=replace(_regex_cleaner().cfg, json_key_cleaning="off"))
+    assert process_json(off, source).value == source
+
+    with pytest.raises(ValueError, match="duplicate key"):
+        process_json(_regex_cleaner(), {("a@example.com",): 1, ("b@example.com",): 2})
+
+
+def test_process_rag_chunks_masks_tuple_metadata_keys():
+    chunk = RAGChunk(id="1", text="plain text", metadata={("maria@example.com",): 1})
+    processed = process_rag_chunks(_regex_cleaner(), [chunk])[0]
+    assert processed.metadata[("<EMAIL>",)] == 1 and processed.sensitive
 
 
 def test_process_rag_chunks_masks_tuple_metadata():

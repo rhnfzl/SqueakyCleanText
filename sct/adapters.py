@@ -99,7 +99,8 @@ def _pii_only_cleaner(cleaner: TextCleaner, ner: bool = True) -> TextCleaner:
 def process_json(cleaner: TextCleaner, value: Any) -> StructuredResult:
     """Process every string in a JSON-compatible value.
 
-    Tuples come back as lists and any ``Mapping`` as a dict.
+    Tuples come back as lists and any ``Mapping`` as a dict. A tuple key stays a
+    tuple, with the strings inside it cleaned as keys, since a list cannot be a key.
 
     Keys follow ``cfg.json_key_cleaning``: ``'pii'`` (default) replaces regex
     PII only (emails, phones, URLs...), so short keys such as ``"k"`` and
@@ -113,8 +114,17 @@ def process_json(cleaner: TextCleaner, value: Any) -> StructuredResult:
     key_mode = cleaner.cfg.json_key_cleaning
     key_cleaner: TextCleaner | None = None
 
-    def visit(item: Any, path: tuple[Hashable, ...], text_cleaner: TextCleaner = cleaner) -> Any:
+    def clean_key(key: Hashable, path: tuple[Hashable, ...]) -> Any:
         nonlocal key_cleaner
+        if isinstance(key, tuple):
+            return tuple(clean_key(part, path) for part in key)
+        if not isinstance(key, str) or key_mode == 'off':
+            return key
+        if key_mode in ('pii', 'pii_ner') and key_cleaner is None:
+            key_cleaner = _pii_only_cleaner(cleaner, ner=key_mode == 'pii_ner')
+        return visit(key, path, cleaner if key_mode == 'full' else cast(TextCleaner, key_cleaner))
+
+    def visit(item: Any, path: tuple[Hashable, ...], text_cleaner: TextCleaner = cleaner) -> Any:
         if isinstance(item, str):
             result = text_cleaner.process(item)
             views.append(result.signals)
@@ -127,16 +137,7 @@ def process_json(cleaner: TextCleaner, value: Any) -> StructuredResult:
             processed = {}
             for index, (key, child) in enumerate(item.items()):
                 # The raw key may itself be PII, so its path uses the index.
-                if isinstance(key, str) and key_mode != 'off':
-                    if key_mode in ('pii', 'pii_ner') and key_cleaner is None:
-                        key_cleaner = _pii_only_cleaner(cleaner, ner=key_mode == 'pii_ner')
-                    processed_key = visit(
-                        key,
-                        path + ("@key", index),
-                        cleaner if key_mode == 'full' else cast(TextCleaner, key_cleaner),
-                    )
-                else:
-                    processed_key = key
+                processed_key = clean_key(key, path + ("@key", index))
                 if processed_key in processed:
                     raise _DuplicateKeyError(
                         "Cleaning JSON keys produced a duplicate key. "

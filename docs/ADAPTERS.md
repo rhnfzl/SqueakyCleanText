@@ -18,6 +18,7 @@ cleaned_chunks = process_rag_chunks(
 ```
 
 `process_json` also walks tuples and any `Mapping`, and returns them in JSON shape (lists and dicts).
+A tuple key stays a tuple, with the strings inside it cleaned as keys. `json.dumps` rejects any tuple key.
 
 `findings` on these results stay empty unless the cleaner has `include_entities=True` or a privacy
 policy. `sensitive` and `signals` are always filled: `StructuredResult` and `DataFrameResult` cover every
