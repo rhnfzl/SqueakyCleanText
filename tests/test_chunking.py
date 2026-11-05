@@ -13,6 +13,7 @@ from sct.utils.ner_chunking import align_chunk, simple_chunk, split_text, token_
 from sct.utils.anonymization_map import AnonymizationMap
 from sct.config import TextCleanerConfig
 from sct.utils.ner import GeneralNER
+from tests.conftest import TEST_NER_MODELS, TEST_NER_REVISIONS
 
 BUDGET = 384  # simple_chunk max_tokens -> 768 chars
 
@@ -262,8 +263,6 @@ def test_overlap_config_validation_and_module_global(monkeypatch):
 
 
 def test_overlap_with_real_tokenizer():
-    from tests.conftest import TEST_NER_MODELS, TEST_NER_REVISIONS
-
     with pytest.raises(ValueError, match="ner_chunk_overlap"):
         GeneralNER(TextCleanerConfig(ner_models=TEST_NER_MODELS,
                                      ner_model_revisions=TEST_NER_REVISIONS, ner_chunk_overlap=200))

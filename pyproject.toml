@@ -140,6 +140,7 @@ sct = ["py.typed"]
 
 [tool.pytest.ini_options]
 timeout = 1200
+markers = ["needs_model: loads a real Hugging Face model"]
 
 [tool.ruff]
 line-length = 127

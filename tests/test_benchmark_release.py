@@ -1,6 +1,7 @@
 from benchmarks.score import predicted_spans
 from scripts.benchmark_release import _git_commit, find_leaks
 from sct.evaluation import EntitySpan, EvaluationExample
+from tests.conftest import TEST_NER_MODELS, TEST_NER_REVISIONS
 import builtins
 import importlib
 import subprocess
@@ -85,7 +86,6 @@ def test_predicted_spans_context_changed_by_cleanup():
 
 def test_run_batch_reports_throughput_keys(tmp_path):
     from scripts.benchmark_release import ROOT, run_batch
-    from tests.conftest import TEST_NER_MODELS, TEST_NER_REVISIONS
 
     lines = (ROOT / "evaluation" / "release_benchmark.jsonl").read_text(encoding="utf-8").splitlines()
     dataset = tmp_path / "two.jsonl"
