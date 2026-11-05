@@ -15,6 +15,7 @@ from sct.config import ONNX_BACKENDS, TextCleanerConfig
 from sct.presets import preset_config
 from sct.score import SCORE_A_COLUMNS, score_record
 from sct.sct import TextCleaner
+from sct.signals import merge_views
 
 OUTPUTS = ("overwrite", "new_column")
 
@@ -92,7 +93,7 @@ def output_column(col: str, output: str) -> str:
 
 
 def _clean(handle: CleanerHandle, batch: Mapping[str, Sequence], columns, output: str):
-    """Return (new batch, ProcessResult-or-None per row of the first column)."""
+    """Return (new batch, {column: ProcessResult-or-None per row})."""
     if output not in OUTPUTS:
         raise ValueError(f"output must be one of {OUTPUTS}, got {output!r}")
     columns = as_columns(columns)
@@ -103,7 +104,7 @@ def _clean(handle: CleanerHandle, batch: Mapping[str, Sequence], columns, output
         raise KeyError(f"columns not in batch: {missing}")
     cleaner = handle.get()
     out = dict(batch)
-    first = None
+    per_column: dict[str, list] = {}
     for col in columns:
         values = list(batch[col])
         idx = [i for i, v in enumerate(values) if isinstance(v, str)]
@@ -113,9 +114,8 @@ def _clean(handle: CleanerHandle, batch: Mapping[str, Sequence], columns, output
         out[output_column(col, output)] = [
             v if r is None else r.lm_text for v, r in zip(values, results)
         ]
-        if first is None:
-            first = results
-    return out, first
+        per_column[col] = results
+    return out, per_column
 
 
 def clean_columns(
@@ -131,12 +131,12 @@ def clean_columns(
     ``output="new_column"`` writes ``<col>_clean`` and keeps the raw text.
     ``score=True`` adds ``sct.score.SCORE_A_COLUMNS`` for the first column.
     """
-    out, results = _clean(handle, batch, columns, output)
+    out, per_column = _clean(handle, batch, columns, output)
     if score:
         first = as_columns(columns)[0]
         records = [
             None if r is None else score_record(r, original=t)
-            for r, t in zip(results, batch[first])
+            for r, t in zip(per_column[first], batch[first])
         ]
         for col in SCORE_A_COLUMNS:
             out[col] = [None if rec is None else rec[col] for rec in records]
@@ -154,11 +154,11 @@ def clean_records(
 
     A column equal to ``text_key`` is the document text, any other is a metadata
     key (missing keys pass through). Metadata is copied; ``metadata["sct"]``
-    holds the public signals of the first column.
+    holds the public signals merged over all listed columns.
     """
     columns = as_columns(columns)
     batch = {c: [t if c == text_key else m.get(c) for t, m in records] for c in columns}
-    out, results = _clean(handle, batch, columns, output)
+    out, per_column = _clean(handle, batch, columns, output)
     cleaned = []
     for i, (text, meta) in enumerate(records):
         meta = dict(meta)
@@ -170,7 +170,10 @@ def clean_records(
                 text = out[key][i]
             else:
                 meta[key] = out[key][i]
-        if results[i] is not None:
-            meta["sct"] = results[i].signals
+        views = [results[i].signals for results in per_column.values() if results[i] is not None]
+        # An empty cell has no view to add: it would only add warnings.
+        views = [view for view in views if view["chars"]] or views[:1]
+        if views:
+            meta["sct"] = views[0] if len(views) == 1 else merge_views(views)
         cleaned.append((text, meta))
     return cleaned

@@ -17,6 +17,8 @@ cleaned_chunks = process_rag_chunks(
 )
 ```
 
+`process_json` also walks tuples and any `Mapping`, and returns them in JSON shape (lists and dicts).
+
 `findings` on these results stay empty unless the cleaner has `include_entities=True` or a privacy
 policy. `sensitive` and `signals` are always filled: `StructuredResult` and `DataFrameResult` cover every
 processed string, and `ProcessedRAGChunk` covers text and metadata (`findings` and `metadata["sct"]` cover

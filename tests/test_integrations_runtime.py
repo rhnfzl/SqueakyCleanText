@@ -90,13 +90,42 @@ def test_clean_records_text_and_metadata():
     out = clean_records(handle, records, "body", ("body", "author"), "overwrite")
     assert out[0][0] == "mail <EMAIL> now"
     assert out[0][1]["author"] == "mail <EMAIL> now" and out[0][1]["n"] == 1
-    assert out[0][1]["sct"]["pii_count"] == 1
+    assert out[0][1]["sct"]["pii_count"] == 2
     assert "author" not in out[1][1] and out[1][0] == "plain"
     assert records[0][1]["author"] == EMAIL  # input metadata not modified
     new = clean_records(handle, records, "body", ("body", "author"), "new_column")
     assert new[0][0] == EMAIL
     assert new[0][1]["body_clean"] == "mail <EMAIL> now"
     assert new[0][1]["author_clean"] == "mail <EMAIL> now" and new[0][1]["author"] == EMAIL
+
+
+def test_clean_records_signals_cover_every_column():
+    handle = CleanerHandle(FAST)
+    clean_first = clean_records(handle, [("plain text", {"author": EMAIL})], "body", ("body", "author"), "overwrite")
+    signals = clean_first[0][1]["sct"]
+    assert signals["sensitive"] and signals["pii_types"] == {"EMAIL": 1}
+    assert signals["chars"] == len("plain text") + len(EMAIL)
+    # A first cell with no text does not hide the PII of a later one.
+    no_first = clean_records(handle, [(None, {"author": EMAIL})], "body", ("body", "author"), "overwrite")
+    assert no_first[0][1]["sct"]["pii_types"] == {"EMAIL": 1}
+
+
+def test_clean_records_one_view_stays_unmerged():
+    handle = CleanerHandle(FAST)
+    view = handle.get().process(EMAIL).signals
+    alone = clean_records(handle, [(EMAIL, {})], "body", ("body",), "overwrite")
+    assert alone[0][1]["sct"] == view
+    # An empty cell adds no warning, a repeated column counts once.
+    empty = clean_records(handle, [(EMAIL, {"author": ""})], "body", ("body", "author"), "overwrite")
+    assert empty[0][1]["sct"] == view
+    repeated = clean_records(handle, [(EMAIL, {})], "body", ("body", "body"), "overwrite")
+    assert repeated[0][1]["sct"] == view
+    assert "empty_input" in clean_records(handle, [("", {})], "body", ("body",), "overwrite")[0][1]["sct"]["warnings"]
+
+
+def test_clean_columns_score_stays_on_first_column():
+    out = clean_columns(CleanerHandle(FAST), {"a": ["plain text"], "b": [EMAIL]}, ("a", "b"), score=True)
+    assert out["sct_pii_count"] == [0] and out["b"] == ["mail <EMAIL> now"]
 
 
 # --- threads sharing a handle build one cleaner ---

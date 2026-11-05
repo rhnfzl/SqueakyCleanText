@@ -23,9 +23,9 @@ def test_datatrove_step():
     docs = [Document(text=RAW, id=str(i), metadata={"author": RAW}) for i in range(3)]
     out = list(step.run(iter(docs)))
     assert [d.text for d in out] == [CLEAN] * 3
-    assert out[0].metadata["author"] == CLEAN and out[0].metadata["sct"]["pii_count"] == 1
+    assert out[0].metadata["author"] == CLEAN and out[0].metadata["sct"]["pii_count"] == 2
     stats = step.stats.stats
-    assert stats["pii"].total == 3 and stats["pii_EMAIL"].total == 3 and stats["sensitive"].total == 3
+    assert stats["pii"].total == 6 and stats["pii_EMAIL"].total == 6 and stats["sensitive"].total == 3
 
 
 def test_langchain_transformer():
@@ -40,6 +40,9 @@ def test_langchain_transformer():
     assert doc.page_content == RAW and "sct" not in doc.metadata
     new = asyncio.run(SCTDocumentTransformer(config=FAST, output="new_column").atransform_documents([doc]))
     assert new[0].page_content == RAW and new[0].metadata["page_content_clean"] == CLEAN
+    both = Document(page_content="plain text", metadata={"author": RAW})
+    merged = SCTDocumentTransformer(columns=("page_content", "author"), config=FAST).transform_documents([both])
+    assert merged[0].metadata["sct"]["pii_types"] == {"EMAIL": 1}
 
 
 def test_haystack_component():
@@ -53,6 +56,9 @@ def test_haystack_component():
     assert out[0].content == CLEAN and out[0].meta["src"] == "a" and "sct" in out[0].meta
     assert out[0].id != doc.id and out[1].content is None
     assert doc.content == RAW
+    both = Document(content="plain text", meta={"author": RAW})
+    merged = SCTDocumentCleaner(columns=("content", "author"), config=FAST).run([both])["documents"]
+    assert merged[0].meta["sct"]["pii_types"] == {"EMAIL": 1}
 
 
 RAW_ALICE = "mail alice@example.com"

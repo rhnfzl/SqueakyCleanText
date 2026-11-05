@@ -39,13 +39,13 @@ lm_text, stat_text, lang = result  # backward-compatible 3-tuple unpacking
 - `EvaluationReport` — overall metrics plus label, language, domain, and slice metrics
 - `PrivacyPolicy` / `EntityRule` — versioned entity actions and score thresholds
 - `TokenStore` — external storage boundary for reversible token maps
-- `process_json` / `process_dataframe` / `process_rag_chunks` — boundary adapters
+- `process_json` / `process_dataframe` / `process_rag_chunks` — boundary adapters (`process_json` also walks tuples and any `Mapping`, returned as lists and dicts)
 - `BufferedStreamingRedactor` / `WindowedStreamingRedactor` — streaming interfaces
 - `redact_image` / `TesseractOCRProvider` — optional OCR image redaction
 - `assess_reidentification_risk` — corpus k-anonymity summary
 - `MODEL_CANDIDATES` / `run_model_benchmark` — pinned model evaluation
 - `sct.integrations.hf.clean_dataset(ds, columns=, output=, config=, score=, **map_kwargs)` — Hugging Face datasets (`[datasets]` extra)
-- `sct.integrations.datatrove.SCTCleaner` / `sct.integrations.langchain.SCTDocumentTransformer` / `sct.integrations.haystack.SCTDocumentCleaner` — framework adapters (`[datatrove]`, `[langchain]`, `[haystack]`); shared options `columns`, `output='overwrite'|'new_column'`, `config` (default `"training"` preset); write `metadata["sct"]`
+- `sct.integrations.datatrove.SCTCleaner` / `sct.integrations.langchain.SCTDocumentTransformer` / `sct.integrations.haystack.SCTDocumentCleaner` — framework adapters (`[datatrove]`, `[langchain]`, `[haystack]`); shared options `columns`, `output='overwrite'|'new_column'`, `config` (default `"training"` preset); write `metadata["sct"]`, merged over all listed columns
 - `sct.integrations._runtime.CleanerHandle` / `clean_columns` — one cleaner per process for Ray, Spark, Polars, DuckDB, dlt, Daft (docs/RECIPES.md)
 - `sct.score.score_record(result)` / `score_records(results, texts, ScoreConfig(...))` — flat `sct_*` columns; Score B (quality, MinHash, `[score]` extra) off by default; `build_data_card` / `render_data_card`
 

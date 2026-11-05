@@ -21,7 +21,7 @@ Every adapter takes the same three options.
 
 Columns you do not list are left as they are. If they can hold personal data, clean them too or drop them.
 
-Document adapters (DataTrove, LangChain, Haystack) also write `metadata["sct"]`: the public signals (language, PII counts and types, warnings, model provenance) of the first listed column. Values only, never entity text.
+Document adapters (DataTrove, LangChain, Haystack) also write `metadata["sct"]`: the public signals (language, PII counts and types, warnings, model provenance) merged over all listed columns, so PII in any of them counts. Values only, never entity text.
 
 ## Hugging Face datasets
 

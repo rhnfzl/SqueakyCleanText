@@ -1,3 +1,6 @@
+import json
+from types import MappingProxyType
+
 import pytest
 
 from sct import TextCleaner, TextCleanerConfig
@@ -36,6 +39,29 @@ def test_process_json_preserves_structure_and_non_text_values():
         "messages": ["Call <PHONE>", None],
     }
     assert source["user"]["email"] == "maria@example.com"
+
+
+def test_process_json_masks_tuples_and_mappings():
+    source = MappingProxyType({
+        "pair": ("maria@example.com", ("Call +1-202-555-0147", 1)),
+        "nested": MappingProxyType({"maria@example.com": "maria@example.com"}),
+    })
+
+    result = process_json(_regex_cleaner(), source)
+
+    assert result.value == {
+        "pair": ["<EMAIL>", ["Call <PHONE>", 1]],
+        "nested": {"<EMAIL>": "<EMAIL>"},
+    }
+    assert type(result.value) is dict and type(result.value["nested"]) is dict
+    assert result.signals["pii_types"] == {"EMAIL": 3, "PHONE": 1} and result.sensitive
+    json.dumps(result.value)
+
+
+def test_process_rag_chunks_masks_tuple_metadata():
+    chunk = RAGChunk(id="1", text="plain text", metadata={"authors": ("maria@example.com",)})
+    processed = process_rag_chunks(_regex_cleaner(), [chunk])[0]
+    assert processed.metadata["authors"] == ["<EMAIL>"] and processed.sensitive
 
 
 def test_process_json_cleans_string_keys():

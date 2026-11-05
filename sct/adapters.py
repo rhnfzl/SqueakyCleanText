@@ -99,6 +99,8 @@ def _pii_only_cleaner(cleaner: TextCleaner, ner: bool = True) -> TextCleaner:
 def process_json(cleaner: TextCleaner, value: Any) -> StructuredResult:
     """Process every string in a JSON-compatible value.
 
+    Tuples come back as lists and any ``Mapping`` as a dict.
+
     Keys follow ``cfg.json_key_cleaning``: ``'pii'`` (default) replaces regex
     PII only (emails, phones, URLs...), so short keys such as ``"k"`` and
     common words such as ``"message"`` survive (NER tags lone words out of
@@ -121,7 +123,7 @@ def process_json(cleaner: TextCleaner, value: Any) -> StructuredResult:
                 for finding in result.metadata.get("findings", ())
             )
             return result.lm_text
-        if isinstance(item, dict):
+        if isinstance(item, Mapping):
             processed = {}
             for index, (key, child) in enumerate(item.items()):
                 # The raw key may itself be PII, so its path uses the index.
@@ -145,7 +147,7 @@ def process_json(cleaner: TextCleaner, value: Any) -> StructuredResult:
                     path + (processed_key,),
                 )
             return processed
-        if isinstance(item, list):
+        if isinstance(item, (list, tuple)):
             return [
                 visit(child, path + (index,))
                 for index, child in enumerate(item)
