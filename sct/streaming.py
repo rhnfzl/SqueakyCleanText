@@ -170,7 +170,7 @@ def _find_split(normalise, buffer, cutoff, normalised_text, protected, steps, st
     whose own normalised text ends at or before the match start (a bisect on its offsets, since NFKC can make
     it longer, "⑫" -> "12", or escapes shorter), so a feed normalises a few times, not once per space.
     """
-    candidates = [index for index, character in enumerate(buffer[:cutoff + 1]) if character.isspace()]
+    candidates = [index for index, character in enumerate(buffer[:max(cutoff + 1, 0)]) if character.isspace()]
     index = len(candidates) - 1
     while index >= 0:
         position = candidates[index]
@@ -257,10 +257,12 @@ class WindowedStreamingRedactor:
         # and the regexes on the views the cleaner's steps use, so the two cannot differ.
         cleaner, cfg = self._cleaner, self._cleaner.cfg
         normalise = cleaner.normalise
-        # The unfinished last token is left out when it changes the text before it: a cut escape ("\\U000000")
-        # stops the cleaner's escape decoding for the whole buffer (the whole text decodes it once complete).
+        # The unfinished end is left out when it changes the text before it: a cut escape ("\\U000000") stops the
+        # cleaner's escape decoding for the whole buffer (the whole text decodes it once complete). Only the escape
+        # goes, not its token, so a value running into that token ("March 15, 1990,x\\U000000") stays in view.
         buffer, normalised_text = self._buffer, normalise(self._buffer)
-        head = buffer[:max((i for i, c in enumerate(buffer) if c.isspace()), default=-1) + 1]
+        last_space = max((i for i, c in enumerate(buffer) if c.isspace()), default=-1)
+        head = buffer[:max(last_space + 1, buffer.rfind("\\"))]
         if head != buffer and not normalised_text.startswith(normalised_head := normalise(head)):
             buffer, normalised_text = head, normalised_head
         # The overlap is kept on the text the guard reads: a split needs overlap_chars of it to its right, so a
