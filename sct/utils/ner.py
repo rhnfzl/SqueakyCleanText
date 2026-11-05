@@ -7,7 +7,7 @@ import re
 import threading
 from collections import defaultdict
 import logging
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any, NamedTuple, cast
 from collections.abc import Callable, Collection, Iterable, Mapping, Sequence
 
 from sct.utils import constants, resources
@@ -70,6 +70,14 @@ def _pin_live_ner_in_child():
 
 if hasattr(os, "register_at_fork"):
     os.register_at_fork(after_in_child=_pin_live_ner_in_child)
+
+
+class _Window(NamedTuple):
+    text: str
+    start: int
+    offsets: Any  # an align_chunk result or a range
+    own_start: int
+    own_end: int
 
 
 class ModelLoadError(Exception):
@@ -554,7 +562,7 @@ class GeneralNER:
         if not windows:
             return NERProcessingResult(text=text, findings=())
         window_results = self._detect(
-            [window[0] for window in windows], [language] * len(windows), positional_tags,
+            [window.text for window in windows], [language] * len(windows), positional_tags,
         )
         return self._finalize(text, windows, window_results, ner_confidence_threshold, anon_map, source_markers)
 
@@ -653,7 +661,7 @@ class GeneralNER:
             self._plan_windows(text, self._window_keys(language))
             for text, language in zip(texts, languages)
         ]
-        flat_windows = [window[0] for windows in doc_windows for window in windows]
+        flat_windows = [window.text for windows in doc_windows for window in windows]
         flat_languages = [
             languages[i] for i, windows in enumerate(doc_windows) for _ in windows
         ]
@@ -717,8 +725,8 @@ class GeneralNER:
         gliner_max = self._gliner_pipe.max_context_length if self._gliner_pipe else 384
         return int(gliner_max * 0.9)
 
-    def _plan_windows(self, text: str, keys=None) -> list[tuple]:
-        """Split *text* into model windows ``(window, win_start, offsets, own_start, own_end)``.
+    def _plan_windows(self, text: str, keys=None) -> list[_Window]:
+        """Split *text* into model windows.
 
         Windows fit the models in *keys* (the document's ensemble; None: every
         loaded model), so other documents' models never change this one.
@@ -759,7 +767,7 @@ class GeneralNER:
             search_start = start + len(source_chunk)
             cores.append((chunk, start, start + len(source_chunk), offsets))
         if not overlap:
-            return [(chunk, start, offsets, 0, len(text) + 1) for chunk, start, _, offsets in cores]
+            return [_Window(chunk, start, offsets, 0, len(text) + 1) for chunk, start, _, offsets in cores]
 
         if self.tokenizer is not None:
             tokens = [
@@ -785,7 +793,7 @@ class GeneralNER:
             else:
                 win_start = max(0, core_start - overlap * 2)
                 win_end = min(len(text), core_end + overlap * 2)
-            windows.append((
+            windows.append(_Window(
                 text[win_start:win_end],
                 win_start,
                 range(win_end - win_start + 1),
@@ -859,7 +867,7 @@ class GeneralNER:
     def _finalize(
         self,
         text: str,
-        windows: list[tuple],
+        windows: list[_Window],
         window_results: list[list],
         ner_confidence_threshold: float,
         anon_map: 'AnonymizationMap | None',
