@@ -6,7 +6,7 @@ import pytest
 
 from sct import TextCleaner, TextCleanerConfig, process_json
 from sct.signals import PUBLIC_VIEW_KEYS, WARNING_CODES
-from tests.conftest import TEST_NER_MODELS
+from tests.conftest import TEST_NER_MODELS, TEST_NER_REVISIONS
 
 NO_NER = TextCleanerConfig(check_ner_process=False)
 TEXT = "John Smith wrote to john.smith@example.com from 203.0.113.9, call 415-555-0134."
@@ -56,7 +56,7 @@ def test_nothing_raw_in_repr_or_signals(mode):
     if mode == "synthetic":
         pytest.importorskip("faker")
     cleaner = TextCleaner(
-        cfg=TextCleanerConfig(ner_models=TEST_NER_MODELS, replacement_mode=mode,
+        cfg=TextCleanerConfig(ner_models=TEST_NER_MODELS, ner_model_revisions=TEST_NER_REVISIONS, replacement_mode=mode,
                               check_to_ascii_unicode=False),
         include_entities=True,
     )

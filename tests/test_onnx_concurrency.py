@@ -13,7 +13,7 @@ from sct.config import TextCleanerConfig
 from sct.utils import ner as ner_module
 from sct.utils.ner import GeneralNER
 from sct.utils.onnx_pipeline import load_onnx_ner_model
-from tests.conftest import TEST_NER_MODELS
+from tests.conftest import TEST_NER_MODELS, TEST_NER_REVISIONS
 
 TAGS = ('PER', 'LOC', 'ORG', 'MISC')
 NAMES = ["John Smith", "Angela Merkel", "Barack Obama", "Marie Curie"]
@@ -35,7 +35,7 @@ def _key(result):
 
 @pytest.fixture(scope="module")
 def onnx_ner():
-    return GeneralNER(TextCleanerConfig(ner_models=TEST_NER_MODELS))
+    return GeneralNER(TextCleanerConfig(ner_models=TEST_NER_MODELS, ner_model_revisions=TEST_NER_REVISIONS))
 
 
 def test_onnx_threaded_matches_sequential_and_takes_no_lock(onnx_ner):
@@ -103,10 +103,11 @@ def test_model_cache_is_keyed_by_revision(monkeypatch, revisions, loads):
 
 def test_thread_knobs_reach_the_onnx_session():
     model = TEST_NER_MODELS['ENGLISH']
-    pipe, _ = load_onnx_ner_model(model, intra_op_threads=2, inter_op_threads=3)
+    revision = TEST_NER_REVISIONS['ENGLISH']
+    pipe, _ = load_onnx_ner_model(model, revision=revision, intra_op_threads=2, inter_op_threads=3)
     opts = pipe._session.get_session_options()
     assert (opts.intra_op_num_threads, opts.inter_op_num_threads) == (2, 3)
-    default_pipe, _ = load_onnx_ner_model(model)
+    default_pipe, _ = load_onnx_ner_model(model, revision=revision)
     assert default_pipe._session.get_session_options().intra_op_num_threads == 0
 
 
@@ -141,7 +142,7 @@ def test_fork_child_pins_live_ner(monkeypatch):
     # A forked child must never free an inherited GeneralNER (ONNX teardown crashes there);
     # the at-fork hook keeps a strong reference to every live one. Called directly: no real fork on macOS.
     monkeypatch.setattr(ner_module, "_FORK_PINNED", [])
-    ner = GeneralNER(TextCleanerConfig(ner_models=TEST_NER_MODELS))
+    ner = GeneralNER(TextCleanerConfig(ner_models=TEST_NER_MODELS, ner_model_revisions=TEST_NER_REVISIONS))
     assert ner in ner_module._LIVE_NER
     ner_module._pin_live_ner_in_child()
     assert any(p is ner for p in ner_module._FORK_PINNED)

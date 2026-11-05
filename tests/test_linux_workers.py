@@ -14,7 +14,7 @@ import sys
 
 import pytest
 
-from tests.conftest import TEST_NER_MODELS
+from tests.conftest import TEST_NER_MODELS, TEST_NER_REVISIONS
 
 pytestmark = pytest.mark.skipif(sys.platform != "linux", reason="real fork/forkserver path is Linux only")
 
@@ -48,7 +48,7 @@ TEXTS = [
 def _config():
     from sct.presets import preset_config
 
-    return preset_config("training", ner_models=TEST_NER_MODELS)
+    return preset_config("training", ner_models=TEST_NER_MODELS, ner_model_revisions=TEST_NER_REVISIONS)
 
 
 def test_hf_num_proc_matches_single_process():

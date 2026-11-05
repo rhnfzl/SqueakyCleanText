@@ -7,7 +7,7 @@ import pytest
 from sct import config as config_module
 from sct.config import TextCleanerConfig
 from sct.sct import TextCleaner
-from tests.conftest import TEST_NER_MODELS
+from tests.conftest import TEST_NER_MODELS, TEST_NER_REVISIONS
 from tests.helpers import FakeRunDetector, word_ner
 
 pytest.importorskip("faker")
@@ -24,7 +24,8 @@ MODES = ("placeholder", "synthetic", "reversible")
 
 def _cleaner(mode, **overrides):
     return TextCleaner(
-        TextCleanerConfig(ner_models=TEST_NER_MODELS, replacement_mode=mode, **overrides),
+        TextCleanerConfig(ner_models=TEST_NER_MODELS,
+                          ner_model_revisions=TEST_NER_REVISIONS, replacement_mode=mode, **overrides),
         include_entities=True,
     )
 

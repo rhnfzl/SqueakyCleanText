@@ -12,7 +12,7 @@ from sct.signals import public_view
 from sct.utils import constants
 from sct.utils.special import _json_object_spans
 
-from tests.conftest import TEST_NER_MODELS
+from tests.conftest import TEST_NER_MODELS, TEST_NER_REVISIONS
 from tests.helpers import assert_near_linear
 
 
@@ -128,7 +128,7 @@ def test_isolated_symbols_need_space_on_both_sides(text, expected):
 # --- JSON keys get regex PII only by default; NER on keys is opt-in ---
 def test_json_keys_skip_ner_by_default():
     from sct.adapters import _pii_only_cleaner
-    cleaner = TextCleaner(TextCleanerConfig(ner_models=TEST_NER_MODELS))
+    cleaner = TextCleaner(TextCleanerConfig(ner_models=TEST_NER_MODELS, ner_model_revisions=TEST_NER_REVISIONS))
     assert _pii_only_cleaner(cleaner, ner=False).cfg.check_ner_process is False
     assert _pii_only_cleaner(cleaner, ner=True).cfg.check_ner_process is True
 

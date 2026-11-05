@@ -10,7 +10,7 @@ from sct import TextCleaner, TextCleanerConfig
 from sct.presets import preset_config
 from sct.utils.anonymization_map import AnonymizationMap
 
-from tests.conftest import TEST_NER_MODELS
+from tests.conftest import TEST_NER_MODELS, TEST_NER_REVISIONS
 from tests.helpers import FakeRunDetector, word_ner
 
 
@@ -29,7 +29,8 @@ def test_source_marker_text_gets_no_placeholder_protection():
 
 @pytest.fixture(scope="module")
 def ner_cleaner():
-    return TextCleaner(cfg=preset_config("training", ner_models=TEST_NER_MODELS, ner_batch_size=8))
+    return TextCleaner(cfg=preset_config("training", ner_models=TEST_NER_MODELS,
+                                         ner_model_revisions=TEST_NER_REVISIONS, ner_batch_size=8))
 
 
 def test_source_marker_pii_is_masked_single_and_batch(ner_cleaner):
@@ -73,7 +74,7 @@ def test_swap_deferred_tag_inside_ner_span():
 def test_reversible_tag_cut_by_ner_span():
     text = "University of ann@example.com. Contact bob@example.org today."
     cleaner = TextCleaner(TextCleanerConfig(language="ENGLISH", replacement_mode="reversible",
-                                            ner_models=TEST_NER_MODELS))
+                                            ner_models=TEST_NER_MODELS, ner_model_revisions=TEST_NER_REVISIONS))
     result = cleaner.process(text)
     assert "ann@example.com" not in result.lm_text
     assert result.metadata["anon_map"].deanonymize(result.lm_text) == text
@@ -83,7 +84,8 @@ def test_reversible_tag_cut_by_ner_span():
 def test_bracket_tag_survives_bracket_removal_in_reversible():
     text = "Mail ann@example.com today."
     cleaner = TextCleaner(TextCleanerConfig(language="ENGLISH", replacement_mode="reversible",
-                                            ner_models=TEST_NER_MODELS, replace_with_email="[EMAIL]"))
+                                            ner_models=TEST_NER_MODELS,
+                                            ner_model_revisions=TEST_NER_REVISIONS, replace_with_email="[EMAIL]"))
     result = cleaner.process(text)
     assert "<EMAIL_0>" in result.lm_text
     assert "ann@example.com" in result.metadata["anon_map"].deanonymize(result.lm_text)
@@ -94,7 +96,8 @@ def test_bracket_tag_survives_bracket_removal_in_reversible():
 def test_cut_tag_leaves_no_fragment(mode):
     text = "University of ann@example.com. Contact bob@example.org today."
     cleaner = TextCleaner(TextCleanerConfig.from_preset(
-        "training", language="ENGLISH", replacement_mode=mode, ner_models=TEST_NER_MODELS))
+        "training", language="ENGLISH", replacement_mode=mode, ner_models=TEST_NER_MODELS,
+        ner_model_revisions=TEST_NER_REVISIONS))
     out = cleaner.process(text).lm_text
     assert out.count("<") == out.count(">") and "ann@example.com" not in out
 
@@ -106,6 +109,7 @@ def test_cut_tag_leaves_no_fragment(mode):
 ])
 def test_marker_inside_ner_placeholder_round_trips(field, value, text):
     cfg = TextCleanerConfig.from_preset("training", language="ENGLISH", ner_models=TEST_NER_MODELS,
+                                        ner_model_revisions=TEST_NER_REVISIONS,
                                         replacement_mode="reversible", **{field: "PERSON"})
     result = TextCleaner(cfg).process(text)
     assert value not in result.lm_text
@@ -118,6 +122,7 @@ TEXT = "John Smith at ann@example.com and Jane Doe at bob@example.org, in London
 
 def _ner_cfg(mode, **kw):
     return TextCleanerConfig.from_preset("training", language="ENGLISH", ner_models=TEST_NER_MODELS,
+                                         ner_model_revisions=TEST_NER_REVISIONS,
                                          replacement_mode=mode, **kw)
 
 
@@ -149,7 +154,8 @@ SOURCE = "The EMAIL field is mandatory. John Smith at ann@example.com and Jane D
 @pytest.fixture(scope="module")
 def marker_cleaners():
     return {mode: TextCleaner(TextCleanerConfig.from_preset(
-        "training", language="en", ner_models=TEST_NER_MODELS, replacement_mode=mode, replace_with_email="EMAIL"))
+        "training", language="en", ner_models=TEST_NER_MODELS,
+        ner_model_revisions=TEST_NER_REVISIONS, replacement_mode=mode, replace_with_email="EMAIL"))
         for mode in MODES}
 
 

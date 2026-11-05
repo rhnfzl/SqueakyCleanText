@@ -10,7 +10,7 @@ from sct import TextCleaner, config
 from sct.config import TextCleanerConfig
 from sct.utils import ner as ner_module
 from sct.utils.ner import GeneralNER
-from tests.conftest import TEST_NER_MODELS
+from tests.conftest import TEST_NER_MODELS, TEST_NER_REVISIONS
 import sys
 import types
 
@@ -21,7 +21,8 @@ TEXT = "John Smith visited the office in London yesterday afternoon."
 
 def _cfg(**overrides):
     return TextCleanerConfig(
-        ner_models=TEST_NER_MODELS, language="en", check_statistical_model_processing=False,
+        ner_models=TEST_NER_MODELS,
+        ner_model_revisions=TEST_NER_REVISIONS, language="en", check_statistical_model_processing=False,
         **overrides,
     )
 

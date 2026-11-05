@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from tests.conftest import TEST_NER_MODELS
+from tests.conftest import TEST_NER_MODELS, TEST_NER_REVISIONS
 
 
 # --- the quantized cache is keyed by the resolved commit, not the branch name ---
@@ -79,7 +79,8 @@ def test_onnx_load_from_warm_cache_makes_no_hub_request(monkeypatch):
     from sct.utils.onnx_pipeline import load_onnx_ner_model
 
     model = TEST_NER_MODELS["ENGLISH"]
-    pipe, _ = load_onnx_ner_model(model)  # warms the cache, records the missing model.onnx_data
+    # warms the cache, records the missing model.onnx_data
+    pipe, _ = load_onnx_ner_model(model, revision=TEST_NER_REVISIONS["ENGLISH"])
     calls = []
     monkeypatch.setattr(fd, "get_hf_file_metadata", lambda *a, **k: calls.append(a) or 1 / 0)
     load_onnx_ner_model(model, revision=pipe.revision)

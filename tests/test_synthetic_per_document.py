@@ -11,7 +11,7 @@ from sct.config import TextCleanerConfig
 from sct.integrations._runtime import CleanerHandle
 from sct.sct import TextCleaner
 from sct.utils.synthetic import SyntheticReplacer, faker_locale_for
-from tests.conftest import TEST_NER_MODELS
+from tests.conftest import TEST_NER_MODELS, TEST_NER_REVISIONS
 
 pytest.importorskip("faker")
 
@@ -75,7 +75,7 @@ def test_adapter_handle_in_a_new_process_reproduces_fakes():
 
 def test_batched_ner_matches_single_document_processing():
     cfg = TextCleanerConfig(
-        replacement_mode='synthetic', ner_models=TEST_NER_MODELS, ner_batch_size=8,
+        replacement_mode='synthetic', ner_models=TEST_NER_MODELS, ner_model_revisions=TEST_NER_REVISIONS, ner_batch_size=8,
         check_detect_language=False, language='ENGLISH',
     )
     docs = ["John Smith wrote to anna@example.com.", "Angela Merkel wrote to anna@example.com."]

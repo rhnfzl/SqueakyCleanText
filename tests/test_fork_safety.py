@@ -10,7 +10,7 @@ import pytest
 from sct import TextCleanerConfig
 from sct.utils import resources, synthetic
 
-from tests.conftest import TEST_NER_MODELS
+from tests.conftest import TEST_NER_MODELS, TEST_NER_REVISIONS
 
 
 # --- a forked child does not inherit the detector lock held ---
@@ -77,7 +77,7 @@ def test_forked_handle_pins_the_parent_commits(monkeypatch):
 
     from sct.integrations import _runtime as rt
 
-    handle = rt.CleanerHandle(TextCleanerConfig(ner_models=TEST_NER_MODELS))
+    handle = rt.CleanerHandle(TextCleanerConfig(ner_models=TEST_NER_MODELS, ner_model_revisions=TEST_NER_REVISIONS))
     handle.get().GeneralNER.load_language("ENGLISH")
     commit = handle.get().GeneralNER.provenance["ENGLISH"]["revision"]
     copied = pickle.loads(pickle.dumps(handle))  # noqa: S301 - own object

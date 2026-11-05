@@ -10,7 +10,7 @@ from sct.utils.anonymization_map import AnonymizationMap
 from sct.utils.onnx_pipeline import ONNXNERPipeline
 from sct.utils.synthetic import SyntheticReplacer
 
-from tests.conftest import TEST_NER_MODELS
+from tests.conftest import TEST_NER_MODELS, TEST_NER_REVISIONS
 from tests.helpers import bare_ner, FakeRunDetector, finalize_spans, finalized_text, set_cfg, word_ner
 
 
@@ -281,7 +281,7 @@ def test_ner_leaves_regex_synthetic_fakes_alone():
 def test_wordpiece_entity_ends_on_a_whole_word():
     from sct.utils.onnx_pipeline import load_onnx_ner_model
 
-    pipe, _ = load_onnx_ner_model(TEST_NER_MODELS["ENGLISH"])
+    pipe, _ = load_onnx_ner_model(TEST_NER_MODELS["ENGLISH"], revision=TEST_NER_REVISIONS["ENGLISH"])
     text = "Contact John Doe today."
     spans = [(e["start"], e["end"]) for e in pipe(text)[0] if e["entity_group"] == "PER"]
     assert spans and all(text[end] in " ." for _, end in spans)

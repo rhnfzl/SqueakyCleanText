@@ -11,7 +11,7 @@ datasets = pytest.importorskip("datasets")
 
 from sct.integrations.hf import SCTMap, clean_dataset  # noqa: E402
 from sct.presets import preset_config  # noqa: E402
-from tests.conftest import TEST_NER_MODELS  # noqa: E402
+from tests.conftest import TEST_NER_MODELS, TEST_NER_REVISIONS  # noqa: E402
 
 FAST = preset_config("training", check_ner_process=False)
 
@@ -59,7 +59,7 @@ def test_fingerprint_stable_across_processes():
 
 
 def test_clean_dataset_with_test_ner_model():
-    cfg = preset_config("training", ner_models=TEST_NER_MODELS, language="ENGLISH")
+    cfg = preset_config("training", ner_models=TEST_NER_MODELS, ner_model_revisions=TEST_NER_REVISIONS, language="ENGLISH")
     ds = datasets.Dataset.from_dict({"text": ["Angela Merkel visited Paris."]})
     assert "Merkel" not in clean_dataset(ds, config=cfg)["text"][0]
 

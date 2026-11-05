@@ -9,7 +9,7 @@ from lingua import Language, LanguageDetectorBuilder
 from tests.helpers import bare_ner, gliner_ner, set_cfg
 import sct.config as config_module
 from sct import TextCleaner, TextCleanerConfig
-from tests.conftest import TEST_NER_MODELS
+from tests.conftest import TEST_NER_MODELS, TEST_NER_REVISIONS
 
 # EN/NL/DE/ES labels must not change when detection widens to 75 languages (decision 4).
 CORE_SENTENCES = [
@@ -182,7 +182,7 @@ def test_bring_your_own_model_routes_hindi(monkeypatch):
     cfg = TextCleanerConfig(
         check_ner_process=True,
         ner_models={**TEST_NER_MODELS, "HINDI": model},
-        ner_model_revisions={},
+        ner_model_revisions={**TEST_NER_REVISIONS, "HINDI": TEST_NER_REVISIONS["ENGLISH"]},
     )
     cleaner = TextCleaner(cfg=cfg)
     ner = cleaner.GeneralNER

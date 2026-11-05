@@ -10,7 +10,7 @@ from sct.config import TextCleanerConfig
 from sct.sct import TextCleaner
 from sct.utils.gliner_adapter import GLiNERAdapter
 from sct.utils.ner import GeneralNER
-from tests.conftest import TEST_NER_MODELS
+from tests.conftest import TEST_NER_MODELS, TEST_NER_REVISIONS
 from types import SimpleNamespace
 
 TAGS = ('PER', 'LOC', 'ORG', 'MISC')
@@ -37,7 +37,7 @@ class _CountingSession:
 
 @pytest.fixture(scope="module")
 def onnx_ner():
-    return GeneralNER(TextCleanerConfig(ner_models=TEST_NER_MODELS))
+    return GeneralNER(TextCleanerConfig(ner_models=TEST_NER_MODELS, ner_model_revisions=TEST_NER_REVISIONS))
 
 
 def test_onnx_batch_runs_once_per_slice(onnx_ner, monkeypatch):
@@ -71,7 +71,7 @@ def test_onnx_padded_batch_matches_unbatched(onnx_ner):
 def _cleaner(**overrides):
     cfg = TextCleanerConfig(
         check_statistical_model_processing=True,
-        ner_models=TEST_NER_MODELS,
+        ner_models=TEST_NER_MODELS, ner_model_revisions=TEST_NER_REVISIONS,
         **overrides,
     )
     return TextCleaner(cfg, include_entities=True)

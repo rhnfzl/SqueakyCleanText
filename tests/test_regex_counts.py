@@ -4,7 +4,7 @@ import pytest
 
 from sct import TextCleaner, TextCleanerConfig
 from sct.adapters import is_sensitive_result
-from tests.conftest import TEST_NER_MODELS
+from tests.conftest import TEST_NER_MODELS, TEST_NER_REVISIONS
 
 EMAIL = "maria@example.com"
 
@@ -80,7 +80,7 @@ def test_fuzzy_dates_counted():
 
 def test_batch_path_equals_single_path():
     cleaner = TextCleaner(cfg=TextCleanerConfig(
-        ner_models=TEST_NER_MODELS,
+        ner_models=TEST_NER_MODELS, ner_model_revisions=TEST_NER_REVISIONS,
         ner_batch_size=8,
         check_statistical_model_processing=False,
     ))

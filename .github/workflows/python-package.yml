@@ -87,8 +87,8 @@ jobs:
         python -c "
         from sct.config import TextCleanerConfig
         from sct.utils.ner import GeneralNER
-        from tests.conftest import TEST_NER_MODELS
-        ner = GeneralNER(TextCleanerConfig(ner_device='cpu', ner_models=TEST_NER_MODELS))
+        from tests.conftest import TEST_NER_MODELS, TEST_NER_REVISIONS
+        ner = GeneralNER(TextCleanerConfig(ner_device='cpu', ner_models=TEST_NER_MODELS, ner_model_revisions=TEST_NER_REVISIONS))
         ner.ner_process('Test sentence.', positional_tags=['PER', 'ORG', 'LOC'], ner_confidence_threshold=0.85)
         assert 'ENGLISH' in ner._pipelines
         "

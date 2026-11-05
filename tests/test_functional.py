@@ -18,7 +18,7 @@ import pytest
 from sct import TextCleaner, TextCleanerConfig, ProcessResult, AnonymizationMap
 from sct.config import DEFAULT_NER_MODELS, PII_DEFAULT_MODEL
 from sct.utils.ner import ENTITY_TYPE_MAP
-from tests.conftest import TEST_NER_MODELS, TEST_TORCH_NER_MODELS
+from tests.conftest import TEST_NER_MODELS, TEST_NER_REVISIONS, TEST_TORCH_NER_MODELS
 
 # Derive entity tags from the authoritative map — stays in sync automatically
 ENTITY_TAGS = tuple(f"<{v}>" for v in ENTITY_TYPE_MAP.values())
@@ -33,6 +33,7 @@ PROD_NER_MODELS = dict(DEFAULT_NER_MODELS)
 # Use production models when env var is set
 USE_PROD = os.environ.get("FUNC_TEST_PROD_MODELS", "0") == "1"
 NER_MODELS = PROD_NER_MODELS if USE_PROD else TEST_NER_MODELS
+NER_REVISIONS = None if USE_PROD else TEST_NER_REVISIONS
 
 
 def _has_package(name: str) -> bool:
@@ -60,7 +61,7 @@ def _make_cfg(**overrides) -> TextCleanerConfig:
     defaults = dict(
         check_ner_process=False,
         check_statistical_model_processing=False,
-        ner_models=TEST_NER_MODELS,
+        ner_models=TEST_NER_MODELS, ner_model_revisions=TEST_NER_REVISIONS,
     )
     defaults.update(overrides)
     with warnings.catch_warnings():
@@ -74,6 +75,7 @@ def _make_ner_cfg(**overrides) -> TextCleanerConfig:
         check_ner_process=True,
         check_statistical_model_processing=True,
         ner_models=NER_MODELS,
+        ner_model_revisions=NER_REVISIONS,
     )
     if overrides.get("ner_backend") in ("torch", "ensemble_torch") and not USE_PROD:
         defaults["torch_ner_models"] = TEST_TORCH_NER_MODELS

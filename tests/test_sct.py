@@ -20,7 +20,7 @@ from sct.utils.ner import GeneralNER, ModelLoadError
 from unittest.mock import patch, MagicMock
 from functools import wraps
 from sct.sct import TextCleaner
-from tests.conftest import TEST_NER_MODELS
+from tests.conftest import TEST_NER_MODELS, TEST_NER_REVISIONS
 
 
 def requires_ner(func):
@@ -60,7 +60,8 @@ class TextCleanerTest(unittest.TestCase):
         # Always use lightweight ONNX test model — never download production models
         cls.ner = None
         try:
-            cls.ner = GeneralNER(TextCleanerConfig(ner_device='cpu', ner_models=TEST_NER_MODELS))
+            cls.ner = GeneralNER(TextCleanerConfig(ner_device='cpu', ner_models=TEST_NER_MODELS,
+                                                   ner_model_revisions=TEST_NER_REVISIONS))
             cls.ner.ner_process(
                 "Test sentence.",
                 positional_tags=['PER', 'ORG', 'LOC'],
@@ -567,7 +568,7 @@ class TextCleanerTest(unittest.TestCase):
         """Custom ner_ensemble_default_keys overrides the module-level fallback."""
         cfg = TextCleanerConfig(
             check_ner_process=True,
-            ner_models=TEST_NER_MODELS,
+            ner_models=TEST_NER_MODELS, ner_model_revisions=TEST_NER_REVISIONS,
             ner_ensemble_default_keys=('MULTILINGUAL',),
         )
         sx = TextCleaner(cfg=cfg)
@@ -582,7 +583,7 @@ class TextCleanerTest(unittest.TestCase):
         config.CHECK_NER_PROCESS = True
         cfg = TextCleanerConfig(
             check_ner_process=True,
-            ner_models=TEST_NER_MODELS,
+            ner_models=TEST_NER_MODELS, ner_model_revisions=TEST_NER_REVISIONS,
         )
         sx = TextCleaner(cfg=cfg)
 
@@ -609,7 +610,7 @@ class TextCleanerTest(unittest.TestCase):
         """Test end-to-end text cleaning following the pipeline."""
         cfg = TextCleanerConfig(
             check_ner_process=True,
-            ner_models=TEST_NER_MODELS,
+            ner_models=TEST_NER_MODELS, ner_model_revisions=TEST_NER_REVISIONS,
         )
         sx = TextCleaner(cfg=cfg)
         lm_text, stat_text, lang = sx.process(TEST_TEXT)
@@ -670,7 +671,7 @@ class TextCleanerTest(unittest.TestCase):
         """
         cfg = TextCleanerConfig(
             check_ner_process=True,
-            ner_models=TEST_NER_MODELS,
+            ner_models=TEST_NER_MODELS, ner_model_revisions=TEST_NER_REVISIONS,
         )
 
         texts = [
