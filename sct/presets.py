@@ -12,6 +12,7 @@ from collections.abc import Mapping
 
 from sct.config import TextCleanerConfig
 
+# sct.adapters._pii_only_cleaner reads the False values here: a change also changes JSON key cleaning.
 _TRAINING = {
     # On (library defaults, listed so the preset reads on its own)
     'check_replace_urls': True,

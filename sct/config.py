@@ -492,16 +492,18 @@ class TextCleanerConfig:
         from sct.presets import preset_config
         return preset_config(name, **overrides)
 
-    def __getstate__(self):
-        # Restore the exact normalized state; never re-run __post_init__.
-        state = dict(self.__dict__)
-        frozen = [k for k, v in state.items() if isinstance(v, MappingProxyType)]
-        for key in frozen:
-            state[key] = dict(state[key])
+    def _plain_state(self) -> dict[str, Any]:
+        """The fields as plain values: mapping proxies as dicts, a PII-derived gliner_label_map as None."""
+        state = {k: dict(v) if isinstance(v, MappingProxyType) else v for k, v in self.__dict__.items()}
         # derived only in PII mode (re-shared on load); a map kept after a replace() to another mode is data
         if self.ner_mode == 'pii' and any(self.gliner_label_map is m for m in _PII_MAPS.values()):
             state['gliner_label_map'] = None
-            frozen.remove('gliner_label_map')
+        return state
+
+    def __getstate__(self):
+        # Restore the exact normalized state; never re-run __post_init__.
+        state = self._plain_state()
+        frozen = [k for k, v in self.__dict__.items() if isinstance(v, MappingProxyType) and state[k] is not None]
         return state, frozen
 
     def __setstate__(self, packed):

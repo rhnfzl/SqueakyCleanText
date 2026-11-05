@@ -154,5 +154,6 @@ def test_pickle_state_keeps_its_shape(kwargs, frozen, label_map):
     assert names == frozen
     assert list(state) == list(vars(cfg))
     assert state["gliner_label_map"] == label_map
+    assert cfg._plain_state() == state
     assert not any(isinstance(value, MappingProxyType) for value in state.values())
     assert pickle.loads(pickle.dumps(cfg)) == cfg

@@ -78,7 +78,7 @@ def clean_dataset(
         from datasets.fingerprint import Hasher
         state = {
             k: sorted(v) if isinstance(v, (set, frozenset)) else v
-            for k, v in fn.handle.config.__getstate__()[0].items()
+            for k, v in fn.handle.config._plain_state().items()
         }
         map_kwargs["new_fingerprint"] = Hasher.hash([
             ds._fingerprint, sct.__version__, fn.columns, output, score, batch_size,

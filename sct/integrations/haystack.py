@@ -46,7 +46,7 @@ class SCTDocumentCleaner:
         if isinstance(config, TextCleanerConfig):
             default = TextCleanerConfig()
             # The pickle state: a derived PII label map is None there, so the loaded config re-derives it.
-            state = config.__getstate__()[0]
+            state = config._plain_state()
             config = {
                 f.name: _plain(value)
                 for f in fields(config)
