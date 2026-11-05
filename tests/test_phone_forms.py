@@ -9,6 +9,7 @@ from sct import TextCleaner, TextCleanerConfig
 from sct.adapters import process_json
 from sct.presets import preset_config
 from sct.streaming import WindowedStreamingRedactor
+from sct.utils import contact
 from sct.utils.normtext import fold_styled
 
 
@@ -169,3 +170,33 @@ def test_typeset_separators_stay_with_fold_off():
 ])
 def test_fold_reads_typeset_separators(text, folded):
     assert fold_styled(text) == folded
+
+
+NATIVE_PHONE = "٠٦ ١٢ ٣٤ ٥٦ ٧٨"
+
+
+@pytest.mark.parametrize("text, expected", [
+    (f"Call {NATIVE_PHONE} today.", "Call <PHONE> today."),
+    ("Pay NL91 ABNA 0417 1643 00 today.", "Pay <IBAN> today."),
+    ("Card 4111 1111 1111 1111 today.", "Card <CARD> today."),
+])
+def test_view_matches_mask_the_source_value(text, expected):
+    assert TextCleaner(cfg=FAST).process(text).lm_text == expected
+
+
+@pytest.mark.parametrize("view, text, value, span", [
+    (contact.PHONE_VIEW, f"Call {NATIVE_PHONE} today.", NATIVE_PHONE, (5, 19)),
+    (contact.IBAN_VIEW, "Pay NL91 ABNA 0417 1643 00 today.", "NL91 ABNA 0417 1643 00", (4, 26)),
+    (contact.CARD_VIEW, "Card 4111 1111 1111 1111 today.", "4111 1111 1111 1111", (5, 24)),
+])
+def test_view_match_reads_the_source_text(view, text, value, span):
+    seen = []
+
+    def repl(match):
+        seen.append((match.group(), match.group(0), match.start(), match.end(), match.span()))
+        with pytest.raises(IndexError):
+            match.group(1)
+        return "X"
+
+    assert view.sub(repl, text) == text[:span[0]] + "X" + text[span[1]:]
+    assert seen == [(value, value, *span, span)]

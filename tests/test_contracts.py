@@ -6,6 +6,7 @@ import pytest
 
 from tests.helpers import bare_ner, set_cfg, set_policy
 from sct import EntityRule, PrivacyPolicy, TextCleaner, TextCleanerConfig
+from sct.sct import _KEY
 from sct.utils import constants
 from sct.utils.normtext import NormaliseText
 from sct.utils.ner import GeneralNER, ModelLoadError
@@ -182,3 +183,7 @@ def test_gliner_and_presidio_construction_errors(monkeypatch, backend, target, r
     monkeypatch.setattr(target, fail)
     with pytest.raises(expected, match="no weights"):
         GeneralNER(TextCleanerConfig(ner_backend=backend, gliner_model="x/y"))
+
+
+def test_protected_key_pattern_stays_the_same():
+    assert _KEY.pattern == "\U00100000[\U000F0000-\U0010FFFF]\U00100001"
