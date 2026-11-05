@@ -140,3 +140,23 @@ def test_report_cli_usage_errors_instead_of_tracebacks(tmp_path, monkeypatch):
     with pytest.raises(SystemExit) as exit_info:
         report_cli.main([source, "--no-ner", "--out", out])
     assert exit_info.value.code == 2
+
+
+def test_report_cli_bad_quality_model_is_a_usage_error(tmp_path, monkeypatch, capsys):
+    monkeypatch.setattr(report_cli, "TextCleaner", _FakeCleaner)
+    source, out = str(_jsonl(tmp_path)), str(tmp_path / "r.json")
+    model = tmp_path / "model"
+    model.mkdir()
+    (model / "model.onnx").write_bytes(b"")  # onnxruntime's Fail for this is not an OSError or ValueError
+    args = [source, "--no-ner", "--quality-model", str(model), "--out", out]
+
+    with pytest.raises(SystemExit) as exit_info:
+        report_cli.main(args)
+    assert exit_info.value.code == 2
+    assert "cannot score" in capsys.readouterr().err
+
+    monkeypatch.setattr(report_cli, "score_records", lambda *_args: [])
+    (model / "sct_quality.json").write_text("[]")
+    with pytest.raises(SystemExit) as exit_info:
+        report_cli.main(args)
+    assert exit_info.value.code == 2

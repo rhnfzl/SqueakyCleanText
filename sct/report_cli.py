@@ -119,16 +119,19 @@ def main(argv: Sequence[str] | None = None) -> int:
         quality_model=args.quality_model,
         minhash=args.minhash,
     )
-    # onnxruntime's NoSuchFile for a missing model is no OSError, so the handler below misses it.
+    # Fail before the corpus is cleaned, which can take far longer than this check.
     if args.quality_model and not Path(args.quality_model, "model.onnx").is_file():
         parser.error(f"no model.onnx in --quality-model folder {args.quality_model}")
     overrides = {"check_ner_process": False} if args.no_ner else {}
     try:
         cleaner = TextCleaner(cfg=preset_config(args.preset, **overrides))
         results = cleaner.process_batch(texts)
-        scored = score_records(results, texts, config)
     except (ImportError, ModelLoadError, OSError, ValueError) as exc:
         parser.error(str(exc))
+    try:
+        scored = score_records(results, texts, config)
+    except Exception as exc:  # onnxruntime and tokenizers errors derive directly from Exception
+        parser.error(f"cannot score: {exc}")
     models = [m for result in results for m in result.signals["models"]]
 
     report: dict[str, Any] = {
@@ -140,10 +143,13 @@ def main(argv: Sequence[str] | None = None) -> int:
     }
     if config.quality:
         manifest = Path(args.quality_model) / "sct_quality.json"
+        recorded = json.loads(manifest.read_text()) if manifest.is_file() else {}
+        if not isinstance(recorded, dict):
+            parser.error(f"{manifest.name} is not a JSON object")
         report["quality"] = {
             "model_dir": Path(args.quality_model).name,
             "input": "original text",
-            **(json.loads(manifest.read_text()) if manifest.is_file() else {}),
+            **recorded,
         }
     if config.minhash:
         report["minhash"] = minhash_metadata(config)
