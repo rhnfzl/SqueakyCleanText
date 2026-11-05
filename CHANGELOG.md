@@ -1,5 +1,54 @@
 # Changelog
 
+## Unreleased
+
+**Cleaner internals, faster import, clearer errors.**
+
+- **Faster start:** `import sct` is about 1.1 seconds faster and no longer loads NER libraries until a model is needed.
+- **Masked output is the same** in our byte-for-byte comparison of regex-only configs.
+- **Clearer errors:** `sct-clean`, `sct-report` and MCP report bad input and failed model loads as usage errors, not tracebacks.
+- **Safer files:** reports and browser manifests are written so a crash cannot leave half a file.
+- **Type checkers work:** the package ships `py.typed`, and CI checks it with mypy.
+
+Heads-up: legacy `config.*` globals that were ignored now take effect. `process_batch` now refuses a plain string. Importers of `sct.utils.ner` or other private names must update, see below.
+
+### Behaviour changes
+- Every `TextCleanerConfig` field now has a legacy module global with its upper-case name, for example `config.NER_BACKEND`. These were silently ignored before and now take effect. The exceptions are the computed `supported_languages` and the deprecated `ner_models_list`, which `NER_MODELS_LIST` still feeds. New global `config.NER_MODELS` takes a language-keyed dict and wins over `NER_MODELS_LIST`, and `config.NER_ENSEMBLE_DEFAULT_KEYS` now takes effect when changed.
+- `process_batch` raises `ValueError` for a plain string instead of treating each character as a text. Use `process()` for one text.
+- `WindowedStreamingRedactor` raises `BufferError` for a broken or cut escape followed by a very long token. It used to stream this input with output that differed from whole-text cleaning.
+- ONNX model loading raises `ModelLoadError` when a network or auth error hits `model.onnx_data` or `tokenizer_config.json`, instead of treating the file as missing. GLiNER and Presidio construction errors are also wrapped as `ModelLoadError`.
+- `score_records` now runs a supplied scorer when `ScoreConfig.quality` is False, and adds the `sct_quality` and `sct_minhash` columns. Before, the scorer was silently ignored.
+- `sct-clean` refuses reversible mode before cleaning on platforms without `os.fchmod`.
+- Importing SCT no longer changes the process-wide ONNX Runtime log level or adds a warnings filter for lingua. Other ONNX Runtime output in the host application is no longer silenced.
+- The `torch` extra now requires `transformers>=5.0`; 4.x could not be installed alongside the `huggingface-hub>=1.5.0` requirement.
+
+### Added
+- The `presidio` extra now also installs GLiNER. New `quantize` extra installs `onnx` for `load_onnx_ner_model(quantize=True)`.
+- `process_dataframe` and `process_rag_chunks` results gain `sensitive` and `signals`; `ProcessedRAGChunk` also gains `metadata_findings`.
+- `process_dataframe` accepts a single column name as a string.
+- `ModelLoadError` is exported from `sct`.
+- MCP `detail='full'` adds the warning `findings_not_collected`, and its `outputSchema` describes the `signals` keys.
+
+### Fixed
+- `presidio_gliner` honours `replacement_mode='reversible'` and `'synthetic'`. Masked spans are unchanged.
+- `process_json` masks a `custom_deny_terms` value in a JSON key when `check_to_ascii_unicode` is on (a key `José` stayed readable).
+- Empty input includes `metadata['policy']` and `metadata['findings']` under the same conditions as other documents.
+- `WindowedStreamingRedactor` no longer raises a false `BufferError` with a one-character `custom_patterns` rule, keeps processed windows across a caught `BufferError`, and keeps a date whole when a cut escape ends the buffer.
+- `TextCleaner` no longer keeps document text in per-thread state after processing, including after a step raises.
+- `AnonymizationMap.to_dict` and `from_dict` keep reserved tokens, so placeholders allocated after a round trip do not collide.
+- `sct-clean` writes the token map before printing masked text.
+- MCP no longer names the root folder when `SCT_MCP_ROOT` cannot be opened, and gives the unique-keys remedy only for duplicate-key errors.
+- A plain string for `quasi_identifiers` in `assess_reidentification_risk` means one field, not separate characters.
+- A float, zero or negative `model_max_length` in `tokenizer_config.json` is read safely, with a fallback to 512.
+
+### Deprecated
+- `TextCleaner.NormaliseText`, `ProcessStopwords`, `ProcessDateTime`, `ProcessContacts` and `ProcessSpecialSymbols` are now private attributes. The old names still work and raise a `DeprecationWarning`.
+
+### Removed or changed for deep importers (undocumented names)
+- `GeneralNER` now takes a `TextCleanerConfig` plus its collaborators. `process_batch` is now `ner_process_batch`, `ner_data` is `entities_with_position_key`, `ner_ensemble` is `vote_entities`, and `positional_tags` is required on `ner_process*`.
+- Removed: `AnonymizeResult`, eight unused `ProcessContacts` methods, `ProcessStopwords.STOP_WORDS_*`, the `no_emoji` argument of `to_ascii_unicode`, and `DETECTOR`, `LANGUAGES`, `LANGUAGE_NAME` in `sct.utils.resources`.
+- Removed the stub `setup.py` and the root `requirements.txt`; use `pyproject.toml` and its extras.
+
 ## 0.8.2 - 2026-11-03
 
 **Smarter numbers, your own rules, safer streaming.**
