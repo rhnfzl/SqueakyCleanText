@@ -38,6 +38,9 @@ Heads-up: reversible output changes, and streaming and MCP now refuse reversible
 - MCP `detail='full'` adds the warning `findings_not_collected`, and its `outputSchema` describes the `signals` keys.
 
 ### Fixed
+- Synthetic mode gives each type a fake of its own kind, including Presidio's types: a company stays a company, a date stays a date, and a number stays a number. A type with no fake generator, such as your own label, is written as `<TYPE>` instead of a person name. A fake no longer contains the original value as a whole word.
+- `presidio_gliner` no longer masks inside SCT's own tags, so `<EMAIL>` stays `<EMAIL>` and is not counted as a finding. Text outside a tag and tag-shaped text from your source are still masked.
+- Without Faker, synthetic mode raises one clear `ImportError` naming `squeakycleantext[synthetic]`.
 - `process_json` and RAG chunk metadata mask strings inside tuples and non-dict mappings, returned as lists and dicts, and inside tuple dict keys, following `json_key_cleaning`. Sets and bytes are still not masked.
 - The ensemble backends no longer ignore GLiNER's spans with default labels. `person`, `organization` and `location` reach the vote as `PER`, `ORG` and `LOC`. A tag you request as `PERSON`, `ORGANIZATION` or `LOCATION` stays under that name, and your own `gliner_label_map` still wins.
 - `ner_propagate_masked` and `ner_merge_location_gap` also work on the `PERSON`, `ORGANIZATION` and `LOCATION` spans of the plain `gliner` backend, with the same output tokens.
