@@ -2,6 +2,14 @@ name: Optional backend tests
 
 on:
   workflow_dispatch:
+  pull_request:
+    paths:
+      - sct/utils/gliner_adapter.py
+      - sct/utils/gliclass_adapter.py
+      - sct/utils/torch_pipeline.py
+      - sct/utils/ner.py
+      - pyproject.toml
+      - .github/workflows/optional-backends.yml
   schedule:
     - cron: "17 3 * * 1"
 
