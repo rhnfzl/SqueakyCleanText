@@ -60,6 +60,12 @@ jobs:
     - name: Check initial disk usage
       run: df -h
 
+    - name: Cache the test NER model
+      uses: actions/cache@v4
+      with:
+        path: ~/.cache/huggingface
+        key: hf-protectai-bert-base-NER-onnx-${{ runner.os }}
+
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
