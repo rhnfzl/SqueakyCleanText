@@ -1,3 +1,4 @@
+import asyncio
 import gc
 import unittest
 import string
@@ -927,10 +928,9 @@ class TextCleanerTest(unittest.TestCase):
 
     def test_aprocess_batch_uses_running_loop(self):
         """aprocess_batch() must call get_running_loop, not get_event_loop."""
-        import inspect
-        src = inspect.getsource(TextCleaner.aprocess_batch)
-        self.assertIn('get_running_loop', src)
-        self.assertNotIn('get_event_loop', src)
+        cleaner = TextCleaner(TextCleanerConfig(check_ner_process=False))
+        with patch('asyncio.get_event_loop', side_effect=AssertionError):
+            self.assertEqual(asyncio.run(cleaner.aprocess_batch(['hi there']))[0][0], 'hi there')
 
     def test_sentence_boundary_no_false_split_on_abbreviation(self):
         """SENTENCE_BOUNDARY_PATTERN must not split abbreviation-dot + space."""
@@ -951,10 +951,10 @@ class TextCleanerTest(unittest.TestCase):
 
     def test_simple_chunk_conservative_ratio(self):
         """_simple_chunk uses 2 chars/token (not 4) to handle CJK/Arabic safely."""
-        import inspect
-        src = inspect.getsource(simple_chunk)
-        self.assertIn('max_tokens * 2', src)
-        self.assertNotIn('max_tokens * 4', src)
+        text = '\u6f22\u5b57' * 500
+        chunks = simple_chunk(text, max_tokens=50)
+        self.assertLessEqual(max(map(len, chunks)), 100)
+        self.assertEqual(''.join(chunks), text)
 
     def test_threadpool_single_text_no_threading(self):
         """Test that process_batch with 1 text skips ThreadPoolExecutor."""
