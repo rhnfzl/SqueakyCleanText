@@ -344,7 +344,7 @@ class TextCleaner:
 
         self._pipeline.extend(self._normalising_steps())
         # Steps before this index only normalise; markers they surface are source text.
-        self._normalise_steps = len(self._pipeline)
+        self._normalise_step_count = len(self._pipeline)
         rows = (
             # escaped "<b>" stays text: decoded after the view, hidden from tags
             (cfg.check_fix_bad_unicode, self._unescape_markup),
@@ -458,7 +458,7 @@ class TextCleaner:
 
         The streaming split guard reads this same view, so the two cannot differ.
         """
-        for step in self._pipeline[:self._normalise_steps]:
+        for step in self._pipeline[:self._normalise_step_count]:
             text = step(text)
         return text
 
@@ -516,7 +516,7 @@ class TextCleaner:
             anon_map.reserved.update(source_markers)
         # (marker, emitted) for each marker occurrence, recorded by _restore_protected
         self._document_context.marker_order = [] if source_markers else None
-        for step in self._pipeline[self._normalise_steps:]:
+        for step in self._pipeline[self._normalise_step_count:]:
             self._document_context.step_text = current_text
             current_text = step(current_text)
         source_markers = self._source_marker_spans(current_text, source_markers)
@@ -813,27 +813,27 @@ class TextCleaner:
             text = self._sub_user_rule(pattern, timed, lambda m, label_of=label_of: emit(m, label_of(m)), text)
         return text
 
-    def _sub_user_rule(self, pattern, label, repl, text):
+    def _sub_user_rule(self, pattern, timed_label, repl, text):
         """*text* with each match of a user rule replaced. Matches first, then *repl*: a pattern that times out
         (see _user_matches) adds nothing to the map (the streaming guard runs this too)."""
         parts, last = [], 0
-        for match in self._user_matches(pattern, label, text) or ():
+        for match in self._user_matches(pattern, timed_label, text) or ():
             parts += [text[last:match.start()], repl(match)]
             last = match.end()
         return ''.join(parts) + text[last:]
 
-    def _user_matches(self, pattern, label, text, **kwargs):
-        """Every match of a user rule in *text*; a custom pattern (*label* set) stops at custom_patterns_timeout
+    def _user_matches(self, pattern, timed_label, text, **kwargs):
+        """Every match of a user rule in *text*; a custom pattern (*timed_label* set) stops at custom_patterns_timeout
         and then raises CustomPatternTimeout, or with custom_patterns_on_timeout='warn' logs it, adds the
         'custom_pattern_timeout' warning and returns None."""
-        timeout = self.cfg.custom_patterns_timeout if label is not None else None
+        timeout = self.cfg.custom_patterns_timeout if timed_label is not None else None
         try:
             return list(pattern.finditer(text, timeout=timeout, **kwargs))
         except TimeoutError:
             assert timeout is not None  # no limit, no TimeoutError
             if self.cfg.custom_patterns_on_timeout == 'raise':
-                raise CustomPatternTimeout(label, timeout) from None
-            logger.warning("custom_patterns[%r] ran longer than %ss; skipped for this document", label, timeout)
+                raise CustomPatternTimeout(timed_label, timeout) from None
+            logger.warning("custom_patterns[%r] ran longer than %ss; skipped for this document", timed_label, timeout)
             warnings = self._document_context.warnings
             if warnings is not None:
                 warnings.add('custom_pattern_timeout')
