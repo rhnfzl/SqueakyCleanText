@@ -9,7 +9,7 @@ from tests.helpers import gliner_ner, set_cfg, windows_for
 from sct.config import TextCleanerConfig
 from sct.sct import TextCleaner
 from sct.utils.gliner_adapter import GLiNERAdapter
-from sct.utils.ner import GeneralNER
+from sct.utils.ner import GeneralNER, ModelLoadError
 from tests.conftest import TEST_NER_MODELS, TEST_NER_REVISIONS
 from types import SimpleNamespace
 
@@ -37,7 +37,12 @@ class _CountingSession:
 
 @pytest.fixture(scope="module")
 def onnx_ner():
-    return GeneralNER(TextCleanerConfig(ner_models=TEST_NER_MODELS, ner_model_revisions=TEST_NER_REVISIONS))
+    try:
+        return GeneralNER(TextCleanerConfig(ner_models=TEST_NER_MODELS, ner_model_revisions=TEST_NER_REVISIONS))
+    except ModelLoadError as e:
+        if not isinstance(e.__cause__, OSError):  # download or network failure; anything else is a bug
+            raise
+        pytest.skip(f"NER models unavailable: {e}")
 
 
 def test_onnx_batch_runs_once_per_slice(onnx_ner, monkeypatch):
