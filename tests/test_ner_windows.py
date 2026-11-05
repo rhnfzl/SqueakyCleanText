@@ -334,3 +334,26 @@ def test_overlap_keeps_a_fitting_document_in_one_window_gliner_only():
     text = "x" * (ner._chunk_budget() * 2)
     assert [w[0] for w in windows_for(ner, text)] == [text]
     assert len(windows_for(ner, text + "x")) > 1
+
+
+# --- the window shape: (text, start, offsets, own_start, own_end) ---
+@pytest.mark.parametrize("overlap, expected", [
+    (0, [("Ann Bob Cid Dan", 0, list(range(16)), 0, 32), ("Eve Fay Gus Hal", 16, list(range(16)), 0, 32)]),
+    (1, [("Ann Bob Cid Dan Eve", 0, range(20), 0, 16), ("Dan Eve Fay Gus Hal", 12, range(20), 16, 32)]),
+])
+def test_token_window_shape(overlap, expected):
+    ner = word_ner(overlap, FakeRunDetector(), budget=6 if overlap else 4)
+    assert windows_for(ner, "Ann Bob Cid Dan Eve Fay Gus Hal") == expected
+
+
+def test_character_window_shape():
+    ner = gliner_ner()
+    ner._gliner_pipe.max_context_length = 6  # 5 tokens -> 10-char chunks
+    assert windows_for(ner, "abcd efgh ijkl mnop") == [
+        ("abcd efgh", 0, list(range(10)), 0, 20), ("ijkl mnop", 10, list(range(10)), 0, 20),
+    ]
+    ner._gliner_pipe.max_context_length = 10  # 9 tokens, 7 after overlap -> 14-char cores
+    set_cfg(ner, ner_chunk_overlap=1)
+    assert windows_for(ner, "abcd efgh ijkl mnop qrst uvwx") == [
+        ("abcd efgh ijkl m", 0, range(17), 0, 15), ("l mnop qrst uvwx", 13, range(17), 15, 30),
+    ]
