@@ -7,11 +7,12 @@ import pytest
 
 from sct import TextCleanerConfig
 from sct.utils.anonymization_map import AnonymizationMap
+from sct.utils.ner import GeneralNER
 from sct.utils.onnx_pipeline import ONNXNERPipeline
 from sct.utils.synthetic import SyntheticReplacer
 
 from tests.conftest import TEST_NER_MODELS, TEST_NER_REVISIONS
-from tests.helpers import bare_ner, FakeRunDetector, finalize_spans, finalized_text, set_cfg, word_ner
+from tests.helpers import bare_ner, FakeRunDetector, finalize_spans, finalized_text, set_cfg, word_ner, word_tokenizer
 
 
 def test_propagation_does_not_match_inside_a_word_with_combining_mark():
@@ -311,3 +312,73 @@ def test_nested_spans_leave_no_part_of_the_entity(mode):
         assert text.startswith("<PERSON>. ")
     if mode == "reversible":
         assert anon_map.deanonymize(text) == TEXT
+
+
+# --- GLiNER labels reach the ensemble vote, and the span rules see the long labels ---
+class _FakeGLiNERModel:
+    """A GLiNER model that finds one fixed word for each label it is asked about."""
+
+    words = {"person": "Ann", "organization": "Acme", "location": "Paris"}
+
+    def predict_entities(self, text, labels, threshold=0.5):
+        return [{"label": label, "text": self.words[label], "score": 0.95,
+                 "start": text.index(self.words[label]), "end": text.index(self.words[label]) + len(self.words[label])}
+                for label in labels]
+
+
+class _SilentTokenModel:
+    """A token model that finds nothing, so every span in the output came from GLiNER."""
+
+    max_len_single_sentence = 510
+
+    def __call__(self, text_or_texts, **kwargs):
+        if kwargs.get("batch_size"):
+            return [[] for _ in text_or_texts]
+        return word_tokenizer(text_or_texts)
+
+
+def _gliner_output(monkeypatch, **cfg):
+    silent = _SilentTokenModel()
+    monkeypatch.setattr("sct.utils.onnx_pipeline.load_onnx_ner_model", lambda *a, **k: (silent, silent))
+    monkeypatch.setattr("sct.utils.torch_pipeline.load_torch_ner_model", lambda *a, **k: (silent, silent))
+    monkeypatch.setattr("sct.utils.gliner_adapter.GLiNERAdapter._load_gliner", lambda *a: _FakeGLiNERModel())
+    ner = GeneralNER(TextCleanerConfig(gliner_model="fake/gliner", ner_device="cpu", **cfg))
+    return ner.ner_process_detailed("Ann works at Acme in Paris", language="ENGLISH").text
+
+
+@pytest.mark.parametrize("backend", ["ensemble_onnx", "ensemble_torch"])
+def test_ensemble_keeps_gliner_spans_with_default_labels(monkeypatch, backend):
+    assert _gliner_output(monkeypatch, ner_backend=backend) == "<PERSON> works at <ORGANISATION> in <LOCATION>"
+
+
+@pytest.mark.parametrize("label_map, expected", [
+    ({"person": "ORG", "organization": "PER", "location": "MISC"}, "<ORGANISATION> works at <PERSON> in <MISC>"),
+    ({"person": "PER"}, "<PERSON> works at Acme in Paris"),
+    ({}, "Ann works at Acme in Paris"),
+])
+def test_ensemble_user_label_map_wins(monkeypatch, label_map, expected):
+    assert _gliner_output(monkeypatch, ner_backend="ensemble_onnx", gliner_label_map=label_map) == expected
+
+
+def test_ensemble_keeps_a_label_requested_under_its_long_tag(monkeypatch):
+    out = _gliner_output(monkeypatch, ner_backend="ensemble_onnx", positional_tags=("ORGANIZATION", "PER", "LOC"))
+    assert out == "<PERSON> works at <ORGANIZATION> in <LOCATION>"
+
+
+def test_plain_gliner_backend_keeps_its_default_tokens(monkeypatch):
+    assert _gliner_output(monkeypatch, ner_backend="gliner") == "<PERSON> works at <ORGANIZATION> in <LOCATION>"
+
+
+def test_long_labels_propagate_and_keep_their_tokens():
+    text = "Ann of Acme in Paris. Ann, Acme, Paris."
+    spans = [(0, 3, "PERSON", 0.9), (7, 11, "ORGANIZATION", 0.9), (15, 20, "LOCATION", 0.9)]
+    ner, windows, results = finalize_spans(text, spans)
+    assert finalized_text(ner, text, windows, results) == \
+        "<PERSON> of <ORGANIZATION> in <LOCATION>. <PERSON>, <ORGANIZATION>, <LOCATION>."
+
+
+def test_long_location_label_merges_across_a_gap():
+    text = "Elm Street, Springfield. Rome"
+    spans = [(0, 10, "LOCATION", 0.9), (12, 23, "LOCATION", 0.9), (25, 29, "LOC", 0.9)]
+    ner, windows, results = finalize_spans(text, spans, ner_merge_location_gap=12)
+    assert finalized_text(ner, text, windows, results) == "<LOCATION>. <LOCATION>"

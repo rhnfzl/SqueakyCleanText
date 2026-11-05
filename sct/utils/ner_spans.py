@@ -15,6 +15,9 @@ ENTITY_TYPE_MAP = {
     'MISC': 'MISC',
 }
 
+# Propagated groups: the token models' short tags and the long labels the default gliner backend emits.
+_PROPAGATED_GROUPS = frozenset({'PER', 'ORG', 'LOC', 'PERSON', 'ORGANIZATION', 'LOCATION'})
+
 # Ends a LOCATION merge gap: a line break or a sentence end (format only, no words).
 _GAP_BREAK = re.compile(r"[\n\r\u2028\u2029]|[.!?;:]\s|[。！？]")
 
@@ -94,8 +97,7 @@ def merge_location_gaps(text: str, spans: Iterable[dict[str, Any]], markers: Col
     merged: list[dict[str, Any]] = []
     for item in sorted(spans, key=lambda x: (x['start'], -x['end'])):
         last = merged[-1] if merged else None
-        if last and ENTITY_TYPE_MAP.get(last['entity_group']) == 'LOCATION' \
-                and ENTITY_TYPE_MAP.get(item['entity_group']) == 'LOCATION':
+        if last and {last['entity_group'], item['entity_group']} <= {'LOC', 'LOCATION'}:
             a, b = last['end'], item['start']
             gap = text[a:b]
             visible = sum(1 for i in range(a, b) if not any(s <= i < e for s, e in markers))
@@ -111,7 +113,7 @@ def _spreadable_values(text: str, spans: list[dict[str, Any]], min_score: float 
     sources: dict[str, dict[str, Any]] = {}
     for item in spans:
         value = text[item['start']:item['end']]
-        if (item['entity_group'] in ('PER', 'ORG', 'LOC') and (min_score is None or item['score'] >= min_score)
+        if (item['entity_group'] in _PROPAGATED_GROUPS and (min_score is None or item['score'] >= min_score)
                 and len(value) >= 2 and any(ch.isalpha() for ch in value)
                 and (value not in sources or item['score'] > sources[value]['score'])):
             sources[value] = item
@@ -120,7 +122,7 @@ def _spreadable_values(text: str, spans: list[dict[str, Any]], min_score: float 
 
 def propagate(text: str, spans: list[dict[str, Any]], markers: Iterable[tuple[int, int]],
               min_score: float | None) -> list[dict[str, Any]]:
-    """Add a span at every other whole-word, case-sensitive copy of a masked PER/ORG/LOC value.
+    """Add a span at every other whole-word, case-sensitive copy of a masked person, organisation or location.
 
     The values come from the models' own spans; a span below *min_score*,
     shorter than 2 characters or without a letter is not spread. Copies that overlap a

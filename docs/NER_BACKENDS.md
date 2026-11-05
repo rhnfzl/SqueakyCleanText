@@ -72,6 +72,8 @@ gliner_label_map={
 # 'product' → <PRODUCT>, 'event' → <EVENT>, 'skill' → <SKILL>
 ```
 
+With `gliner_label_map=None`, the ensemble backends map `person`, `organization` and `location` to `PER`, `ORG` and `LOC`, so GLiNER's spans reach the vote and become `<PERSON>`, `<ORGANISATION>` and `<LOCATION>`. Your own map replaces this one entirely. The plain `gliner` backend has no default map, so those labels become `<PERSON>`, `<ORGANIZATION>` and `<LOCATION>`.
+
 ## GLiNER: Zero-Shot Custom NER
 
 Use [GLiNER](https://github.com/urchade/GLiNER) to recognize any entity type without retraining:
@@ -108,7 +110,6 @@ cfg = TextCleanerConfig(
     ner_backend='ensemble_onnx',  # or 'ensemble_torch'
     gliner_model='urchade/gliner_large-v2.1',
     gliner_labels=('person', 'organization', 'location'),
-    gliner_label_map={'person': 'PER', 'organization': 'ORG', 'location': 'LOC'},
 )
 
 cleaner = TextCleaner(cfg=cfg)

@@ -48,6 +48,8 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+_ENSEMBLE_LABEL_MAP = {'person': 'PER', 'organization': 'ORG', 'location': 'LOC'}
+
 # An inference lock's key: 'gliner', or a token model's (name, revision).
 ModelKey = tuple[str, str | None]
 
@@ -84,6 +86,14 @@ class _Window(NamedTuple):
 class ModelLoadError(Exception):
     """Raised when model loading fails"""
     pass
+
+
+def _gliner_label_map(cfg: TextCleanerConfig) -> dict[str, str]:
+    """The adapter's label map: a user's own, else on ensembles the short tags the vote keeps."""
+    if cfg.gliner_label_map is not None or cfg.ner_backend == 'gliner':
+        return dict(cfg.gliner_label_map or {})
+    # A tag already requested under its long name keeps reaching the vote under that name.
+    return {label: tag for label, tag in _ENSEMBLE_LABEL_MAP.items() if label.upper() not in cfg.positional_tags}
 
 
 def _presidio_type_map(legacy_type_names: bool, label_map: Mapping[str, str] | None) -> dict[str, str]:
@@ -208,7 +218,7 @@ class GeneralNER:
                     variant=cfg.gliner_variant,
                     labels=cfg.gliner_labels,
                     threshold=cfg.effective_gliner_threshold,
-                    label_map=dict(cfg.gliner_label_map or {}),
+                    label_map=_gliner_label_map(cfg),
                     label_descriptions=dict(cfg.gliner_label_descriptions or {}),
                     device=self._torch_device,
                     onnx=cfg.gliner_onnx,

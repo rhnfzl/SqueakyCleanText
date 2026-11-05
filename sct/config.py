@@ -371,7 +371,7 @@ class TextCleanerConfig:
     # ner_confidence_threshold, so a weak second model never hides a strong hit; 'mean' averages
     # the model scores (0.8.0)
     ner_ensemble_vote: NerEnsembleVote = 'max'
-    # mask every other case-sensitive whole-word copy of a masked PER/ORG/LOC value in the same
+    # mask every other case-sensitive whole-word copy of a masked person/org/location value in the same
     # document (the value comes from the model's own span); False = 0.8.0 output
     ner_propagate_masked: bool = True
     # score a span needs before its value is propagated (0..1); None = the effective NER cut.
@@ -398,7 +398,7 @@ class TextCleanerConfig:
     date_builtin_month_languages: tuple[str, ...] | None = None
     # HTML rule reads only tag shapes (<b>, </a>, <br/>, <!-- -->); False = 0.8.0 "<.*?>" (eats "<a@b.com>")
     html_tag_strict: bool = True
-    # join two LOCATION spans whose gap has <= N chars (placeholders not counted), no line break
+    # join two location spans whose gap has <= N chars (placeholders not counted), no line break
     # and no sentence end, so an address is one <LOCATION>; 0 = off (0.8.0 output)
     ner_merge_location_gap: int = 0
     # NER span edges cut inside a word (letters and marks, not wide CJK) move out to the word
