@@ -2,23 +2,31 @@
 
 ## Unreleased
 
-**Cleaner internals, faster import, clearer errors.**
+**Leak fixes, cleaner internals, faster import, clearer errors.**
 
-- **Faster start:** `import sct` is about 1.1 seconds faster and no longer loads NER libraries until a model is needed.
-- **Masked output is the same** in our byte-for-byte comparison of regex-only configs.
+- **Leak fixes:** `process_json` now masks strings in tuples and non-dict mappings, and reversible mode masks digits glued to a placeholder.
+- **Ensembles use GLiNER:** with default labels, the ONNX + GLiNER vote used to ignore GLiNER's spans.
+- **Honest signals:** `sensitive` now means PII was found, and values your policy keeps no longer count.
+- **Faster start:** `import sct` is about 1.1 seconds faster and loads NER libraries only when needed.
 - **Clearer errors:** `sct-clean`, `sct-report` and MCP report bad input and failed model loads as usage errors, not tracebacks.
-- **Safer files:** reports and browser manifests are written so a crash cannot leave half a file.
 - **Type checkers work:** the package ships `py.typed`, and CI checks it with mypy.
 
-Heads-up: legacy `config.*` globals that were ignored now take effect. `process_batch` now refuses a plain string. Importers of `sct.utils.ner` or other private names must update, see below.
+Heads-up: reversible output changes, and streaming and MCP now refuse reversible cleaners. `sensitive` is false for a date or number alone. `process_batch` refuses a plain string, and `batch_size` is now `max_workers` there. Legacy `config.*` globals that were ignored now take effect. Importers of private names must update, see below.
 
 ### Behaviour changes
+- In reversible mode, a digit run glued to a placeholder is now masked and restores exactly: `a@b.com-107683` gives `<EMAIL_0>-<NUMBER_0>`, and `John Smith-107683` gives `<PERSON_0>-<NUMBER_0>`. A quote, dash, `*` or `%` touching a placeholder is now kept, so it comes back on restore.
+- The streaming redactors and the MCP server refuse a reversible cleaner with a clear error, because they have no way to return its token map.
+- `signals['sensitive']` and `is_sensitive_result` now mean `pii_count > 0`, so a replaced date, year, number, currency or HTML tag alone is no longer sensitive.
+- `entity_counts`, `pii_count` and the metrics callback no longer count entities a `PrivacyPolicy` kept, allowed or ignored. `metadata['findings']` still lists them.
+- OCR redaction no longer covers regions that hold only entities a policy exempted. It still covers everything replaced in the text, including dates and years.
+- Framework adapters (DataTrove, LangChain, Haystack) write `metadata['sct']` merged over all listed columns, so PII in a later column marks the document as sensitive. Score columns stay on the first column.
+- `process_batch` and `aprocess_batch` take `max_workers` for the worker thread limit. `batch_size` is a deprecated keyword alias, and passing both raises `TypeError`.
 - Every `TextCleanerConfig` field now has a legacy module global with its upper-case name, for example `config.NER_BACKEND`. These were silently ignored before and now take effect. The exceptions are the computed `supported_languages` and the deprecated `ner_models_list`, which `NER_MODELS_LIST` still feeds. New global `config.NER_MODELS` takes a language-keyed dict and wins over `NER_MODELS_LIST`, and `config.NER_ENSEMBLE_DEFAULT_KEYS` now takes effect when changed.
 - `process_batch` raises `ValueError` for a plain string instead of treating each character as a text. Use `process()` for one text.
 - `WindowedStreamingRedactor` raises `BufferError` for a broken or cut escape followed by a very long token. It used to stream this input with output that differed from whole-text cleaning.
 - ONNX model loading raises `ModelLoadError` when a network or auth error hits `model.onnx_data` or `tokenizer_config.json`, instead of treating the file as missing. GLiNER and Presidio construction errors are also wrapped as `ModelLoadError`.
 - `score_records` now runs a supplied scorer when `ScoreConfig.quality` is False, and adds the `sct_quality` and `sct_minhash` columns. Before, the scorer was silently ignored.
-- `sct-clean` refuses reversible mode before cleaning on platforms without `os.fchmod`.
+- `sct-clean` refuses reversible mode before cleaning on any non-POSIX platform, including Windows on Python 3.13+, where `os.fchmod` exists but cannot restrict the token map.
 - Importing SCT no longer changes the process-wide ONNX Runtime log level or adds a warnings filter for lingua. Other ONNX Runtime output in the host application is no longer silenced.
 - The `torch` extra now requires `transformers>=5.0`; 4.x could not be installed alongside the `huggingface-hub>=1.5.0` requirement.
 
@@ -30,6 +38,9 @@ Heads-up: legacy `config.*` globals that were ignored now take effect. `process_
 - MCP `detail='full'` adds the warning `findings_not_collected`, and its `outputSchema` describes the `signals` keys.
 
 ### Fixed
+- `process_json` and RAG chunk metadata mask strings inside tuples and non-dict mappings, returned as lists and dicts, and inside tuple dict keys, following `json_key_cleaning`. Sets and bytes are still not masked.
+- The ensemble backends no longer ignore GLiNER's spans with default labels. `person`, `organization` and `location` reach the vote as `PER`, `ORG` and `LOC`. A tag you request as `PERSON`, `ORGANIZATION` or `LOCATION` stays under that name, and your own `gliner_label_map` still wins.
+- `ner_propagate_masked` and `ner_merge_location_gap` also work on the `PERSON`, `ORGANIZATION` and `LOCATION` spans of the plain `gliner` backend, with the same output tokens.
 - `presidio_gliner` honours `replacement_mode='reversible'` and `'synthetic'`. Masked spans are unchanged.
 - `process_json` masks a `custom_deny_terms` value in a JSON key when `check_to_ascii_unicode` is on (a key `José` stayed readable).
 - Empty input includes `metadata['policy']` and `metadata['findings']` under the same conditions as other documents.
@@ -42,6 +53,7 @@ Heads-up: legacy `config.*` globals that were ignored now take effect. `process_
 - A float, zero or negative `model_max_length` in `tokenizer_config.json` is read safely, with a fallback to 512.
 
 ### Deprecated
+- `batch_size` on `process_batch` and `aprocess_batch`; use `max_workers`.
 - `TextCleaner.NormaliseText`, `ProcessStopwords`, `ProcessDateTime`, `ProcessContacts` and `ProcessSpecialSymbols` are now private attributes. The old names still work and raise a `DeprecationWarning`.
 
 ### Removed or changed for deep importers (undocumented names)
