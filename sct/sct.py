@@ -808,9 +808,9 @@ class TextCleaner:
             if self._synthetic_replacer and label in FAKER_GENERATORS:
                 return self._emit(label, original, self._synthetic_replacer.get_replacement(label, original))
             return self._emit(label, original, self._tags[label])
-        for pattern, label_of, timed in self._user_rules:
+        for pattern, label_of, timed_label in self._user_rules:
             self._document_context.step_text = text
-            text = self._sub_user_rule(pattern, timed, lambda m, label_of=label_of: emit(m, label_of(m)), text)
+            text = self._sub_user_rule(pattern, timed_label, lambda m, label_of=label_of: emit(m, label_of(m)), text)
         return text
 
     def _sub_user_rule(self, pattern, timed_label, repl, text):

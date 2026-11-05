@@ -71,7 +71,7 @@ def _masking_steps(cleaner, cfg, normalised_text):
     fuzzy_dates = partial(_sub_fuzzy_dates, cleaner, cfg.fuzzy_date_score_cutoff, language)
     # a pattern past custom_patterns_timeout raises, or (on_timeout='warn') masks nothing
     steps: list[tuple[bool, Callable[..., str]]] = [
-        (True, partial(cleaner._sub_user_rule, pattern, timed)) for pattern, _, timed in cleaner._user_rules]
+        (True, partial(cleaner._sub_user_rule, pattern, timed_label)) for pattern, _, timed_label in cleaner._user_rules]
     steps += [(cfg.check_replace_html, cleaner._html_regex.sub), (cfg.check_replace_urls, cleaner._url_regex.sub),
               (cfg.check_replace_emails, constants.EMAIL_REGEX.sub), (cfg.check_replace_ips, contact.IP_VIEW.sub),
               (cfg.check_replace_dates, cleaner._date_view.sub), (cfg.check_fuzzy_replace_dates, fuzzy_dates),
@@ -152,8 +152,8 @@ def _protected_spans(cleaner, cfg, normalised_text, step_spans, blanked, overlap
     # User rules (a deny term holding a space, "Blue Sky Initiative"): their matches, and a match the buffer
     # end cuts off ("... the Blue Sky"), which the next feed completes.
     # A custom pattern past custom_patterns_timeout raises, or (on_timeout='warn') protects nothing.
-    protected += [match.span() for pattern, _, timed in cleaner._user_rules
-                  for match in cleaner._user_matches(pattern, timed, normalised_text, partial=True) or ()]
+    protected += [match.span() for pattern, _, timed_label in cleaner._user_rules
+                  for match in cleaner._user_matches(pattern, timed_label, normalised_text, partial=True) or ()]
     phone_digits = normalised_text.translate(cleaner._phone_folded_view.table)
     tail = _PHONE_TAIL.search(phone_digits, max(0, len(phone_digits) - _PHONE_TAIL_MAX))
     if tail:
