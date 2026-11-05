@@ -275,7 +275,8 @@ PART_JOINERS = r"\-\u2010-\u2015/+*._|,"
 # A placeholder edge joined to the digits counts as a token part too ("<YEAR>", or the cleaner's protected
 # \U00100000..\U00100001 key for an emitted value), so "INV-<YEAR>-107683" keeps its tail instead of a
 # second, partial mask.
-_LEFT_EDGE, _RIGHT_EDGE = ">\U00100001", "<\U00100000"
+KEY_OPEN, KEY_CLOSE = "\U00100000", "\U00100001"
+_LEFT_EDGE, _RIGHT_EDGE = ">" + KEY_CLOSE, "<" + KEY_OPEN
 CURRENCY_SIGNS = CATEGORY_CHARS['Sc']
 
 

@@ -39,7 +39,7 @@ class CustomPatternTimeout(TimeoutError):
         return (f"custom_patterns[{self.label!r}] ran longer than {self.timeout}s on one document; "
                 "simplify the pattern, raise custom_patterns_timeout or set custom_patterns_on_timeout='warn'")
 # A _protect key (an emitted value hidden from later steps).
-_KEY = re.compile('\U00100000[\U000F0000-\U0010FFFF]\U00100001')
+_KEY = re.compile(f'{constants.KEY_OPEN}[\U000F0000-\U0010FFFF]{constants.KEY_CLOSE}')
 _INDEXED_PLACEHOLDER = re.compile(r"<[A-Z][A-Z0-9_]*_\d+>")
 
 
@@ -844,7 +844,7 @@ class TextCleaner:
             return value
         # Private-use planes 15-16 only: outside the BMP letter ranges the email and URL
         # rules accept, and no digit, letter or space for later steps to match.
-        return protected.setdefault(value, f"\U00100000{chr(0xF0000 + len(protected))}\U00100001")
+        return protected.setdefault(value, f"{constants.KEY_OPEN}{chr(0xF0000 + len(protected))}{constants.KEY_CLOSE}")
 
     def _restore_protected(self, text):
         protected = self._document_context.protected or {}
@@ -1105,7 +1105,7 @@ class TextCleaner:
         hidden = {}
 
         def hide(match):
-            key = f"{chr(65 + len(hidden))}"
+            key = f'\ue000{chr(65 + len(hidden))}\ue001'
             hidden[key] = match.group()
             return key
 

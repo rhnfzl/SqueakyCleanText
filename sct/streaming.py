@@ -91,7 +91,7 @@ def _step_matches(steps, normalised_text):
         length = len(match.group())
         if length < 2:  # no room for the key's brackets
             return "\U000F0000" * length
-        return "\U00100000" + "\U000F0000" * (length - 2) + "\U00100001"
+        return constants.KEY_OPEN + "\U000F0000" * (length - 2) + constants.KEY_CLOSE
     for step in steps:
         normalised_text = step(blank, normalised_text)
     return spans, normalised_text
