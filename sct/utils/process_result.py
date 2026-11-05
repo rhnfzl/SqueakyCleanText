@@ -72,6 +72,7 @@ class ProcessResult:
     @property
     def signals(self) -> "Signals":
         """Value-free view: counts, shares, types, language, models; never entity text."""
+        # deferred: sct.signals imports this module at load
         from sct.signals import public_view
         return public_view(self)
 

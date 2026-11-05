@@ -488,6 +488,7 @@ class TextCleanerConfig:
     @classmethod
     def from_preset(cls, name: str = "training", **overrides: Any) -> "TextCleanerConfig":
         """Build a config from a named preset (see ``sct.presets.PRESETS``)."""
+        # deferred: sct.presets imports this module at load
         from sct.presets import preset_config
         return preset_config(name, **overrides)
 

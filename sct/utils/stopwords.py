@@ -2,8 +2,7 @@ from collections.abc import Collection, Mapping
 
 from stop_words import StopWordError, get_stop_words as _get_pkg_stop_words
 
-from sct.config import DEFAULT_LANGUAGES
-from sct.utils.resources import language_to_iso
+from sct.utils.resources import DEFAULT_LANGUAGES, language_to_iso
 
 
 class ProcessStopwords:
