@@ -547,9 +547,9 @@ class TextCleaner:
             warnings.add('mps_fallback')
         return warnings
 
-    def _policy_metadata(self, findings) -> dict[str, Any]:
+    def _policy_metadata(self, findings) -> ProcessMetadata:
         """The metadata a privacy policy or include_entities adds, for empty input too."""
-        metadata: dict[str, Any] = {}
+        metadata: ProcessMetadata = {}
         if self._privacy_policy is not None:
             metadata['policy'] = {
                 'name': self._privacy_policy.name,
@@ -573,7 +573,7 @@ class TextCleaner:
         entity_counts = _entity_counts(findings)
         ner_on = self.GeneralNER is not None
         models = self.GeneralNER.models_for(language) if self.GeneralNER is not None else []
-        metadata: dict[str, Any] = {
+        metadata: ProcessMetadata = {
             'source_chars': state.source_chars,
             'regex_counts': state.regex_counts,
             'entity_counts': entity_counts,
@@ -603,7 +603,7 @@ class TextCleaner:
                 entity_counts={k: v['count'] for k, v in entity_counts.items()},
             ))
 
-        return ProcessResult(current_text, stat_text, language, metadata=cast(ProcessMetadata, metadata))
+        return ProcessResult(current_text, stat_text, language, metadata=metadata)
 
     def process_batch(self, texts: list[str], batch_size: int | None = None) -> list[ProcessResult]:
         """Process multiple texts with bounded document concurrency.
@@ -629,7 +629,7 @@ class TextCleaner:
             if not isinstance(text, str):
                 raise ValueError(f"Input must be string, got {type(text)}")
             if not text or text.isspace():
-                results[i] = ProcessResult("", "", None, metadata=cast(ProcessMetadata, self._empty_metadata(text)))
+                results[i] = ProcessResult("", "", None, metadata=self._empty_metadata(text))
             else:
                 to_process.append((i, text))
 
@@ -681,9 +681,9 @@ class TextCleaner:
 
         return cast(list[ProcessResult], results)
 
-    def _empty_metadata(self, text: str) -> dict[str, Any]:
+    def _empty_metadata(self, text: str) -> ProcessMetadata:
         """Metadata for empty or whitespace input (nothing ran)."""
-        metadata = {
+        metadata: ProcessMetadata = {
             'source_chars': len(text),
             'regex_counts': {},
             'entity_counts': {},
@@ -784,7 +784,8 @@ class TextCleaner:
         return verdicts[original]
 
     def _replace_user_terms(self, text):
-        """custom_deny_terms, then each custom_patterns regex, as <LABEL> in every replacement mode."""
+        """custom_deny_terms, then each custom_patterns regex: <LABEL> in placeholder mode, <LABEL_0> in reversible
+        mode, and a fake in synthetic mode when the label has a generator."""
         anon_map = self._document_context.anon_map
 
         def source(original):

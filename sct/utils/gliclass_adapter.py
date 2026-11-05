@@ -4,6 +4,7 @@ Optional dependency. Requires: ``pip install squeakycleantext[classify]``
 """
 
 import logging
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -11,7 +12,7 @@ logger = logging.getLogger(__name__)
 class GLiClassAdapter:
     """Zero-shot document classifier using GLiClass models.
 
-    __call__(text) returns a list of ``{"label": str, "score": float}`` dicts.
+    classify(text) returns a list of ``{"label": str, "score": float}`` dicts.
     """
 
     def __init__(
@@ -68,7 +69,7 @@ class GLiClassAdapter:
             device=self._device,
         )
 
-    def classify(self, text: str) -> list[dict[str, float]]:
+    def classify(self, text: str) -> list[dict[str, Any]]:
         """Classify text against configured labels.
 
         Returns:

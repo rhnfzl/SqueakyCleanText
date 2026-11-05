@@ -1,6 +1,6 @@
 """Optional Model Context Protocol server.
 
-Server settings come from the environment only:
+Server settings come from create_mcp_server arguments, else the environment:
 
 ``SCT_MCP_ROOT``
     Folder the ``path`` input may read from. Unset means ``path`` is off.
@@ -150,7 +150,7 @@ def sanitize_json(
     }
     if detail == "full":
         output["findings"] = [
-            {"path": list(item.path), **_public_finding(item.finding)}
+            {"path": cast(list[str | int], list(item.path)), **_public_finding(item.finding)}
             for item in result.findings
         ]
         output["warnings"] = _full_warnings(signals, output["findings"])

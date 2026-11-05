@@ -29,6 +29,7 @@ from sct.config import (
     GLINER_BACKENDS,
     NER_ENSEMBLE_DEFAULT_KEYS,
     ONNX_BACKENDS,
+    ReplacementMode,
     TOKEN_MODEL_BACKENDS,
     TORCH_BACKENDS,
     TextCleanerConfig,
@@ -428,7 +429,7 @@ class GeneralNER:
                     unique_data[item['key']] = item
         return list(unique_data.values())
 
-    def anonymize_text(self, text: str, filtered_data: list[dict[str, Any]], replacement_mode: str = 'placeholder',
+    def anonymize_text(self, text: str, filtered_data: list[dict[str, Any]], replacement_mode: ReplacementMode = 'placeholder',
                        anon_map: AnonymizationMap | None = None) -> str:
         """Anonymize text. Supports placeholder, synthetic, or reversible replacement."""
         has_custom = any(

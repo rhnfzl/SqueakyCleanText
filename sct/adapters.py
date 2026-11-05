@@ -6,7 +6,7 @@ or a privacy policy). ``sensitive`` and ``signals`` are always filled.
 
 from dataclasses import dataclass, field, replace
 from typing import Any, cast
-from collections.abc import Iterable, Mapping
+from collections.abc import Hashable, Iterable, Mapping
 
 from sct.presets import PRESETS
 from sct.privacy import EntityFinding
@@ -22,7 +22,7 @@ def _no_signals() -> Signals:
 class PathFinding:
     """Entity finding with its path in structured input."""
 
-    path: tuple[str | int, ...]
+    path: tuple[Hashable, ...]
     finding: EntityFinding
 
 
@@ -111,7 +111,7 @@ def process_json(cleaner: TextCleaner, value: Any) -> StructuredResult:
     key_mode = cleaner.cfg.json_key_cleaning
     key_cleaner: TextCleaner | None = None
 
-    def visit(item: Any, path: tuple[str | int, ...], text_cleaner: TextCleaner = cleaner) -> Any:
+    def visit(item: Any, path: tuple[Hashable, ...], text_cleaner: TextCleaner = cleaner) -> Any:
         nonlocal key_cleaner
         if isinstance(item, str):
             result = text_cleaner.process(item)

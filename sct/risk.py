@@ -32,7 +32,7 @@ def _tagged(value: Any) -> Any:
 def assess_reidentification_risk(
     records: Sequence[Mapping[str, Any]],
     *,
-    quasi_identifiers: tuple[str, ...],
+    quasi_identifiers: tuple[str, ...] | str,
     k_threshold: int = 5,
 ) -> ReidentificationRiskReport:
     """Measure k-anonymity for selected quasi-identifiers; a plain string names one."""
