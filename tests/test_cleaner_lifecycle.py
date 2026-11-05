@@ -74,8 +74,8 @@ def test_one_character_custom_pattern_streams_without_a_buffer_error():
 
 
 @pytest.mark.parametrize("text, expected", [
-    ("<REF_1>-107683", "<REF_1><NUMBER_0>"),
-    ("107683-<REF_1>", "<NUMBER_0><REF_1>"),
+    ("<REF_1>-107683", "<REF_1>-<NUMBER_0>"),
+    ("107683-<REF_1>", "<NUMBER_0>-<REF_1>"),
     ("<REF_1>,107683", "<REF_1>,<NUMBER_0>"),
 ])
 def test_reversible_masks_a_number_joined_to_a_placeholder_shaped_token(text, expected):
@@ -83,19 +83,34 @@ def test_reversible_masks_a_number_joined_to_a_placeholder_shaped_token(text, ex
 
 
 @pytest.mark.parametrize("text, expected", [
-    ("a@b.com-107683", "<EMAIL_0><NUMBER_0>"),
-    ("8.8.8.8-107683", "<IP_0><NUMBER_0>"),
+    ("a@b.com-107683", "<EMAIL_0>-<NUMBER_0>"),
+    ("8.8.8.8-107683", "<IP_0>-<NUMBER_0>"),
     ("<REF_1>_107683", "<REF_1>_<NUMBER_0>"),
     ("<REF_1>|123-45", "<REF_1>|<NUMBER_0>"),
     ("a@b.com|123-45", "<EMAIL_0>|<NUMBER_0>"),
-    ("a@b.com*107683", "<EMAIL_0><NUMBER_0>"),
-    ("<REF_1>-107683", "<REF_1><NUMBER_0>"),
-    ("107683-<REF_1>", "<NUMBER_0><REF_1>"),
+    ("a@b.com*107683", "<EMAIL_0>*<NUMBER_0>"),
+    ("<REF_1>-107683", "<REF_1>-<NUMBER_0>"),
+    ("107683-<REF_1>", "<NUMBER_0>-<REF_1>"),
     ("107683_<REF_1>", "<NUMBER_0>_<REF_1>"),
     ("123-45|<REF_1>", "<NUMBER_0>|<REF_1>"),
     ("<A_1>_1234_<B_2>", "<A_1>_<NUMBER_0>_<B_2>"),
-    ("<NUMBER_0>-107683", "<NUMBER_0><NUMBER_1>"),  # a source spelling stays reserved
-    ("a@b.com-107683-x7", "<EMAIL_0><NUMBER_0>-x7"),
+    ("<NUMBER_0>-107683", "<NUMBER_0>-<NUMBER_1>"),  # a source spelling stays reserved
+    ("a@b.com-107683-x7", "<EMAIL_0>-<NUMBER_0>-x7"),
+    # "_" on the far side of the placeholder only joins
+    ("a@b.com_<REF_1>_107683", "<EMAIL_0>_<REF_1>_<NUMBER_0>"),
+    ("<A_1>_<B_2>_107683", "<A_1>_<B_2>_<NUMBER_0>"),
+    ("1234_<REF_1>_5678", "<NUMBER_0>_<REF_1>_<NUMBER_1>"),
+    ("_<REF_1>_107683", "_<REF_1>_<NUMBER_0>"),
+    # a symbol glued to a placeholder survives the isolated-symbol step, whichever step masked its neighbour
+    ("a@b.com-107683-", "<EMAIL_0>-<NUMBER_0>-"),
+    ("a@b.com-107683--x", "<EMAIL_0>-<NUMBER_0>--x"),
+    ("a@b.com-2023", "<EMAIL_0>-<YEAR_0>"),
+    ("<REF_1>-1000-3000", "<REF_1>-<PHONE_0>"),
+    ("a@b.com_<REF_1>-107683", "<EMAIL_0>_<REF_1>-<NUMBER_0>"),
+    ("107683-<REF_1>_1234", "<NUMBER_0>-<REF_1>_<NUMBER_1>"),
+    ("<REF_1>--107683", "<REF_1>--<NUMBER_0>"),
+    ('"a@b.com"', '"<EMAIL_0>"'),
+    ("*a@b.com*", "*<EMAIL_0>*"),
 ])
 def test_reversible_masks_a_run_glued_to_a_placeholder_and_restores_it(text, expected):
     result = _cleaner(replacement_mode="reversible").process(text)
@@ -108,6 +123,7 @@ def test_reversible_masks_a_run_glued_to_a_placeholder_and_restores_it(text, exp
     "<REF_1>-123",  # shorter than replace_numbers_min_digits
     "<REF_1>-12345%",
     "<REF_1>-1234abc",
+    "x_<REF_1>_107683",  # a letter across a joiner makes the placeholder part of a longer token
 ])
 def test_reversible_keeps_a_run_that_is_not_an_identifier_beside_a_placeholder(text):
     assert _cleaner(replacement_mode="reversible").process(text).lm_text == text
@@ -126,6 +142,11 @@ def test_reversible_glued_run_follows_the_number_settings_and_allow_terms():
 
 def test_placeholder_mode_keeps_a_run_glued_to_a_placeholder():
     assert _cleaner().process("a@b.com-107683").lm_text == "<EMAIL>-107683"
+
+
+def test_only_reversible_mode_keeps_a_symbol_glued_to_a_placeholder():
+    assert _cleaner().process("a@b.com- x7").lm_text == "<EMAIL> x7"
+    assert _cleaner(replacement_mode="reversible").process("foo - bar").lm_text == "foo bar"
 
 
 @pytest.mark.parametrize("old, new", [

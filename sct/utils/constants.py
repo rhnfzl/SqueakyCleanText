@@ -369,19 +369,18 @@ def placeholder_glued_number_regex(min_digits: int, in_words: bool = False) -> r
     """A whole digit run of at least *min_digits* digits in all, joined groups included (107683, 123-45), that
     touches a hidden placeholder or emitted key, directly or across one joiner. The identifier rule reads such a
     placeholder as a token part and "_" as glue; reversible mode can restore the run, so it is masked instead.
-    A placeholder with text glued to its other side sits inside a longer token (INV-<YEAR>-107683) and does not
-    count. A "-" or "*" beside the placeholder goes with the match: the isolated-symbol step would drop it from
-    between two placeholders, and the map could not restore it."""
+    A placeholder with a letter glued to its other side sits inside a longer token (INV-<YEAR>-107683) and does
+    not count."""
     glue, j = token_glue(in_words), PART_JOINERS
-    text, word = glue.removeprefix(r"\d"), glue.replace("_", "")  # beside a placeholder "_" only joins
+    letters, word = glue.removeprefix(r"\d_"), glue.replace("_", "")
     key = f"[{KEY_OPEN}{HIDDEN_OPEN}].[{KEY_CLOSE}{HIDDEN_CLOSE}]"
-    alone_before, alone_after = rf"(?<![{text}])(?<![{text}][{j}])", rf"(?![{text}])(?![{j}][{text}])"
+    alone_before = rf"(?<![{letters}])(?<![{letters}][{j}])" if letters else ""
+    alone_after = rf"(?![{letters}])(?![{j}][{letters}])" if letters else ""
     run = rf"(?=(?:[{j}]?\d){{{min_digits}}})\d+(?:[{j}]\d+)*(?![{word}])(?![{j}]\d)(?! ?[%‰{CURRENCY_SIGNS}])"
-    trailing_drop = rf"(?:[\-*](?={key}))?"
     return re.compile(
-        rf"(?:(?<={alone_before}{key})[\-*]?|(?<={alone_before}{key}[{j}])){run}{trailing_drop}"
+        rf"(?:(?<={alone_before}{key})|(?<={alone_before}{key}[{j}])){run}"
         rf"|(?<![{word}])(?<!\d[{j}])(?<![{CURRENCY_SIGNS}])(?<![{CURRENCY_SIGNS}] )"
-        rf"{run}(?=[{j}]?{key}{alone_after}){trailing_drop}"
+        rf"{run}(?=[{j}]?{key}{alone_after})"
     )
 
 
@@ -766,6 +765,10 @@ BRACE_INNER_REGEX = re.compile(r'\{[^{}]+\}')
 # A quote, dash, * or % is isolated unless a letter, digit or mark of any script touches it
 # (special.py checks the neighbours), so "ইসলাম-এর" and "東京-大阪" keep their hyphen.
 ISOLATED_QUOTES_REGEX = re.compile(r"['\"\-*%]")
+# Reversible mode: a run of those symbols glued to a placeholder or emitted key (group 1) stays, as the map cannot
+# restore it once dropped.
+ISOLATED_QUOTES_OR_GLUED_REGEX = re.compile(
+    rf"((?<=[{_LEFT_EDGE}])['\"\-*%]+|['\"\-*%]+(?=[{_RIGHT_EDGE}]))|['\"\-*%]")
 
 # Pre-compiled punctuation pattern (was re-compiled on every call in special.py)
 PUNCTUATION_REGEX = re.compile('[' + re.escape(string.punctuation) + ']')

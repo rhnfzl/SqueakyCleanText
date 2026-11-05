@@ -90,7 +90,8 @@ class ProcessSpecialSymbols:
         return cleaned_text
 
     def remove_isolated_special_symbols(self, text: str, remove_brackets: bool = True, remove_braces: bool = True,
-                                        max_chars: int = 0, max_words: int = 0, keep_json: bool = False) -> str:
+                                        max_chars: int = 0, max_words: int = 0, keep_json: bool = False,
+                                        keep_glued_to_placeholder: bool = False) -> str:
         """
         Removes any isolated symbols which shouldn't be present in the text.
 
@@ -101,6 +102,7 @@ class ProcessSpecialSymbols:
             max_chars, max_words: when either is > 0, only innermost spans within both limits
                 are removed; 0 and 0 = remove every span (0.8.0).
             keep_json: never remove a {...} that parses as a JSON object, nor anything inside it.
+            keep_glued_to_placeholder: keep a quote, dash, * or % that touches a placeholder (reversible mode).
         """
         spans = _json_object_spans(text) if keep_json and (remove_brackets or remove_braces) else []
         parts, last = [], 0
@@ -111,6 +113,9 @@ class ProcessSpecialSymbols:
         parts.append(_remove_bracketed(text[last:], remove_brackets, remove_braces, max_chars, max_words))
         cleaned_text = ''.join(parts)
         cleaned_text = constants.ISOLATED_SPECIAL_SYMBOLS_REGEX.sub('', cleaned_text)
+        if keep_glued_to_placeholder:
+            return constants.ISOLATED_QUOTES_OR_GLUED_REGEX.sub(
+                lambda m: m.group(1) or _drop_if_isolated(m), cleaned_text)
         cleaned_text = constants.ISOLATED_QUOTES_REGEX.sub(_drop_if_isolated, cleaned_text)
 
         return cleaned_text

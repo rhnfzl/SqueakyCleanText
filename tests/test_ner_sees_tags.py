@@ -129,3 +129,27 @@ def test_document_state_output_is_pinned(monkeypatch, mode, lm_text, entries):
     assert result.metadata["source_chars"] == len(text)
     anon_map = result.metadata.get("anon_map")
     assert (anon_map and [(e.placeholder, e.entity_type, e.original) for e in anon_map.entries]) == entries
+
+
+GLUED_TO_NAME = [
+    ("The contract was signed by John Smith-107683 in London.", "<PERSON_0>-<NUMBER_0>"),
+    ("Please call John Smith_107683 today.", "<PERSON_0>_<NUMBER_0>"),
+    ("Please call Mary Jones|123-45 today.", "<PERSON_0>|<NUMBER_0>"),
+]
+
+
+@pytest.mark.parametrize("text, expected", GLUED_TO_NAME)
+def test_reversible_masks_a_run_left_glued_to_an_ner_placeholder(text, expected):
+    cleaner = _cleaner("reversible", check_statistical_model_processing=True)
+    for result in (cleaner.process(text), cleaner.process_batch([text], batch_size=1)[0]):
+        assert expected in result.lm_text
+        assert result.metadata["regex_counts"]["NUMBER"]["count"] == 1
+        assert not re.search(r"107683|123-45", result.stat_text)
+        assert result.metadata["anon_map"].deanonymize(result.lm_text) == text
+
+
+def test_glued_run_after_ner_follows_allow_terms_and_the_number_switch():
+    text = "The contract was signed by John Smith-107683 in London."
+    assert "<PERSON_0>-107683" in _cleaner("reversible", custom_allow_terms=("107683",)).process(text).lm_text
+    assert "<PERSON_0>-107683" in _cleaner("reversible", check_replace_numbers=False).process(text).lm_text
+    assert "<PERSON>-107683" in _cleaner("placeholder").process(text).lm_text

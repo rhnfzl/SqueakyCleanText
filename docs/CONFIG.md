@@ -119,7 +119,7 @@ new_cfg = dataclasses.replace(cfg, check_ner_process=False)
 | `check_replace_currency_symbols` | `True` | Replace currency symbols |
 | `check_ner_process` | `True` | Run NER entity recognition |
 | `check_remove_isolated_letters` | `True` | Remove single letters |
-| `check_remove_isolated_special_symbols` | `True` | Remove isolated symbols |
+| `check_remove_isolated_special_symbols` | `True` | Remove isolated symbols (reversible mode keeps a quote, dash, `*` or `%` touching a placeholder, so it restores) |
 | `check_remove_bracket_content` | `True` | Remove `[...]` content (needs `check_remove_isolated_special_symbols`) |
 | `check_remove_brace_content` | `True` | Remove `{...}` content (needs `check_remove_isolated_special_symbols`) |
 | `bracket_content_max_chars` | `32` | Bracket/brace removal only takes innermost `[...]`/`{...}` spans with at most this many characters inside, so bracketed prose stays. `0` = no limit |

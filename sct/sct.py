@@ -562,6 +562,8 @@ class TextCleaner:
         """Every step after NER, for the document *state* from ``_before_ner``."""
         language, anon_map = state.language, state.anon_map
         current_text = self._swap_deferred(current_text, state.deferred, state.text, findings, anon_map)
+        if anon_map is not None and self.GeneralNER is not None and self.cfg.check_replace_numbers:
+            current_text = self._mask_numbers_glued_to_ner(current_text, state)
 
         # Statistical model processing (always returns stat_text, even if None)
         stat_text = None
@@ -1103,6 +1105,10 @@ class TextCleaner:
     def _replace_numbers(self, text):
         if self._document_context.anon_map is None:
             return self._replace_typed(text, self._numbers_regex, 'NUMBER')
+        return self._mask_numbers(text, self._glued_number_regex, self._numbers_regex)
+
+    def _mask_numbers(self, text, *patterns):
+        """Reversible mode: mask *patterns* as NUMBER with every placeholder hidden."""
         # A placeholder-shaped source token keeps its digits, so it cannot collide with an allocated one. It is
         # hidden, not just skipped: the pattern's lookarounds treat '<' and '>' as edges and would spare a joined run.
         hidden: dict[str, str] = {}
@@ -1112,15 +1118,28 @@ class TextCleaner:
             hidden[key] = match.group()
             return key
 
-        min_digits = 1 if self.cfg.replace_numbers_mode == 'all' else self.cfg.replace_numbers_min_digits
-        glued = contact.RejectView(  # an allow term holds the digits, not the joiner the match may carry
-            constants.placeholder_glued_number_regex(min_digits, self.cfg.replace_numbers_in_words),
-            lambda view, start, end: self._allowed(view[start:end].strip('-*')))
-        replaced = self._replace_typed(ner.PLACEHOLDER_TOKEN.sub(hide, text), glued, 'NUMBER')
-        replaced = self._replace_typed(replaced, self._numbers_regex, 'NUMBER')
+        replaced = ner.PLACEHOLDER_TOKEN.sub(hide, text)
+        for pattern in patterns:
+            replaced = self._replace_typed(replaced, pattern, 'NUMBER')
         for key, placeholder in hidden.items():
             replaced = replaced.replace(key, placeholder)
         return replaced
+
+    @property
+    def _glued_number_regex(self):
+        min_digits = 1 if self.cfg.replace_numbers_mode == 'all' else self.cfg.replace_numbers_min_digits
+        return constants.placeholder_glued_number_regex(min_digits, self.cfg.replace_numbers_in_words)
+
+    def _mask_numbers_glued_to_ner(self, text: str, state: _DocumentState) -> str:
+        """A run glued to a name was a token part in the number step; once NER replaces the name it stands
+        beside a placeholder."""
+        context = self._document_context
+        context.clear()  # no key to hide a value behind any more: no step follows to restore it
+        context.anon_map, context.regex_counts, context.step_text = state.anon_map, state.regex_counts, text
+        try:
+            return self._mask_numbers(text, self._glued_number_regex)
+        finally:
+            context.clear()
 
     @property
     def _numbers_regex(self):
@@ -1152,6 +1171,7 @@ class TextCleaner:
             max_chars=self.cfg.bracket_content_max_chars,
             max_words=self.cfg.bracket_content_max_words,
             keep_json=self.cfg.keep_json_braces,
+            keep_glued_to_placeholder=self._document_context.anon_map is not None,
         )
 
     def _normalize_whitespace(self, text):
