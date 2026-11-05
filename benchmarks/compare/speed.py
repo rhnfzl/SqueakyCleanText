@@ -48,17 +48,19 @@ VRAM_POLL_SECONDS = 0.2
 
 
 def vram_mb(pid: int) -> float | None:
-    """GPU memory (MiB) used by *pid* now, from nvidia-smi's compute-app list; None without nvidia-smi or if it hangs."""
+    """GPU memory (MiB) used by *pid* now, from nvidia-smi's compute-app list; None without nvidia-smi or if it fails."""
     smi = shutil.which("nvidia-smi")
     if smi is None:
         return None
     try:
-        out = subprocess.run([smi, "--query-compute-apps=pid,used_memory", "--format=csv,noheader,nounits"],  # noqa: S603
-                             capture_output=True, text=True, timeout=30).stdout
-    except subprocess.TimeoutExpired:
+        done = subprocess.run([smi, "--query-compute-apps=pid,used_memory", "--format=csv,noheader,nounits"],  # noqa: S603
+                              capture_output=True, text=True, timeout=30)
+        if done.returncode != 0:
+            return None
+        return sum(float(used) for p, used in (line.split(", ") for line in done.stdout.strip().splitlines() if ", " in line)
+                   if int(p) == pid)
+    except (subprocess.TimeoutExpired, OSError, ValueError):  # the daemon poller thread would die on these
         return None
-    return sum(float(used) for p, used in (line.split(", ") for line in out.strip().splitlines() if ", " in line)
-               if int(p) == pid)
 
 
 def vm_hwm_mb(pid: int) -> float | None:

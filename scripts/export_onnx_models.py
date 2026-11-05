@@ -90,7 +90,6 @@ def export_model(source_model: str, output_dir: Path) -> None:
     cmd.append(str(output_dir))
     subprocess.run(cmd, check=True)  # noqa: S603
 
-    # Verify required files exist
     for fname in REQUIRED_FILES:
         fpath = output_dir / fname
         if not fpath.exists():
@@ -108,10 +107,8 @@ def upload_model(output_dir: Path, repo_id: str, dry_run: bool = False) -> None:
 
     api = HfApi()
 
-    # Create repo if it doesn't exist
     api.create_repo(repo_id, exist_ok=True, repo_type="model")
 
-    # Upload each required file
     for fname in REQUIRED_FILES:
         fpath = output_dir / fname
         if fpath.exists():
@@ -146,7 +143,6 @@ def main() -> None:
     )
     args = parser.parse_args()
 
-    # Determine which models to export
     if args.models:
         models = {m: MODEL_MAP[m] for m in args.models if m in MODEL_MAP}
         unknown = [m for m in args.models if m not in MODEL_MAP]

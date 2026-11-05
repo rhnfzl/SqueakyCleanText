@@ -249,6 +249,9 @@ sct/utils/anonymization_map.py   — AnonymizationMap: reversible anonymization 
 sct/utils/process_result.py      — ProcessResult: backward-compatible result with metadata
 sct/utils/synthetic.py           — SyntheticReplacer: Faker-based entity replacement
 sct/utils/onnx_pipeline.py       — ONNXNERPipeline: ONNX inference, BIO aggregation
+sct/utils/ner_spans.py           — Span merging and propagation
+sct/utils/ner_chunking.py        — Window chunking
+sct/utils/atomic_file.py         — Atomic file writes
 sct/signals.py                   — public value-free view (ProcessResult.signals)
 sct/presets.py                   — training / sct presets
 sct/integrations/                — HF datasets, DataTrove, LangChain, Haystack adapters
@@ -273,6 +276,9 @@ sct/model_benchmark.py           — Ground-truth quality and latency benchmarks
 sct/model_candidates.py          — Pinned model candidates for repeatable PII evaluation
 sct/cli.py                       — Command-line interface for text and JSON cleaning (sct-clean)
 tests/                           — pytest suite (hypothesis, faker, pytest-timeout)
+scripts/                         — Evaluation, export and fuzz tools
+benchmarks/                      — Benchmark and comparison harness
+evaluation/                      — Reviewed evaluation sets
 ```
 
 ## Docs

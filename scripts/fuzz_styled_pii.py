@@ -63,6 +63,7 @@ from ftfy.fixes import ANSI_RE, unescape_html
 from sct import TextCleaner, TextCleanerConfig
 from sct.streaming import WindowedStreamingRedactor
 from sct.utils import constants
+from sct.utils.atomic_file import write_text_atomic
 
 PRESETS = ("training", "sct", "training+dates")
 PRESET_ARGS = {"training": ("training", {}), "sct": ("sct", {}),
@@ -1131,13 +1132,12 @@ def main(argv=None) -> int:
     results = run(range(args.start, args.start + args.seeds), args.workers, args.modes)
     clusters = cluster(results)
     if args.out:
-        with args.out.open("w", encoding="utf-8") as handle:
-            for result in results:
-                for failure in result["failures"]:
-                    handle.write(json.dumps(failure, ensure_ascii=False) + "\n")
+        write_text_atomic(args.out, "".join(
+            json.dumps(failure, ensure_ascii=False) + "\n" for result in results for failure in result["failures"]
+        ))
     text = summary(results, clusters)
     if args.report:
-        args.report.write_text(text + "\n", encoding="utf-8")
+        write_text_atomic(args.report, text + "\n")
     print(text)
     return 1 if any(entry["counts"] for entry in clusters.values()) else 0
 

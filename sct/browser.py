@@ -20,6 +20,8 @@ _LIMITATIONS = (
     "phone_reject_embedded is a server-side rule: the browser phone rule keeps every phone match "
     "(0.8.1 behaviour).",
     "custom_deny_terms, custom_allow_terms and custom_patterns are server-side features.",
+    "replace_with_currency_symbols=None (per-symbol ISO codes) is a server-side rule: the browser currency rule has "
+    "no replacement token.",
     "The browser year rule runs before the number rule on its own, so a year-like group of an ID "
     "run ('123-45 2020') becomes the year token and the rest of the run stays; the server masks the "
     "whole run.",

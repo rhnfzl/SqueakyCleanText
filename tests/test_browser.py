@@ -18,6 +18,7 @@ def test_browser_manifest_pins_onnx_model_and_records_limitations():
         "2c10955af9538d6ff8a68316c5dbfcd0b968761e"
     )
     assert "language detection" in " ".join(manifest["limitations"]).lower()
+    assert "replace_with_currency_symbols" in " ".join(manifest["limitations"])
 
 
 def test_browser_manifest_rejects_unpinned_custom_models():

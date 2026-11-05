@@ -166,7 +166,8 @@ Rerun (Linux box, CPU, 16 cores per job; one job per entry and track, then one m
     python -m benchmarks.compare.audit_recover --cache <merged cache> --datasets <all> --out audit-<track>.json
 
 Copy only the JSON results (no `predictions/` of `scores-only` sets, no raw outputs) into
-`results/compare-<date>/`. A rerun of the test part needs a logged reason in PROTOCOL.md.
+`results/compare-<date>/`; dev or tuning runs stay under `results/compare/` (such as
+`2026-11-02-dev-tune/`). A rerun of the test part needs a logged reason in PROTOCOL.md.
 
 Add a tool:
 

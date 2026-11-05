@@ -86,7 +86,7 @@ def freeze(py: Path) -> str:
         done = subprocess.run(cmd, capture_output=True, text=True, timeout=30)  # noqa: S603
     except subprocess.TimeoutExpired:
         return ""
-    return done.stdout
+    return done.stdout if done.returncode == 0 else ""
 
 
 def child_env(threads: int | None = None, device: str = "cpu", gpu: str | None = None,

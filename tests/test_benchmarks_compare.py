@@ -752,3 +752,15 @@ def test_hung_tool_probes_fall_back(tmp_path, monkeypatch):
     monkeypatch.setattr(speed.shutil, "which", lambda name: f"/usr/bin/{name}")
     assert speed.vram_mb(123) is None
     assert runner.freeze(tmp_path / "bin" / "python") == ""
+
+
+def test_failed_tool_probes_fall_back(tmp_path, monkeypatch):
+    from benchmarks.compare import speed
+
+    monkeypatch.setattr(subprocess, "run", lambda cmd, **_: subprocess.CompletedProcess(cmd, 1, "123, 5\n", ""))
+    monkeypatch.setattr(speed.shutil, "which", lambda name: f"/usr/bin/{name}")
+    assert speed.vram_mb(123) is None
+    assert runner.freeze(tmp_path / "bin" / "python") == ""
+
+    monkeypatch.setattr(subprocess, "run", lambda cmd, **_: subprocess.CompletedProcess(cmd, 0, "123, [N/A]\n", ""))
+    assert speed.vram_mb(123) is None

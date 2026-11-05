@@ -93,7 +93,7 @@ def predict(cleaner, records: list[dict], workers: int) -> tuple[dict, dict, flo
     return predictions, outputs, seconds
 
 
-def _lid_config(cleaners: Cleaners, records: list[dict], chars: int) -> dict[str, Any]:
+def _run_lid_suite(cleaners: Cleaners, records: list[dict], chars: int) -> dict[str, Any]:
     cleaner = cleaners.get("default", scoring=False)
     started = time.perf_counter()
     guesses = {}
@@ -106,7 +106,7 @@ def _lid_config(cleaners: Cleaners, records: list[dict], chars: int) -> dict[str
     return {**score_lid(records, guesses, in_set), "time": rates(len(records), chars, seconds)}
 
 
-def _clean_configs(records: list[dict], args, cleaners: Cleaners) -> dict[str, dict]:
+def _run_clean_suite(records: list[dict], args, cleaners: Cleaners) -> dict[str, dict]:
     rng = random.Random(args.seed)  # noqa: S311  # noise placement, not crypto
     noisy, items = [], {}
     for record in records:
@@ -143,12 +143,12 @@ def run_dataset(name: str, suite: str, args, cleaners: Cleaners) -> dict[str, An
                 scores["masking_recall"] = masking_recall(records, predictions)
             result["configs"][config] = {**scores, "time": rates(len(records), chars, seconds)}
     elif suite == "lid":
-        result["configs"]["default"] = _lid_config(cleaners, records, chars)
+        result["configs"]["default"] = _run_lid_suite(cleaners, records, chars)
     elif suite == "speed":
         for config in args.configs:
             result["configs"][config] = measure(cleaners.get(config, scoring=False), records, args.workers)
     elif suite == "clean":
-        result["configs"] = _clean_configs(records, args, cleaners)
+        result["configs"] = _run_clean_suite(records, args, cleaners)
     return result
 
 

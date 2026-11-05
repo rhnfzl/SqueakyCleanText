@@ -38,7 +38,7 @@ from benchmarks.labels import DATE, PRED_ALIASES, normalise_gold
 # What scoring needs from TextCleaner: each placeholder must map back to the value it replaced.
 SCORING = {"replacement_mode": "reversible", "check_to_ascii_unicode": False}
 LEAK_WORD = regex.compile(r"[\w\p{M}]+")  # \w alone splits Devanagari/Tamil at vowel signs
-# Same characters as sct.utils.ner._PLACEHOLDER_TOKEN. A local copy: adapter venvs pin an sct release.
+# Same characters as sct.utils.ner.PLACEHOLDER_TOKEN. A local copy: adapter venvs pin an sct release.
 PLACEHOLDER = re.compile(r"<[A-Z][A-Z0-9_]*>")
 _NUMBERED_PLACEHOLDER = re.compile(r"<([A-Z][A-Z0-9_]*?)_\d+>")
 # Pre-0.8.0 reversible type names (legacy_type_names=True) -> dataset label.

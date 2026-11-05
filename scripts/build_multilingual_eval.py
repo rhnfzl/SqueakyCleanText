@@ -18,6 +18,8 @@ import random
 import re
 from pathlib import Path
 
+from sct.utils.atomic_file import write_text_atomic
+
 ROOT = Path(__file__).resolve().parents[1]
 OUTPUT = ROOT / "evaluation" / "multilingual_pii.jsonl"
 SEED = 8
@@ -247,7 +249,7 @@ def main() -> None:
     parser.add_argument("--output", type=Path, default=OUTPUT)
     parser.add_argument("--seed", type=int, default=SEED)
     args = parser.parse_args()
-    args.output.write_text(to_jsonl(build(args.seed)), encoding="utf-8")
+    write_text_atomic(args.output, to_jsonl(build(args.seed)))
 
 
 if __name__ == "__main__":

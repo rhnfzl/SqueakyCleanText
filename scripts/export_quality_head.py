@@ -20,6 +20,8 @@ import huggingface_hub
 import torch
 from transformers import AutoModel, AutoTokenizer
 
+from sct.utils.atomic_file import write_text_atomic
+
 HEAD_REPO = "epfml/FineWeb2-HQ-Plus-Classifier"
 BACKBONE_REPO = "FacebookAI/xlm-roberta-base"
 
@@ -73,7 +75,7 @@ def main() -> None:
     )
     tokenizer.backend_tokenizer.save(str(out / "tokenizer.json"))
     info = huggingface_hub.HfApi()
-    (out / "sct_quality.json").write_text(json.dumps({
+    write_text_atomic(out / "sct_quality.json", json.dumps({
         "head": HEAD_REPO,
         "head_revision": info.model_info(HEAD_REPO, revision=args.head_revision).sha,
         "backbone": BACKBONE_REPO,

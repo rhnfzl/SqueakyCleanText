@@ -449,7 +449,8 @@ Round 2 needs fresh datasets that no entry (SCT included) and no generator famil
 
 ## 19. Result bundle (rule 20)
 
-Under `benchmarks/results/compare/<date>/`: per entry x dataset JSON (scores, counts,
+Final bundles go under `benchmarks/results/compare-<date>/` (such as `compare-2026-11-02/`); dev
+or tuning runs go under `benchmarks/results/compare/` (such as `2026-11-02-dev-tune/`). A bundle holds: per entry x dataset JSON (scores, counts,
 config, versions, model revisions, device, threads, seed, sample-id hash, dataset revision),
 `uv.lock` / `pip freeze` per entry venv, the frozen `entries.py` copy, dev tuning log, speed
 JSON, failures, the summary tables, and this protocol's commit sha. Predictions only as

@@ -31,10 +31,6 @@ def table(lines):
     emit(*([] if out and out[-1] == "" else [""]), *lines, "")
 
 
-def f3(x):
-    return report._fmt(x)
-
-
 def res(track, entry, dataset, without=False):
     root = bundle / ("norecover/" + track if without else track)
     return json.loads((root / entry / f"{dataset}-test.json").read_text())
