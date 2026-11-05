@@ -55,7 +55,8 @@ _CJK_SYMBOL_LETTERS = ''.join(chr(c) for c in range(0x3000, 0x3040) if unicodeda
 def _scan_unicode():
     """One pass over Unicode: {general category: its characters in code point order} and {character: decomposition}.
     Unassigned, private-use and surrogate code points are left out: no class is built from them, none decomposes."""
-    by_category, decompositions = {}, {}
+    by_category: dict[str, list[str]] = {}
+    decompositions: dict[str, str] = {}
     for ch in map(chr, range(0x110000)):
         category = unicodedata.category(ch)
         if category not in ('Cn', 'Co', 'Cs'):
@@ -95,7 +96,7 @@ def _class_ranges(categories, *spans):
 
 def _ranges(chars):
     """Character-class body (literal ranges) of the ascending iterable *chars*."""
-    spans = []
+    spans: list[list[int]] = []
     for cp in map(ord, chars):
         if spans and spans[-1][1] == cp - 1:
             spans[-1][1] = cp

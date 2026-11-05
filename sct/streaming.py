@@ -2,6 +2,7 @@
 
 import re
 from bisect import bisect_right
+from collections.abc import Callable
 from functools import partial
 
 from sct.sct import TextCleaner
@@ -69,7 +70,8 @@ def _masking_steps(cleaner, cfg, normalised_text):
     language = cleaner._detect_language(normalised_text)[0] if cfg.check_fuzzy_replace_dates else None
     fuzzy_dates = partial(_sub_fuzzy_dates, cleaner, cfg.fuzzy_date_score_cutoff, language)
     # a pattern past custom_patterns_timeout raises, or (on_timeout='warn') masks nothing
-    steps = [(True, partial(cleaner._sub_user_rule, pattern, timed)) for pattern, _, timed in cleaner._user_rules]
+    steps: list[tuple[bool, Callable[..., str]]] = [
+        (True, partial(cleaner._sub_user_rule, pattern, timed)) for pattern, _, timed in cleaner._user_rules]
     steps += [(cfg.check_replace_html, cleaner._html_regex.sub), (cfg.check_replace_urls, cleaner._url_regex.sub),
               (cfg.check_replace_emails, constants.EMAIL_REGEX.sub), (cfg.check_replace_ips, contact.IP_VIEW.sub),
               (cfg.check_replace_dates, cleaner._date_view.sub), (cfg.check_fuzzy_replace_dates, fuzzy_dates),

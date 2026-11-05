@@ -544,7 +544,8 @@ def _validate_user_terms(cfg):
     if cfg.custom_deny_terms is not None:
         if not isinstance(cfg.custom_deny_terms, Mapping):
             raise ValueError(f"custom_deny_terms must be a mapping {{LABEL: (term, ...)}}, got {cfg.custom_deny_terms!r}")
-        deny, seen = {}, {}
+        deny = {}
+        seen: dict[str, str] = {}
         for label, terms in cfg.custom_deny_terms.items():
             _user_label('custom_deny_terms', label)
             deny[label] = _user_terms(f'custom_deny_terms[{label!r}]', terms)

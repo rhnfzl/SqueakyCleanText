@@ -138,7 +138,7 @@ def embedded_phone(text: str, start: int, end: int) -> bool:
 class RejectView:
     """*view* matches, except those *reject(text, start, end)* holds for: they stay as they are."""
 
-    def __init__(self, view: DigitView, reject: Callable[[str, int, int], bool]):
+    def __init__(self, view: DigitView | re.Pattern[str], reject: Callable[[str, int, int], bool]):
         self.view, self.reject = view, reject
 
     def sub(self, repl: Callable[[Any], str], text: str) -> str:

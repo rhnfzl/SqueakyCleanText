@@ -829,6 +829,7 @@ class TextCleaner:
         try:
             return list(pattern.finditer(text, timeout=timeout, **kwargs))
         except TimeoutError:
+            assert timeout is not None  # no limit, no TimeoutError
             if self.cfg.custom_patterns_on_timeout == 'raise':
                 raise CustomPatternTimeout(label, timeout) from None
             logger.warning("custom_patterns[%r] ran longer than %ss; skipped for this document", label, timeout)
@@ -887,7 +888,7 @@ class TextCleaner:
     def _restore_deferred(self, text):
         protected = self._document_context.protected or {}
         tags, order = self._document_context.deferred_tags, self._document_context.deferred_order
-        if not tags:
+        if not tags or order is None:
             return text
         # Deferred keys become their tag; every tag occurrence is recorded in order
         # (source text and plain tag emits as None) so _swap_deferred can pair them up.
@@ -1022,9 +1023,10 @@ class TextCleaner:
         )
         if reversible is not None:
             return reversible
-        if self._synthetic_replacer:
+        replacer = self._synthetic_replacer
+        if replacer:
             def emit(orig):
-                return self._synthetic_replacer.get_replacement(self._ip_type, orig)
+                return replacer.get_replacement(self._ip_type, orig)
         else:
             def emit(orig):
                 return self.cfg.replace_with_ips
@@ -1061,7 +1063,7 @@ class TextCleaner:
                     and not all(map(constants.YEAR_REGEX.fullmatch, re.split(r"\D+", m.group())))
                     and not constants.SPACED_DATE_REGEX.fullmatch(m.group())]
             if runs:
-                view = contact.RejectView(view, lambda _, start, end: any(a <= start and end <= b for a, b in runs))
+                return contact.RejectView(view, lambda _, start, end: any(a <= start and end <= b for a, b in runs))
         return view
 
     @property
@@ -1083,9 +1085,10 @@ class TextCleaner:
         reversible = self._replace_reversible(text, pattern, entity_type)
         if reversible is not None:
             return reversible
-        if synthetic and self._synthetic_replacer:
+        replacer = self._synthetic_replacer
+        if synthetic and replacer:
             def value(orig):
-                return self._synthetic_replacer.get_replacement(entity_type, orig)
+                return replacer.get_replacement(entity_type, orig)
         else:
             def value(orig):
                 return self._tags[entity_type]
@@ -1102,7 +1105,7 @@ class TextCleaner:
             return self._replace_typed(text, self._numbers_regex, 'NUMBER')
         # A placeholder-shaped source token keeps its digits, so it cannot collide with an allocated one. It is
         # hidden, not just skipped: the pattern's lookarounds treat '<' and '>' as edges and would spare a joined run.
-        hidden = {}
+        hidden: dict[str, str] = {}
 
         def hide(match):
             key = f'\ue000{chr(65 + len(hidden))}\ue001'
