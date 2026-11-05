@@ -1,10 +1,9 @@
 """0.8.0 security review leftovers (research/0.8.0-security-review-findings.md): one regression per root cause."""
 
-import time
-
 import pytest
 
 from sct import TextCleaner, TextCleanerConfig
+from tests.helpers import assert_near_linear
 
 
 def _cleaner(**kw):
@@ -47,15 +46,6 @@ def test_scheme_url_safety_net_keeps_prose():
 
 # --- 2: no regex scans a long token once per character (quadratic time) ---
 
-def _seconds(cleaner, text):
-    best = float("inf")
-    for _ in range(3):
-        start = time.perf_counter()
-        cleaner.process(text)
-        best = min(best, time.perf_counter() - start)
-    return best
-
-
 @pytest.mark.parametrize("make", [
     lambda n: "http://" + "a1" * n + " ",  # URL authority
     lambda n: "http://x.com/" + "a1" * n + " ",  # URL run over a long path
@@ -71,10 +61,8 @@ def _seconds(cleaner, text):
 @pytest.mark.parametrize("fold", [True, False])
 def test_long_tokens_near_linear(make, fold):
     cleaner = _cleaner(fold_styled_characters=fold)
-    _seconds(cleaner, make(10))  # warm up
-    small, large = _seconds(cleaner, make(2000)), _seconds(cleaner, make(8000))
-    # 4x the length; linear is ~4x the time, quadratic 16x (generous for CI noise)
-    assert large < 8 * small + 0.05, (small, large)
+    cleaner.process(make(10))  # warm up
+    assert_near_linear(cleaner.process, make, 8000, factor=4)
 
 
 def test_linear_scanners_keep_matches():
