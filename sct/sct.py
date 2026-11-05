@@ -877,7 +877,7 @@ class TextCleaner:
         emitted one ("EMAIL" in the source and as a replacement); by text if a step moved markers."""
         order = self._document_context.marker_order
         self._document_context.marker_order = None
-        if not source_markers or order is None:
+        if order is None:
             return source_markers
         found = list(self._marker_regex.finditer(text))
         if [m.group() for m in found] != [marker for marker, _ in order]:
@@ -900,8 +900,7 @@ class TextCleaner:
             if found in tags:
                 order.append((tags[found], values[found]))
                 return tags[found]
-            if found in tracked:
-                order.append((found, None))
+            order.append((found, None))
             return found
         return pattern.sub(put, text)
 

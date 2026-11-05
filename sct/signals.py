@@ -54,7 +54,7 @@ def is_sensitive_result(result: ProcessResult) -> bool:
 
 def public_view(result: ProcessResult) -> Signals:
     """The value-free view of one result; same keys for every input."""
-    metadata = result.metadata or {}
+    metadata = result.metadata
     chars = metadata.get("source_chars", 0)
     regex_counts = {k: dict(v) for k, v in sorted(metadata.get("regex_counts", {}).items())}
     entity_counts = {k: dict(v) for k, v in sorted(metadata.get("entity_counts", {}).items())}

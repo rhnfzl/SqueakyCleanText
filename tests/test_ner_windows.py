@@ -29,6 +29,7 @@ def test_models_for_leaves_a_list_route_unchanged(monkeypatch):
 
     fake.GLiNERAdapter = GLiNERAdapter
     monkeypatch.setitem(sys.modules, "sct.utils.gliner_adapter", fake)
+    monkeypatch.setattr("sct.utils.onnx_pipeline.load_onnx_ner_model", lambda *a, **k: (object(), _FakeTok()))
     route = {"ENGLISH": ["ENGLISH", "MULTILINGUAL"]}
     ner = TextCleaner(cfg=TextCleanerConfig(
         ner_backend="ensemble_onnx", gliner_model="x/y", ner_ensemble=route)).GeneralNER

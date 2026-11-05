@@ -141,9 +141,6 @@ class ONNXNERPipeline:
         # Models exported with a fixed batch dimension of 1 take one row per run.
         self._single_row = any(inp.shape and inp.shape[0] == 1 for inp in inputs)
 
-    # ------------------------------------------------------------------
-    # ------------------------------------------------------------------
-
     def __call__(self, texts, batch_size: int = 1, max_workers: int = 1,
                  subword_widen: float | None = 1.0,
                  subword_same_script: bool = True) -> list[list[dict]]:
@@ -206,9 +203,6 @@ class ONNXNERPipeline:
                 run_batch(rows)
 
         return all_results
-
-    # ------------------------------------------------------------------
-    # ------------------------------------------------------------------
 
     @staticmethod
     def _softmax(logits: np.ndarray) -> np.ndarray:

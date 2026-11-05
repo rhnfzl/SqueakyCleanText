@@ -47,11 +47,9 @@ def merge_pieces(pieces: list[tuple], fits: Callable[[str], bool]) -> list[str]:
         if fits(merged):
             current = merged
         else:
-            if current:
-                chunks.append(current)
+            chunks.append(current)
             current = piece
-    if current:
-        chunks.append(current)
+    chunks.append(current)
     return chunks
 
 

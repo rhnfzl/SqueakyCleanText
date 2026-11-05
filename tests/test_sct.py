@@ -534,7 +534,8 @@ class TextCleanerTest(unittest.TestCase):
             shared_model = "protectai/bert-base-NER-onnx"
             models = {'ENGLISH': shared_model, 'MULTILINGUAL': shared_model,
                       'FRENCH': shared_model}
-            ner2 = GeneralNER(TextCleanerConfig(ner_device='cpu', ner_models=models))
+            ner2 = GeneralNER(TextCleanerConfig(ner_device='cpu', ner_models=models,
+                                                ner_model_revisions=dict.fromkeys(models, TEST_NER_REVISIONS['ENGLISH'])))
             ner2._ensure_loaded('FRENCH')
             ner2._ensure_loaded('MULTILINGUAL')
             self.assertIs(ner2._pipelines['FRENCH'],
