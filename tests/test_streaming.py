@@ -1,8 +1,21 @@
 from functools import partial
 
+import pytest
+
 from sct import TextCleaner, TextCleanerConfig
 from sct.streaming import BufferedStreamingRedactor, WindowedStreamingRedactor, _masking_steps, _sub_fuzzy_dates
 from sct.utils import constants, contact
+
+
+def test_streaming_redactors_refuse_reversible_and_keep_placeholder():
+    def cleaner(mode):
+        return TextCleaner(cfg=TextCleanerConfig(check_ner_process=False, replacement_mode=mode))
+
+    for redactor in (BufferedStreamingRedactor, WindowedStreamingRedactor):
+        with pytest.raises(ValueError, match="retain its token map"):
+            redactor(cleaner("reversible"))
+        stream = redactor(cleaner("placeholder"))
+        assert stream.feed("mail a@b.com now") + stream.finish() == "mail <EMAIL> now"
 
 
 def test_buffered_streaming_redactor_handles_entities_split_across_chunks():

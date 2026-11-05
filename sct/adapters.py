@@ -8,6 +8,7 @@ from dataclasses import dataclass, field, replace
 from typing import Any, cast
 from collections.abc import Hashable, Iterable, Mapping
 
+from sct.config import require_adapter_mode
 from sct.presets import PRESETS
 from sct.privacy import EntityFinding
 from sct.sct import TextCleaner
@@ -79,14 +80,6 @@ class _DuplicateKeyError(ValueError):
     """Two JSON keys became the same text after cleaning."""
 
 
-def _require_adapter_mode(cleaner: TextCleaner) -> None:
-    if cleaner.cfg.replacement_mode == "reversible":
-        raise ValueError(
-            "Structured adapters do not support reversible mode. "
-            "Process each text directly and retain its token map."
-        )
-
-
 def _pii_only_cleaner(cleaner: TextCleaner, ner: bool = True) -> TextCleaner:
     """Return a view of *cleaner* that runs only its PII steps, sharing its NER models."""
     # Everything the training preset turns off (folding, letter/number removal, casefold...).
@@ -108,7 +101,7 @@ def process_json(cleaner: TextCleaner, value: Any) -> StructuredResult:
     context); ``'pii_ner'`` also runs NER on keys; ``'full'`` uses the whole
     config; ``'off'`` keeps keys as written.
     """
-    _require_adapter_mode(cleaner)
+    require_adapter_mode(cleaner.cfg)
     findings: list[PathFinding] = []
     views: list[Signals] = []
     key_mode = cleaner.cfg.json_key_cleaning
@@ -174,7 +167,7 @@ def process_rag_chunks(
     Writes ``metadata["sensitive"]`` and ``metadata["sct"]``, replacing caller keys
     with those names.
     """
-    _require_adapter_mode(cleaner)
+    require_adapter_mode(cleaner.cfg)
     processed = []
     for chunk in chunks:
         result = cleaner.process(chunk.text)
@@ -212,7 +205,7 @@ def process_dataframe(
     columns: tuple[str, ...] | str,
 ) -> DataFrameResult:
     """Process selected string columns in a copied DataFrame-like object."""
-    _require_adapter_mode(cleaner)
+    require_adapter_mode(cleaner.cfg)
     if isinstance(columns, str):  # "text" is not ("t", "e", "x", "t")
         columns = (columns,)
     unknown = set(columns).difference(frame.columns)

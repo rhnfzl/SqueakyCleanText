@@ -168,6 +168,17 @@ def test_mcp_server_reports_missing_optional_package(monkeypatch):
         create_mcp_server()
 
 
+def test_sanitize_text_refuses_reversible():
+    with pytest.raises(ToolError, match="retain its token map"):
+        sanitize_text(_cleaner(replacement_mode="reversible"), "Email maria@example.com")
+
+
+def test_server_refuses_a_reversible_cleaner_at_start_up():
+    pytest.importorskip("fastmcp")
+    with pytest.raises(ValueError, match="retain its token map"):
+        create_mcp_server(_cleaner(replacement_mode="reversible"))
+
+
 def test_bad_max_bytes_rejected():
     pytest.importorskip("fastmcp")
     with pytest.raises(ValueError, match="SCT_MCP_MAX_BYTES"):

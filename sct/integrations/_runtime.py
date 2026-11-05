@@ -11,7 +11,7 @@ from dataclasses import replace
 from typing import Any
 from collections.abc import Iterable, Mapping, Sequence
 
-from sct.config import ONNX_BACKENDS, TextCleanerConfig
+from sct.config import ONNX_BACKENDS, TextCleanerConfig, require_adapter_mode
 from sct.presets import preset_config
 from sct.score import SCORE_A_COLUMNS, score_record
 from sct.sct import TextCleaner
@@ -34,11 +34,7 @@ def resolve_config(config: TextCleanerConfig | str | None) -> TextCleanerConfig:
         config = preset_config(config)
     if not isinstance(config, TextCleanerConfig):
         raise TypeError(f"config must be a TextCleanerConfig, a preset name or None, got {type(config)}")
-    if config.replacement_mode == "reversible":
-        raise ValueError(
-            "Adapters do not support reversible mode. "
-            "Process each text directly and retain its token map."
-        )
+    require_adapter_mode(config)
     return config
 
 

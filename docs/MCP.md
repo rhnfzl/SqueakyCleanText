@@ -17,6 +17,9 @@ cached. Both declare an `outputSchema`.
 | `clean_text` | `text` or `path` (exactly one), `pii=false`, `detail="concise"` |
 | `clean_json` | `value`, `pii=false`, `detail="concise"` |
 
+`create_mcp_server` refuses a reversible cleaner (`ValueError`), and `sanitize_text` and `sanitize_json` raise a
+`ToolError` for one: a tool result has no place for the token map.
+
 ## Output
 
 Keys, in this order:

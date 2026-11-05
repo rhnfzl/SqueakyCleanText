@@ -5,6 +5,7 @@ from bisect import bisect_right
 from collections.abc import Callable
 from functools import partial
 
+from sct.config import require_adapter_mode
 from sct.sct import TextCleaner
 from sct.utils import constants, contact
 
@@ -36,6 +37,7 @@ class BufferedStreamingRedactor:
     """Buffer a document so entities split across chunks remain detectable."""
 
     def __init__(self, cleaner: TextCleaner) -> None:
+        require_adapter_mode(cleaner.cfg)
         self._cleaner = cleaner
         self._chunks: list[str] = []
         self._finished = False
@@ -214,6 +216,7 @@ class WindowedStreamingRedactor:
         max_buffer_chars: int = 4096,
         overlap_chars: int = 256,
     ) -> None:
+        require_adapter_mode(cleaner.cfg)
         if overlap_chars < 1:
             raise ValueError("overlap_chars must be >= 1")
         if max_buffer_chars <= overlap_chars:

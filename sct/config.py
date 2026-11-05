@@ -896,6 +896,15 @@ _NO_PLAIN_GLOBAL = frozenset({'ner_models_list', 'supported_languages', 'ner_ens
 _BUILTIN_ENSEMBLE_DEFAULT_KEYS = NER_ENSEMBLE_DEFAULT_KEYS
 
 
+def require_adapter_mode(cfg: TextCleanerConfig) -> None:
+    """Refuse reversible mode on a surface that has no way to hand back each text's map."""
+    if cfg.replacement_mode == "reversible":
+        raise ValueError(
+            "Adapters do not support reversible mode. "
+            "Process each text directly and retain its token map."
+        )
+
+
 def _config_from_module_globals() -> TextCleanerConfig:
     """Build a TextCleanerConfig from the current module-level variable state.
 

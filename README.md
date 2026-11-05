@@ -139,7 +139,7 @@ if __name__ == "__main__":
 | Data card for a file | `sct-report data.jsonl --text-column text --out report.json --card card.md` | [SCORE](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/SCORE.md) |
 | AI assistants | `sct-mcp` (MCP server, `mcp` extra) | [MCP](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/MCP.md) |
 
-The framework adapters use the `training` preset unless you pass a config, so their output keeps numbers, dates, HTML and case. They build one cleaner per worker process and reject reversible mode. Plan for 5 to 7 GB of RAM per worker with the default NER ensemble.
+The framework adapters use the `training` preset unless you pass a config, so their output keeps numbers, dates, HTML and case. They build one cleaner per worker process and reject reversible mode, as do the streaming redactors and the MCP server. Plan for 5 to 7 GB of RAM per worker with the default NER ensemble.
 
 ## How it works
 

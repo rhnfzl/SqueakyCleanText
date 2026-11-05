@@ -22,6 +22,7 @@ from contextlib import contextmanager
 from typing import TYPE_CHECKING, Any, Literal, NotRequired, TypedDict, cast
 
 from sct.adapters import process_json
+from sct.config import require_adapter_mode
 from sct.presets import preset_config
 from sct.sct import CustomPatternTimeout, TextCleaner
 from sct.signals import Signals, public_view
@@ -114,6 +115,10 @@ def sanitize_text(
     detail: Literal["concise", "full"] = "concise",
 ) -> TextOutput:
     """Return a JSON-safe, value-free text cleaning result."""
+    try:
+        require_adapter_mode(cleaner.cfg)
+    except ValueError as exc:
+        raise ToolError(str(exc)) from None
     result = cleaner.process(text)
     signals = public_view(result)
     output: TextOutput = {
@@ -244,6 +249,8 @@ def _server_settings(root: str | None, max_bytes: int | None, preset: str | None
 
 def _cleaner_getter(cleaner: TextCleaner | None, preset: str) -> Callable[[bool], TextCleaner]:
     """``get_cleaner(pii)``: the given cleaner, else one built on first use for each mode."""
+    if cleaner is not None:
+        require_adapter_mode(cleaner.cfg)
     ascii_override = {"check_to_ascii_unicode": True} if os.environ.get("SCT_MCP_TO_ASCII") == "1" else {}
     cleaners: dict[bool, TextCleaner] = {}
     cleaners_lock = threading.Lock()  # sync tools run on worker threads

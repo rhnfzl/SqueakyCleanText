@@ -35,6 +35,7 @@ pip install 'SqueakyCleanText[mcp]'
 sct-mcp
 ```
 
+Both streaming redactors refuse a reversible cleaner (`ValueError`): a stream cannot hand back a token map, so process each text directly and retain its map.
 `BufferedStreamingRedactor` holds a full document for cross-chunk NER safety.
 `WindowedStreamingRedactor` provides bounded latency for contact tokens. It refuses `custom_allow_terms` (`ValueError`): whether an allowed value is kept depends on the whole document.
 When its buffer passes `max_buffer_chars` (default 4096) and has no safe whitespace split, it raises
