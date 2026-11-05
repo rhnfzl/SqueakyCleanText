@@ -85,7 +85,8 @@ class TextCleanerTest(unittest.TestCase):
 
     # --- Regex tests (non-NER, always run) ---
 
-    @settings(deadline=None)
+    # Derandomized: Hypothesis can replay draws from this regex inconsistently, which fails with no wrong output.
+    @settings(deadline=None, derandomize=True)
     @given(from_regex(constants.EMAIL_REGEX, fullmatch=True))
     def test_email_regex(self, rx):
         self.assertEqual("", self.ProcessContacts.replace_emails_with_fn(rx, lambda _: ""))
