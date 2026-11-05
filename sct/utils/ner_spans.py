@@ -62,6 +62,12 @@ def snap_word_edges(text: str, start: int, end: int, ratio: float | None, same_s
     return new_start, new_end
 
 
+def _union(text: str, last: dict[str, Any], item: dict[str, Any]) -> dict[str, Any]:
+    best = last if last['score'] >= item['score'] else item
+    start, end = last['start'], max(last['end'], item['end'])
+    return {**best, 'start': start, 'end': end, 'word': text[start:end], 'key': f"{start}:{end}"}
+
+
 def merge_overlaps(text: str, filtered_data: Iterable[dict[str, Any]]) -> list[dict[str, Any]]:
     """Merge overlapping spans into their union, labelled by the highest score.
 
@@ -71,11 +77,7 @@ def merge_overlaps(text: str, filtered_data: Iterable[dict[str, Any]]) -> list[d
     merged: list[dict[str, Any]] = []
     for item in sorted(filtered_data, key=lambda x: (x['start'], -x['end'])):
         if merged and item['start'] < merged[-1]['end']:
-            last = merged[-1]
-            best = last if last['score'] >= item['score'] else item
-            start, end = last['start'], max(last['end'], item['end'])
-            merged[-1] = {**best, 'start': start, 'end': end,
-                          'word': text[start:end], 'key': f"{start}:{end}"}
+            merged[-1] = _union(text, merged[-1], item)
         else:
             merged.append(item)
     return merged
@@ -98,10 +100,7 @@ def merge_location_gaps(text: str, spans: Iterable[dict[str, Any]], markers: Col
             gap = text[a:b]
             visible = sum(1 for i in range(a, b) if not any(s <= i < e for s, e in markers))
             if visible <= max_gap and not _GAP_BREAK.search(gap):
-                best = last if last['score'] >= item['score'] else item
-                start, end = last['start'], max(last['end'], item['end'])
-                merged[-1] = {**best, 'start': start, 'end': end,
-                              'word': text[start:end], 'key': f"{start}:{end}"}
+                merged[-1] = _union(text, last, item)
                 continue
         merged.append(item)
     return merged
