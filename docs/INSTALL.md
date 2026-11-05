@@ -12,7 +12,7 @@ The base install uses **ONNX Runtime** for NER inference - no PyTorch or Transfo
 
 | Extra | Command | What it adds |
 |-------|---------|--------------|
-| GPU | `pip install SqueakyCleanText[gpu]` | CUDA-accelerated ONNX inference; needs the extra install steps in [docs/PERFORMANCE.md](PERFORMANCE.md), which also covers speed by hardware |
+| GPU | `pip install SqueakyCleanText[gpu]` | CUDA-accelerated ONNX inference; needs the extra install steps in [docs/PERFORMANCE.md](PERFORMANCE.md), which also covers speed by hardware and [older drivers](PERFORMANCE.md#older-drivers) |
 | Quantize | `pip install SqueakyCleanText[quantize]` | `onnx`, needed by `load_onnx_ner_model(quantize=True)` |
 | Fuzzy dates | `pip install SqueakyCleanText[fuzzy]` | Fuzzy month name matching ([rapidfuzz](https://github.com/rapidfuzz/RapidFuzz)) |
 | PyTorch NER | `pip install SqueakyCleanText[torch]` | PyTorch/Transformers NER backend |

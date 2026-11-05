@@ -104,6 +104,20 @@ def _mps_available() -> bool:
         return False
 
 
+def _torch_cuda_usable(device_id: int) -> bool:
+    try:
+        import torch
+        if not torch.cuda.is_available():
+            return False
+        count = torch.cuda.device_count()
+    except Exception:  # torch missing or broken
+        return False
+    if device_id >= count:
+        logger.warning("cuda_device_id %d is not visible to torch (%d GPUs)", device_id, count)
+        return False
+    return True
+
+
 class GeneralNER:
     """NER processor with lazy model loading, multi-backend support, and ensemble voting.
 
@@ -158,16 +172,21 @@ class GeneralNER:
         if cfg.ner_device:
             self.device = cfg.ner_device
         elif ner_backend in TORCH_BACKENDS:
-            try:
-                import torch  # noqa: S404
-                self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
-            except ImportError:
-                self.device = 'cpu'
+            self.device = 'cuda' if _torch_cuda_usable(cfg.cuda_device_id) else 'cpu'
         else:
             import onnxruntime as ort
             self.device = 'cuda' if 'CUDAExecutionProvider' in ort.get_available_providers() else 'cpu'
         # Torch and GLiNER take an indexed device string; ONNX gets the index as a provider option.
         self._torch_device = f"cuda:{cfg.cuda_device_id}" if self.device == 'cuda' else self.device
+        # The provider list says what ONNX Runtime was built with, not that torch can use a GPU.
+        if (not cfg.ner_device and self.device == 'cuda' and ner_backend in GLINER_BACKENDS
+                and not _torch_cuda_usable(cfg.cuda_device_id)):
+            logger.warning(
+                "Torch models run on CPU: ONNX Runtime has CUDA but torch cannot use GPU %d. "
+                "Check CUDA_VISIBLE_DEVICES and that the torch CUDA version matches your driver.",
+                cfg.cuda_device_id,
+            )
+            self._torch_device = 'cpu'
         # 'mps' (Apple GPU) moves torch and GLiNER only; ONNX models stay on CPU.
         if self.device == 'mps' and not _mps_available():
             logger.warning("NER runs on CPU: Apple GPU (mps) was requested but torch has no MPS backend")

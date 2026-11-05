@@ -6,7 +6,7 @@ are the benchmark documents (up to about 900 characters); "long" docs join 8 of 
 Numbers are docs per second, median of 3 runs. Output text is identical on CPU and GPU.
 
 Machine: Linux x86_64, AMD Ryzen Threadripper PRO 7985WX (64 cores), RTX 4090 (24 GB),
-onnxruntime 1.30/1.31 (CPU) and onnxruntime-gpu 1.29 (CUDA 12). CPU runs were pinned to 16 or
+onnxruntime 1.30/1.31 (CPU) and onnxruntime-gpu 1.29 (CUDA build not recorded). CPU runs were pinned to 16 or
 64 physical cores. Correctness and the 16-core CPU commands:
 `evaluation/results/comparison-0.7.1-0.8.0.md`.
 
@@ -54,6 +54,10 @@ If CUDA cannot be loaded, ONNX Runtime runs on CPU. SCT logs a warning
 ("runs on CPU: CUDA was requested") and adds `cuda_fallback` to `metadata['warnings']` of
 every result. `metadata['provenance']['models']` names the provider each model ran on.
 
+With `ner_device=None`, torch and GLiNER models also run on CPU when torch cannot use the GPU, for
+example with `CUDA_VISIBLE_DEVICES` empty. If ONNX Runtime has CUDA, SCT logs a warning and adds
+`cuda_fallback`. With an explicit `ner_device="cuda"`, they fail to load instead.
+
 Pick the GPU with `cuda_device_id` (default 0) and force a device with `ner_device`
 (`None` auto, `"cpu"`, `"cuda"`, or `"mps"` for the Apple GPU, see below). `onnx_cuda_provider_options` passes extra
 `CUDAExecutionProvider` options, for example `{"gpu_mem_limit": 8 << 30}`.
@@ -72,6 +76,35 @@ With the full multilingual ensemble, batch sizes above 8 gave no gain and used m
 
 GPU memory: the full default ensemble needs about 12 to 16 GB of free GPU memory. An
 English-only setup needs about 3 to 5 GB.
+
+### Older drivers
+
+The newest wheels target CUDA 13. On an older driver, such as 560 (CUDA 12.6), torch and ONNX
+Runtime silently use CPU; SCT warns and sets `cuda_fallback` as described above. To check:
+
+```sh
+nvidia-smi  # "CUDA Version" is the newest CUDA the driver supports
+python -c "from onnxruntime.capi import build_and_package_info as i; print(i.cuda_version)"
+python -c "import torch; print(torch.version.cuda, torch.cuda.is_available())"
+```
+
+For example, this worked on driver 560; other combinations can work too. That run also set
+`LD_LIBRARY_PATH` to every `site-packages/nvidia/*/lib` folder.
+
+```sh
+pip install "torch==2.14.1+cu126" --index-url https://download.pytorch.org/whl/cu126
+pip install onnxruntime-gpu==1.26.0
+```
+
+### Shared GPUs
+
+ONNX Runtime's memory pool grows, so it can take nearly all free GPU memory: about 7.5 GB of 7.6 GB
+free with default options, measured with two loaded models. With
+`onnx_cuda_provider_options={"gpu_mem_limit": 2500 << 20, "arena_extend_strategy": "kSameAsRequested"}`
+the same two models took 5.6 GB.
+
+The limit applies per session, and each language can load its own models, so it does not cap the
+total across models. A limit below what a model needs fails with an out-of-memory error.
 
 ## Apple silicon (M-series)
 

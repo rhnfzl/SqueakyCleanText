@@ -554,7 +554,7 @@ class TextCleaner:
             return warnings
         if general_ner.uses_fallback_models(state.language):
             warnings.add('ner_fallback_models')
-        if any(m['provider'] == 'CPUExecutionProvider' for m in models) and general_ner.device == 'cuda':
+        if any(m['provider'] in ('CPUExecutionProvider', 'cpu') for m in models) and general_ner.device == 'cuda':
             warnings.add('cuda_fallback')
         if any(m['provider'] == 'cpu' for m in models) and general_ner.device == 'mps':
             warnings.add('mps_fallback')

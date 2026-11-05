@@ -183,7 +183,7 @@ new_cfg = dataclasses.replace(cfg, check_ner_process=False)
 | `onnx_inter_op_threads` | `None` | ONNX Runtime inter-op threads (`None` = ORT default). Only matters with ORT parallel execution mode, so `onnx_intra_op_threads` is the usual knob |
 | `ner_device` | `None` | NER device: `None` = auto (CUDA when available, else CPU; never the Apple GPU), `'cpu'`, `'cuda'`, `'mps'` (Apple GPU for torch NER and GLiNER in torch mode; ONNX stays on CPU; CPU fallback adds `mps_fallback`). GLiClass moves to the GPU only with `'cuda'` |
 | `cuda_device_id` | `0` | GPU index for ONNX, torch, GLiNER and GLiClass when on CUDA |
-| `onnx_cuda_provider_options` | `None` | Extra `CUDAExecutionProvider` options, e.g. `{"gpu_mem_limit": 8 << 30}`; passed to ONNX Runtime unchecked |
+| `onnx_cuda_provider_options` | `None` | Extra `CUDAExecutionProvider` options, e.g. `{"gpu_mem_limit": 8 << 30}`; passed to ONNX Runtime unchecked. See [Shared GPUs](PERFORMANCE.md#shared-gpus) |
 | `ner_chunk_overlap` | `0` | Tokens of neighbouring text each NER window adds on both sides, for documents longer than one window (about 460 tokens with the default models). Finds entities that a chunk boundary would split (`John \| Smith`); costs about `2 * overlap / window` more inference and can change recall either way. `0` = 0.7.1 chunks. Must stay below a quarter of the window |
 | `ner_models` | `None` | Language-keyed dict of ONNX model repo IDs |
 | `torch_ner_models` | `None` | Language-keyed dict of PyTorch model repo IDs |
