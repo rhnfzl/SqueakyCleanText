@@ -40,7 +40,6 @@ class CustomPatternTimeout(TimeoutError):
                 "simplify the pattern, raise custom_patterns_timeout or set custom_patterns_on_timeout='warn'")
 # A _protect key (an emitted value hidden from later steps).
 _KEY = re.compile(f'{constants.KEY_OPEN}[\U000F0000-\U0010FFFF]{constants.KEY_CLOSE}')
-_INDEXED_PLACEHOLDER = re.compile(r"<[A-Z][A-Z0-9_]*_\d+>")
 
 
 class _DocumentState(NamedTuple):
@@ -1109,11 +1108,16 @@ class TextCleaner:
         hidden: dict[str, str] = {}
 
         def hide(match):
-            key = f'\ue000{chr(65 + len(hidden))}\ue001'
+            key = f'{constants.HIDDEN_OPEN}{chr(65 + len(hidden))}{constants.HIDDEN_CLOSE}'
             hidden[key] = match.group()
             return key
 
-        replaced = self._replace_typed(_INDEXED_PLACEHOLDER.sub(hide, text), self._numbers_regex, 'NUMBER')
+        min_digits = 1 if self.cfg.replace_numbers_mode == 'all' else self.cfg.replace_numbers_min_digits
+        glued = contact.RejectView(  # an allow term holds the digits, not the joiner the match may carry
+            constants.placeholder_glued_number_regex(min_digits, self.cfg.replace_numbers_in_words),
+            lambda view, start, end: self._allowed(view[start:end].strip('-*')))
+        replaced = self._replace_typed(ner.PLACEHOLDER_TOKEN.sub(hide, text), glued, 'NUMBER')
+        replaced = self._replace_typed(replaced, self._numbers_regex, 'NUMBER')
         for key, placeholder in hidden.items():
             replaced = replaced.replace(key, placeholder)
         return replaced

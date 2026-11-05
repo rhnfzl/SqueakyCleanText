@@ -82,6 +82,52 @@ def test_reversible_masks_a_number_joined_to_a_placeholder_shaped_token(text, ex
     assert _cleaner(replacement_mode="reversible").process(text).lm_text == expected
 
 
+@pytest.mark.parametrize("text, expected", [
+    ("a@b.com-107683", "<EMAIL_0><NUMBER_0>"),
+    ("8.8.8.8-107683", "<IP_0><NUMBER_0>"),
+    ("<REF_1>_107683", "<REF_1>_<NUMBER_0>"),
+    ("<REF_1>|123-45", "<REF_1>|<NUMBER_0>"),
+    ("a@b.com|123-45", "<EMAIL_0>|<NUMBER_0>"),
+    ("a@b.com*107683", "<EMAIL_0><NUMBER_0>"),
+    ("<REF_1>-107683", "<REF_1><NUMBER_0>"),
+    ("107683-<REF_1>", "<NUMBER_0><REF_1>"),
+    ("107683_<REF_1>", "<NUMBER_0>_<REF_1>"),
+    ("123-45|<REF_1>", "<NUMBER_0>|<REF_1>"),
+    ("<A_1>_1234_<B_2>", "<A_1>_<NUMBER_0>_<B_2>"),
+    ("<NUMBER_0>-107683", "<NUMBER_0><NUMBER_1>"),  # a source spelling stays reserved
+    ("a@b.com-107683-x7", "<EMAIL_0><NUMBER_0>-x7"),
+])
+def test_reversible_masks_a_run_glued_to_a_placeholder_and_restores_it(text, expected):
+    result = _cleaner(replacement_mode="reversible").process(text)
+    assert result.lm_text == expected
+    assert result.metadata["anon_map"].deanonymize(result.lm_text) == text
+
+
+@pytest.mark.parametrize("text", [
+    "<REF_1> 123-45",  # not glued
+    "<REF_1>-123",  # shorter than replace_numbers_min_digits
+    "<REF_1>-12345%",
+    "<REF_1>-1234abc",
+])
+def test_reversible_keeps_a_run_that_is_not_an_identifier_beside_a_placeholder(text):
+    assert _cleaner(replacement_mode="reversible").process(text).lm_text == text
+
+
+def test_reversible_keeps_the_tail_of_a_code_holding_a_placeholder():
+    assert _cleaner(replacement_mode="reversible").process("INV-8.8.8.8-107683").lm_text == "INV-<IP_0>-107683"
+
+
+def test_reversible_glued_run_follows_the_number_settings_and_allow_terms():
+    in_all_mode = _cleaner(replacement_mode="reversible", replace_numbers_mode="all").process("<REF_1>_12")
+    assert in_all_mode.lm_text == "<REF_1>_<NUMBER_0>"
+    assert _cleaner(replacement_mode="reversible", custom_allow_terms=("107683",)).process(
+        "a@b.com-107683").lm_text == "<EMAIL_0>-107683"
+
+
+def test_placeholder_mode_keeps_a_run_glued_to_a_placeholder():
+    assert _cleaner().process("a@b.com-107683").lm_text == "<EMAIL>-107683"
+
+
 @pytest.mark.parametrize("old, new", [
     ("NormaliseText", "_text_normaliser"),
     ("ProcessStopwords", "_stopword_remover"),

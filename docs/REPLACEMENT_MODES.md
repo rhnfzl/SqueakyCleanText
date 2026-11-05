@@ -42,6 +42,10 @@ print(anon_map.deanonymize(result.lm_text))  # -> John Smith works at Google in 
 stored = json.dumps(anon_map.to_dict())
 ```
 
+A digit run glued to a placeholder, directly or across one joiner, is masked and restored with the rest of the text: `a@b.com-107683` gives `<EMAIL_0><NUMBER_0>` and `<REF_1>|123-45` gives `<REF_1>|<NUMBER_0>`. It needs `replace_numbers_min_digits` digits in all (joined groups count together). An emitted placeholder inside a longer code does not count, so `INV-2023-107683` gives `INV-<YEAR_0>-107683`. Placeholder and synthetic modes keep such a run as a token part.
+
+The streaming redactors, the MCP server and the adapters refuse this mode, as they cannot return a map per text.
+
 
 ## User term lists
 

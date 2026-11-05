@@ -360,6 +360,31 @@ def identifier_numbers_regex(min_digits: int, in_words: bool = False, *, letter_
     return re.compile("|".join(shapes))
 
 
+# Reversible mode: a source placeholder hidden from the number step, beside the emitted KEY_OPEN..KEY_CLOSE keys.
+HIDDEN_OPEN, HIDDEN_CLOSE = "", ""
+
+
+@functools.cache
+def placeholder_glued_number_regex(min_digits: int, in_words: bool = False) -> re.Pattern[str]:
+    """A whole digit run of at least *min_digits* digits in all, joined groups included (107683, 123-45), that
+    touches a hidden placeholder or emitted key, directly or across one joiner. The identifier rule reads such a
+    placeholder as a token part and "_" as glue; reversible mode can restore the run, so it is masked instead.
+    A placeholder with text glued to its other side sits inside a longer token (INV-<YEAR>-107683) and does not
+    count. A "-" or "*" beside the placeholder goes with the match: the isolated-symbol step would drop it from
+    between two placeholders, and the map could not restore it."""
+    glue, j = token_glue(in_words), PART_JOINERS
+    text, word = glue.removeprefix(r"\d"), glue.replace("_", "")  # beside a placeholder "_" only joins
+    key = f"[{KEY_OPEN}{HIDDEN_OPEN}].[{KEY_CLOSE}{HIDDEN_CLOSE}]"
+    alone_before, alone_after = rf"(?<![{text}])(?<![{text}][{j}])", rf"(?![{text}])(?![{j}][{text}])"
+    run = rf"(?=(?:[{j}]?\d){{{min_digits}}})\d+(?:[{j}]\d+)*(?![{word}])(?![{j}]\d)(?! ?[%‰{CURRENCY_SIGNS}])"
+    trailing_drop = rf"(?:[\-*](?={key}))?"
+    return re.compile(
+        rf"(?:(?<={alone_before}{key})[\-*]?|(?<={alone_before}{key}[{j}])){run}{trailing_drop}"
+        rf"|(?<![{word}])(?<!\d[{j}])(?<![{CURRENCY_SIGNS}])(?<![{CURRENCY_SIGNS}] )"
+        rf"{run}(?=[{j}]?{key}{alone_after}){trailing_drop}"
+    )
+
+
 # phone_reject_embedded: a digit-only phone match with a letter or "_" on either side, directly or across a
 # joiner, or one that is a yyyymmdd date or a yyyymmddhhmm[ss] timestamp (20231105123456), not a phone. A
 # date with other digits after it (2023010123) can be a real phone, so only these exact shapes are rejected.
