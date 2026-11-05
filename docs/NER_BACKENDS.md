@@ -36,6 +36,12 @@ SqueakyCleanText supports six NER backends, selectable via the `ner_backend` con
 | `ensemble_torch` | Torch + GLiNER ensemble voting | `[torch,gliner]` extra | Maximum recall with PyTorch |
 | `presidio_gliner` | Presidio + GLiNER recognizer (beta) | `[presidio]` extra | Context-aware NER via Presidio's pipeline |
 
+`presidio_gliner` reads the text after the regex steps, so its recognizers can tag the word inside `<EMAIL>`. As on
+the other backends, a result inside a tag the pipeline wrote (`<EMAIL>`, `<EMAIL_0>`, `replace_with_email="EMAIL"`)
+is dropped and is not a finding. A result that also covers text outside the tag masks that text and the tag with it.
+The same marker text in your source (`<LONDON>`, `<John>`) gets no protection, so Presidio can still mask it. Its
+other results are not filtered by `positional_tags` or the confidence threshold.
+
 ## Default NER Models (ONNX)
 
 | Language | Model |

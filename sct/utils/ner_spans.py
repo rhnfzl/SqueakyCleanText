@@ -141,6 +141,17 @@ def propagate(text: str, spans: list[dict[str, Any]], markers: Iterable[tuple[in
     return sorted(spans + added, key=lambda x: x['start']) if added else spans
 
 
+def fit_to_markers(start: int, end: int, markers: list[tuple[int, int]]) -> tuple[int, int] | None:
+    """The span to replace for (*start*, *end*): None inside a marker; one that cuts a marker ("of <EMAIL")
+    takes it whole, so no fragment ("<EM", ">") is left beside the replacement in any mode."""
+    if any(a <= start and end <= b for a, b in markers):
+        return None
+    for a, b in markers:
+        if a < end and start < b:
+            start, end = min(start, a), max(end, b)
+    return start, end
+
+
 def drop_allowed(allow: regex.Pattern | None, text: str, items: list[Any],
                  span: Callable[[Any], tuple[int, int]]) -> list[Any]:
     """*items* without those equal to or inside a custom_allow_terms occurrence (applied last)."""

@@ -1806,13 +1806,11 @@ class SyntheticReplacementTest(unittest.TestCase):
         self.assertGreater(len(name), 0)
 
     def test_synthetic_replacer_unknown_type_fallback(self):
-        """Unknown entity types should fall back to name generation."""
+        """Unknown entity types are written as their tag, not a person name."""
         from sct.utils.synthetic import SyntheticReplacer
         replacer = SyntheticReplacer(seed=42)
 
-        result = replacer.get_replacement('UNKNOWN_TYPE', 'something')
-        self.assertIsInstance(result, str)
-        self.assertGreater(len(result), 0)
+        self.assertEqual(replacer.get_replacement('UNKNOWN_TYPE', 'something'), '<UNKNOWN_TYPE>')
 
     def test_synthetic_generate_for_entities(self):
         """generate_for_entities should replace entities in text."""

@@ -16,6 +16,7 @@ from sct.utils.ner_chunking import align_chunk, simple_chunk, split_text, token_
 from sct.utils.ner_spans import (
     ENTITY_TYPE_MAP,
     drop_allowed,
+    fit_to_markers,
     merge_location_gaps,
     merge_overlaps,
     propagate,
@@ -558,7 +559,7 @@ class GeneralNER:
         positional_tags, ner_confidence_threshold = self._tags_and_cut(positional_tags, ner_confidence_threshold)
 
         if self.cfg.ner_backend == 'presidio_gliner':
-            return self._process_presidio(text, language, anon_map)
+            return self._process_presidio(text, language, anon_map, source_markers)
 
         self._load_models([language])
         windows = self._plan_windows(text, self._window_keys(language))
@@ -569,11 +570,14 @@ class GeneralNER:
         )
         return self._finalize(text, windows, window_results, ner_confidence_threshold, anon_map, source_markers)
 
-    def _process_presidio(self, text, language, anon_map) -> NERProcessingResult:
+    def _process_presidio(self, text, language, anon_map, source_markers=None) -> NERProcessingResult:
         """The presidio_gliner backend: Presidio detects; the replacement mode replaces.
 
-        Presidio's own analyzer decides what is found: the caller's tags, confidence threshold
-        and source markers do not filter its results (filtering would mask less than today).
+        Presidio's own analyzer decides what is found: the caller's tags and confidence threshold
+        do not filter its results. Only the tags this pipeline wrote do: a result inside one is
+        dropped and a result that cuts one takes it whole. Marker-shaped source text
+        (*source_markers*) gets no protection, and neither do fakes, so real text equal to a
+        fake is still masked.
         """
         analyzer_language = resources.language_to_iso(language) if language else 'en'
         # Detection covers 75 languages; Presidio only analyzes those its NLP engine has.
@@ -584,6 +588,14 @@ class GeneralNER:
             text=text,
             language=analyzer_language,
         )
+        markers = self._marker_spans(text, source_markers)
+        kept = []
+        for result in analyzer_results:
+            span = fit_to_markers(result.start, result.end, markers)
+            if span is not None:
+                result.start, result.end = span
+                kept.append(result)
+        analyzer_results = kept
         # Analyzer names (PHONE_NUMBER, a label's upper case) -> the configured type names,
         # then aliases (PER/LOC/ORG) to canonical names, as the other backends do.
         analyzer_results = drop_allowed(self._allow_regex, text, analyzer_results, lambda r: (r.start, r.end))
@@ -655,7 +667,7 @@ class GeneralNER:
                 if before_finalize is not None:
                     before_finalize(i)
                 results.append(self.ner_process_detailed(
-                    text, positional_tags, ner_confidence_threshold, languages[i], anon_maps[i],
+                    text, positional_tags, ner_confidence_threshold, languages[i], anon_maps[i], source_markers[i],
                 ))
             return results
 
@@ -921,33 +933,19 @@ class GeneralNER:
             ]
 
         ensemble_results = self.vote_entities(spans, ner_confidence_threshold)
-        source_markers = source_markers or ()
-        source_spans = [s for s in source_markers if isinstance(s, tuple)]
-
-        def emitted(m):
-            return m.group() not in source_markers and not any(
-                a <= m.start() and m.end() <= b for a, b in source_spans)
-        markers = [m.span() for m in PLACEHOLDER_TOKEN.finditer(text) if emitted(m)]
+        markers = self._marker_spans(text, source_markers)
         if self._synthetic_replacer:  # None outside synthetic mode
             # Fakes the regex steps inserted (emails, phones...) are protected like placeholders.
             for fake in set(self._synthetic_replacer._get_cache().values()):
                 markers += [m.span() for m in re.finditer(re.escape(fake), text)]
-        for marker in self._regex_markers:
-            markers += [m.span() for m in re.finditer(re.escape(marker), text) if emitted(m)]
-        if markers:
-            ensemble_results = [
-                item for item in ensemble_results
-                if not any(a <= item['start'] and item['end'] <= b for a, b in markers)
-            ]
-            # A span that cuts a marker ("of <EMAIL") takes it whole, so no fragment ("<EM", ">")
-            # is left beside the replacement in any mode.
-            for index, item in enumerate(ensemble_results):
-                start, end = item['start'], item['end']
-                for a, b in markers:
-                    if a < end and start < b:
-                        start, end = min(start, a), max(end, b)
-                if (start, end) != (item['start'], item['end']):
-                    ensemble_results[index] = {**item, 'start': start, 'end': end, 'word': text[start:end]}
+        fitted = []
+        for item in ensemble_results:
+            fit = fit_to_markers(item['start'], item['end'], markers)
+            if fit == (item['start'], item['end']):
+                fitted.append(item)
+            elif fit is not None:
+                fitted.append({**item, 'start': fit[0], 'end': fit[1], 'word': text[fit[0]:fit[1]]})
+        ensemble_results = fitted
         if self.cfg.ner_propagate_masked:
             ensemble_results = propagate(text, ensemble_results, markers, self.cfg.ner_propagate_min_score)
         if self.cfg.ner_merge_location_gap:
@@ -961,6 +959,19 @@ class GeneralNER:
             text, entities,
             lambda: self.anonymize_text(text, ensemble_results, self.cfg.replacement_mode, anon_map=anon_map),
         )
+
+    def _marker_spans(self, text, source_markers) -> list[tuple[int, int]]:
+        """The spans of the tags the pipeline wrote in *text* (not marker-shaped source text)."""
+        source_markers = source_markers or ()
+        source_spans = [s for s in source_markers if isinstance(s, tuple)]
+
+        def emitted(m):
+            return m.group() not in source_markers and not any(
+                a <= m.start() and m.end() <= b for a, b in source_spans)
+        markers = [m.span() for m in PLACEHOLDER_TOKEN.finditer(text) if emitted(m)]
+        for marker in self._regex_markers:
+            markers += [m.span() for m in re.finditer(re.escape(marker), text) if emitted(m)]
+        return markers
 
     @staticmethod
     def _entity(item) -> DetectedEntity:

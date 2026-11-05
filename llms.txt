@@ -179,7 +179,7 @@ presidio_gliner   — Presidio + GLiNER recognizer (beta) — pip install squeak
 
 ```
 placeholder (default)  — Entities become <TAG> tokens: "John" → "<PERSON>"
-synthetic              — Faker-generated values: "John" → "Robert Chen" (pip install squeakycleantext[synthetic])
+synthetic              — Faker-generated values: "John" → "Robert Chen" (pip install squeakycleantext[synthetic]); a type with no generator becomes <TYPE>
 reversible             — Indexed placeholders: "John" → "<PERSON_0>" with AnonymizationMap for round-trip restore
 ```
 
