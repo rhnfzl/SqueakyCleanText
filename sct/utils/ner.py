@@ -181,11 +181,6 @@ class GeneralNER:
         # The provider list says what ONNX Runtime was built with, not that torch can use a GPU.
         if (not cfg.ner_device and self.device == 'cuda' and ner_backend in GLINER_BACKENDS
                 and not _torch_cuda_usable(cfg.cuda_device_id)):
-            logger.warning(
-                "Torch models run on CPU: ONNX Runtime has CUDA but torch cannot use GPU %d. "
-                "Check CUDA_VISIBLE_DEVICES and that the torch CUDA version matches your driver.",
-                cfg.cuda_device_id,
-            )
             self._torch_device = 'cpu'
         # 'mps' (Apple GPU) moves torch and GLiNER only; ONNX models stay on CPU.
         if self.device == 'mps' and not _mps_available():
@@ -241,6 +236,13 @@ class GeneralNER:
                 raise ModelLoadError(f"Model loading failed for GLINER ({cfg.gliner_model}): {e}") from e
         if ner_backend in GLINER_BACKENDS:
             onnx_gliner = self._gliner_pipe is not None and self._gliner_pipe._onnx
+            # After the load: GLiNER ONNX ignores the device, but missing ONNX weights fall back to torch.
+            if self.device == 'cuda' and self._torch_device == 'cpu' and not onnx_gliner:
+                logger.warning(
+                    "Torch models run on CPU: ONNX Runtime has CUDA but torch cannot use GPU %d. "
+                    "Check CUDA_VISIBLE_DEVICES and that the torch CUDA version matches your driver.",
+                    cfg.cuda_device_id,
+                )
             self.provenance['GLINER'] = {
                 'key': 'GLINER', 'id': cfg.gliner_model,
                 'revision': cfg.gliner_revision,

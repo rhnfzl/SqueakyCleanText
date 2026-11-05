@@ -55,8 +55,12 @@ If CUDA cannot be loaded, ONNX Runtime runs on CPU. SCT logs a warning
 every result. `metadata['provenance']['models']` names the provider each model ran on.
 
 With `ner_device=None`, torch and GLiNER models also run on CPU when torch cannot use the GPU, for
-example with `CUDA_VISIBLE_DEVICES` empty. If ONNX Runtime has CUDA, SCT logs a warning and adds
-`cuda_fallback`. With an explicit `ner_device="cuda"`, they fail to load instead.
+example with `CUDA_VISIBLE_DEVICES` empty. With `ner_backend` `gliner`, `ensemble_onnx` or
+`presidio_gliner`, if ONNX Runtime has CUDA and GLiNER runs in torch, SCT logs a warning and adds
+`cuda_fallback`. GLiNER in ONNX mode (`gliner_onnx=True`, as in `ner_mode="pii"`) does not depend on
+torch here, so nothing changes for it. `ner_backend` `torch` and `ensemble_torch` log nothing and only
+show provider `cpu`. With an explicit `ner_device="cuda"`, torch and GLiNER torch models fail to load
+instead.
 
 Pick the GPU with `cuda_device_id` (default 0) and force a device with `ner_device`
 (`None` auto, `"cpu"`, `"cuda"`, or `"mps"` for the Apple GPU, see below). `onnx_cuda_provider_options` passes extra
@@ -80,7 +84,8 @@ English-only setup needs about 3 to 5 GB.
 ### Older drivers
 
 The newest wheels target CUDA 13. On an older driver, such as 560 (CUDA 12.6), torch and ONNX
-Runtime silently use CPU; SCT warns and sets `cuda_fallback` as described above. To check:
+Runtime silently use CPU. SCT warns and sets `cuda_fallback` as described above, except with
+`ner_backend` `torch` and `ensemble_torch`, which only show provider `cpu`. To check:
 
 ```sh
 nvidia-smi  # "CUDA Version" is the newest CUDA the driver supports

@@ -224,11 +224,11 @@ class _Model:
         return self
 
 
-def _fake_gliner(monkeypatch):
+def _fake_gliner(monkeypatch, has_onnx=False):
     class GLiNER:
         @staticmethod
         def from_pretrained(model_id, load_onnx_model=False, **kwargs):
-            if load_onnx_model:
+            if load_onnx_model and not has_onnx:
                 raise FileNotFoundError("no model.onnx")
             return _Model()
 
@@ -324,7 +324,7 @@ def test_auto_ensemble_onnx_keeps_trying_cuda_for_onnx_only(monkeypatch):
     assert ner.provenance["GLINER"]["provider"] == "cpu"
 
 
-def test_auto_ensemble_torch_stays_on_cpu_without_a_gpu(monkeypatch):
+def test_auto_ensemble_torch_stays_on_cpu_without_a_gpu(monkeypatch, caplog):
     _torch_sees(monkeypatch, 0)
     _fake_gliner(monkeypatch)
     seen = _fake_torch_loader(monkeypatch)
@@ -332,6 +332,8 @@ def test_auto_ensemble_torch_stays_on_cpu_without_a_gpu(monkeypatch):
                                        torch_ner_models={"ENGLISH": "a", "MULTILINGUAL": "b"}))
     assert seen == ["cpu", "cpu"]
     assert ner._gliner_pipe.model.moved is None
+    # Torch backends just run on CPU: no warning, so the docs only promise provider "cpu" for them.
+    assert ner.device == "cpu" and "Torch models run on CPU" not in caplog.text
 
 
 def test_auto_torch_backend_skips_a_gpu_index_torch_cannot_see(monkeypatch):
@@ -350,6 +352,24 @@ def test_auto_gliner_on_cpu_sets_cuda_fallback(monkeypatch, caplog):
         ner_backend="gliner", gliner_model="m", language="en", check_statistical_model_processing=False,
     )).process(TEXT)
     assert "cuda_fallback" in result.metadata["warnings"]
+    assert "Torch models run on CPU" in caplog.text
+
+
+def test_auto_gliner_in_onnx_mode_does_not_warn_about_torch(monkeypatch, caplog):
+    _torch_sees(monkeypatch, 0)
+    _fake_gliner(monkeypatch, has_onnx=True)
+    ner = GeneralNER(TextCleanerConfig(ner_mode="pii"))
+    assert ner._gliner_pipe._onnx is True
+    assert ner.provenance["GLINER"]["provider"] == "onnx"
+    assert "Torch models run on CPU" not in caplog.text
+
+
+def test_auto_gliner_warns_when_missing_onnx_weights_force_torch(monkeypatch, caplog):
+    _torch_sees(monkeypatch, 0)
+    _fake_gliner(monkeypatch)
+    ner = GeneralNER(TextCleanerConfig(ner_mode="pii"))
+    assert ner._gliner_pipe._onnx is False
+    assert ner.provenance["GLINER"]["provider"] == "cpu"
     assert "Torch models run on CPU" in caplog.text
 
 
