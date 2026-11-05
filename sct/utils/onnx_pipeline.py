@@ -142,7 +142,6 @@ class ONNXNERPipeline:
         self._single_row = any(inp.shape and inp.shape[0] == 1 for inp in inputs)
 
     # ------------------------------------------------------------------
-    # Public API
     # ------------------------------------------------------------------
 
     def __call__(self, texts, batch_size: int = 1, max_workers: int = 1,
@@ -209,7 +208,6 @@ class ONNXNERPipeline:
         return all_results
 
     # ------------------------------------------------------------------
-    # Internal helpers
     # ------------------------------------------------------------------
 
     @staticmethod
@@ -259,7 +257,6 @@ class ONNXNERPipeline:
             token_score = float(scores[idx][label_id])
             start, end = encoding.offsets[idx]
 
-            # Parse BIO prefix
             if '-' in label:
                 bio_prefix, entity_type = label.split('-', 1)
             else:
@@ -294,7 +291,6 @@ class ONNXNERPipeline:
                     and (token['bio'] == 'I' or token['start'] == prev['end'])):
                 current_group.append(token)
                 continue
-            # Start new group
             groups.append(current_group)
             current_group = [token]
 
@@ -497,7 +493,6 @@ def load_onnx_ner_model(
     if revision:
         download_kwargs['revision'] = revision
 
-    # Download required files
     model_path = hf_hub_download(model_name, 'model.onnx', **download_kwargs)
     # hub cache layout: .../snapshots/<commit>/model.onnx
     commit = Path(model_path).parent.name

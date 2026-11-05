@@ -713,7 +713,7 @@ class TextCleaner:
         return await loop.run_in_executor(None, self.process_batch, texts, batch_size)
 
     def warmup(self, languages: list[str] | None = None) -> None:
-        """Pre-load NER models to avoid first-request latency.
+        """Pre-load the NER models each language routes to, to avoid first-request latency.
 
         A language that fails to load is logged as a warning and skipped; it loads (or fails) on first use.
 
@@ -726,7 +726,7 @@ class TextCleaner:
         langs = languages or list(self.cfg.supported_languages)
         for lang in langs:
             try:
-                self.GeneralNER.load_language(lang)
+                self.GeneralNER._load_models([lang])
             except ner.ModelLoadError as e:
                 logger.warning("warmup: skipping %s: %s", lang, e)
 
@@ -900,10 +900,9 @@ class TextCleaner:
             if found in tags:
                 order.append((tags[found], values[found]))
                 return tags[found]
-            value = values.get(found, found)
-            if value in tracked:
-                order.append((value, None))
-            return value
+            if found in tracked:
+                order.append((found, None))
+            return found
         return pattern.sub(put, text)
 
     @staticmethod

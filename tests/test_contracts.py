@@ -8,7 +8,7 @@ from tests.helpers import bare_ner, set_cfg, set_policy
 from sct import EntityRule, PrivacyPolicy, TextCleaner, TextCleanerConfig
 from sct.utils import constants
 from sct.utils.normtext import NormaliseText
-from sct.utils.ner import GeneralNER
+from sct.utils.ner import GeneralNER, ModelLoadError
 
 
 def test_process_batch_uses_batch_size_as_concurrency_limit():
@@ -169,3 +169,16 @@ def test_blank_input_has_classes_key_when_classifying():
 
     cleaner._gliclass = object()
     assert cleaner.process("  ").metadata["classes"] == []
+
+
+@pytest.mark.parametrize("backend, target", [
+    ("gliner", "sct.utils.gliner_adapter.GLiNERAdapter"),
+    ("presidio_gliner", "sct.utils.ner.GeneralNER._init_presidio_gliner"),
+])
+@pytest.mark.parametrize("raised, expected", [(OSError, ModelLoadError), (ImportError, ImportError)])
+def test_gliner_and_presidio_construction_errors(monkeypatch, backend, target, raised, expected):
+    def fail(*_args, **_kwargs):
+        raise raised("no weights")
+    monkeypatch.setattr(target, fail)
+    with pytest.raises(expected, match="no weights"):
+        GeneralNER(TextCleanerConfig(ner_backend=backend, gliner_model="x/y"))

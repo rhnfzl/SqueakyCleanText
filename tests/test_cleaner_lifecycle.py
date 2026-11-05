@@ -6,6 +6,7 @@ from sct.config import TextCleanerConfig
 from sct.privacy import PrivacyPolicy
 from sct.sct import CustomPatternTimeout, TextCleaner
 from sct.streaming import WindowedStreamingRedactor, _step_matches
+from tests.helpers import bare_ner, gliner_ner
 
 
 def _cleaner(**overrides):
@@ -96,3 +97,22 @@ def test_renamed_collaborators_keep_their_deprecated_public_names(old, new):
     with pytest.warns(DeprecationWarning, match=old):
         setattr(cleaner, old, replacement)
     assert getattr(cleaner, new) is replacement
+
+
+def test_warmup_loads_a_custom_route():
+    ner = bare_ner()
+    ner._ensemble_models = {"DUTCH": ("CUSTOM",)}
+    loaded = []
+    ner._ensure_loaded = loaded.append
+    cleaner = _cleaner()
+    cleaner.GeneralNER = ner
+    cleaner.warmup(["DUTCH"])
+    assert loaded == ["CUSTOM"]
+
+
+def test_warmup_on_gliner_only_logs_no_skip(caplog):
+    cleaner = _cleaner()
+    cleaner.GeneralNER = gliner_ner()
+    with caplog.at_level("WARNING"):
+        cleaner.warmup(["ENGLISH"])
+    assert "warmup: skipping" not in caplog.text

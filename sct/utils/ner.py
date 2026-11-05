@@ -143,7 +143,6 @@ class GeneralNER:
         )
         ner_backend = cfg.ner_backend
 
-        # Device detection
         if cfg.ner_device:
             self.device = cfg.ner_device
         elif ner_backend in TORCH_BACKENDS:
@@ -165,7 +164,6 @@ class GeneralNER:
 
         self._engine: Any = None
 
-        # Common state for all backends
         self._pipelines: dict = {}
         self._tokenizers: dict = {}
         self._load_lock = threading.Lock()
@@ -173,8 +171,6 @@ class GeneralNER:
         # InferenceSession.run and the Rust tokenizer are thread-safe.
         self._inference_locks: dict[str | ModelKey, threading.Lock] = {}
         self._locks_lock = threading.Lock()  # Guards creation of per-model locks
-
-        # --- Backend-specific initialization ---
 
         if ner_backend in TOKEN_MODEL_BACKENDS:
             self._model_names = dict((cfg.torch_ner_models if ner_backend in TORCH_BACKENDS else cfg.ner_models) or {})
@@ -187,22 +183,31 @@ class GeneralNER:
             self.min_token_length = None
             self.tokenizer = None
             if ner_backend == 'presidio_gliner':
-                self._init_presidio_gliner()
+                try:
+                    self._init_presidio_gliner()
+                except ImportError:
+                    raise
+                except Exception as e:
+                    raise ModelLoadError(f"Model loading failed for GLINER ({cfg.gliner_model}): {e}") from e
 
-        # --- GLiNER pipeline (for gliner/ensemble modes) ---
         if ner_backend in GLINER_ADAPTER_BACKENDS:
             from sct.utils.gliner_adapter import GLiNERAdapter
-            self._gliner_pipe = GLiNERAdapter(
-                model_id=cast(str, cfg.gliner_model),  # __post_init__ requires it for these backends
-                revision=cfg.gliner_revision,
-                variant=cfg.gliner_variant,
-                labels=cfg.gliner_labels,
-                threshold=cfg.effective_gliner_threshold,
-                label_map=dict(cfg.gliner_label_map or {}),
-                label_descriptions=dict(cfg.gliner_label_descriptions or {}),
-                device=self._torch_device,
-                onnx=cfg.gliner_onnx,
-            )
+            try:
+                self._gliner_pipe = GLiNERAdapter(
+                    model_id=cast(str, cfg.gliner_model),  # __post_init__ requires it for these backends
+                    revision=cfg.gliner_revision,
+                    variant=cfg.gliner_variant,
+                    labels=cfg.gliner_labels,
+                    threshold=cfg.effective_gliner_threshold,
+                    label_map=dict(cfg.gliner_label_map or {}),
+                    label_descriptions=dict(cfg.gliner_label_descriptions or {}),
+                    device=self._torch_device,
+                    onnx=cfg.gliner_onnx,
+                )
+            except ImportError:
+                raise
+            except Exception as e:
+                raise ModelLoadError(f"Model loading failed for GLINER ({cfg.gliner_model}): {e}") from e
         if ner_backend in GLINER_BACKENDS:
             onnx_gliner = self._gliner_pipe is not None and self._gliner_pipe._onnx
             self.provenance['GLINER'] = {
@@ -439,27 +444,25 @@ class GeneralNER:
                 tag = ENTITY_TYPE_MAP.get(items['entity_group'], items['entity_group'])
                 text = text[:items['start']] + f"<{tag}>" + text[items['end']:]
             return text
-        else:
-            # Standard entities only: use Presidio (existing behavior)
-            from presidio_anonymizer.entities import RecognizerResult
-            analyzer_result = []
-            for items in filtered_data:
-                entity_type = ENTITY_TYPE_MAP.get(items['entity_group'])
-                if entity_type:
-                    analyzer_result.append(RecognizerResult(
-                        entity_type=entity_type,
-                        start=items['start'],
-                        end=items['end'],
-                        score=items['score'],
-                    ))
+        # Standard entities only: use Presidio (existing behavior)
+        from presidio_anonymizer.entities import RecognizerResult
+        analyzer_result = [
+            RecognizerResult(
+                entity_type=ENTITY_TYPE_MAP[items['entity_group']],
+                start=items['start'],
+                end=items['end'],
+                score=items['score'],
+            )
+            for items in filtered_data
+        ]
 
-            text_length = len(text)
-            analyzer_result = [
-                entry for entry in analyzer_result
-                if 0 <= entry.start < text_length and 0 < entry.end <= text_length
-            ]
+        text_length = len(text)
+        analyzer_result = [
+            entry for entry in analyzer_result
+            if 0 <= entry.start < text_length and 0 < entry.end <= text_length
+        ]
 
-            return self.engine.anonymize(text=text, analyzer_results=analyzer_result).text
+        return self.engine.anonymize(text=text, analyzer_results=analyzer_result).text
 
     @property
     def engine(self) -> Any:
