@@ -229,8 +229,8 @@ DATE, NUMBER), with dataset-side mapping in `benchmarks/labels.py`.
 
 1. **Tool-supported subset**: per entry, only gold of the types in its `supports`;
    unsupported types show "N/A", never 0.
-2. **Shared intersection**: types every entry supports (with the current set:
-   EMAIL, PHONE, DATE, NUMBER; without datafog: + PERSON, LOCATION, URL). The headline
+2. **Shared intersection**: types every entry supports (round 1: EMAIL, PHONE, DATE, NUMBER,
+   without datafog: + PERSON, LOCATION, URL; round 2: EMAIL, PHONE, NUMBER, see section 2). The headline
    ranking uses this view.
 3. **Full taxonomy**: all 9 types; an unsupported type counts as missed.
 
@@ -419,8 +419,8 @@ completion < 99% on a dataset is flagged in every table. No silent drops.
 
 ## 16. Speed and resources (rules 17, 18)
 
-Box: AMD Threadripper PRO 7985WX (64 cores, 2 threads each; CPUs 0-63 are one thread per
-core), 754 GB RAM, 4x RTX 4090 shared with a vLLM server (16.5-19 GB in use per GPU).
+Box: one Linux workstation. CPUs 0-63 are one thread per core. Its GPUs are shared with other
+work, so each job gets a fixed memory cap.
 
 - CPU: `taskset -c 0-15`, `OMP_NUM_THREADS=MKL_NUM_THREADS=16`, torch/ONNX intra-op 16,
   inter-op 1; single-thread latency run on `taskset -c 0` with all thread caps 1.

@@ -632,8 +632,8 @@ def test_report_tables_from_a_tiny_bundle(tmp_path):
     out = report.tables(tmp_path)
     assert "| x | 10 | 1 | tab 0.900 |" in out
     assert "paired bootstrap vs baseline" not in out  # every set excluded/unknown for SCT: section dropped
-    assert "| tab | 0.500 |" in out
-    assert "| en | tab | 0.600 |" in out
+    assert "| tab | 0.500† |" in out  # tab is under 99% complete: flagged beyond the completion table
+    assert "| en | tab | 0.600† |" in out
     assert "masked recall, ner," not in out  # no ner set in the bundle: no empty per-language section
 
 
@@ -750,8 +750,25 @@ def test_pairwise_and_own_tables(tmp_path):
     assert own[2].startswith("| x | none (1) | 0.800 [0.700, 0.900] |")
     assert own[3].startswith("| sct-default | none (0) | - |") and "((0.950 (1))" not in own[3] and "(0.950 (1))" in own[3]
     assert report.same_set_table({}, "full", "privacy-real", "all")[0].startswith("No dataset")
+    (tmp_path / "x").mkdir()
+    (tmp_path / "x" / "tab-test.json").write_text(json.dumps({"flag_low_completion": True}))
+    assert report.own_table(summary, tmp_path, "full", "privacy-real", track_dir=tmp_path)[2].startswith("| x† |")
+    assert report.pairwise_table(summary, "full", "privacy-real", track_dir=tmp_path)[2].startswith("| x† | tab, redact |")
     empty = report.pairwise_table({"own": {"sct-default": {}, "x": {}}}, "full", "privacy-real")
     assert empty == ["No dataset in this group is clean for both sct-default and any other entry (languages both claim)."]
+
+
+@pytest.mark.parametrize("category", ["unknown", "excluded"])
+def test_own_table_flags_incomplete_information_cells(tmp_path, category):
+    from benchmarks.compare import report
+
+    (tmp_path / "x").mkdir()
+    (tmp_path / "x" / "tab-test.json").write_text(json.dumps({"flag_low_completion": True}))
+    cell = {category: {"datasets": ["tab"], "claimed": {
+        "datasets": ["tab"], "macro": {"masked_recall": 0.5}}}}
+    summary = {"own": {"x": {"full": {"privacy-real": cell}}}}
+    row = report.own_table(summary, tmp_path, "full", "privacy-real", track_dir=tmp_path)[2]
+    assert row.startswith("| x† |") and "0.500 (1)" in row
 
 
 def test_audit_recover_flags_folded_traces():

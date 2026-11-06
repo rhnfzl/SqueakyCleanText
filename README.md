@@ -187,17 +187,17 @@ Modes, privacy policies and more PII types (`ner_mode="pii"`): [docs/REPLACEMENT
 
 ## Speed and hardware
 
-Default config (full multilingual NER ensemble), release benchmark documents (up to about 900 characters), SCT 0.8.0, AMD Threadripper PRO 7985WX and RTX 4090, median of 3 runs. 0.8.1 runs at the same speed.
+Default config (full multilingual NER ensemble), release benchmark documents (up to about 900 characters), SCT 0.8.0, on a workstation CPU and high-end GPUs, median of 3 runs. 0.8.1 runs at the same speed.
 
 | Workload | Hardware | Docs/s |
 |---|---|---|
 | `process`, one document at a time | 16 CPU cores | 5.0 |
 | `process_batch`, short documents, 16 workers | 16 CPU cores | 15.5 |
 | `process_batch`, short documents, 16 workers | 64 CPU cores | 29.2 |
-| `process_batch`, short documents, full ensemble | 3x RTX 4090 (models split across GPUs) | 130 |
-| `process_batch`, short documents, English only (2 models) | 1x RTX 4090 | 646 |
+| `process_batch`, short documents, full ensemble | 3 GPUs (models split across them) | 130 |
+| `process_batch`, short documents, English only (2 models) | 1 GPU | 646 |
 
-The full ensemble needs about 12 to 16 GB of free memory on one GPU; English only needs 3 to 5 GB. As a rough estimate from this table, 1 million short documents take about 26 minutes English-only on one RTX 4090, about 2 hours with the full ensemble on 3 GPUs, and about 10 hours on 64 CPU cores.
+The full ensemble needs about 12 to 16 GB of free memory on one GPU; English only needs 3 to 5 GB. As a rough estimate from this table, 1 million short documents take about 26 minutes English-only on one GPU, about 2 hours with the full ensemble on 3 GPUs, and about 10 hours on 64 CPU cores.
 
 NER is the slow stage. Turn it off (`check_ner_process=False`) for regex-only cleaning, or limit `language=` to load fewer models. Hardware advice and GPU setup: [docs/PERFORMANCE.md](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/PERFORMANCE.md).
 

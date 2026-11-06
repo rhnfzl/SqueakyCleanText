@@ -12,7 +12,7 @@ from benchmarks.labels import DATE, EMAIL, IP, LOCATION, NUMBER, ORGANISATION, P
 SCT_TYPES = (PERSON, LOCATION, ORGANISATION, EMAIL, PHONE, IP, URL, DATE, NUMBER)
 # SCT's own placeholder names (YEAR, IBAN, ...) are aliases of the canonical types: map them
 # here, before map_spans drops unknown labels.
-# GPU entries use CUDA 12 venvs (envs/*.txt): torch cu126 runs on the gpuserver CUDA 12.6 driver.
+# GPU entries use CUDA 12 venvs (envs/*.txt): torch cu126 runs on a CUDA 12.6 driver.
 TORCH_CU126 = "torch==2.14.1+cu126"
 SCT_LABELS = {**{t: t for t in SCT_TYPES}, **PRED_ALIASES}
 
