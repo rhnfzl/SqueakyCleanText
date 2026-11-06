@@ -509,6 +509,11 @@ def test_c6_sct_offsets_survive_whitespace_collapse_and_report_why_unplaced():
     assert sct.unplaced_reason("", view) == "no_value"
     assert sct.unplaced_reason("555123", view) == "separators"
     assert sct.unplaced_reason("Ann", view) == "absent"
+    assert sct.unplaced_reason("555 -  123", view) == "in_view"
+    full = sct.sct_view("Bob met Ann. Cy saw Ann.", normalise)
+    assert sct.misplaced("Bob met ", full, 8) is False
+    assert sct.misplaced(". Cy saw ", full, 8) is True
+    assert sct.misplaced(" - ", full, 8) is None
 
 
 def test_c7_nvidia_postcode_is_a_number_like_gold_and_fastino():

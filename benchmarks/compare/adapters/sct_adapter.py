@@ -12,10 +12,12 @@ Config: ``mode`` (default|gliner), ``preset`` (a ``sct.presets`` name, applied u
 ``device`` (cpu|cuda), ``gpu_mem_gb``, ``overrides`` (extra TextCleanerConfig fields).
 """
 
+from bisect import bisect_left
 from collections import Counter
 import os
 import re
 import sys
+import unicodedata
 from pathlib import Path
 
 # Repo root goes AFTER site-packages: the venv's pinned sct wins over the checkout's sources.
@@ -69,12 +71,25 @@ def sct_view(source: str, normalise) -> tuple[str, list[int]]:
 
 
 def unplaced_reason(value: str, view: str) -> str:
-    """Why a value was not placed: ``no_value`` (no anon_map entry), ``separators`` (its letters and
-    digits are in the view, a cleanup changed what lies between them) or ``absent`` (rewritten text)."""
+    """Why a value was not placed: ``no_value`` (no anon_map entry), ``in_view`` (in the view as written:
+    placement refused it, the cursor or window excluded it or only unmasked copies matched), ``separators``
+    (its letters and digits are in the view, a cleanup changed what lies between them) or ``absent``."""
     if not value:
         return "no_value"
+    if " ".join(value.split()) in " ".join(view.split()):
+        return "in_view"
     alnum = re.sub(r"\W", "", value)
     return "separators" if alnum and alnum in re.sub(r"\W", "", view) else "absent"
+
+
+def misplaced(context: str, view: tuple[str, list[int]], start: int) -> bool | None:
+    """Whether a placed span looks misplaced: the last 2+ char word of the output *context* differs from
+    the last one before the span in *view*. None when the context has no such word to check."""
+    words = re.findall(r"\w{2,}", context)
+    if not words:
+        return None
+    before = re.findall(r"\w{2,}", view[0][:bisect_left(view[1], start)][-200:])
+    return not before or before[-1] != words[-1]
 
 
 def load(config: dict):
@@ -139,10 +154,14 @@ def load(config: dict):
                 spans = predicted_spans(docs[i]["text"], result.lm_text, originals, view, model.cfg)
                 placed = [{"start": s.start, "end": s.end, "label": s.label, "score": None} for s in spans if s.start >= 0]
                 out[i] = {"spans": placed, "masked_text": result.lm_text, "unplaced": len(spans) - len(placed)}
-                if debug and len(placed) < len(spans):
+                if debug:
                     tags = [m.group(0) for m in PLACEHOLDER_REGEX.finditer(result.lm_text)]
                     reasons.update(f"{s.label}:{unplaced_reason(originals.get(tag, ''), view[0])}"
                                    for tag, s in zip(tags, spans, strict=True) if s.start < 0)
+                    contexts = re.split(PLACEHOLDER_REGEX.pattern, unicodedata.normalize("NFKC", result.lm_text))
+                    reasons.update(f"{s.label}:placed_{'unchecked' if bad is None else 'suspect' if bad else 'ok'}"
+                                   for s, context in zip(spans, contexts[::PLACEHOLDER_REGEX.groups + 1])
+                                   if s.start >= 0 for bad in [misplaced(context, view, s.start)])
         if reasons:
             print(f"sct_adapter: unplaced {dict(reasons)}", file=sys.stderr)
         return out

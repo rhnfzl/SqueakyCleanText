@@ -104,13 +104,59 @@ def _sct_cleanup(view: str, offsets: list[int], cfg) -> tuple[str, list[int]]:
     return _drop(view, offsets, constants.ISOLATED_QUOTES_REGEX, lambda m: special._drop_if_isolated(m) == "")
 
 
-def _find_value(value: str, views, low: int, high: int | None = None) -> tuple[int, int] | None:
+def _find_value(value: str, views, low: int, high: int | None = None,
+                earliest: bool = False) -> tuple[int, int] | None:
     """Source offsets of the first and last char of the first *value* starting in source range
-    [*low*, *high*), tried in each of *views* in turn; None if absent."""
+    [*low*, *high*), tried in each of *views* in turn (*earliest*: the earliest hit of all views); None if absent."""
+    hits = []
     for text, offsets in views:
         at = text.find(value, bisect_left(offsets, low))
         if at >= 0 and (high is None or offsets[at] < high):
-            return offsets[at], offsets[at + len(value) - 1]
+            hits.append((offsets[at], offsets[at + len(value) - 1]))
+            if not earliest:
+                break
+    return min(hits) if hits else None
+
+
+def _align(context: str, text: str, offsets: list[int], cursor: int, cuts: int) -> tuple[int, int, int] | None:
+    """(cut, source start, source end) of the longest suffix ``context[cut:]`` (cut < *cuts*) found in
+    *text* after source offset *cursor*; None if none is."""
+    start = bisect_left(offsets, cursor)
+    # The cursor sits inside a whitespace run the view kept as an earlier space: that space is still
+    # the gap after the previous value, so the context may start on it.
+    if 0 < start < len(offsets) and offsets[start] != cursor and text[start - 1] == " ":
+        start -= 1
+    for cut in range(cuts):
+        at = text.find(context[cut:], start)
+        if at >= 0:
+            return cut, offsets[at], offsets[at + len(context) - cut]
+    return None
+
+
+def _locate(value: str, views, cursor: int, low: int, context_at: int,
+            earliest: bool = False) -> tuple[int, int] | None:
+    """*value* (whitespace collapsed) after *cursor*, else in [*low*, *context_at*): a context found too
+    late moved the cursor past the value, which still lies after the previous one and before that
+    context, never on text the output kept (an unmasked copy)."""
+    value = WHITESPACE_RUN.sub(" ", unicodedata.normalize("NFKC", value)).strip()
+    return (_find_value(value, views, cursor, earliest=earliest)
+            or _find_value(value, views, low, context_at, earliest)) if value else None
+
+
+def _recover(context: str, value: str, views, low: int, output: str, spans) -> tuple[int, int] | None:
+    """*value* right after the whole output *context*, at the last such place before source offset *low*:
+    an earlier span credited to a later copy moved the cursor past this one. Only when the output shows
+    ``context + value`` nowhere (every source copy of the pair was masked) and no earlier span holds it."""
+    value = WHITESPACE_RUN.sub(" ", unicodedata.normalize("NFKC", value)).strip()
+    if not value or context + value in output:
+        return None
+    for text, offsets in views:
+        end = bisect_left(offsets, low) + len(context) + len(value) - 1  # the value starts before *low*
+        if (at := text.rfind(context + value, 0, end)) >= 0:
+            start = offsets[at + len(context)]
+            if any(s.start <= start < s.end for s in spans):
+                return None
+            return start, offsets[at + len(context) + len(value) - 1]
     return None
 
 
@@ -152,7 +198,7 @@ def predicted_spans(source: str, output: str, originals: dict[str, str],
         cfg = TextCleanerConfig()
     base, base_offsets = view or _nfkc_view(source)
     views = (_collapse_whitespace(*_sct_cleanup(base, base_offsets, cfg)), _collapse_whitespace(base, base_offsets))
-    view, offsets = views[0]
+    (clean, clean_offsets), (plain, plain_offsets) = views
     shown = {m.group(0) for m in PLACEHOLDER_REGEX.finditer(output)}
     swallowed: dict[str, list[str]] = {}  # values whose placeholder a wider NER span took in, by tag
     for placeholder, original in originals.items():
@@ -169,19 +215,48 @@ def predicted_spans(source: str, output: str, originals: dict[str, str],
         low = context_at = cursor
         # A cleanup step may have changed the context ("Ann x met" -> "Ann met"):
         # align on its longest suffix still found in the source.
-        for cut in range(len(context)):
-            found = view.find(context[cut:], bisect_left(offsets, cursor))
-            if found >= 0:
-                context_at, cursor = offsets[found], offsets[found + len(context) - cut]
-                break
+        hit = _align(context, clean, clean_offsets, cursor, len(context))
+        flipped, longer_at = False, None  # flipped: the value is searched in both views, earliest hit wins
+        if hit and hit[0]:
+            # SCT's own cleanup may have kept text the mirror drops (brackets around a value a regex step
+            # replaced first): a longer suffix in the uncleaned view wins if it ends earlier, so it never
+            # moves the cursor further than the cleaned view would.
+            plain_hit = _align(context, plain, plain_offsets, cursor, hit[0])
+            if plain_hit and plain_hit[2] < hit[2]:
+                hit, flipped = plain_hit, True
+            elif plain_hit and plain_hit[2] == hit[2]:
+                longer_at = plain_hit[1]  # same end, earlier start: the fallback window stops there
+        if hit:
+            _, context_at, cursor = hit
+            # A context that starts on the space before the cursor: the value lies in that collapsed
+            # run (only whitespace or text the mirror dropped), not before it.
+            if context_at < low:
+                context_at = cursor
+            elif longer_at is not None:
+                context_at = max(low, longer_at)
         label = LABEL_ALIASES.get(match.group(1), match.group(1))
-        value = GENERIC_MARKER.sub(
-            lambda m: swallowed[m.group(1)].pop(0) if swallowed.get(m.group(1)) else m.group(0),
-            originals.get(match.group(0), ""))
-        value = WHITESPACE_RUN.sub(" ", unicodedata.normalize("NFKC", value)).strip()
-        # A context found too late moved the cursor past the value; the value still lies after the
-        # previous one and before that context, never on text the output kept (an unmasked copy).
-        found = (_find_value(value, views, cursor) or _find_value(value, views, low, context_at)) if value else None
+        raw = originals.get(match.group(0), "")
+        found = _locate(raw, views, cursor, low, context_at, flipped)
+        # A "<TAG>" is literal markup ("<HTML>") or a regex step's marker a swallowed entry fills: the
+        # reading found earlier wins; swallowed entries are used up only when the marker reading does.
+        used: Counter = Counter()
+
+        def fill(m):
+            queue = swallowed.get(m.group(1), [])
+            if used[m.group(1)] < len(queue):
+                used[m.group(1)] += 1
+                return queue[used[m.group(1)] - 1]
+            return m.group(0)
+
+        expanded = GENERIC_MARKER.sub(fill, raw)
+        if expanded != raw:
+            alt = _locate(expanded, views, cursor, low, context_at, flipped)
+            if found is None or (alt and alt[0] < found[0]):
+                found = alt
+                for tag, n in used.items():
+                    del swallowed[tag][:n]
+        if found is None and any(ch.isalnum() for ch in context):  # a bare space or symbol anchors nothing
+            found = _recover(context, raw, views, low, output, spans)
         if found is None:
             # The replaced value is not in the source (an earlier step changed it): never matches.
             spans.append(EntitySpan(label, -1, -1))
