@@ -1,5 +1,11 @@
 # SCT benchmarks
 
+Other-tools charts: [SCT v0.8.2 paired comparisons](https://github.com/rhnfzl/SqueakyCleanText/blob/main/benchmarks/results/compare-2026-11-04-visuals/README.md).
+These show the completed round-2 run; they do not measure v0.8.3.
+
+Released version comparison: [v0.7.1 versus v0.8.3](https://github.com/rhnfzl/SqueakyCleanText/blob/main/benchmarks/results/compare-0.7.1-0.8.3/README.md).
+The report includes Plotly charts, aggregate JSON, settings, and limits.
+
 Download-and-score benchmarks over open datasets. They measure how well SCT finds
 and removes PII, how well it detects the language, how it does on long documents,
 how well it removes noise, and how fast it runs. This folder is not part of the

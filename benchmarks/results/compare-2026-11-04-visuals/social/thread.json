@@ -1,0 +1,9 @@
+[
+  "SqueakyCleanText is a text-processing pipeline for training and RAG datasets.\n\nLanguage detection, text repair, PII handling, scoring and data cards.\n\nI benchmarked its PII stage alongside other tools: 18 entries, 12 datasets. Tested SCT version: v0.8.2.",
+  "The PII stage also acts as a router.\n\nSCT has its own regex detection and language-based model routing. You can choose supported backends and models: ONNX, PyTorch, GLiNER, or Presidio/GLiNER.\n\nThe pipeline is not tied to one detection model.",
+  "On shared emails, phones and numbers, four tools have higher masking recall than SCT default: PII-Tracer, BardsAI-v3, OPF and OpenMed.\n\nThese are synthetic-data, matched-document comparisons. The image shows every pair whose 95% interval favours the other tool.",
+  "Across the broader label set, SCT default has higher recall in 13 of 14 paired synthetic comparisons. The GLiNER2-Fastino interval crosses zero.\n\nUnsupported types count as misses, so this also measures entity coverage. Intervals are unadjusted.",
+  "One example: PII-Tracer has higher masking precision than SCT on the same synthetic data, 78.1% vs 75.0%. These are dataset averages.\n\nPrecision counts predicted mask spans that overlap a labelled mention. It is a separate measure from recall.",
+  "In that same pair, SCT has higher recall, but its document-exposure rate is higher: 58.0% vs 50.2%, averaged across datasets.\n\nRecall counts any overlap. A partly masked identifier can still leave sensitive letters or digits visible.",
+  "This benchmark tests PII configurations, not the whole processing pipeline.\n\nIt tested v0.8.2. v0.8.3 is available, but these results do not measure it.\n\nFull methods, limits and results:\nhttps://github.com/rhnfzl/SqueakyCleanText/blob/main/benchmarks/results/compare-2026-11-04/README.md"
+]

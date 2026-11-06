@@ -1,0 +1,385 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="artifact-kind" content="review">
+  <meta name="artifact-mode" content="dynamic">
+  <meta name="artifact-audience" content="human">
+  <meta name="artifact-created" content="2026-11-06">
+  <meta name="artifact-source" content="local">
+  <meta name="artifact-read-time" content="4 min">
+  <!-- Gallery card text. Leave empty to auto-derive from the summary block; fill for a sharper one-liner. -->
+  <meta name="artifact-summary" content="Six phone-readable social cards and a seven-post X draft, with source data and visible limits.">
+  <meta name="artifact-keywords" content="">
+  <title>SCT social images and X draft</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Ctext y='13' font-size='13'%3E🔍%3C/text%3E%3C/svg%3E">
+  <script>
+    (function(){try{var r=document.documentElement;r.classList.add('theme-js');var t=localStorage.getItem('hh-theme');if(t==='dark'||t==='light')r.dataset.theme=t;}catch(e){}})();
+  </script>
+  <style>
+:root {
+      color-scheme: light;                     /* base = light, renders on any engine; dark tokens live in the @media screen blocks appended after this constant */
+      /* surfaces: cool off-white, slight blue-grey hue bias (never pure grey/white) */
+      --bg: #f6f8fb; --surface: #ffffff; --surface-2: #f2f5f9; --surface-3: #e9eef4;
+      /* ink: navy-biased grey ramp (never pure black) */
+      --ink: #172033; --ink-2: #3c4657; --muted: #5a6577; --faint: #66707f;  /* --faint is text-safe AA (4.7:1 on --bg) */
+      /* structure */
+      --line: #dbe2ec; --line-strong: #c6cfdc;
+      /* brand accent (#226fb2) + tint */
+      --accent: #226fb2; --accent-2: #1b5e97; --accent-bg: #eef5fb; --accent-line: #b9d5ec;
+      /* severity: fg / tint-bg / tint-line triples (semantic color only) */
+      --crit: #c0342a; --crit-bg: #fbeae8; --crit-line: #f0c4be;
+      --high: #a84522; --high-bg: #fbeee6; --high-line: #f0cdba;  /* fg contrast-locked to tint (5.2:1) */
+      --warn: #845d06; --warn-bg: #f9f1d8; --warn-line: #e8d69a;  /* fg contrast-locked to tint (5.2:1) */
+      --good: #2d7a55; --good-bg: #e9f5ee; --good-line: #b6ddc6;
+      --info: #226fb2; --info-bg: #eef5fb; --info-line: #b9d5ec;
+      --neutral: #5a6577; --neutral-bg: #eef1f5; --neutral-line: #d7dde6;
+      /* legacy aliases: keep every existing selector below valid (safe incremental migration) */
+      --blue: var(--accent); --soft: var(--surface-2);
+      --orange: var(--high); --green: var(--good);
+      --rose-bg: var(--high-bg); --rose-line: var(--high);
+      --emerald-bg: var(--good-bg); --emerald-line: var(--good);
+      /* elevation */
+      --shadow-sm: 0 1px 2px rgba(23,32,51,.05);
+      --shadow: 0 1px 2px rgba(23,32,51,.05), 0 8px 24px rgba(23,32,51,.06);
+      /* radius */
+      --radius: 10px; --radius-sm: 6px; --radius-lg: 14px;
+      /* spacing scale */
+      --s-1:4px; --s-2:6px; --s-3:8px; --s-4:12px; --s-5:14px; --s-6:16px; --s-7:18px; --s-8:20px; --s-9:24px; --s-10:32px; --s-12:48px;
+      /* families: display serif for h1/numbers, sans body (NOT led by Inter), mono kickers */
+      --display: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, ui-serif, serif;
+      --sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", "Helvetica Neue", sans-serif;
+      --mono: ui-monospace, "SF Mono", "Cascadia Code", Menlo, Consolas, monospace;
+      /* fluid type scale: only the 3 biggest levels clamp; body & below fixed so copy never wobbles */
+      --fs-h1: clamp(2rem, 1.35rem + 2.6vw, 3.2rem);
+      --fs-h2: clamp(1.3rem, 1.15rem + .7vw, 1.6rem);
+      --fs-h3: 1.05rem; --fs-lede: clamp(1.05rem, 1rem + .35vw, 1.18rem);
+      --fs-body: 1rem; --fs-sm: .875rem; --fs-cap: .72rem;
+      --lh-body: 1.62; --ls-caps: .1em;
+      font-family: var(--sans);
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; color: var(--ink); background: var(--bg); font-family: var(--sans); line-height: var(--lh-body); accent-color: var(--accent); text-rendering: optimizeLegibility; -webkit-font-smoothing: antialiased; font-feature-settings: "kern", "liga"; }
+    main { width: min(1060px, calc(100vw - clamp(2rem, 8vw, 5rem))); margin: 0 auto; padding: clamp(28px,5vw,56px) 0 clamp(64px,10vw,96px); }
+    header { border-bottom: 1px solid var(--line); padding-bottom: var(--s-9); margin-bottom: var(--s-10); }
+    .eyebrow { font-family: var(--mono); color: var(--accent); font-size: var(--fs-cap); font-weight: 600; text-transform: uppercase; letter-spacing: .14em; }
+    h1 { margin: 10px 0 12px; font-family: var(--display); font-size: var(--fs-h1); font-weight: 800; line-height: 1.05; letter-spacing: -.02em; }
+    h2 { margin: 0 0 12px; font-size: var(--fs-h2); font-weight: 700; letter-spacing: -.01em; }
+    h3 { margin: 18px 0 8px; font-size: var(--fs-h3); font-weight: 600; color: var(--ink); }
+    h1, h2, h3 { text-wrap: balance; }
+    p { color: var(--ink-2); line-height: var(--lh-body); max-width: 72ch; text-wrap: pretty; }
+    li { max-width: 72ch; }
+    a { color: var(--accent); }
+    :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+    .lead-summary { background: var(--surface-2); border-left: 4px solid var(--accent); padding: 20px 22px; border-radius: var(--radius); margin: 16px 0 32px; box-shadow: var(--shadow-sm); }
+    .lead-summary h2 { color: var(--accent); margin-bottom: 12px; }
+    .lead-summary ul { margin: 0; padding-left: 20px; }
+    .lead-summary li { margin-bottom: 8px; color: var(--ink-2); line-height: 1.55; }
+    .lead-summary li strong { color: var(--accent); }
+    nav.toc { background: var(--surface-2); border: 1px solid var(--line); border-radius: var(--radius); padding: 14px 20px; margin: 16px 0 32px; }
+    nav.toc ol { margin: 8px 0 0; padding-left: 22px; columns: 2; column-gap: 24px; }
+    nav.toc li { margin-bottom: 4px; }
+    nav.toc a { color: var(--accent); text-decoration: none; }
+    nav.toc a:hover { text-decoration: underline; }
+    section.section { margin-top: clamp(32px,5vw,52px); }
+    section[id] { scroll-margin-top: var(--s-9); }
+    section:target > h2 { color: var(--accent-2); }
+    .grid-cols-2, .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: var(--s-6); }
+    .grid-3 { display: grid; grid-template-columns: repeat(3,1fr); gap: var(--s-6); }
+    /* grid items default to min-width:auto and will not shrink below a wide child (a long <pre> or code
+       line), pushing the page past a phone viewport. min-width:0 lets the child's overflow-x:auto scroll. */
+    .grid-cols-2 > *, .grid-2 > *, .grid-3 > *, .compare-before, .compare-after { min-width: 0; }
+    .compare-before { background: var(--high-bg); border-left: 4px solid var(--high); border-radius: var(--radius); padding: 16px; }
+    .compare-after { background: var(--good-bg); border-left: 4px solid var(--good); border-radius: var(--radius); padding: 16px; }
+    .compare-before > strong:first-child, .compare-after > strong:first-child { display: block; margin-bottom: 8px; font-family: var(--mono); font-size: var(--fs-cap); letter-spacing: .08em; text-transform: uppercase; }
+    .compare-before > strong:first-child { color: var(--high); }
+    .compare-after > strong:first-child { color: var(--good); }
+    table { width: 100%; border-collapse: collapse; border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; }
+    th, td { padding: 12px 14px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; font-variant-numeric: tabular-nums; }
+    th { background: var(--surface-2); color: var(--muted); font-family: var(--mono); font-size: var(--fs-cap); text-transform: uppercase; letter-spacing: .08em; }
+    tr:last-child td { border-bottom: 0; }
+    .table-scroll { overflow-x: auto; border-radius: var(--radius); }
+    .table-scroll table { display: table; }
+    code { background: var(--surface-2); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 2px 5px; font-family: var(--mono); font-size: .88em; overflow-wrap: anywhere; }
+    pre { background: #0f172a; color: #e2e8f0; border-radius: var(--radius); padding: 14px; overflow: auto; border: 1px solid var(--line); }
+    pre code { background: transparent; border: 0; color: inherit; }
+    .mermaid svg { max-width: 100%; height: auto; }
+    /* Mermaid node labels clip on the right when the page's kerning / ligatures / letter-spacing widen the
+       final SVG text past mermaid's own measurement. Neutralize those inside the diagram, and let a label
+       spill into the node's padding rather than be cut off. */
+    .mermaid text, .mermaid .nodeLabel, .mermaid .edgeLabel,
+    .mermaid foreignObject div, .mermaid foreignObject span, .mermaid foreignObject p {
+      font-feature-settings: normal; font-variant-ligatures: none; letter-spacing: normal; text-rendering: auto;
+    }
+    .mermaid foreignObject { overflow: visible; }
+    .mermaid:not([data-processed]) { font-family: var(--mono); font-size: var(--fs-sm); white-space: pre; overflow-x: auto; background: var(--surface-2); border: 1px dashed var(--line-strong); border-radius: var(--radius); padding: var(--s-6); color: var(--muted); }
+    /* shipped diagram: inline SVG in a scroll wrapper, mermaid/source kept in an adjacent <details>.
+       The wrapper's overflow-x contains a too-wide diagram to its own scrollbar instead of the page. */
+    figure.diagram { margin: var(--s-7) 0; }
+    .diagram-scroll { overflow-x: auto; }
+    .diagram-scroll svg { max-width: 100%; height: auto; display: block; margin: 0 auto; }
+    .diagram-src { margin-top: var(--s-4); }
+    .diagram-src summary { cursor: pointer; color: var(--muted); font-size: var(--fs-sm); }
+    .diagram-src pre { white-space: pre; overflow-x: auto; }
+    .needs-verification { display: inline-block; font-family: var(--mono); padding: 2px 8px; border-radius: var(--radius-sm); font-size: var(--fs-cap); font-weight: 700; background: var(--warn-bg); color: var(--warn); border: 1px solid var(--warn-line); }
+    /* responsive overrides for components live next to the component (in _EXTRA_SCAFFOLD_STYLE) */
+    @media (max-width: 820px) {
+      .grid-cols-2, .grid-2, .grid-3 { grid-template-columns: 1fr; }
+      nav.toc ol { columns: 1; }
+      table { display: block; overflow-x: auto; }
+    }
+    .theme-toggle { display:none; }
+    .theme-js .theme-toggle { position:fixed; top:16px; right:16px; z-index:100; width:40px; height:40px; padding:0; display:inline-flex; align-items:center; justify-content:center; font:inherit; font-size:18px; line-height:1; cursor:pointer; background:var(--surface-2, var(--soft)); color:var(--muted); border:1px solid var(--line); border-radius:999px; }
+    .theme-js .theme-toggle:hover { color:var(--ink); border-color:var(--line-strong, var(--line)); }
+    .theme-js .theme-toggle:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+    .theme-toggle::before { content:"\263E"; }
+    :root[data-theme="dark"] .theme-toggle::before { content:"\2600"; }
+    @media (prefers-color-scheme:dark){ :root:not([data-theme]) .theme-toggle::before{ content:"\2600"; } }
+    @media print { .theme-toggle { display:none; } }
+    @media screen {
+      :root[data-theme="dark"] {
+        color-scheme: dark;
+        --bg:#0f1522; --surface:#161e2e; --surface-2:#1c2536; --surface-3:#232e42;
+        --ink:#e8edf5; --ink-2:#c3ccdb; --muted:#96a2b5; --faint:#8593a8;
+        --line:#253145; --line-strong:#33415a;
+        --accent:#6aa8dd; --accent-2:#85bce6; --accent-bg:#152740; --accent-line:#2c4a6b;
+        --crit:#f19488; --crit-bg:#351d22; --crit-line:#6b3936;
+        --high:#eda06b; --high-bg:#33251a; --high-line:#6b4a30;
+        --warn:#d8b45c; --warn-bg:#312a16; --warn-line:#665626;
+        --good:#74c99b; --good-bg:#16301f; --good-line:#2e5c42;
+        --info:#6aa8dd; --info-bg:#152740; --info-line:#2c4a6b;
+        --neutral:#9aa6ba; --neutral-bg:#232c3c; --neutral-line:#3a465a;
+        --shadow-sm:0 1px 2px rgba(0,0,0,.35);
+        --shadow:0 4px 14px rgba(0,0,0,.45), 0 1px 3px rgba(0,0,0,.3);
+      }
+    }
+    @media screen and (prefers-color-scheme: dark) {
+      :root:not([data-theme]) {
+        color-scheme: dark;
+        --bg:#0f1522; --surface:#161e2e; --surface-2:#1c2536; --surface-3:#232e42;
+        --ink:#e8edf5; --ink-2:#c3ccdb; --muted:#96a2b5; --faint:#8593a8;
+        --line:#253145; --line-strong:#33415a;
+        --accent:#6aa8dd; --accent-2:#85bce6; --accent-bg:#152740; --accent-line:#2c4a6b;
+        --crit:#f19488; --crit-bg:#351d22; --crit-line:#6b3936;
+        --high:#eda06b; --high-bg:#33251a; --high-line:#6b4a30;
+        --warn:#d8b45c; --warn-bg:#312a16; --warn-line:#665626;
+        --good:#74c99b; --good-bg:#16301f; --good-line:#2e5c42;
+        --info:#6aa8dd; --info-bg:#152740; --info-line:#2c4a6b;
+        --neutral:#9aa6ba; --neutral-bg:#232c3c; --neutral-line:#3a465a;
+        --shadow-sm:0 1px 2px rgba(0,0,0,.35);
+        --shadow:0 4px 14px rgba(0,0,0,.45), 0 1px 3px rgba(0,0,0,.3);
+      }
+    }
+.meta-ribbon { display:flex; flex-wrap:wrap; gap:var(--s-4) var(--s-9); padding:var(--s-5) var(--s-7); margin:0 0 var(--s-9); background:var(--surface); border:1px solid var(--line); border-radius:var(--radius); box-shadow:var(--shadow-sm); font-size:var(--fs-sm); color:var(--muted); }
+    .meta-ribbon span { white-space:normal; overflow-wrap:anywhere; }
+    .meta-ribbon strong { color:var(--faint); font-family:var(--mono); font-size:var(--fs-cap); letter-spacing:.1em; text-transform:uppercase; font-weight:600; margin-right:var(--s-2); }
+    .read-map { background:var(--surface); border:1px solid var(--line); border-radius:var(--radius); padding:var(--s-5) var(--s-7); margin:0 0 var(--s-9); font-size:var(--fs-sm); color:var(--ink); box-shadow:var(--shadow-sm); }
+    .read-map div { margin:var(--s-1) 0; }
+    .read-map strong { color:var(--accent); font-family:var(--mono); font-size:var(--fs-cap); letter-spacing:.08em; text-transform:uppercase; margin-right:var(--s-2); }
+    .read-map a { color:var(--accent); }
+    .provenance { margin-top:var(--s-12); padding-top:var(--s-7); border-top:1px solid var(--line); font-size:var(--fs-sm); color:var(--faint); }
+    .provenance code { background:transparent; border:0; color:var(--ink); font-family:var(--mono); }
+    .provenance a { color:var(--accent); text-decoration:none; }
+    .callout { border:1px solid var(--line); border-left:4px solid var(--muted); background:var(--surface-2); border-radius:var(--radius); padding:var(--s-4) var(--s-6); margin:var(--s-6) 0; }
+    .callout > strong:first-child { display:block; margin-bottom:var(--s-1); font-family:var(--mono); font-size:var(--fs-cap); text-transform:uppercase; letter-spacing:.08em; }
+    .callout-note { border-left-color:var(--accent); background:var(--accent-bg); }
+    .callout-note > strong:first-child { color:var(--accent); }
+    .callout-note > strong:first-child::before { content:"📌 "; content:"📌 " / ""; }
+    .callout-tip { border-left-color:var(--good); background:var(--good-bg); }
+    .callout-tip > strong:first-child { color:var(--good); }
+    .callout-tip > strong:first-child::before { content:"💡 "; content:"💡 " / ""; }
+    .callout-warning { border-left-color:var(--warn); background:var(--warn-bg); }
+    .callout-warning > strong:first-child { color:var(--warn); }
+    .callout-warning > strong:first-child::before { content:"⚠️ "; content:"⚠️ " / ""; }
+    .callout-important { border-left-color:var(--crit); background:var(--crit-bg); }
+    .callout-important > strong:first-child { color:var(--crit); }
+    .callout-important > strong:first-child::before { content:"❗ "; content:"❗ " / ""; }
+    /* ---- collapsible (appendix lane) ---- */
+    details { background:var(--surface); border:1px solid var(--line); border-radius:var(--radius); padding:0 var(--s-6); margin:var(--s-6) 0; }
+    summary { cursor:pointer; padding:var(--s-4) 0; font-weight:600; color:var(--accent); }
+    summary:hover { color:var(--accent-2); }
+    details[open] > summary { border-bottom:1px solid var(--line); margin-bottom:var(--s-4); }
+    #layout-audit { position:fixed; left:0; right:0; bottom:0; z-index:9999; margin:0; padding:var(--s-3) var(--s-5); background:var(--warn-bg); color:var(--warn); border-top:1px solid var(--warn-line); font-size:var(--fs-sm); text-align:center; }
+    #layout-audit[hidden] { display:none; }
+    #layout-audit code { background:var(--surface); }
+    .confidence { display:inline-block; font-family:var(--mono); padding:2px 8px; border-radius:var(--radius-sm); font-size:var(--fs-cap); font-weight:700; border:1px solid transparent; }
+    .confidence-high { background:var(--good-bg); color:var(--good); border-color:var(--good-line); }
+    .confidence-medium { background:var(--accent-bg); color:var(--accent); border-color:var(--accent-line); }
+    .confidence-low { background:var(--warn-bg); color:var(--warn); border-color:var(--warn-line); }
+    /* components own their measure via grid tracks; the 72ch cap applies to open prose only */
+    .keycard p, .card p, .tile p, .metric p, .compare-before p, .compare-after p, .callout p { max-width:none; }
+    /* ---- KPI tiles (shared: incident .metrics/.metric inherit these) ---- */
+    .tiles, .metrics { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:var(--s-5); margin:var(--s-8) 0; }
+    .tile, .metric { position:relative; overflow:hidden; background:var(--surface); border:1px solid var(--line); border-radius:var(--radius); padding:var(--s-7) var(--s-7) var(--s-6); box-shadow:var(--shadow-sm); }
+    .tile::before { content:""; position:absolute; inset:0 auto 0 0; width:4px; background:var(--sv,var(--accent)); }
+    .tile .n, .metric strong { display:block; font-family:var(--display); font-size:clamp(1.8rem,4vw,2.4rem); font-weight:800; line-height:1; color:var(--sv,var(--ink)); font-variant-numeric:tabular-nums; }
+    .tile .k, .metric span { display:block; font-family:var(--mono); font-size:var(--fs-cap); letter-spacing:.12em; text-transform:uppercase; color:var(--muted); font-weight:600; margin-top:var(--s-3); }
+    .tile .d { font-size:.8rem; color:var(--faint); margin-top:var(--s-1); }
+    .tile.crit{--sv:var(--crit);} .tile.high{--sv:var(--high);} .tile.warn{--sv:var(--warn);} .tile.good{--sv:var(--good);} .tile.info{--sv:var(--accent);} .tile.neutral{--sv:var(--neutral);}
+    /* ---- stripe / accent cards ---- */
+    .card { background:var(--surface); border:1px solid var(--line); border-radius:var(--radius); padding:var(--s-7) var(--s-8); box-shadow:var(--shadow-sm); }
+    .card.tint-info { background:var(--info-bg); border-color:var(--info-line); }
+    .card.tint-good { background:var(--good-bg); border-color:var(--good-line); }
+    .card.tint-high { background:var(--high-bg); border-color:var(--high-line); }
+    .card.tint-crit { background:var(--crit-bg); border-color:var(--crit-line); }
+    .stripe { position:relative; padding-left:var(--s-7); }
+    .stripe::before { content:""; position:absolute; left:0; top:.35rem; bottom:.35rem; width:3px; border-radius:3px; background:var(--accent); }
+    .stripe.crit::before{background:var(--crit);} .stripe.high::before{background:var(--high);} .stripe.warn::before{background:var(--warn);} .stripe.good::before{background:var(--good);}
+    /* ---- keycard: big number + prose ---- */
+    .keycard { display:grid; grid-template-columns:auto minmax(0,1fr); gap:var(--s-8); align-items:center; margin:var(--s-9) 0; padding:var(--s-8) var(--s-9); background:var(--surface); border:1px solid var(--line-strong); border-left:4px solid var(--sv,var(--accent)); border-radius:var(--radius); box-shadow:var(--shadow); }
+    /* Robust to any child count. Two children happened to land correctly by auto-placement;
+       a THIRD wrapped back into column 1, whose `auto` width then grew to fit a paragraph of
+       prose and starved the 1fr column down to a one-word-per-line ribbon. Pin the hero to
+       column 1 for the full height and stack everything else in column 2, so adding a second
+       paragraph is not a silent layout break. */
+    .keycard > * { grid-column:2; min-width:0; }
+    .keycard > :first-child:is(.big,.kind,.sev,.chip) { grid-column:1; grid-row:1/-1; }
+    .keycard .big { font-family:var(--display); font-size:clamp(2.4rem,7vw,3.4rem); font-weight:800; line-height:.95; color:var(--sv,var(--accent)); font-variant-numeric:tabular-nums; }
+    .keycard .big small { display:block; margin-top:var(--s-2); font-family:var(--mono); font-size:var(--fs-sm); font-weight:600; letter-spacing:.04em; text-transform:uppercase; color:var(--muted); }
+    .keycard p b { color:var(--ink); }
+    .keycard.crit{--sv:var(--crit);} .keycard.high{--sv:var(--high);} .keycard.good{--sv:var(--good);} .keycard.info{--sv:var(--accent);}
+    /* ---- severity / status chips ---- */
+    .chip { display:inline-block; font-family:var(--mono); font-size:var(--fs-cap); font-weight:700; padding:2px 8px; border-radius:var(--radius-sm); letter-spacing:.04em; font-variant-numeric:tabular-nums; border:1px solid transparent; }
+    .chip.crit{color:var(--crit);background:var(--crit-bg);border-color:var(--crit-line);}
+    .chip.high{color:var(--high);background:var(--high-bg);border-color:var(--high-line);}
+    .chip.warn{color:var(--warn);background:var(--warn-bg);border-color:var(--warn-line);}
+    .chip.good{color:var(--good);background:var(--good-bg);border-color:var(--good-line);}
+    .chip.info{color:var(--accent);background:var(--accent-bg);border-color:var(--accent-line);}
+    .chip.neutral{color:var(--muted);background:var(--neutral-bg);border-color:var(--neutral-line);font-weight:600;}
+    /* ---- cross-links / chain caption / inline mono ---- */
+    .chain { font-family:var(--mono); font-size:.8rem; color:var(--accent); font-weight:600; margin-top:var(--s-4); }
+    .crosslink { font-weight:600; }
+    .crosslink::before { content:"→ "; color:var(--accent); }
+    code.m { font-family:var(--mono); color:var(--muted); background:var(--surface-2); padding:1px 6px; border-radius:var(--radius-sm); }
+    /* ---- opt-in sticky nav rail: author wraps {nav}{body} in <div class="railed"> ---- */
+    .railed { display:grid; grid-template-columns:220px minmax(0,1fr); gap:clamp(24px,4vw,48px); align-items:start; }
+    .railed nav.toc { position:sticky; top:24px; margin:0; }
+    .railed nav.toc ol { columns:1; }
+    @media (max-width:900px) { .railed { grid-template-columns:1fr; } .railed nav.toc { position:static; } }
+    /* component responsive overrides live HERE (after the base rules, in the later-injected _EXTRA) so they win the cascade */
+    @media (max-width:820px) {
+      .keycard { grid-template-columns:1fr; gap:var(--s-5); }
+      /* single column now, so release the explicit placement or it would conjure an
+         implicit second column and put the hero back beside the text */
+      .keycard > *, .keycard > :first-child:is(.big,.kind,.sev,.chip) { grid-column:1; grid-row:auto; }
+      .tiles, .metrics { grid-template-columns:1fr 1fr; }
+    }
+    @media (max-width:460px) { .tiles, .metrics { grid-template-columns:1fr; } }
+    /* ---- sparkline: area fill, faint grid, emphasized endpoint ---- */
+    .spark { color:var(--accent); overflow:visible; }
+    .spark .line { stroke:currentColor; stroke-width:2; fill:none; }
+    .spark .fill { fill:currentColor; opacity:.12; }
+    .spark .grid { stroke:var(--line); stroke-width:1; }
+    .spark .dot { fill:currentColor; }
+    .spark.good { color:var(--good); } .spark.warn { color:var(--warn); } .spark.crit { color:var(--crit); }
+    /* ---- bar rows / progress meter ---- */
+    .bars { display:grid; grid-template-columns:max-content 1fr max-content; gap:var(--s-2) var(--s-4); align-items:center; margin:var(--s-6) 0; }
+    .bars dt { font-family:var(--mono); font-size:var(--fs-sm); color:var(--muted); margin:0; }
+    /* min-width:0 + wrap: if a plain <dd> paragraph is fed to this progress grid by mistake,
+       it wraps and degrades instead of forcing a max-content column and blowing out the page
+       (a chip + description definition list belongs in .deflist, not .bars). */
+    .bars dd { margin:0; min-width:0; overflow-wrap:anywhere; }
+    .bars .val { font-variant-numeric:tabular-nums; font-size:var(--fs-sm); }
+    .bars .track, .progress { background:var(--surface-2); border-radius:999px; overflow:hidden; min-width:60px; margin:0; }
+    .bars .fill, .progress .fill { display:block; height:12px; border-radius:inherit; background:var(--sv,var(--accent)); width:var(--w,50%); }
+    .fill.crit { --sv:var(--crit); } .fill.high { --sv:var(--high); } .fill.warn { --sv:var(--warn); } .fill.good { --sv:var(--good); }
+    /* ---- definition list: chip/label + wrapping description (risks, key terms, glossary rows) ----
+       Use this, NOT .bars, for a <dl> of label + prose. .bars is a 3-col progress grid whose
+       max-content columns never wrap a long <dd>; .deflist is a 2-col grid whose 1fr description
+       column wraps and caps at a readable measure. Collapses to one column on narrow screens. */
+    .deflist { display:grid; grid-template-columns:max-content 1fr; gap:var(--s-4) var(--s-6); align-items:baseline; margin:var(--s-6) 0; }
+    .deflist dt { margin:0; }
+    .deflist dd { margin:0; color:var(--ink-2); max-width:72ch; min-width:0; overflow-wrap:anywhere; }
+    @media (max-width:560px){ .deflist{ grid-template-columns:1fr; gap:var(--s-2); } .deflist dd{ margin:0 0 var(--s-5); } }
+    /* ---- delta: direction glyph is AT-hidden; carry direction in the text (signed value) ---- */
+    .delta { font-family:var(--mono); font-size:var(--fs-sm); font-weight:700; font-variant-numeric:tabular-nums; }
+    .delta.good { color:var(--good); } .delta.bad { color:var(--crit); } .delta.flat { color:var(--muted); }
+    .delta.up::before { content:"▲ "; content:"▲ " / ""; }
+    .delta.down::before { content:"▼ "; content:"▼ " / ""; }
+    .delta.flat::before { content:"→ "; content:"→ " / ""; }
+    /* ---- opt-in button (prototype controls); never restyles bare <button> ---- */
+    .btn { font:inherit; padding:var(--s-2) var(--s-6); border:1px solid var(--accent-line); border-radius:var(--radius-sm); background:var(--accent-bg); color:var(--accent-2); font-weight:600; cursor:pointer; }
+    .btn:hover { background:var(--accent); color:#fff; }
+    /* print lives at the END of the later-injected constant so it wins every cascade tie */
+    @media print {
+      nav.toc, .read-map, #layout-audit { display: none; }
+      .railed { display: block; }
+      pre { background: var(--surface-2); color: var(--ink); border: 1px solid var(--line); }
+      section.section, table, figure, pre, .callout, .compare-before, .compare-after, .metric, .tile, .card, .keycard, .chip, .confidence, .timeline .event, details { break-inside: avoid; }
+      a[href^="http"]::after { content: " (" attr(href) ")"; font-size: .85em; color: var(--muted); }
+      .kind, .sev, .callout, .compare-before, .compare-after, .meta-ribbon, .needs-verification, .chip, .tile, .card, .keycard, .stripe, .confidence, .timeline .actor, .lead-summary, .spark, .bars, .progress, .delta { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      details:not([open])::details-content { content-visibility: visible; display: block; }
+    }
+  </style>
+<script type="module">
+    /* Self-contained by default: fetch Mermaid from the CDN ONLY if this page actually has a
+       diagram. A diagram-free artifact makes ZERO network calls and renders fully offline; add
+       a <div class="mermaid"> later and it still renders (the guard checks the DOM at load). */
+    if (document.querySelector(".mermaid")) {
+      const { default: mermaid } = await import("https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.esm.min.mjs");
+      /* Pick the palette at load from the resolved theme (data-theme, else the OS preference).
+         Diagrams render to static SVG, so this matches the page on load; a mid-session toggle
+         re-themes them on the next reload. Keep both sets in sync with the :root light/dark tokens. */
+      const _root = document.documentElement;
+      const _dark = _root.dataset.theme ? _root.dataset.theme === "dark"
+                                        : window.matchMedia("(prefers-color-scheme: dark)").matches;
+      const _lightVars = { primaryColor: "#eef5fb", primaryBorderColor: "#b9d5ec", primaryTextColor: "#172033", lineColor: "#5a6577", fontFamily: "inherit", fontSize: "14px" };
+      const _darkVars = { primaryColor: "#152740", primaryBorderColor: "#2c4a6b", primaryTextColor: "#e8edf5", lineColor: "#96a2b5", fontFamily: "inherit", fontSize: "14px" };
+      mermaid.initialize({ startOnLoad: false, securityLevel: "loose", theme: "base",
+        flowchart: { htmlLabels: true, padding: 12, useMaxWidth: true },
+        themeVariables: _dark ? _darkVars : _lightVars });
+      await mermaid.run();   /* module scripts defer, so the DOM is parsed; run() renders every .mermaid once */
+    }
+  </script>
+<style>main { overflow-wrap: anywhere; } article { min-width: 0; }</style></head>
+<body data-human-html-artifact="true">
+  <button class="theme-toggle" type="button" aria-label="Switch theme" title="Toggle light / dark"></button>
+  <main><header><p class="eyebrow">Social images · SCT · 2026-11-06</p><h1>SCT: pipeline, PII choices, and measured tradeoffs</h1><p>Six simpler images replace the report plots in the X draft. PII handling is one part of a configurable text-processing pipeline.</p></header><div class="meta-ribbon" data-meta-ribbon="true"><span>Owner: Rehan</span><span>Status: draft, human review pending</span><span>Preview width: 390 pixels</span></div><section data-summary="true" class="lead-summary"><h2>Read each image without zooming</h2><p>The first two explain the product. The next four show synthetic-data results and tradeoffs. All result images identify SCT v0.8.2 default, retain uncertainty, and state their limits.</p><p>These are image designs for a feed, not new benchmark results. The full source tables and detailed report plots remain available. Backend flexibility does not imply every compared tool plugs into SCT.</p><p>Review the actual X composer before posting. This page approximates phone image width; it does not simulate the native app or measure reader comprehension.</p></section><nav aria-label="Gallery sections"><a href="#images">Images</a> · <a href="#thread">Copy-ready thread</a> · <a href="#method">Evidence and limits</a></nav><section id="images"><h2>Six images at phone width</h2><p>PNG downloads are 1200 × 1350 pixels. Previews below are 390 pixels wide and remain visible with JavaScript disabled. Each image has one message.</p><div style="display:flex;flex-wrap:wrap;align-items:flex-start;gap:28px"><article style="width:390px;max-width:100%"><h3>1. Processing pipeline</h3><a href="../../benchmarks/results/compare-2026-11-04-visuals/social/01-pipeline.drawio.png"><img src="assets/sct-social/01-pipeline-phone.png" width="390" style="width:100%;height:auto;border:1px solid var(--line)" alt="SqueakyCleanText is a configurable text-processing pipeline. Four stages: detect language, repair text, handle personal data, then score and document. PII is one stage. Outputs include cleaned text and signals, with optional scoring and data cards. Stages can be switched off."></a><p><a href="../../benchmarks/results/compare-2026-11-04-visuals/social/01-pipeline.drawio.png">Full-resolution PNG</a> · <a href="../../benchmarks/results/compare-2026-11-04-visuals/social/01-pipeline.drawio">Editable source</a></p><details><summary>Image description for X</summary><p>SqueakyCleanText is a configurable text-processing pipeline. Four stages: detect language, repair text, handle personal data, then score and document. PII is one stage. Outputs include cleaned text and signals, with optional scoring and data cards. Stages can be switched off.</p></details></article><article style="width:390px;max-width:100%"><h3>2. PII routing</h3><a href="../../benchmarks/results/compare-2026-11-04-visuals/social/02-pii-routing.drawio.png"><img src="assets/sct-social/02-pii-routing-phone.png" width="390" style="width:100%;height:auto;border:1px solid var(--line)" alt="SCT&#x27;s PII stage combines its own regex rules with a chosen model backend. Rules cover emails, phones, IPs, IBANs, cards and custom patterns. Supported backend choices include ONNX, PyTorch, GLiNER, GLiNER2 and beta Presidio plus GLiNER. Language-based model selection and custom models use documented interfaces. These are configurable choices, not simultaneous use of all backends or integration of every benchmarked tool."></a><p><a href="../../benchmarks/results/compare-2026-11-04-visuals/social/02-pii-routing.drawio.png">Full-resolution PNG</a> · <a href="../../benchmarks/results/compare-2026-11-04-visuals/social/02-pii-routing.drawio">Editable source</a></p><details><summary>Image description for X</summary><p>SCT&#x27;s PII stage combines its own regex rules with a chosen model backend. Rules cover emails, phones, IPs, IBANs, cards and custom patterns. Supported backend choices include ONNX, PyTorch, GLiNER, GLiNER2 and beta Presidio plus GLiNER. Language-based model selection and custom models use documented interfaces. These are configurable choices, not simultaneous use of all backends or integration of every benchmarked tool.</p></details></article><article style="width:390px;max-width:100%"><h3>3. Shared-type recall</h3><a href="../../benchmarks/results/compare-2026-11-04-visuals/social/03-shared-recall.drawio.png"><img src="assets/sct-social/03-shared-recall-phone.png" width="390" style="width:100%;height:auto;border:1px solid var(--line)" alt="SCT v0.8.2 default, synthetic datasets, shared EMAIL/PHONE/NUMBER types. PII-Tracer: 13.51 percentage points above SCT; 95% interval 10.73 to 16.05. BardsAI-v3: 9.11 percentage points above SCT; 95% interval 7.72 to 10.46. OPF: 7.97 percentage points above SCT; 95% interval 5.16 to 10.62. OpenMed: 5.66 percentage points above SCT; 95% interval 3.66 to 7.48. The four entries are selected because the paired 95% interval for their recall advantage is entirely above zero. Each pair uses matched documents and languages both claim; subsets differ. Bootstrap intervals are unadjusted. Masking recall counts any overlap, not complete redaction."></a><p><a href="../../benchmarks/results/compare-2026-11-04-visuals/social/03-shared-recall.drawio.png">Full-resolution PNG</a> · <a href="../../benchmarks/results/compare-2026-11-04-visuals/social/03-shared-recall.drawio">Editable source</a></p><details><summary>Image description for X</summary><p>SCT v0.8.2 default, synthetic datasets, shared EMAIL/PHONE/NUMBER types. PII-Tracer: 13.51 percentage points above SCT; 95% interval 10.73 to 16.05. BardsAI-v3: 9.11 percentage points above SCT; 95% interval 7.72 to 10.46. OPF: 7.97 percentage points above SCT; 95% interval 5.16 to 10.62. OpenMed: 5.66 percentage points above SCT; 95% interval 3.66 to 7.48. The four entries are selected because the paired 95% interval for their recall advantage is entirely above zero. Each pair uses matched documents and languages both claim; subsets differ. Bootstrap intervals are unadjusted. Masking recall counts any overlap, not complete redaction.</p></details></article><article style="width:390px;max-width:100%"><h3>4. Full-taxonomy recall</h3><a href="../../benchmarks/results/compare-2026-11-04-visuals/social/04-full-recall.drawio.png"><img src="assets/sct-social/04-full-recall-phone.png" width="390" style="width:100%;height:auto;border:1px solid var(--line)" alt="SCT v0.8.2 default, full-taxonomy synthetic comparisons: 13 paired 95% intervals show higher SCT masking recall; 1 crosses zero; 0 shows lower SCT recall. GLiNER2-Fastino is the unclear comparison. These are unadjusted bootstrap intervals, not equivalence tests or a universal ranking. Unsupported types count as misses and DATE is excluded. Each pair matches documents; pair subsets differ. Any overlap counts as recall."></a><p><a href="../../benchmarks/results/compare-2026-11-04-visuals/social/04-full-recall.drawio.png">Full-resolution PNG</a> · <a href="../../benchmarks/results/compare-2026-11-04-visuals/social/04-full-recall.drawio">Editable source</a></p><details><summary>Image description for X</summary><p>SCT v0.8.2 default, full-taxonomy synthetic comparisons: 13 paired 95% intervals show higher SCT masking recall; 1 crosses zero; 0 shows lower SCT recall. GLiNER2-Fastino is the unclear comparison. These are unadjusted bootstrap intervals, not equivalence tests or a universal ranking. Unsupported types count as misses and DATE is excluded. Each pair matches documents; pair subsets differ. Any overlap counts as recall.</p></details></article><article style="width:390px;max-width:100%"><h3>5. Precision: one pair</h3><a href="../../benchmarks/results/compare-2026-11-04-visuals/social/05-precision.drawio.png"><img src="assets/sct-social/05-precision-phone.png" width="390" style="width:100%;height:auto;border:1px solid var(--line)" alt="SCT v0.8.2 default versus PII-Tracer, dataset averages on the same synthetic documents in eight datasets, full taxonomy excluding DATE. masked_precision: SCT 75.03%, PII-Tracer 78.12%. PII-Tracer advantage: 3.1 points. Paired bootstrap 95% difference interval 1.53 to 4.47 percentage points, unadjusted. Precision counts predicted mask spans that overlap labelled mentions. This is one illustrative pair, not a ranking."></a><p><a href="../../benchmarks/results/compare-2026-11-04-visuals/social/05-precision.drawio.png">Full-resolution PNG</a> · <a href="../../benchmarks/results/compare-2026-11-04-visuals/social/05-precision.drawio">Editable source</a></p><details><summary>Image description for X</summary><p>SCT v0.8.2 default versus PII-Tracer, dataset averages on the same synthetic documents in eight datasets, full taxonomy excluding DATE. masked_precision: SCT 75.03%, PII-Tracer 78.12%. PII-Tracer advantage: 3.1 points. Paired bootstrap 95% difference interval 1.53 to 4.47 percentage points, unadjusted. Precision counts predicted mask spans that overlap labelled mentions. This is one illustrative pair, not a ranking.</p></details></article><article style="width:390px;max-width:100%"><h3>6. Exposed text: the same pair</h3><a href="../../benchmarks/results/compare-2026-11-04-visuals/social/06-exposed-text.drawio.png"><img src="assets/sct-social/06-exposed-text-phone.png" width="390" style="width:100%;height:auto;border:1px solid var(--line)" alt="SCT v0.8.2 default versus PII-Tracer, dataset averages on the same synthetic documents in eight datasets, full taxonomy excluding DATE. doc_leak_rate: SCT 57.99%, PII-Tracer 50.17%. SCT exposure is 7.8 points higher. Paired bootstrap 95% difference interval 5.73 to 10.10 percentage points, unadjusted. Exposure: at least one labelled letter or digit stays visible in a document. This is one illustrative pair, not a ranking."></a><p><a href="../../benchmarks/results/compare-2026-11-04-visuals/social/06-exposed-text.drawio.png">Full-resolution PNG</a> · <a href="../../benchmarks/results/compare-2026-11-04-visuals/social/06-exposed-text.drawio">Editable source</a></p><details><summary>Image description for X</summary><p>SCT v0.8.2 default versus PII-Tracer, dataset averages on the same synthetic documents in eight datasets, full taxonomy excluding DATE. doc_leak_rate: SCT 57.99%, PII-Tracer 50.17%. SCT exposure is 7.8 points higher. Paired bootstrap 95% difference interval 5.73 to 10.10 percentage points, unadjusted. Exposure: at least one labelled letter or digit stays visible in a document. This is one illustrative pair, not a ranking.</p></details></article></div><p>Use one image per post. Product images explain what users can configure; result images describe only the measured benchmark configuration.</p></section><section id="thread"><h2>Copy-ready X thread</h2><p>Draft only. Attach image 1 to post 1, continuing through image 6 and post 6. Post 7 links the published source report.</p><article><h3>Post 1</h3><p style="white-space:pre-line">SqueakyCleanText is a text-processing pipeline for training and RAG datasets.
+
+Language detection, text repair, PII handling, scoring and data cards.
+
+I benchmarked its PII stage alongside other tools: 18 entries, 12 datasets. Tested SCT version: v0.8.2.</p></article><article><h3>Post 2</h3><p style="white-space:pre-line">The PII stage also acts as a router.
+
+SCT has its own regex detection and language-based model routing. You can choose supported backends and models: ONNX, PyTorch, GLiNER, or Presidio/GLiNER.
+
+The pipeline is not tied to one detection model.</p></article><article><h3>Post 3</h3><p style="white-space:pre-line">On shared emails, phones and numbers, four tools have higher masking recall than SCT default: PII-Tracer, BardsAI-v3, OPF and OpenMed.
+
+These are synthetic-data, matched-document comparisons. The image shows every pair whose 95% interval favours the other tool.</p></article><article><h3>Post 4</h3><p style="white-space:pre-line">Across the broader label set, SCT default has higher recall in 13 of 14 paired synthetic comparisons. The GLiNER2-Fastino interval crosses zero.
+
+Unsupported types count as misses, so this also measures entity coverage. Intervals are unadjusted.</p></article><article><h3>Post 5</h3><p style="white-space:pre-line">One example: PII-Tracer has higher masking precision than SCT on the same synthetic data, 78.1% vs 75.0%. These are dataset averages.
+
+Precision counts predicted mask spans that overlap a labelled mention. It is a separate measure from recall.</p></article><article><h3>Post 6</h3><p style="white-space:pre-line">In that same pair, SCT has higher recall, but its document-exposure rate is higher: 58.0% vs 50.2%, averaged across datasets.
+
+Recall counts any overlap. A partly masked identifier can still leave sensitive letters or digits visible.</p></article><article><h3>Post 7</h3><p style="white-space:pre-line">This benchmark tests PII configurations, not the whole processing pipeline.
+
+It tested v0.8.2. v0.8.3 is available, but these results do not measure it.
+
+Full methods, limits and results:
+https://github.com/rhnfzl/SqueakyCleanText/blob/main/benchmarks/results/compare-2026-11-04/README.md</p></article></section><section id="method"><h2>Evidence and limits</h2><p>The card generator reads the archived round-2 summary through the existing validated extractor. It preserves source values and the aggregate SHA-256. No benchmark inference is rerun.</p><p>The shared-type card includes all four non-SCT tools whose paired recall advantage has a recorded 95% interval entirely above zero. The full-taxonomy card counts 13 higher-SCT intervals, one crossing zero and none below zero. Those intervals have no multiple-comparison correction.</p><p>Precision and exposure show one named pair, SCT default and PII-Tracer, on the same synthetic documents. Values are dataset averages, not pooled document percentages. DATE is excluded. Masking recall counts any overlap; exposure checks whether a labelled letter or digit remains visible.</p><p>Different tool pairs can use different clean dataset/language subsets. SCT receives gold language. The benchmark does not test automatic language selection or the complete processing pipeline end to end.</p><p>The available release is v0.8.3. This other-tools benchmark tests v0.8.2. These results do not establish the later version’s ranking.</p><p><a href="2026-11-06-research-sct-v0-8-2-versus-other-pii-tools.html">Detailed report and all fourteen tool comparisons</a> · <a href="../../benchmarks/results/compare-2026-11-04-visuals/social/README.md">Sources, regeneration and image descriptions</a></p></section><footer class="provenance" data-provenance="true"><p>Generated by Codex with draw.io on 2026-11-06. Human review pending. Nothing posted.</p><script type="application/ld+json" id="provenance">{"@context": "https://schema.org", "@type": "CreativeWork", "@id": "urn:human-html:2026-11-06:review:sct-social-images", "artifactKind": "review", "dateCreated": "2026-11-06", "creator": {"@type": "SoftwareApplication", "name": "Codex"}, "prompt": "Apply the readability fixes: simple pipeline and PII-routing diagrams plus phone-readable, accurately scoped benchmark cards for X.", "source": "Archived round-2 aggregates, existing SCT product documentation and editable draw.io sources.", "reviewState": "unreviewed", "reviewer": "pending"}</script></footer></main>
+<div id="layout-audit" hidden role="status">⚠ This artifact overflows horizontally at this width - wrap wide tables / diagrams / <code>pre</code> blocks so they scroll, or they will clip on a phone.</div>
+  <script>
+    (function () {
+      var el = document.getElementById('layout-audit');
+      if (!el) return;
+      function check() { el.hidden = !(document.documentElement.scrollWidth > window.innerWidth + 2); }
+      window.addEventListener('DOMContentLoaded', check);
+      window.addEventListener('resize', check);
+    })();
+  </script>
+  <script>
+    (function(){
+      var btn=document.querySelector('.theme-toggle'); if(!btn) return;
+      function cur(){ return document.documentElement.dataset.theme || (window.matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light'); }
+      function label(){ btn.setAttribute('aria-label', cur()==='dark'?'Switch to light theme':'Switch to dark theme'); }
+      label();
+      btn.addEventListener('click', function(){
+        var next=cur()==='dark'?'light':'dark';
+        document.documentElement.dataset.theme=next;
+        try{ localStorage.setItem('hh-theme', next); }catch(e){}
+        label();
+      });
+    })();
+  </script>
+</body>
+</html>

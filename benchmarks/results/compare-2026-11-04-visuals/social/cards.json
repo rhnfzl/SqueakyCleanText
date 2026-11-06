@@ -1,0 +1,19 @@
+{
+  "source_sha256": "8698487c90a6af1039b22c9237585ca8d17962675620e5889a5329a668c345b4",
+  "sct_version": "0.8.2",
+  "width": 1200,
+  "height": 1350,
+  "full_counts": [
+    13,
+    1,
+    0
+  ],
+  "alt_text": {
+    "01-pipeline": "SqueakyCleanText is a configurable text-processing pipeline. Four stages: detect language, repair text, handle personal data, then score and document. PII is one stage. Outputs include cleaned text and signals, with optional scoring and data cards. Stages can be switched off.",
+    "02-pii-routing": "SCT's PII stage combines its own regex rules with a chosen model backend. Rules cover emails, phones, IPs, IBANs, cards and custom patterns. Supported backend choices include ONNX, PyTorch, GLiNER, GLiNER2 and beta Presidio plus GLiNER. Language-based model selection and custom models use documented interfaces. These are configurable choices, not simultaneous use of all backends or integration of every benchmarked tool.",
+    "03-shared-recall": "SCT v0.8.2 default, synthetic datasets, shared EMAIL/PHONE/NUMBER types. PII-Tracer: 13.51 percentage points above SCT; 95% interval 10.73 to 16.05. BardsAI-v3: 9.11 percentage points above SCT; 95% interval 7.72 to 10.46. OPF: 7.97 percentage points above SCT; 95% interval 5.16 to 10.62. OpenMed: 5.66 percentage points above SCT; 95% interval 3.66 to 7.48. The four entries are selected because the paired 95% interval for their recall advantage is entirely above zero. Each pair uses matched documents and languages both claim; subsets differ. Bootstrap intervals are unadjusted. Masking recall counts any overlap, not complete redaction.",
+    "04-full-recall": "SCT v0.8.2 default, full-taxonomy synthetic comparisons: 13 paired 95% intervals show higher SCT masking recall; 1 crosses zero; 0 shows lower SCT recall. GLiNER2-Fastino is the unclear comparison. These are unadjusted bootstrap intervals, not equivalence tests or a universal ranking. Unsupported types count as misses and DATE is excluded. Each pair matches documents; pair subsets differ. Any overlap counts as recall.",
+    "05-precision": "SCT v0.8.2 default versus PII-Tracer, dataset averages on the same synthetic documents in eight datasets, full taxonomy excluding DATE. masked_precision: SCT 75.03%, PII-Tracer 78.12%. PII-Tracer advantage: 3.1 points. Paired bootstrap 95% difference interval 1.53 to 4.47 percentage points, unadjusted. Precision counts predicted mask spans that overlap labelled mentions. This is one illustrative pair, not a ranking.",
+    "06-exposed-text": "SCT v0.8.2 default versus PII-Tracer, dataset averages on the same synthetic documents in eight datasets, full taxonomy excluding DATE. doc_leak_rate: SCT 57.99%, PII-Tracer 50.17%. SCT exposure is 7.8 points higher. Paired bootstrap 95% difference interval 5.73 to 10.10 percentage points, unadjusted. Exposure: at least one labelled letter or digit stays visible in a document. This is one illustrative pair, not a ranking."
+  }
+}

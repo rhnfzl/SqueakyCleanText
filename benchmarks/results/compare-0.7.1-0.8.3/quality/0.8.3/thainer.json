@@ -1,0 +1,596 @@
+{
+ "configs": {
+  "default": {
+   "by_position": {
+    "0-1000": {
+     "gold": 752,
+     "gold_found": 541,
+     "recall": 0.7194
+    }
+   },
+   "chars": 46645,
+   "documents": 300,
+   "gold_spans": 752,
+   "leak": {
+    "by_label": {
+     "DATE": {
+      "full": 51,
+      "full_leak_rate": 0.5667,
+      "leak_rate": 0.7444,
+      "partial": 16,
+      "total": 90
+     },
+     "LOCATION": {
+      "full": 18,
+      "full_leak_rate": 0.0811,
+      "leak_rate": 0.0811,
+      "partial": 0,
+      "total": 222
+     },
+     "ORGANISATION": {
+      "full": 61,
+      "full_leak_rate": 0.2226,
+      "leak_rate": 0.2336,
+      "partial": 3,
+      "total": 274
+     },
+     "PERSON": {
+      "full": 4,
+      "full_leak_rate": 0.0256,
+      "leak_rate": 0.0962,
+      "partial": 11,
+      "total": 156
+     },
+     "PHONE": {
+      "full": 2,
+      "full_leak_rate": 0.2857,
+      "leak_rate": 0.2857,
+      "partial": 0,
+      "total": 7
+     },
+     "URL": {
+      "full": 0,
+      "full_leak_rate": 0.0,
+      "leak_rate": 0.3333,
+      "partial": 1,
+      "total": 3
+     }
+    },
+    "by_language": {
+     "th": {
+      "full": 85,
+      "full_leak_rate": 0.1284,
+      "leak_rate": 0.1511,
+      "partial": 15,
+      "total": 662
+     }
+    },
+    "overall": {
+     "full": 85,
+     "full_leak_rate": 0.1284,
+     "leak_rate": 0.1511,
+     "partial": 15,
+     "total": 662
+    }
+   },
+   "out_of_scope_gold_spans": 100,
+   "partial": {
+    "by_label": {
+     "DATE": {
+      "f1": 0.0638,
+      "gold": 90,
+      "gold_found": 3,
+      "gold_masked": 38,
+      "masked_recall": 0.4222,
+      "precision": 0.75,
+      "pred": 4,
+      "pred_correct": 3,
+      "recall": 0.0333
+     },
+     "LOCATION": {
+      "f1": 0.8872,
+      "gold": 222,
+      "gold_found": 193,
+      "gold_masked": 200,
+      "masked_recall": 0.9009,
+      "precision": 0.9058,
+      "pred": 191,
+      "pred_correct": 173,
+      "recall": 0.8694
+     },
+     "NUMBER": {
+      "f1": 0.0,
+      "gold": 0,
+      "gold_found": 0,
+      "gold_masked": 0,
+      "masked_recall": 0.0,
+      "precision": 0.0,
+      "pred": 43,
+      "pred_correct": 0,
+      "recall": 0.0
+     },
+     "ORGANISATION": {
+      "f1": 0.8009,
+      "gold": 274,
+      "gold_found": 199,
+      "gold_masked": 212,
+      "masked_recall": 0.7737,
+      "precision": 0.8925,
+      "pred": 214,
+      "pred_correct": 191,
+      "recall": 0.7263
+     },
+     "PERSON": {
+      "f1": 0.9305,
+      "gold": 156,
+      "gold_found": 141,
+      "gold_masked": 145,
+      "masked_recall": 0.9295,
+      "precision": 0.9589,
+      "pred": 146,
+      "pred_correct": 140,
+      "recall": 0.9038
+     },
+     "PHONE": {
+      "f1": 0.4444,
+      "gold": 7,
+      "gold_found": 2,
+      "gold_masked": 5,
+      "masked_recall": 0.7143,
+      "precision": 1.0,
+      "pred": 2,
+      "pred_correct": 2,
+      "recall": 0.2857
+     },
+     "URL": {
+      "f1": 1.0,
+      "gold": 3,
+      "gold_found": 3,
+      "gold_masked": 3,
+      "masked_recall": 1.0,
+      "precision": 1.0,
+      "pred": 3,
+      "pred_correct": 3,
+      "recall": 1.0
+     }
+    },
+    "by_language": {
+     "th": {
+      "f1": 0.7789,
+      "gold": 752,
+      "gold_found": 541,
+      "gold_masked": 603,
+      "masked_recall": 0.8019,
+      "precision": 0.8491,
+      "pred": 603,
+      "pred_correct": 512,
+      "recall": 0.7194
+     }
+    },
+    "overall": {
+     "f1": 0.7789,
+     "gold": 752,
+     "gold_found": 541,
+     "gold_masked": 603,
+     "masked_recall": 0.8019,
+     "precision": 0.8491,
+     "pred": 603,
+     "pred_correct": 512,
+     "recall": 0.7194
+    }
+   },
+   "strict": {
+    "by_label": {
+     "DATE": {
+      "f1": 0.06382978723404256,
+      "false_negatives": 87,
+      "false_positives": 1,
+      "precision": 0.75,
+      "recall": 0.03333333333333333,
+      "true_positives": 3
+     },
+     "LOCATION": {
+      "f1": 0.3680387409200968,
+      "false_negatives": 146,
+      "false_positives": 115,
+      "precision": 0.39790575916230364,
+      "recall": 0.34234234234234234,
+      "true_positives": 76
+     },
+     "NUMBER": {
+      "f1": 0.0,
+      "false_negatives": 0,
+      "false_positives": 43,
+      "precision": 0.0,
+      "recall": 0.0,
+      "true_positives": 0
+     },
+     "ORGANISATION": {
+      "f1": 0.47540983606557374,
+      "false_negatives": 158,
+      "false_positives": 98,
+      "precision": 0.5420560747663551,
+      "recall": 0.4233576642335766,
+      "true_positives": 116
+     },
+     "PERSON": {
+      "f1": 0.2980132450331126,
+      "false_negatives": 111,
+      "false_positives": 101,
+      "precision": 0.3082191780821918,
+      "recall": 0.28846153846153844,
+      "true_positives": 45
+     },
+     "PHONE": {
+      "f1": 0.0,
+      "false_negatives": 7,
+      "false_positives": 2,
+      "precision": 0.0,
+      "recall": 0.0,
+      "true_positives": 0
+     },
+     "URL": {
+      "f1": 0.6666666666666666,
+      "false_negatives": 1,
+      "false_positives": 1,
+      "precision": 0.6666666666666666,
+      "recall": 0.6666666666666666,
+      "true_positives": 2
+     }
+    },
+    "by_language": {
+     "th": {
+      "f1": 0.3571955719557195,
+      "false_negatives": 510,
+      "false_positives": 361,
+      "precision": 0.4013266998341625,
+      "recall": 0.32180851063829785,
+      "true_positives": 242
+     }
+    },
+    "overall": {
+     "f1": 0.3571955719557195,
+     "false_negatives": 510,
+     "false_positives": 361,
+     "precision": 0.4013266998341625,
+     "recall": 0.32180851063829785,
+     "true_positives": 242
+    }
+   },
+   "time": {
+    "chars": 46645,
+    "chars_per_second": 3675.0,
+    "docs_per_second": 23.636,
+    "documents": 300,
+    "seconds": 12.693
+   }
+  },
+  "training": {
+   "by_position": {
+    "0-1000": {
+     "gold": 752,
+     "gold_found": 538,
+     "recall": 0.7154
+    }
+   },
+   "chars": 46645,
+   "documents": 300,
+   "gold_spans": 752,
+   "leak": {
+    "by_label": {
+     "DATE": {
+      "full": 86,
+      "full_leak_rate": 0.9556,
+      "leak_rate": 0.9667,
+      "partial": 1,
+      "total": 90
+     },
+     "LOCATION": {
+      "full": 18,
+      "full_leak_rate": 0.0811,
+      "leak_rate": 0.0811,
+      "partial": 0,
+      "total": 222
+     },
+     "ORGANISATION": {
+      "full": 63,
+      "full_leak_rate": 0.2299,
+      "leak_rate": 0.2336,
+      "partial": 1,
+      "total": 274
+     },
+     "PERSON": {
+      "full": 4,
+      "full_leak_rate": 0.0256,
+      "leak_rate": 0.1026,
+      "partial": 12,
+      "total": 156
+     },
+     "PHONE": {
+      "full": 5,
+      "full_leak_rate": 0.7143,
+      "leak_rate": 0.7143,
+      "partial": 0,
+      "total": 7
+     },
+     "URL": {
+      "full": 0,
+      "full_leak_rate": 0.0,
+      "leak_rate": 0.3333,
+      "partial": 1,
+      "total": 3
+     }
+    },
+    "by_language": {
+     "th": {
+      "full": 90,
+      "full_leak_rate": 0.136,
+      "leak_rate": 0.1571,
+      "partial": 14,
+      "total": 662
+     }
+    },
+    "overall": {
+     "full": 90,
+     "full_leak_rate": 0.136,
+     "leak_rate": 0.1571,
+     "partial": 14,
+     "total": 662
+    }
+   },
+   "out_of_scope_gold_spans": 100,
+   "partial": {
+    "by_label": {
+     "DATE": {
+      "f1": 0.0,
+      "gold": 90,
+      "gold_found": 0,
+      "gold_masked": 1,
+      "masked_recall": 0.0111,
+      "precision": 0.0,
+      "pred": 0,
+      "pred_correct": 0,
+      "recall": 0.0
+     },
+     "LOCATION": {
+      "f1": 0.8874,
+      "gold": 222,
+      "gold_found": 193,
+      "gold_masked": 200,
+      "masked_recall": 0.9009,
+      "precision": 0.9062,
+      "pred": 192,
+      "pred_correct": 174,
+      "recall": 0.8694
+     },
+     "ORGANISATION": {
+      "f1": 0.8033,
+      "gold": 274,
+      "gold_found": 200,
+      "gold_masked": 210,
+      "masked_recall": 0.7664,
+      "precision": 0.893,
+      "pred": 215,
+      "pred_correct": 192,
+      "recall": 0.7299
+     },
+     "PERSON": {
+      "f1": 0.927,
+      "gold": 156,
+      "gold_found": 140,
+      "gold_masked": 145,
+      "masked_recall": 0.9295,
+      "precision": 0.9586,
+      "pred": 145,
+      "pred_correct": 139,
+      "recall": 0.8974
+     },
+     "PHONE": {
+      "f1": 0.4444,
+      "gold": 7,
+      "gold_found": 2,
+      "gold_masked": 2,
+      "masked_recall": 0.2857,
+      "precision": 1.0,
+      "pred": 2,
+      "pred_correct": 2,
+      "recall": 0.2857
+     },
+     "URL": {
+      "f1": 1.0,
+      "gold": 3,
+      "gold_found": 3,
+      "gold_masked": 3,
+      "masked_recall": 1.0,
+      "precision": 1.0,
+      "pred": 3,
+      "pred_correct": 3,
+      "recall": 1.0
+     }
+    },
+    "by_language": {
+     "th": {
+      "f1": 0.8032,
+      "gold": 752,
+      "gold_found": 538,
+      "gold_masked": 561,
+      "masked_recall": 0.746,
+      "precision": 0.9156,
+      "pred": 557,
+      "pred_correct": 510,
+      "recall": 0.7154
+     }
+    },
+    "overall": {
+     "f1": 0.8032,
+     "gold": 752,
+     "gold_found": 538,
+     "gold_masked": 561,
+     "masked_recall": 0.746,
+     "precision": 0.9156,
+     "pred": 557,
+     "pred_correct": 510,
+     "recall": 0.7154
+    }
+   },
+   "strict": {
+    "by_label": {
+     "DATE": {
+      "f1": 0.0,
+      "false_negatives": 90,
+      "false_positives": 0,
+      "precision": 0.0,
+      "recall": 0.0,
+      "true_positives": 0
+     },
+     "LOCATION": {
+      "f1": 0.3816425120772947,
+      "false_negatives": 143,
+      "false_positives": 113,
+      "precision": 0.4114583333333333,
+      "recall": 0.35585585585585583,
+      "true_positives": 79
+     },
+     "ORGANISATION": {
+      "f1": 0.4785276073619632,
+      "false_negatives": 157,
+      "false_positives": 98,
+      "precision": 0.5441860465116279,
+      "recall": 0.42700729927007297,
+      "true_positives": 117
+     },
+     "PERSON": {
+      "f1": 0.2990033222591362,
+      "false_negatives": 111,
+      "false_positives": 100,
+      "precision": 0.3103448275862069,
+      "recall": 0.28846153846153844,
+      "true_positives": 45
+     },
+     "PHONE": {
+      "f1": 0.0,
+      "false_negatives": 7,
+      "false_positives": 2,
+      "precision": 0.0,
+      "recall": 0.0,
+      "true_positives": 0
+     },
+     "URL": {
+      "f1": 0.6666666666666666,
+      "false_negatives": 1,
+      "false_positives": 1,
+      "precision": 0.6666666666666666,
+      "recall": 0.6666666666666666,
+      "true_positives": 2
+     }
+    },
+    "by_language": {
+     "th": {
+      "f1": 0.3712757830404889,
+      "false_negatives": 509,
+      "false_positives": 314,
+      "precision": 0.4362657091561939,
+      "recall": 0.32313829787234044,
+      "true_positives": 243
+     }
+    },
+    "overall": {
+     "f1": 0.3712757830404889,
+     "false_negatives": 509,
+     "false_positives": 314,
+     "precision": 0.4362657091561939,
+     "recall": 0.32313829787234044,
+     "true_positives": 243
+    }
+   },
+   "time": {
+    "chars": 46645,
+    "chars_per_second": 3732.2,
+    "docs_per_second": 24.004,
+    "documents": 300,
+    "seconds": 12.498
+   }
+  }
+ },
+ "dataset": {
+  "licence": "CC-BY-3.0 (HF tag)",
+  "name": "thainer",
+  "publish": "scores-and-ids",
+  "revision": "e516176cf83d96526e407a7652205d6620837600",
+  "source": "pythainlp/thainer-corpus-v2.2"
+ },
+ "documents": 300,
+ "languages": [
+  "th"
+ ],
+ "load_seconds": 0.1,
+ "n_per_language": 300,
+ "run": {
+  "command": "python -m benchmarks.run --sct-version 0.8.3 --suite pii long lid --datasets openpii gretel nemotron redact iahlt bayanat thainer thai_pii naamapadam multiconer stockmark tab wili --configs default training --threads 16 --workers 2 --out quality/0.8.3",
+  "configs": [
+   "default",
+   "training"
+  ],
+  "device": "cpu",
+  "environment": {
+   "cpus_usable": 64,
+   "git_commit": null,
+   "git_dirty": null,
+   "machine": "x86_64",
+   "onnxruntime_providers": [
+    "AzureExecutionProvider",
+    "CPUExecutionProvider"
+   ],
+   "packages": {
+    "SqueakyCleanText": "0.8.3",
+    "emoji": "2.16.0",
+    "ftfy": "6.3.1",
+    "huggingface-hub": "2.4.0",
+    "lingua-language-detector": "2.2.0",
+    "numpy": "2.5.4",
+    "onnxruntime": "1.31.1",
+    "presidio_anonymizer": "2.2.366",
+    "pyarrow": "26.0.1",
+    "regex": "2026.9.29",
+    "tokenizers": "0.23.3"
+   },
+   "platform": "Linux-6.11.0-26-generic-x86_64-with-glibc2.39",
+   "python": "3.12.3"
+  },
+  "gpu_mem_gb": null,
+  "models": {
+   "ner_backend": "onnx",
+   "ner_model_revisions": {
+    "DUTCH": "381e34ba4c222bc221e9fd02832f52a179ed840d",
+    "ENGLISH": "2c10955af9538d6ff8a68316c5dbfcd0b968761e",
+    "GERMAN": "fe4aecfa6dc376244ef37da37e6df3b1b0911d71",
+    "MULTILINGUAL": "74191432b21c956b5b04b4778c0e92e569b1f80d",
+    "SPANISH": "ef52a7f08172203c763d51fe36660d36985bb388"
+   },
+   "ner_models": {
+    "DUTCH": "rhnfzl/xlm-roberta-large-conll02-dutch-onnx",
+    "ENGLISH": "rhnfzl/xlm-roberta-large-conll03-english-onnx",
+    "GERMAN": "rhnfzl/xlm-roberta-large-conll03-german-onnx",
+    "MULTILINGUAL": "rhnfzl/wikineural-multilingual-ner-onnx",
+    "SPANISH": "rhnfzl/xlm-roberta-large-conll02-spanish-onnx"
+   }
+  },
+  "n": null,
+  "scoring_overrides": {
+   "check_to_ascii_unicode": false,
+   "replacement_mode": "reversible"
+  },
+  "sct_version": "0.8.3",
+  "seed": 13,
+  "suites": [
+   "pii",
+   "long",
+   "lid"
+  ],
+  "threads": 16,
+  "workers": 2
+ },
+ "sample_sha256": "8081971e20cdb504a2d0b9295e160c65c9d870b326c91c61a219ab690d05445e",
+ "seed": 13,
+ "suite": "pii"
+}
