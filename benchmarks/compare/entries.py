@@ -7,6 +7,9 @@ view. Revisions are HF commit shas; package versions are exact pins for that ent
 """
 
 from benchmarks.datasets import ROUND2
+from pathlib import Path
+from typing import Any
+
 from benchmarks.labels import DATE, EMAIL, IP, LOCATION, NUMBER, ORGANISATION, PERSON, PHONE, PRED_ALIASES, URL
 
 SCT_TYPES = (PERSON, LOCATION, ORGANISATION, EMAIL, PHONE, IP, URL, DATE, NUMBER)
@@ -290,10 +293,8 @@ TEST_ENTRIES = {
 }
 
 
-def tool(name: str, track: str = "native") -> dict:
+def tool(name: str, track: str = "native") -> dict[str, Any]:
     """Entry + run settings: ``adapter``, ``adapter_config`` and ``requirements`` (None = current Python)."""
-    from pathlib import Path
-
     if name in TEST_ENTRIES:
         return {**TEST_ENTRIES[name], "requirements": None}
     if name not in ENTRIES:

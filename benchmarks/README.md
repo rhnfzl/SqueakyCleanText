@@ -5,6 +5,11 @@ and removes PII, how well it detects the language, how it does on long documents
 how well it removes noise, and how fast it runs. This folder is not part of the
 PyPI wheel (`pyproject.toml` ships only `sct*`).
 
+This is not the release benchmark in [evaluation/](https://github.com/rhnfzl/SqueakyCleanText/blob/main/evaluation/README.md). That one is a
+small fixed set committed to the repo, run with `python -m scripts.benchmark_release`, with
+results in `evaluation/results/`. This folder samples large downloaded datasets, with
+results in `benchmarks/results/`. One release can have results in both.
+
 The repo holds only download code, the scorer and the scores. Dataset files go to
 `benchmarks/.cache/` (gitignored). Result files never hold dataset text.
 
@@ -161,7 +166,8 @@ Rerun (Linux box, CPU, 16 cores per job; one job per entry and track, then one m
     python -m benchmarks.compare.audit_recover --cache <merged cache> --datasets <all> --out audit-<track>.json
 
 Copy only the JSON results (no `predictions/` of `scores-only` sets, no raw outputs) into
-`results/compare-<date>/`. A rerun of the test part needs a logged reason in PROTOCOL.md.
+`results/compare-<date>/`; dev or tuning runs stay under `results/compare/` (such as
+`2026-11-02-dev-tune/`). A rerun of the test part needs a logged reason in PROTOCOL.md.
 
 Add a tool:
 

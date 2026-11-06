@@ -6,7 +6,41 @@ on:
   pull_request:
     branches: [ "main", "develop" ]
 
+permissions:
+  contents: read
+
 jobs:
+  lockfiles:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - uses: actions/setup-python@v5
+      with:
+        python-version: "3.12"
+
+    - name: Check uv.lock and pylock.toml match pyproject.toml
+      run: |
+        pip install uv==0.10.9
+        uv lock --check
+        uv export --format pylock.toml --all-extras --output-file pylock.toml --locked > /dev/null
+        git diff --exit-code pylock.toml
+
+  typecheck:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - uses: actions/setup-python@v5
+      with:
+        python-version: "3.12"
+
+    - name: Type-check sct with mypy
+      run: |
+        pip install uv==0.10.9
+        pip install -e . --no-cache-dir
+        uvx mypy==2.4.1 --python-executable "$(which python)"
+
   build:
 
     runs-on: ubuntu-latest
@@ -26,6 +60,12 @@ jobs:
     - name: Check initial disk usage
       run: df -h
 
+    - name: Cache the test NER model
+      uses: actions/cache@v4
+      with:
+        path: ~/.cache/huggingface
+        key: hf-protectai-bert-base-NER-onnx-${{ runner.os }}
+
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
@@ -41,9 +81,21 @@ jobs:
       run: |
         ruff check sct/ tests/ scripts/
 
+    # tests/test_sct.py skips its real-NER tests when this load fails, so fail here instead.
+    - name: Check the test NER model loads
+      run: |
+        python -c "
+        from sct.config import TextCleanerConfig
+        from sct.utils.ner import GeneralNER
+        from tests.conftest import TEST_NER_MODELS, TEST_NER_REVISIONS
+        ner = GeneralNER(TextCleanerConfig(ner_device='cpu', ner_models=TEST_NER_MODELS, ner_model_revisions=TEST_NER_REVISIONS))
+        ner.ner_process('Test sentence.', positional_tags=['PER', 'ORG', 'LOC'], ner_confidence_threshold=0.85)
+        assert 'ENGLISH' in ner._pipelines
+        "
+
     - name: Test with pytest and coverage
       run: |
-        pytest tests/ --cov=sct --cov-report=xml --cov-fail-under=85 -v
+        pytest tests/ --cov=sct --cov-report=xml --cov-fail-under=85 -v -rs
 
   # Required gate for the adapters (decision 13): real worker processes on Linux.
   # Mark it required in GitHub branch protection; YAML cannot.

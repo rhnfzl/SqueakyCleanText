@@ -13,7 +13,7 @@ from sct.adapters import process_json
 from sct.config import TextCleanerConfig
 from sct.streaming import BufferedStreamingRedactor, WindowedStreamingRedactor
 from sct.utils.constants import terms_regex
-from tests.test_chunking import _FakeRunDetector, _word_ner
+from tests.helpers import FakeRunDetector, assert_near_linear, word_ner
 
 NO_NER = dict(check_ner_process=False)
 
@@ -139,7 +139,7 @@ def test_allow_terms_win_over_deny_terms_and_patterns():
 
 
 def test_allow_terms_keep_ner_detections():
-    ner = _word_ner(0, _FakeRunDetector())
+    ner = word_ner(0, FakeRunDetector())
     ner._allow_regex = terms_regex(["Ann"])
     result = ner.ner_process_detailed("Ann met Bob today", positional_tags=("PER",), ner_confidence_threshold=0.5)
     assert result.text == "Ann met <PERSON> today"
@@ -247,11 +247,9 @@ def test_overlapping_custom_rules_round_trip_in_reversible_mode():
 
 
 def test_allow_terms_scale_linearly():
-    import time
     cleaner = _cleaner(custom_allow_terms=('Acme 2024',))
-    started = time.perf_counter()
-    out = cleaner.process("Acme 2024 " * 800).lm_text
-    assert time.perf_counter() - started < 2 and "<NUMBER>" not in out
+    assert "<NUMBER>" not in cleaner.process("Acme 2024 " * 800).lm_text
+    assert_near_linear(cleaner.process, lambda n: "Acme 2024 " * n, 800)
 
 
 # --- custom_patterns_timeout (ReDoS guard) -------------------------------------------------------------

@@ -23,13 +23,15 @@ from pathlib import Path
 from benchmarks.compare import entries as registry
 from benchmarks.compare import scorer, split
 from benchmarks.score import overlaps
+from sct.utils.atomic_file import write_text_atomic
 
 SAMPLE = 50
 SEED = 13
 ENTRIES = ("sct-default", "sct-gliner")
 
 
-def audit(records: list[dict], outputs: dict[str, dict], labels: dict, sample: int = SAMPLE, seed: int = SEED):
+def audit(records: list[dict], outputs: dict[str, dict], labels: dict, sample: int = SAMPLE,
+          seed: int = SEED) -> tuple[dict[str, int], list[tuple[dict, dict, dict[str, bool]]]]:
     """(counts, sampled copies): copies = (record, span, check)."""
     copies = []
     for r in records:
@@ -75,9 +77,10 @@ def main(argv=None) -> None:
                     ctx = r["text"][max(0, e["start"] - 60):e["end"] + 60].replace("\n", " ")
                     value = r["text"][e["start"]:e["end"]]
                     notes.append(f"- `{r['id']}` {e['label']} gold={','.join(gold)} {c} value=`{value}` context=`{ctx}`")
-    args.out.write_text(json.dumps({"sample": SAMPLE, "seed": SEED, "entries": result}, indent=1, sort_keys=True) + "\n")
+    report = {"sample": SAMPLE, "seed": SEED, "entries": result}
+    write_text_atomic(args.out, json.dumps(report, indent=1, sort_keys=True) + "\n")
     if args.notes:
-        args.notes.write_text("# recover_dropped audit notes (private)\n" + "\n".join(notes) + "\n", encoding="utf-8")
+        write_text_atomic(args.notes, "# recover_dropped audit notes (private)\n" + "\n".join(notes) + "\n")
 
 
 if __name__ == "__main__":

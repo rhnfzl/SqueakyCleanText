@@ -7,14 +7,18 @@ sct-mcp                       # stdio server
 
 ## Tools
 
-Both tools are read-only, non-destructive, idempotent and closed-world
-(`readOnlyHint`, `destructiveHint=false`, `idempotentHint`, `openWorldHint=false`),
-and both declare an `outputSchema`.
+Both tools are read-only, non-destructive and idempotent (`readOnlyHint`,
+`destructiveHint=false`, `idempotentHint`). They declare `openWorldHint=true`, because a
+built-in cleaner downloads NER models from the Hugging Face Hub when they are not yet
+cached. Both declare an `outputSchema`.
 
 | Tool | Arguments |
 |---|---|
 | `clean_text` | `text` or `path` (exactly one), `pii=false`, `detail="concise"` |
 | `clean_json` | `value`, `pii=false`, `detail="concise"` |
+
+`create_mcp_server` refuses a reversible cleaner (`ValueError`), and `sanitize_text` and `sanitize_json` raise a
+`ToolError` for one: a tool result has no place for the token map.
 
 ## Output
 
@@ -22,7 +26,7 @@ Keys, in this order:
 
 | key | meaning |
 |---|---|
-| `warnings` | sorted warning codes (`language_unknown`, `language_fallback`, `language_low_confidence`, `ner_fallback_models`, `ner_off`, `cuda_fallback`, `mps_fallback`, `custom_pattern_timeout`, `empty_input`) |
+| `warnings` | sorted warning codes (`language_unknown`, `language_fallback`, `language_low_confidence`, `ner_fallback_models`, `ner_off`, `cuda_fallback`, `mps_fallback`, `custom_pattern_timeout`, `empty_input`, and with `detail="full"` `findings_not_collected`: a cleaner passed to `create_mcp_server` counted entities but has no `include_entities=True`, so `findings` is empty) |
 | `summary` | one sentence, e.g. `2 PII items (EMAIL, PERSON), 4% of text, language HINDI 0.93` |
 | `text` / `value` | the cleaned text, or the cleaned JSON value (keys cleaned too) |
 | `signals` | the value-free public view: language, confidence, chars, PII counts and share, per-type counts, regex counts, models |

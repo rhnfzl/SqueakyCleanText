@@ -1,15 +1,19 @@
+import asyncio
 import threading
 import time
 import warnings
 
 import pytest
 
+from tests.helpers import bare_ner, set_cfg, set_policy
 from sct import EntityRule, PrivacyPolicy, TextCleaner, TextCleanerConfig
-from sct.utils.contact import ProcessContacts
-from sct.utils.ner import GeneralNER
+from sct.sct import _KEY
+from sct.utils import constants
+from sct.utils.normtext import NormaliseText
+from sct.utils.ner import GeneralNER, ModelLoadError
 
 
-def test_process_batch_uses_batch_size_as_concurrency_limit():
+def test_process_batch_uses_max_workers_as_concurrency_limit():
     lock = threading.Lock()
     active = 0
     max_active = 0
@@ -31,17 +35,19 @@ def test_process_batch_uses_batch_size_as_concurrency_limit():
         custom_pipeline_steps=(observe_concurrency,),
     ))
 
-    results = cleaner.process_batch(["one", "two", "three"], batch_size=1)
+    results = cleaner.process_batch(["one", "two", "three"], max_workers=1)
 
     assert [result.lm_text for result in results] == ["one", "two", "three"]
     assert max_active == 1
 
 
+def test_to_ascii_unicode_accepts_emoji():
+    # The old no_emoji=False branch called demojize with a keyword the supported emoji versions lack.
+    assert NormaliseText().to_ascii_unicode("caf\u00e9 \U0001F600") == "cafe "
+
+
 def test_html_replacement_honors_configured_token():
-    result = ProcessContacts().replace_html(
-        "<p>Hello <strong>world</strong></p>",
-        replace_with="[TAG]",
-    )
+    result = constants.HTML_REGEX.sub("[TAG]", "<p>Hello <strong>world</strong></p>")
 
     assert result == "[TAG]Hello [TAG]world[TAG][TAG]"
 
@@ -54,8 +60,8 @@ def test_presidio_backend_uses_detected_language():
             calls.append((text, language))
             return []
 
-    ner = object.__new__(GeneralNER)
-    ner._ner_backend = "presidio_gliner"
+    ner = bare_ner()
+    set_cfg(ner, ner_backend="presidio_gliner")
     ner._analyzer = FakeAnalyzer()
     policy = PrivacyPolicy(
         name="strict",
@@ -63,11 +69,11 @@ def test_presidio_backend_uses_detected_language():
         rules={"PERSON": EntityRule()},
     )
 
+    set_policy(ner, policy)
     ner.ner_process_detailed(
         "Piet woont hier.",
         positional_tags=("PER",),
         language="DUTCH",
-        privacy_policy=policy,
     )
 
     assert calls == [("Piet woont hier.", "nl")]
@@ -75,7 +81,7 @@ def test_presidio_backend_uses_detected_language():
     # A detected language the analyzer has no NLP engine for falls back to English.
     FakeAnalyzer.supported_languages = ["en", "nl"]
     ner.ner_process_detailed(
-        "Namaste.", positional_tags=("PER",), language="HINDI", privacy_policy=policy,
+        "Namaste.", positional_tags=("PER",), language="HINDI",
     )
     assert calls[-1] == ("Namaste.", "en")
 
@@ -102,16 +108,16 @@ def test_general_ner_passes_pinned_revision_to_model_loader(monkeypatch):
     class FakeTokenizer:
         max_len_single_sentence = 510
 
-    def fake_loader(model_name, *, device, cache_dir, revision, **thread_kwargs):
+    def fake_loader(model_name, *, device, revision, **thread_kwargs):
         calls.append((model_name, revision))
         return object(), FakeTokenizer()
 
-    monkeypatch.setattr("sct.utils.ner.load_onnx_ner_model", fake_loader)
+    monkeypatch.setattr("sct.utils.onnx_pipeline.load_onnx_ner_model", fake_loader)
 
-    GeneralNER(
-        model_names={"ENGLISH": "org/en", "MULTILINGUAL": "org/multi"},
-        model_revisions={"ENGLISH": "sha-en", "MULTILINGUAL": "sha-multi"},
-    )
+    GeneralNER(TextCleanerConfig(
+        ner_models={"ENGLISH": "org/en", "MULTILINGUAL": "org/multi"},
+        ner_model_revisions={"ENGLISH": "sha-en", "MULTILINGUAL": "sha-multi"},
+    ))
 
     assert calls == [("org/en", "sha-en"), ("org/multi", "sha-multi")]
 
@@ -141,3 +147,76 @@ def test_reversible_mode_rejects_unmapped_fuzzy_date_replacement():
             replacement_mode="reversible",
             check_fuzzy_replace_dates=True,
         )
+
+
+def _no_ner_cleaner():
+    return TextCleaner(cfg=TextCleanerConfig(
+        check_ner_process=False,
+        check_detect_language=False,
+        check_statistical_model_processing=False,
+    ))
+
+
+def test_process_batch_rejects_plain_str_but_keeps_empty():
+    cleaner = _no_ner_cleaner()
+
+    with pytest.raises(ValueError, match="list of strings"):
+        cleaner.process_batch("text")
+    assert cleaner.process_batch("") == []
+
+
+def test_blank_input_has_classes_key_when_classifying():
+    cleaner = _no_ner_cleaner()
+    assert "classes" not in cleaner.process("  ").metadata
+
+    cleaner._gliclass = object()
+    assert cleaner.process("  ").metadata["classes"] == []
+
+
+@pytest.mark.parametrize("backend, target", [
+    ("gliner", "sct.utils.gliner_adapter.GLiNERAdapter"),
+    ("presidio_gliner", "sct.utils.ner.GeneralNER._init_presidio_gliner"),
+])
+@pytest.mark.parametrize("raised, expected", [(OSError, ModelLoadError), (ImportError, ImportError)])
+def test_gliner_and_presidio_construction_errors(monkeypatch, backend, target, raised, expected):
+    def fail(*_args, **_kwargs):
+        raise raised("no weights")
+    monkeypatch.setattr(target, fail)
+    with pytest.raises(expected, match="no weights"):
+        GeneralNER(TextCleanerConfig(ner_backend=backend, gliner_model="x/y"))
+
+
+def test_protected_key_pattern_stays_the_same():
+    assert _KEY.pattern == "\U00100000[\U000F0000-\U0010FFFF]\U00100001"
+
+
+def _plain_cleaner():
+    return TextCleaner(cfg=TextCleanerConfig(
+        check_ner_process=False,
+        check_detect_language=False,
+        check_statistical_model_processing=False,
+    ))
+
+
+def test_process_batch_batch_size_is_a_deprecated_alias():
+    cleaner = _plain_cleaner()
+
+    assert [r.lm_text for r in cleaner.process_batch(["one"], 1)] == ["one"]
+    with pytest.warns(DeprecationWarning, match="max_workers") as caught:
+        assert [r.lm_text for r in cleaner.process_batch(["one"], batch_size=1)] == ["one"]
+    assert caught[0].filename == __file__
+    with pytest.raises(TypeError, match="not both"):
+        cleaner.process_batch(["one"], 1, batch_size=1)
+    with pytest.raises(ValueError, match="max_workers"):
+        cleaner.process_batch(["one"], max_workers=0)
+
+
+def test_aprocess_batch_batch_size_is_a_deprecated_alias():
+    cleaner = _plain_cleaner()
+
+    assert [r.lm_text for r in asyncio.run(cleaner.aprocess_batch(["one"], 1))] == ["one"]
+    assert [r.lm_text for r in asyncio.run(cleaner.aprocess_batch(["one"], max_workers=1))] == ["one"]
+    with pytest.warns(DeprecationWarning, match="max_workers"):
+        assert [r.lm_text for r in asyncio.run(cleaner.aprocess_batch(["one"], batch_size=1))] == ["one"]
+    with pytest.raises(TypeError, match="not both"):
+        asyncio.run(cleaner.aprocess_batch(["one"], 1, batch_size=1))

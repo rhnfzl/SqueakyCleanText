@@ -8,11 +8,14 @@ ONNX sessions. Pickling keeps only the config.
 import os
 import threading
 from dataclasses import replace
-from typing import Any, Mapping, Optional, Sequence, Union
+from typing import Any
+from collections.abc import Iterable, Mapping, Sequence
 
-from sct.config import TextCleanerConfig
+from sct.config import ONNX_BACKENDS, TextCleanerConfig, require_adapter_mode
 from sct.presets import preset_config
+from sct.score import SCORE_A_COLUMNS, score_record
 from sct.sct import TextCleaner
+from sct.signals import merge_views
 
 OUTPUTS = ("overwrite", "new_column")
 
@@ -23,7 +26,7 @@ if hasattr(os, "register_at_fork"):
     os.register_at_fork(after_in_child=lambda: globals().update(_BUILD_LOCK=threading.Lock()))
 
 
-def resolve_config(config: Union[TextCleanerConfig, str, None]) -> TextCleanerConfig:
+def resolve_config(config: TextCleanerConfig | str | None) -> TextCleanerConfig:
     """``None`` -> ``"training"`` preset, a str -> that preset, a config -> itself."""
     if config is None:
         config = "training"
@@ -31,32 +34,29 @@ def resolve_config(config: Union[TextCleanerConfig, str, None]) -> TextCleanerCo
         config = preset_config(config)
     if not isinstance(config, TextCleanerConfig):
         raise TypeError(f"config must be a TextCleanerConfig, a preset name or None, got {type(config)}")
-    if config.replacement_mode == "reversible":
-        raise ValueError(
-            "Adapters do not support reversible mode. "
-            "Process each text directly and retain its token map."
-        )
+    require_adapter_mode(config)
     return config
 
 
-def _pin_loaded_revisions(cleaner: Optional[TextCleaner], config: TextCleanerConfig) -> TextCleanerConfig:
+def _pin_loaded_revisions(cleaner: TextCleaner | None, config: TextCleanerConfig) -> TextCleanerConfig:
     """Pin unpinned ONNX models to the commits *cleaner* loaded, so workers skip the Hub."""
     ner = getattr(cleaner, "GeneralNER", None)
-    if ner is None or config.ner_backend not in ("onnx", "ensemble_onnx"):
+    if ner is None or config.ner_backend not in ONNX_BACKENDS:
         return config
-    loaded = {key: p["revision"] for key, p in ner._provenance.items() if p.get("revision")}
-    if not loaded.keys() - config.ner_model_revisions.keys():
+    loaded = {key: p["revision"] for key, p in ner.provenance.items() if p.get("revision")}
+    pinned = config.ner_model_revisions or {}
+    if not loaded.keys() - pinned.keys():
         return config
-    return replace(config, ner_model_revisions={**loaded, **config.ner_model_revisions})
+    return replace(config, ner_model_revisions={**loaded, **pinned})
 
 
 class CleanerHandle:
     """Picklable owner of one ``TextCleaner`` per process."""
 
-    def __init__(self, config: Union[TextCleanerConfig, str, None] = None):
+    def __init__(self, config: TextCleanerConfig | str | None = None):
         self.config = resolve_config(config)
-        self._cleaner: Optional[TextCleaner] = None
-        self._pid: Optional[int] = None
+        self._cleaner: TextCleaner | None = None
+        self._pid: int | None = None
 
     def get(self) -> TextCleaner:
         pid = os.getpid()
@@ -78,13 +78,18 @@ class CleanerHandle:
         self._pid = None
 
 
-def as_columns(columns) -> tuple:
+def as_columns(columns: str | Iterable[str]) -> tuple[str, ...]:
     """One column name or a sequence of them, as a tuple ("text" is not ("t", "e", "x", "t"))."""
     return (columns,) if isinstance(columns, str) else tuple(columns)
 
 
+def output_column(col: str, output: str) -> str:
+    """The column that ``output`` writes the cleaned ``col`` to."""
+    return col if output == "overwrite" else f"{col}_clean"
+
+
 def _clean(handle: CleanerHandle, batch: Mapping[str, Sequence], columns, output: str):
-    """Return (new batch, ProcessResult-or-None per row of the first column)."""
+    """Return (new batch, {column: ProcessResult-or-None per row})."""
     if output not in OUTPUTS:
         raise ValueError(f"output must be one of {OUTPUTS}, got {output!r}")
     columns = as_columns(columns)
@@ -95,19 +100,18 @@ def _clean(handle: CleanerHandle, batch: Mapping[str, Sequence], columns, output
         raise KeyError(f"columns not in batch: {missing}")
     cleaner = handle.get()
     out = dict(batch)
-    first = None
+    per_column: dict[str, list] = {}
     for col in columns:
         values = list(batch[col])
         idx = [i for i, v in enumerate(values) if isinstance(v, str)]
         results: list = [None] * len(values)
         for i, result in zip(idx, cleaner.process_batch([values[i] for i in idx])):
             results[i] = result
-        out[col if output == "overwrite" else f"{col}_clean"] = [
+        out[output_column(col, output)] = [
             v if r is None else r.lm_text for v, r in zip(values, results)
         ]
-        if first is None:
-            first = results
-    return out, first
+        per_column[col] = results
+    return out, per_column
 
 
 def clean_columns(
@@ -123,13 +127,12 @@ def clean_columns(
     ``output="new_column"`` writes ``<col>_clean`` and keeps the raw text.
     ``score=True`` adds ``sct.score.SCORE_A_COLUMNS`` for the first column.
     """
-    out, results = _clean(handle, batch, columns, output)
+    out, per_column = _clean(handle, batch, columns, output)
     if score:
-        from sct.score import SCORE_A_COLUMNS, score_record
-        first = columns if isinstance(columns, str) else columns[0]
+        first = as_columns(columns)[0]
         records = [
             None if r is None else score_record(r, original=t)
-            for r, t in zip(results, batch[first])
+            for r, t in zip(per_column[first], batch[first])
         ]
         for col in SCORE_A_COLUMNS:
             out[col] = [None if rec is None else rec[col] for rec in records]
@@ -138,32 +141,35 @@ def clean_columns(
 
 def clean_records(
     handle: CleanerHandle,
-    records: Sequence[tuple[Optional[str], Mapping[str, Any]]],
+    records: Sequence[tuple[str | None, Mapping[str, Any]]],
     text_key: str,
     columns: Sequence[str],
     output: str,
-) -> list[tuple[Optional[str], dict]]:
+) -> list[tuple[str | None, dict]]:
     """Clean ``(text, metadata)`` pairs of document objects.
 
     A column equal to ``text_key`` is the document text, any other is a metadata
     key (missing keys pass through). Metadata is copied; ``metadata["sct"]``
-    holds the public signals of the first column.
+    holds the public signals merged over all listed columns.
     """
     columns = as_columns(columns)
     batch = {c: [t if c == text_key else m.get(c) for t, m in records] for c in columns}
-    out, results = _clean(handle, batch, columns, output)
+    out, per_column = _clean(handle, batch, columns, output)
     cleaned = []
     for i, (text, meta) in enumerate(records):
         meta = dict(meta)
         for col in columns:
             if batch[col][i] is None:
                 continue
-            key = col if output == "overwrite" else f"{col}_clean"
+            key = output_column(col, output)
             if key == text_key:
                 text = out[key][i]
             else:
                 meta[key] = out[key][i]
-        if results[i] is not None:
-            meta["sct"] = results[i].signals
+        views = [results[i].signals for results in per_column.values() if results[i] is not None]
+        # An empty cell has no view to add: it would only add warnings.
+        views = [view for view in views if view["chars"]] or views[:1]
+        if views:
+            meta["sct"] = views[0] if len(views) == 1 else merge_views(views)
         cleaned.append((text, meta))
     return cleaned

@@ -1,12 +1,12 @@
 """Haystack component (``pip install squeakycleantext[haystack]``)."""
 
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import fields, replace
-from typing import Any, Sequence, Union
+from typing import Any
 
 from haystack import Document, component, default_from_dict, default_to_dict
 
-from sct.config import _PII_MAPS, TextCleanerConfig
+from sct.config import TextCleanerConfig
 from sct.integrations._runtime import CleanerHandle, as_columns, clean_records
 
 
@@ -30,7 +30,7 @@ class SCTDocumentCleaner:
         self,
         columns: Sequence[str] = ("content",),
         output: str = "overwrite",
-        config: Union[TextCleanerConfig, str, None] = None,
+        config: TextCleanerConfig | str | None = None,
     ):
         self.columns = as_columns(columns)
         self.output = output
@@ -42,17 +42,17 @@ class SCTDocumentCleaner:
 
         Haystack raises SerializationError for values it cannot store (custom steps).
         """
-        config = self._config
+        config: Any = self._config
         if isinstance(config, TextCleanerConfig):
             default = TextCleanerConfig()
+            # The pickle state: a derived PII label map is None there, so the loaded config re-derives it.
+            state = config._plain_state()
             config = {
                 f.name: _plain(value)
                 for f in fields(config)
-                # supported_languages is recomputed by __post_init__; a derived PII label map is
-                # left out in PII mode so the loaded config re-derives it (as pickle does).
+                # supported_languages is recomputed by __post_init__.
                 if f.name != "supported_languages"
-                and not (config.ner_mode == "pii" and any(getattr(config, f.name) is m for m in _PII_MAPS.values()))
-                and (value := getattr(config, f.name)) != getattr(default, f.name)
+                and (value := state[f.name]) != getattr(default, f.name)
             }
         return default_to_dict(self, columns=self.columns, output=self.output, config=config)
 
@@ -64,7 +64,7 @@ class SCTDocumentCleaner:
         return default_from_dict(cls, {**data, "init_parameters": params})
 
     @component.output_types(documents=list[Document])
-    def run(self, documents: list[Document]):
+    def run(self, documents: list[Document]) -> dict[str, list[Document]]:
         pairs = clean_records(
             self.handle, [(d.content, d.meta) for d in documents], "content", self.columns, self.output
         )

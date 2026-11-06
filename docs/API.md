@@ -12,15 +12,16 @@ Cleans one text. It runs `process_batch([text])` and returns its one result. A
   - Cleaned text formatted for statistical models (`None` if `check_statistical_model_processing` is `False`).
   - Detected language of the text. `None` when it is unknown, or when no step needs it: `check_detect_language`, `check_ner_process` and `check_remove_stopwords` all `False` and no `language` set. NER and stopword removal run detection even with `check_detect_language=False`.
 
-### `process_batch(texts: List[str], batch_size: Optional[int] = None) -> List[ProcessResult]`
+### `process_batch(texts: List[str], max_workers: Optional[int] = None) -> List[ProcessResult]`
 
 Processes multiple texts using thread-parallel execution. Each result follows the same format as `process()`.
-`batch_size` is the maximum number of worker threads (default `os.cpu_count()`; it must be >= 1).
+`max_workers` is the maximum number of worker threads (default `os.cpu_count()`; it must be >= 1).
+The keyword `batch_size` is a deprecated alias: it emits `DeprecationWarning`, and passing both raises `TypeError`.
 Empty or whitespace-only input returns `ProcessResult("", "", None)` with the `empty_input` warning,
-and a non-string input raises `ValueError`. With NER on and `ner_batch_size > 1`, the steps before
+and a non-string item or a non-empty plain `str` for `texts` raises `ValueError`. With NER on and `ner_batch_size > 1`, the steps before
 NER run per document in threads, then one NER call batches the chunks of all documents.
 
-### `aprocess_batch(texts: List[str], batch_size: Optional[int] = None) -> List[ProcessResult]`
+### `aprocess_batch(texts: List[str], max_workers: Optional[int] = None) -> List[ProcessResult]`
 
 Async version of `process_batch` for use with asyncio-based frameworks (FastAPI, aiohttp). Runs the batch in a thread-pool executor so it does not block the event loop:
 
@@ -47,12 +48,15 @@ cleaner.warmup(['ENGLISH', 'DUTCH'])  # or warmup() for all supported languages
 
 ## `ProcessResult`
 
-> **Note**: `ProcessResult` from `process()` unpacks as a 3-tuple (`lm_text, stat_text, language`) for backward compatibility, but also exposes `.metadata` for reversible maps and document classification. `metadata` is always a dict with value-free counts: `metadata['regex_counts']` (e.g. `{"EMAIL": {"count": 1, "chars": 17}}`, one entry per regex replacement type) and `metadata['entity_counts']` (NER findings per type, same shape). It also holds `language_confidence` (Lingua top-1 confidence, `1.0` when pinned, `None` when unknown), `language_source` (`pinned`, `detected`, `fallback` when a `language` tuple fell back to its first entry, or `none`) and `warnings`, a sorted list of codes: `language_unknown`, `language_fallback`, `language_low_confidence`, `ner_fallback_models` (the language has no own NER model and ran MULTILINGUAL + ENGLISH), `cuda_fallback` (CUDA was requested but a model ran on CPU), `mps_fallback` (the Apple GPU was requested but a torch or GLiNER model ran on CPU), `custom_pattern_timeout` (a `custom_patterns` regex timed out and was skipped, `custom_patterns_on_timeout='warn'`), `empty_input`. `metadata['provenance']` is `{"backend", "models"}`, one `{"key", "id", "revision", "provider"}` entry per NER model that runs for the document's language (`revision` is the resolved Hub commit for ONNX models, `provider` the ONNX execution provider or the torch device); `{"backend": None, "models": []}` when NER is off.
+> **Note**: `ProcessResult` from `process()` unpacks as a 3-tuple (`lm_text, stat_text, language`) for backward compatibility, but also exposes `.metadata` for reversible maps and document classification. `metadata` is always a dict with value-free counts: `metadata['regex_counts']` (e.g. `{"EMAIL": {"count": 1, "chars": 17}}`, one entry per regex replacement type) and `metadata['entity_counts']` (NER findings per type whose value was concealed, same shape; entities a privacy policy kept, allowed or ignored are not counted). It also holds `language_confidence` (Lingua top-1 confidence, `1.0` when pinned, `None` when unknown), `language_source` (`pinned`, `detected`, `fallback` when a `language` tuple fell back to its first entry, or `none`) and `warnings`, a sorted list of codes: `language_unknown`, `language_fallback`, `language_low_confidence`, `ner_fallback_models` (the language has no own NER model and ran MULTILINGUAL + ENGLISH), `cuda_fallback` (CUDA was requested but a model ran on CPU), `mps_fallback` (the Apple GPU was requested but a torch or GLiNER model ran on CPU), `custom_pattern_timeout` (a `custom_patterns` regex timed out and was skipped, `custom_patterns_on_timeout='warn'`), `empty_input`. `metadata['provenance']` is `{"backend", "models"}`, one `{"key", "id", "revision", "provider"}` entry per NER model that runs for the document's language (`revision` is the resolved Hub commit for ONNX models, `provider` the ONNX execution provider or the torch device); `{"backend": None, "models": []}` when NER is off.
+
+A NER model that cannot load raises `sct.ModelLoadError`, on the first text that needs it. GLiNER and Presidio backends raise it when the NER object is built, not on the first text; a missing extra for them stays `ImportError`.
 
 `result.signals` is the value-free view of that metadata, with the same keys for every input:
 `language`, `language_confidence`, `language_source`, `chars`, `pii_count`, `pii_chars`,
 `pii_share`, `pii_types`, `regex_counts`, `entity_counts`, `sensitive`, `warnings` (adds
-`ner_off`) and `models`. It never holds entity text, so it is safe to log or store next to
+`ner_off`) and `models`. `sensitive` is `pii_count > 0`, so a replaced date, year, number,
+currency or HTML tag alone is not sensitive. It never holds entity text, so it is safe to log or store next to
 cleaned data. Score columns, `sct-report`, the adapters and the MCP server read it.
 
 ## Batch processing
@@ -78,7 +82,7 @@ texts = [
 ]
 
 # Process texts in batch (uses ThreadPoolExecutor for parallel processing)
-results = cleaner.process_batch(texts, batch_size=2)
+results = cleaner.process_batch(texts, max_workers=2)
 
 for lm_text, stat_text, lang in results:
     print(f"Language: {lang}")

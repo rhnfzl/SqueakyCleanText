@@ -1,7 +1,7 @@
 """DataTrove pipeline step (``pip install squeakycleantext[datatrove]``)."""
 
 from itertools import batched
-from typing import Sequence, Union
+from collections.abc import Sequence
 
 from datatrove.data import DocumentsPipeline
 from datatrove.pipeline.base import PipelineStep
@@ -25,7 +25,7 @@ class SCTCleaner(PipelineStep):
         self,
         columns: Sequence[str] = ("text",),
         output: str = "overwrite",
-        config: Union[TextCleanerConfig, str, None] = None,
+        config: TextCleanerConfig | str | None = None,
         batch_size: int = 64,
     ):
         super().__init__()

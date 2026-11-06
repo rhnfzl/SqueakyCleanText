@@ -1,15 +1,17 @@
 """ner_batch_size batches model calls; batched output equals unbatched output."""
 
 import math
-import threading
+from dataclasses import replace
 
 import pytest
 
+from tests.helpers import gliner_ner, set_cfg, windows_for
 from sct.config import TextCleanerConfig
 from sct.sct import TextCleaner
 from sct.utils.gliner_adapter import GLiNERAdapter
-from sct.utils.ner import GeneralNER
-from tests.conftest import TEST_NER_MODELS
+from sct.utils.ner import GeneralNER, ModelLoadError
+from tests.conftest import TEST_NER_MODELS, TEST_NER_REVISIONS
+from types import SimpleNamespace
 
 TAGS = ('PER', 'LOC', 'ORG', 'MISC')
 
@@ -35,16 +37,21 @@ class _CountingSession:
 
 @pytest.fixture(scope="module")
 def onnx_ner():
-    return GeneralNER(model_names=TEST_NER_MODELS)
+    try:
+        return GeneralNER(TextCleanerConfig(ner_models=TEST_NER_MODELS, ner_model_revisions=TEST_NER_REVISIONS))
+    except ModelLoadError as e:
+        if not isinstance(e.__cause__, OSError):  # download or network failure; anything else is a bug
+            raise
+        pytest.skip(f"NER models unavailable: {e}")
 
 
 def test_onnx_batch_runs_once_per_slice(onnx_ner, monkeypatch):
     pipe = onnx_ner._pipelines['ENGLISH']
     counter = _CountingSession(pipe._session)
     monkeypatch.setattr(pipe, '_session', counter)
-    monkeypatch.setattr(onnx_ner, '_ner_batch_size', 4)
+    monkeypatch.setattr(onnx_ner, 'cfg', replace(onnx_ner.cfg, ner_batch_size=4))
     text = DOCS[3] * 2
-    chunks = onnx_ner._plan_windows(text)
+    chunks = windows_for(onnx_ner, text)
     assert len(chunks) >= 5
     keys = onnx_ner._get_ensemble_keys('ENGLISH')
     onnx_ner.ner_process_detailed(text, TAGS, 0.85, 'ENGLISH')
@@ -69,7 +76,7 @@ def test_onnx_padded_batch_matches_unbatched(onnx_ner):
 def _cleaner(**overrides):
     cfg = TextCleanerConfig(
         check_statistical_model_processing=True,
-        ner_models=TEST_NER_MODELS,
+        ner_models=TEST_NER_MODELS, ner_model_revisions=TEST_NER_REVISIONS,
         **overrides,
     )
     return TextCleaner(cfg, include_entities=True)
@@ -89,7 +96,7 @@ def test_process_batch_same_output_for_any_ner_batch_size():
     for size in (8, 32):
         cleaner = _cleaner(ner_batch_size=size)
         assert [_summary(r) for r in cleaner.process_batch(DOCS)] == expected
-        assert [_summary(r) for r in cleaner.process_batch(DOCS, batch_size=1)] == expected
+        assert [_summary(r) for r in cleaner.process_batch(DOCS, max_workers=1)] == expected
         assert [_summary(cleaner.process(d)) for d in DOCS] == expected
 
 
@@ -125,12 +132,8 @@ def test_gliner_gets_one_batched_call_under_its_lock():
             calls.append((list(texts), batch_size, ner._get_lock('gliner').locked()))
             return [[] for _ in texts]
 
-    ner = object.__new__(GeneralNER)
-    ner._ner_backend = 'gliner'
-    ner._ner_batch_size = 16
-    ner._gliner_pipe = FakeGLiNER()
-    ner._inference_locks = {}
-    ner._locks_lock = threading.Lock()
+    ner = gliner_ner(detector=FakeGLiNER())
+    set_cfg(ner, ner_batch_size=16)
     ner.tokenizer = None
     results = ner.ner_process_batch_detailed(["Ann here.", "Bob there.", "Cy."], [None] * 3, TAGS)
     assert [r.text for r in results] == ["Ann here.", "Bob there.", "Cy."]
@@ -183,3 +186,48 @@ def test_gliner_adapter_batches_only_when_asked(bi_encoder):
     name = 'with_embeds' if bi_encoder else 'inference'
     assert batched_calls == [(name, 3, 8)]
     assert len(adapter.model.calls) == 3  # batch_size=1 keeps one call per text
+
+
+def test_fixed_batch_one_model_runs_one_row_per_call():
+    from sct.utils.onnx_pipeline import ONNXNERPipeline, TokenizerWrapper
+    from tokenizers import Tokenizer, models, pre_tokenizers
+
+    tok = Tokenizer(models.WordLevel({"[UNK]": 0, "John": 1, "Smith": 2}, unk_token="[UNK]"))  # noqa: S106
+    tok.pre_tokenizer = pre_tokenizers.Whitespace()
+    rows = []
+
+    class Session:
+        def get_inputs(self):
+            return [SimpleNamespace(name=n, shape=[1, "sequence"])
+                    for n in ("input_ids", "attention_mask")]
+
+        def run(self, _, feeds):
+            rows.append(feeds["input_ids"].shape[0])
+            assert feeds["input_ids"].shape[0] == 1, "fixed batch dimension"
+            import numpy as np
+            return [np.zeros((1, feeds["input_ids"].shape[1], 2), dtype=np.float32)]
+
+    pipe = ONNXNERPipeline(Session(), TokenizerWrapper(tok, 512), {0: "O", 1: "B-PER"})
+    assert pipe(["John", "Smith", "John Smith"], batch_size=8) == [[], [], []]
+    assert rows == [1, 1, 1]
+
+
+def test_synthetic_value_shared_between_regex_and_ner_stages(monkeypatch):
+
+    text = "Call 2025550147 or _2025550147_."
+    outputs = []
+    for size in (1, 8):
+        cleaner = _cleaner(ner_batch_size=size, replacement_mode="synthetic")
+
+        def detect(chunks, *args, **kwargs):
+            return [
+                [{"entity_group": "PHONE_NUMBER", "score": 0.99, "word": "2025550147",
+                  "start": i, "end": i + 10, "key": f"{i}:{i + 10}"}]
+                if (i := chunk.find("2025550147")) != -1 else []
+                for chunk in chunks
+            ]
+
+        monkeypatch.setattr(cleaner.GeneralNER, "_detect", detect)
+        outputs.append(cleaner.process(text).lm_text)
+    assert "2025550147" not in outputs[1]
+    assert outputs[1] == outputs[0]

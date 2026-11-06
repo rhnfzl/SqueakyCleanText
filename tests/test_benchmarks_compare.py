@@ -1,5 +1,7 @@
 """Tool-comparison harness: dev/test split, new loaders' span building, entry tables (no dataset data)."""
 
+import subprocess
+
 from benchmarks.compare import entries, split
 from benchmarks.datasets import MODULES, get
 from benchmarks.datasets.gretel_en import entity_spans
@@ -403,7 +405,7 @@ def test_adapter_label_tables_match_the_frozen_entries():
         assert all(labels[k] == v for k, v in reg.GLINER_PROMPTS.items()), name
 
 
-# --- Codex review round 1 fixes (C1-C13) ---
+# --- Scoring and report edge cases ---
 
 def test_c1_full_miss_scores_f1_zero_not_na_in_the_macro():
     record = gold_record(spans=[span(0, 7, "person")])
@@ -466,7 +468,7 @@ def test_c5_reuse_needs_a_matching_cache_key(tmp_path, monkeypatch):
 def test_c6_sct_offsets_survive_entity_decoding_and_invisible_chars():
     from sct.utils.normtext import NormaliseText, unescape_markup
 
-    from scripts.benchmark_release import predicted_spans
+    from benchmarks.score import predicted_spans
 
     sct = _adapter_module("sct_adapter.py")
     fix = NormaliseText().fix_bad_unicode
@@ -493,7 +495,7 @@ def test_c6_sct_offsets_survive_entity_decoding_and_invisible_chars():
 def test_c6_sct_offsets_survive_whitespace_collapse_and_report_why_unplaced():
     from sct.utils.normtext import NormaliseText, unescape_markup
 
-    from scripts.benchmark_release import predicted_spans
+    from benchmarks.score import predicted_spans
 
     sct = _adapter_module("sct_adapter.py")
     fix = NormaliseText().fix_bad_unicode
@@ -815,3 +817,27 @@ def test_audit_table_reads_both_passes(tmp_path):
         {"entries": {"sct-default": {"tab": {**c, "recovered": 8, "passed": 5, "failed_compact": 0}}}}))
     assert report.audit_table(tmp_path, "default")[2] == "| sct-default | tab | 9 | 5 | 1 | 8 | 5 | 5 | 2 |"
     assert report.audit_table(tmp_path, "tuned") == []
+
+
+def test_hung_tool_probes_fall_back(tmp_path, monkeypatch):
+    from benchmarks.compare import speed
+
+    def hang(cmd, **kwargs):
+        raise subprocess.TimeoutExpired(cmd, kwargs["timeout"])
+
+    monkeypatch.setattr(subprocess, "run", hang)
+    monkeypatch.setattr(speed.shutil, "which", lambda name: f"/usr/bin/{name}")
+    assert speed.vram_mb(123) is None
+    assert runner.freeze(tmp_path / "bin" / "python") == ""
+
+
+def test_failed_tool_probes_fall_back(tmp_path, monkeypatch):
+    from benchmarks.compare import speed
+
+    monkeypatch.setattr(subprocess, "run", lambda cmd, **_: subprocess.CompletedProcess(cmd, 1, "123, 5\n", ""))
+    monkeypatch.setattr(speed.shutil, "which", lambda name: f"/usr/bin/{name}")
+    assert speed.vram_mb(123) is None
+    assert runner.freeze(tmp_path / "bin" / "python") == ""
+
+    monkeypatch.setattr(subprocess, "run", lambda cmd, **_: subprocess.CompletedProcess(cmd, 0, "123, [N/A]\n", ""))
+    assert speed.vram_mb(123) is None

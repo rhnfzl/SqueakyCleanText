@@ -18,11 +18,11 @@ DIRS = ("nld_Latn", "rus_Cyrl", "ell_Grek", "arb_Arab", "heb_Hebr", "hin_Deva", 
         "cmn_Hani", "jpn_Jpan", "kor_Hang")
 
 
-def load(n: int | None, seed: int, dirs=DIRS) -> list[dict]:
+def load(n: int | None, seed: int) -> list[dict]:
     import pyarrow.parquet as pq
 
     records = []
-    for name in dirs:
+    for name in DIRS:
         table = pq.read_table(hf_file(HF_ID, f"data/{name}/test/000_00000.parquet", REVISION), columns=["id", "text"])
         rows = range(table.num_rows)
         picked = rows if n is None else sorted(random.Random(f"{seed}:{name}").sample(rows, min(n, len(rows))))  # noqa: S311

@@ -44,8 +44,9 @@ mode. Failures with ``fold_styled_characters=False`` are recorded, not counted.
 
 import argparse
 from collections import Counter, defaultdict
+from dataclasses import dataclass
 from encodings.idna import dots as IDNA_DOTS
-from functools import lru_cache, partial
+from functools import partial, cache
 import json
 import multiprocessing
 from pathlib import Path
@@ -53,6 +54,7 @@ import random
 import re
 import sys
 import time
+from typing import Any
 import unicodedata
 
 from ftfy.chardata import CONTROL_CHARS
@@ -61,6 +63,7 @@ from ftfy.fixes import ANSI_RE, unescape_html
 from sct import TextCleaner, TextCleanerConfig
 from sct.streaming import WindowedStreamingRedactor
 from sct.utils import constants
+from sct.utils.atomic_file import write_text_atomic
 
 PRESETS = ("training", "sct", "training+dates")
 PRESET_ARGS = {"training": ("training", {}), "sct": ("sct", {}),
@@ -99,8 +102,8 @@ HOST_DASHES = "".join(ch for ch in map(chr, range(0x80, 0x110000)) if unicodedat
 HOST_DOTS = "".join(ch for ch in map(chr, range(0x80, 0x110000)) if unicodedata.normalize("NFKC", ch) == ".")
 
 
-def _unicode_tables():
-    """Styled variants per plain ASCII target, digit sets per script, letters per script."""
+def _styled_tables():
+    """Styled variants per plain ASCII target and the zero of each script's digit set."""
     variants = defaultdict(lambda: defaultdict(list))  # target -> kind -> [chars]
     zeros = []
     for cp in range(0x110000):
@@ -108,8 +111,7 @@ def _unicode_tables():
         category = unicodedata.category(ch)
         if category in ("Cs", "Cn", "Co"):
             continue
-        if category == "Nd" and unicodedata.decimal(ch) == 0 and cp > 0x7F and all(
-                unicodedata.decimal(chr(cp + k), -1) == k for k in range(10)):
+        if category == "Nd" and cp > 0x7F and all(unicodedata.decimal(chr(cp + k), -1) == k for k in range(10)):
             zeros.append(cp)
         decomposition = unicodedata.decomposition(ch)
         if not decomposition.startswith("<"):
@@ -118,6 +120,11 @@ def _unicode_tables():
         target = unicodedata.normalize("NFKC", ch)
         if kind and target.isascii() and target.strip() and (len(target) == 1 or target.isdigit()):
             variants[target][kind].append(ch)
+    return variants, zeros
+
+
+def _script_letters():
+    """Letters per script, accented Latin letters and Devanagari vowel signs."""
     letters = {
         script: [chr(cp) for lo, hi in ranges for cp in range(lo, hi + 1) if unicodedata.category(chr(cp)).startswith("L")]
         for script, ranges in SCRIPT_RANGES.items()
@@ -126,10 +133,11 @@ def _unicode_tables():
                 and unicodedata.normalize("NFD", chr(cp)) != chr(cp)]
     # Devanagari vowel signs (category M*) follow a consonant.
     signs = [chr(cp) for cp in range(0x93E, 0x94D) if unicodedata.category(chr(cp)).startswith("M")]
-    return variants, zeros, letters, accented, signs
+    return letters, accented, signs
 
 
-VARIANTS, DIGIT_ZEROS, LETTERS, ACCENTED, DEVA_SIGNS = _unicode_tables()
+VARIANTS, DIGIT_ZEROS = _styled_tables()
+LETTERS, ACCENTED, DEVA_SIGNS = _script_letters()
 # Styled forms of contact punctuation, for long runs whose right side is no letter or digit (a@－－－ ).
 STYLED_PUNCT = [ch for target in "@.-_+:/?=&#%~" for kind in ("wide", "small", "font")
                 for ch in VARIANTS.get(target, {}).get(kind, ())]
@@ -143,6 +151,17 @@ def fold(text: str) -> str:
     text = "".join("." if ch in IDNA_DOT_CHARS else ch for ch in text if unicodedata.category(ch) != "Cf")
     text = unicodedata.normalize("NFKC", text).translate(_DIGIT_FOLD)
     return "".join("-" if unicodedata.category(ch) == "Pd" else ch for ch in text).casefold()
+
+
+def _check_folds_back(seed, value, decoded):
+    """The oracle rests on this: a rendered value folds back to its plain value (also under ``python -O``)."""
+    if fold(decoded) != fold(value["plain"]):
+        raise ValueError(f"seed {seed}: {value['plain']!r} is rendered as {render(value)!r}")
+
+
+def _kinds(slots, inserts):
+    """The kinds a value's character replacements and insertions use."""
+    return sorted({slot[0] for slot in slots if slot} | {insert[0] for insert in inserts.values()})
 
 
 # --- document generation ---
@@ -266,13 +285,11 @@ def _number(rng):
 GENERATORS = {"EMAIL": _email, "PHONE": _phone, "IP": _ip, "URL": _url, "DATE": _date, "NUMBER": _number}
 
 
-def _plan(rng, plain, legal_join):
-    """Per-character styled replacements and zero-width insertions; each tagged by its kind."""
-    slots = [None] * len(plain)  # index -> (kind, text)
-    inserts = {}  # index -> (kind, text), inserted before plain[index]
+def _eligible(plain, legal_join):
+    """Kind -> the positions of ``plain`` it can change."""
     eligible = defaultdict(list)
     for index, ch in enumerate(plain):
-        for kind, chars in VARIANTS.get(ch, {}).items():
+        for kind in VARIANTS.get(ch, {}):
             eligible[f"{kind}_{'alnum' if ch.isalnum() else 'sep'}"].append(index)
         if ch.isdigit() and ch.isascii():
             eligible["native_digit"].append(index)
@@ -283,6 +300,26 @@ def _plan(rng, plain, legal_join):
         if index in legal_join:
             eligible["zw_join"].append(index)
     eligible["zw_boundary"] = [0, len(plain)]
+    return eligible
+
+
+def _styled_char(rng, kind, plain, index, style, digit_zero):
+    """What a styling kind writes at ``plain[index]``."""
+    if kind == "native_digit":
+        return chr(digit_zero + int(plain[index]))
+    if kind == "decomposed":
+        return unicodedata.normalize("NFD", plain[index])
+    if kind == "enclosed_pair":
+        return rng.choice(VARIANTS[plain[index:index + 2]]["enclosed"])
+    chars = VARIANTS[plain[index]][kind.rsplit("_", 1)[0]]
+    return chars[min(style, len(chars) - 1)] if kind.startswith("font") else rng.choice(chars)
+
+
+def _plan(rng, plain, legal_join):
+    """Per-character styled replacements and zero-width insertions; each tagged by its kind."""
+    slots = [None] * len(plain)  # index -> (kind, text)
+    inserts = {}  # index -> (kind, text), inserted before plain[index]
+    eligible = _eligible(plain, legal_join)
     kinds = sorted(k for k in eligible if rng.random() < 0.4)
     if not kinds:
         kinds = [rng.choice(sorted(eligible))]
@@ -298,21 +335,11 @@ def _plan(rng, plain, legal_join):
                 inserts[index] = (kind, rng.choice((ZWSP, WJ)))
             elif kind == "zw_join":
                 inserts[index] = (kind, rng.choice((ZWNJ, ZWJ)))
-            elif slots[index] is not None:
-                continue
-            elif kind == "native_digit":
-                slots[index] = (kind, chr(digit_zero + int(plain[index])))
-            elif kind == "decomposed":
-                slots[index] = (kind, unicodedata.normalize("NFD", plain[index]))
-            elif kind == "enclosed_pair":
-                if slots[index + 1] is None:
-                    slots[index] = (kind, rng.choice(VARIANTS[plain[index:index + 2]]["enclosed"]))
+            elif slots[index] is None and (kind != "enclosed_pair" or slots[index + 1] is None):
+                slots[index] = (kind, _styled_char(rng, kind, plain, index, style, digit_zero))
+                if kind == "enclosed_pair":
                     slots[index + 1] = (kind, "")
-            else:
-                chars = VARIANTS[plain[index]][kind.rsplit("_", 1)[0]]
-                slots[index] = (kind, chars[min(style, len(chars) - 1)] if kind.startswith("font") else rng.choice(chars))
-    used = {s[0] for s in slots if s} | {i[0] for i in inserts.values()}
-    return slots, inserts, sorted(used)
+    return slots, inserts, _kinds(slots, inserts)
 
 
 def _legal_join(plain, typ):
@@ -353,7 +380,7 @@ def _cruft_inside(rng, plain, inserts, kinds):
     if not free or rng.random() >= 0.15:
         return kinds
     for index in rng.sample(free, rng.randint(1, min(2, len(free)))):
-        ansi = "\x1b[%sm" % rng.choice(("0", "1", "32", "1;31", "38;5;208"))
+        ansi = "\x1b[{}m".format(rng.choice(("0", "1", "32", "1;31", "38;5;208")))
         inserts[index] = ("cruft", ansi if rng.random() < 0.5 else rng.choice(CRUFT_CONTROLS))
     return sorted(kinds + ["cruft"])
 
@@ -516,15 +543,19 @@ def _host_span(plain, typ):
     return start, re.search(r"[/?#]|$", plain[start:]).start() + start
 
 
+def _free_seps(plain, slots, start, end, seps):
+    """Host separators free to retype. The next character must render as ASCII too: a native digit after a dot
+    makes a native-digit host label (rejected, Codex round 25 id 3)."""
+    return [index for index in range(start, end - 1) if plain[index] in seps and slots[index] is None
+            and plain[index + 1].isascii() and plain[index + 1].isalnum()
+            and (slots[index + 1] is None or slots[index + 1][0] != "native_digit")]
+
+
 def _idna_dot(rng, plain, slots, kinds, typ):
     """Host dots typed as an IDNA separator (example。com, as CJK input methods write them) where a
     Latin letter or digit follows; own RNG so the cases of earlier rounds stay the same."""
     start, end = _host_span(plain, typ)
-    # the next character must render as ASCII too: a native digit after 。 is a native-digit host
-    # label (rejected, Codex round 25 id 3)
-    free = [index for index in range(start, end - 1) if plain[index] == "." and slots[index] is None
-            and plain[index + 1].isascii() and plain[index + 1].isalnum()
-            and (slots[index + 1] is None or slots[index + 1][0] != "native_digit")]
+    free = _free_seps(plain, slots, start, end, ".")
     if not free or rng.random() >= 0.25:
         return kinds
     for index in free:
@@ -556,10 +587,7 @@ def _host_sep(rng, plain, slots, kinds, typ):
     """Host hyphens and dots typed as another dash or dot form (my\u2010site, example\u2024com), as copied from
     typeset text; own RNG so the cases of earlier rounds stay the same."""
     start, end = _host_span(plain, typ)
-    # a dot before a native digit makes a native-digit host label (rejected, Codex round 25 id 3)
-    free = [index for index in range(start, end - 1) if plain[index] in "-." and slots[index] is None
-            and plain[index + 1].isascii() and plain[index + 1].isalnum()
-            and (slots[index + 1] is None or slots[index + 1][0] != "native_digit")]
+    free = _free_seps(plain, slots, start, end, "-.")
     if not free or rng.random() >= 0.25:
         return kinds
     for index in free:
@@ -585,59 +613,83 @@ def _zw_domain(rng, plain, inserts, kinds, typ="EMAIL"):
     return sorted(kinds + ["zw_domain"])
 
 
-def make_case(seed: int) -> dict:
+def _reshape(typ, own, plain, cores):
+    """The value in its type's other written shapes (dates: ``_reshape_date``)."""
+    if typ == "URL":
+        plain = _url_shape(own("url"), plain)
+        cores = [core for core in cores if core[1] in plain]  # a bare host has no query values
+        plain, cores = _userinfo(own("userinfo"), plain, cores)
+    if typ == "PHONE":
+        plain, cores = _paren_phone(own("paren"), plain, cores)
+    if typ == "EMAIL":
+        plain, cores = _email_shape(own("mail"), plain, cores)
+        plain, cores = _local_shape(own("local"), plain, cores)
+        plain = _upper(own("upper"), plain)
+        plain, cores = _catalan_dot(own("catalan"), plain, cores)
+    if typ in ("EMAIL", "URL"):
+        plain, cores = _host_hyphen(own("hyphen"), plain, cores, typ)
+    if typ == "URL":
+        plain = _final_dot(own("finaldot"), plain)
+    return plain, cores
+
+
+def _reshape_date(own, plain, cores):
+    """(plain, cores, spaced, shaped): spaced as a month name or spaced shape, which may be longer than the overlap;
+    shaped when the date has a CJK, Korean or unpadded shape."""
+    month = _month_date(own("month"), plain, cores)
+    if month:
+        return *month, True, False
+    shape = _date_shape(own("dateshape"), plain, cores)
+    return (*shape, True) if shape else (plain, cores, False, False)
+
+
+def _break_up(typ, own, plain, slots, inserts, kinds):
+    """Add the invisible characters and retyped separators of the value's type; returns the kinds."""
+    kinds = _zw_inside(own("zw"), plain, inserts, kinds)
+    kinds = _cruft_inside(own("cruft"), plain, inserts, kinds)
+    if typ in ("EMAIL", "URL"):
+        kinds = _idna_dot(own("idna"), plain, slots, kinds, typ)
+        kinds = _host_sep(own("hostsep"), plain, slots, kinds, typ)
+    if typ == "EMAIL":
+        kinds = _zw_domain(own("zwd"), plain, inserts, kinds)
+        kinds = _local_sep(own("localsep"), plain, slots, kinds)
+    if typ == "URL":
+        kinds = _zw_domain(own("zwh"), plain, inserts, kinds, typ)
+    if typ in ("PHONE", "DATE"):
+        kinds = _typo_sep(own("sep"), plain, slots, kinds)
+    return kinds
+
+
+def _make_value(rng, seed, position):
+    def own(salt):
+        return random.Random(f"{seed}-{position}-{salt}")  # noqa: S311
+
+    typ = rng.choice(sorted(GENERATORS))
+    plain, cores = GENERATORS[typ](rng)
+    month = shape = False
+    if typ == "DATE":
+        plain, cores, month, shape = _reshape_date(own, plain, cores)
+    else:
+        plain, cores = _reshape(typ, own, plain, cores)
+    slots, inserts, kinds = _plan(rng, plain, _legal_join(plain, typ))
+    if shape:  # known limit: a circled number glued to a unit character (1月⑮日) stays a list marker
+        slots = [None if slot and slot[0].startswith("enclosed") else slot for slot in slots]
+        kinds = _kinds(slots, inserts)
+    kinds = _break_up(typ, own, plain, slots, inserts, kinds)
+    glue = rng.random() < 0.5
+    return {"type": typ, "plain": plain, "cores": cores, "slots": slots, "inserts": inserts,
+            "kinds": kinds + (["glue"] if glue else []), "glue": glue, "month": month}
+
+
+def make_case(seed: int) -> dict[str, Any]:
     rng = random.Random(seed)  # noqa: S311  # reproducible test data, not crypto
     scripts = rng.sample(sorted(SCRIPT_RANGES), rng.choice((1, 2)))
-    values = []
-    for _ in range(rng.randint(1, 3)):
-        typ = rng.choice(sorted(GENERATORS))
-        plain, cores = GENERATORS[typ](rng)
-        if typ == "URL":
-            plain = _url_shape(random.Random(f"{seed}-{len(values)}-url"), plain)  # noqa: S311
-            cores = [core for core in cores if core[1] in plain]  # a bare host has no query values
-            plain, cores = _userinfo(random.Random(f"{seed}-{len(values)}-userinfo"), plain, cores)  # noqa: S311
-        if typ == "PHONE":
-            plain, cores = _paren_phone(random.Random(f"{seed}-{len(values)}-paren"), plain, cores)  # noqa: S311
-        if typ == "EMAIL":
-            plain, cores = _email_shape(random.Random(f"{seed}-{len(values)}-mail"), plain, cores)  # noqa: S311
-            plain, cores = _local_shape(random.Random(f"{seed}-{len(values)}-local"), plain, cores)  # noqa: S311
-            plain = _upper(random.Random(f"{seed}-{len(values)}-upper"), plain)  # noqa: S311
-            plain, cores = _catalan_dot(random.Random(f"{seed}-{len(values)}-catalan"), plain, cores)  # noqa: S311
-        if typ in ("EMAIL", "URL"):
-            plain, cores = _host_hyphen(random.Random(f"{seed}-{len(values)}-hyphen"), plain, cores, typ)  # noqa: S311
-        if typ == "URL":
-            plain = _final_dot(random.Random(f"{seed}-{len(values)}-finaldot"), plain)  # noqa: S311
-        month = typ == "DATE" and _month_date(random.Random(f"{seed}-{len(values)}-month"), plain, cores)  # noqa: S311
-        shape = typ == "DATE" and not month and _date_shape(
-            random.Random(f"{seed}-{len(values)}-dateshape"), plain, cores)  # noqa: S311
-        if month:
-            plain, cores = month
-        if shape:
-            plain, cores, month = shape  # a spaced shape, like a month-name date, may be longer than the overlap
-        slots, inserts, kinds = _plan(rng, plain, _legal_join(plain, typ))
-        if shape:  # known limit: a circled number glued to a unit character (1月⑮日) stays a list marker
-            slots = [None if slot and slot[0].startswith("enclosed") else slot for slot in slots]
-            kinds = sorted({slot[0] for slot in slots if slot} | {insert[0] for insert in inserts.values()})
-        kinds = _zw_inside(random.Random(f"{seed}-{len(values)}-zw"), plain, inserts, kinds)  # noqa: S311
-        kinds = _cruft_inside(random.Random(f"{seed}-{len(values)}-cruft"), plain, inserts, kinds)  # noqa: S311
-        if typ in ("EMAIL", "URL"):
-            kinds = _idna_dot(random.Random(f"{seed}-{len(values)}-idna"), plain, slots, kinds, typ)  # noqa: S311
-            kinds = _host_sep(random.Random(f"{seed}-{len(values)}-hostsep"), plain, slots, kinds, typ)  # noqa: S311
-        if typ == "EMAIL":
-            kinds = _zw_domain(random.Random(f"{seed}-{len(values)}-zwd"), plain, inserts, kinds)  # noqa: S311
-            kinds = _local_sep(random.Random(f"{seed}-{len(values)}-localsep"), plain, slots, kinds)  # noqa: S311
-        if typ == "URL":
-            kinds = _zw_domain(random.Random(f"{seed}-{len(values)}-zwh"), plain, inserts, kinds, typ)  # noqa: S311
-        if typ in ("PHONE", "DATE"):
-            kinds = _typo_sep(random.Random(f"{seed}-{len(values)}-sep"), plain, slots, kinds)  # noqa: S311
-        glue = rng.random() < 0.5
-        values.append({"type": typ, "plain": plain, "cores": cores, "slots": slots, "inserts": inserts,
-                       "kinds": kinds + (["glue"] if glue else []), "glue": glue, "month": bool(month)})
+    values = [_make_value(rng, seed, position) for position in range(rng.randint(1, 3))]
     context_scripts = [rng.choice(scripts) for _ in range(len(values) + 1)]
     context = [_sentence(rng, script) for script in context_scripts]
     case = {"seed": seed, "scripts": scripts, "context": context, "context_scripts": context_scripts, "values": values}
     for value in values:
-        assert fold(render(value)) == fold(value["plain"]), (seed, value["plain"], render(value))
+        _check_folds_back(seed, value, render(value))
     return case
 
 
@@ -665,7 +717,7 @@ def _unescape_backslash(text):
     return text.encode("latin", "backslashreplace").decode("unicode-escape")
 
 
-def escaped_case(case, kind="escaped", encode=_escape, decode=_unescape_backslash):
+def escaped_case(case, kind="escaped", encode=_escape, decode=_unescape_backslash) -> dict[str, Any]:
     """The case with a few characters of some values written as backslash escapes (``06 12\\u0033\\x34``) or, with
     ``kind="entity"``, HTML entities (``06 12&amp;#32;34``); own RNG per value and kind, so the plain case and the
     other kind stay the same. A value already encoded by an earlier pass is left as it is."""
@@ -686,16 +738,13 @@ def escaped_case(case, kind="escaped", encode=_escape, decode=_unescape_backslas
                 # a terminal code stays raw: written as an escape, ftfy would see "[32m" after the decoded ESC
                 if rng.random() < 0.5 and insert_kind != "cruft":
                     value["inserts"][i] = (kind, encode(rng, text))
-            value["kinds"] = sorted({slot[0] for slot in value["slots"] if slot}
-                                    | {insert[0] for insert in value["inserts"].values()}) + (
-                ["glue"] if value["glue"] else [])
-            decoded = decode(render(value))
-            assert fold(decoded) == fold(value["plain"]), (case["seed"], value["plain"], render(value))
+            value["kinds"] = _kinds(value["slots"], value["inserts"]) + (["glue"] if value["glue"] else [])
+            _check_folds_back(case["seed"], value, decode(render(value)))
         values.append(value)
     return dict(case, values=values)
 
 
-def render(value, disabled=frozenset()):
+def render(value, disabled=frozenset()) -> str:
     out = []
     for index, ch in enumerate(value["plain"] + "\0"):
         insert = value["inserts"].get(index)
@@ -708,20 +757,26 @@ def render(value, disabled=frozenset()):
     return "".join(out)
 
 
+def _glued(case, index, disabled):
+    """Whether the value at ``index`` goes without spaces beside CJK or Thai prose."""
+    value = case["values"][index]
+    if not value["glue"] or "glue" in disabled.get(index, frozenset()):
+        return False
+    # an address, a sentence and a mail local part glued all in one run have no boundary to find
+    # (a@b.jpกขคฅก＋x@y.th: the prose may be either address), so the second address keeps its space
+    prev = case["values"][index - 1] if index else None
+    return not (prev and prev["glue"] and "glue" not in disabled.get(index - 1, frozenset())
+                and prev["type"] in ("EMAIL", "URL") and value["type"] == "EMAIL")
+
+
 def build_doc(case, disabled=None, spans=None) -> str:
     """The document; *spans*, if a list, gets each rendered value's (start, end)."""
     disabled = disabled or {}
     doc = case["context"][0]
     for index, value in enumerate(case["values"]):
         off = disabled.get(index, frozenset())
-        glue = value["glue"] and "glue" not in off
+        glue = _glued(case, index, disabled)
         left, right = case["context_scripts"][index], case["context_scripts"][index + 1]
-        # an address, a sentence and a mail local part glued all in one run have no boundary to find
-        # (a@b.jpกขคฅก＋x@y.th: the prose may be either address), so the second address keeps its space
-        prev = case["values"][index - 1] if index else None
-        if (prev and prev["glue"] and "glue" not in disabled.get(index - 1, frozenset())
-                and prev["type"] in ("EMAIL", "URL") and value["type"] == "EMAIL"):
-            glue = False
         doc += "" if glue and left in UNSPACED else " "
         if spans is not None:
             spans.append((len(doc), len(doc) + len(render(value, off))))
@@ -739,7 +794,7 @@ def longest_stretch(case, disabled=None) -> int:
     return max(b - a - 1 for a, b in zip(cuts, cuts[1:]))
 
 
-def steps(value):
+def steps(value) -> dict[str, list[str]]:
     """Readable render steps: kind -> characters changed."""
     out = defaultdict(list)
     for index, slot in enumerate(value["slots"]):
@@ -755,7 +810,7 @@ def steps(value):
 # --- oracle ---
 
 
-@lru_cache(maxsize=None)
+@cache
 def cleaner(preset: str, fold_styled: bool, mode: str) -> TextCleaner:
     name, extra = PRESET_ARGS[preset]
     cfg = TextCleanerConfig.from_preset(name, check_ner_process=False, fold_styled_characters=fold_styled, **extra,
@@ -791,7 +846,7 @@ def run_stream(cl, doc, max_chars, overlap, seed):
     return "".join(out) + stream.finish()
 
 
-def outputs(doc, preset, fold_styled, mode, seed):
+def outputs(doc, preset, fold_styled, mode, seed) -> dict[str, Any]:
     """Output text(s) of one mode; stream gives one per window size (None on BufferError)."""
     cl = cleaner(preset, fold_styled, mode)
     if mode != "stream":
@@ -815,9 +870,28 @@ def active_cores(case, preset):
             for core in value["cores"] if not leaked(core, context_fold)]
 
 
-def _leaks(case, preset, fold_styled, mode, index, core, disabled, key):
-    out = outputs(build_doc(case, disabled), preset, fold_styled, mode, case["seed"])
-    text = out.get(key)
+@dataclass(frozen=True)
+class _Run:
+    """One case on one preset and fold setting."""
+    case: dict
+    doc: str
+    preset: str
+    fold_styled: bool
+
+    @property
+    def placeholder(self) -> TextCleaner:
+        return cleaner(self.preset, self.fold_styled, "placeholder")
+
+    @property
+    def suffix(self) -> str:
+        return "" if self.fold_styled else "|fold_off"
+
+    def outputs(self, doc, mode):
+        return outputs(doc, self.preset, self.fold_styled, mode, self.case["seed"])
+
+
+def _leaks(run, mode, core, disabled, key):
+    text = run.outputs(build_doc(run.case, disabled), mode).get(key)
     if text is None:
         return False
     return (not leaked(core, fold(text))) if key == "restored" else leaked(core, fold(text))
@@ -854,12 +928,131 @@ def _seconds(cl, text):
     return best
 
 
-def _record(case, doc, check, preset, fold_styled, mode, output, **extra):
-    return {"seed": case["seed"], "check": check, "preset": preset, "fold_styled_characters": fold_styled,
-            "mode": mode, "counts": fold_styled, "input": doc, "output": output, **extra}
+def _record(run, doc, check, mode, output, **extra):
+    return {"seed": run.case["seed"], "check": check, "preset": run.preset, "fold_styled_characters": run.fold_styled,
+            "mode": mode, "counts": run.fold_styled, "input": doc, "output": output, **extra}
 
 
-def check_case(seed: int, modes=MODES, folds=(True, False)) -> dict:
+def _false_positive(run, context_doc):
+    """Prose without PII comes out unchanged (training) or without PII tags (default)."""
+    prose = run.placeholder.process(context_doc).lm_text
+    if not (prose != context_doc if run.preset.startswith("training") else re.search(r"<[A-Z_]+>", prose)):
+        return []
+    return [_record(run, context_doc, "false_positive", "placeholder", prose,
+                    signature=f"false_positive|{run.preset}|{'+'.join(run.case['scripts'])}{run.suffix}")]
+
+
+def _slow(run):
+    """A long run of styled punctuation after a letter, with no letter or digit after it, stays linear."""
+    rng = random.Random(f"{run.case['seed']}-slow-{run.preset}")  # noqa: S311
+    left = rng.choice("aZ7" + "".join(word[-1] for word in run.doc.split()))
+    chars = rng.choices(STYLED_PUNCT + list("@.-_+:/?=&#%~"), k=8000)
+    small, large = (_seconds(run.placeholder, left + "".join(chars[:n]) + " ") for n in (2000, 8000))
+    if large <= 8 * small + 0.05:
+        return []
+    return [_record(run, left + "".join(chars) + " ", "slow", "placeholder",
+                    f"{small:.3f}s -> {large:.3f}s", signature=f"slow|{run.preset}{run.suffix}")]
+
+
+def _stream_error(run, key):
+    """A BufferError counts only where the plain spelling of the document has a split the styled one lacks."""
+    case, doc = run.case, run.doc
+    # a styled spelling no longer than the plain one must not cost a split the plain one has
+    # ("⑫" -> "12"); glue stays on in both, it drops the spaces a split needs. Compared on the
+    # longest stretch with no split, not the whole document: a styled date that adds invisible
+    # characters there can outgrow the window while a shorter styled phone elsewhere keeps the
+    # document shorter (seed 11569)
+    plain_off = {i: frozenset(v["kinds"]) - {"glue"} for i, v in enumerate(case["values"])}
+    # a token longer than size - overlap leaves no split in some feed whatever its spelling,
+    # so there chunk alignment alone decides (the plain one fails on the same buffer)
+    size, overlap = map(int, key.split("/"))
+    fits = max(map(len, doc.split()), default=0) <= size - overlap
+    no_longer = longest_stretch(case) <= longest_stretch(case, plain_off)
+    if not (fits and no_longer and run.outputs(build_doc(case, plain_off), "stream")[key] is not None):
+        return []
+    kinds = _shrink_all(case, lambda off: run.outputs(build_doc(case, off), "stream")[key] is None)
+    return [_record(run, doc, "stream_error", "stream", "BufferError", stream=key, minimal_kinds=kinds,
+                    signature=f"stream_error|{run.preset}|{'+'.join(kinds) or 'plain'}{run.suffix}")]
+
+
+def _core_failure(run, mode, key, text, index, core):
+    value = run.case["values"][index]
+    check = "restore" if key == "restored" else "leak"
+    kinds = _shrink(run.case, index, lambda off: _leaks(run, mode, core, off, key))
+    return _record(run, run.doc, check, mode, text, stream=key if mode == "stream" else None,
+                   type=value["type"], plain=value["plain"], rendered=render(value), core=list(core),
+                   steps=steps(value), minimal_kinds=kinds,
+                   signature=f"{check}|{value['type']}|{'+'.join(kinds) or 'plain'}|{mode}{run.suffix}")
+
+
+def _restore_exact(run, mode, text):
+    """Training keeps the prose, so restore gives the whole input back (up to the fold and the cleaner's HTML
+    entity decoding)."""
+    def restore_differs(off):
+        changed = build_doc(run.case, off)
+        got = run.outputs(changed, "reversible")["restored"]
+        return fold(got) not in (fold(_unescape_html(changed)), fold(run.placeholder.normalise(changed)))
+    kinds = _shrink_all(run.case, restore_differs)
+    return _record(run, run.doc, "restore_exact", mode, text, minimal_kinds=kinds,
+                   signature=f"restore_exact|{run.preset}|{'+'.join(kinds) or 'plain'}{run.suffix}")
+
+
+def _stream_mismatch(run, mode, key, text, whole):
+    def mismatch(off):
+        changed = build_doc(run.case, off)
+        got = run.outputs(changed, "stream")[key]
+        return got is not None and got != run.placeholder.process(changed).lm_text
+    kinds = _shrink_all(run.case, mismatch)
+    return _record(run, run.doc, "stream_mismatch", mode, text, stream=key, whole=whole, minimal_kinds=kinds,
+                   signature=f"stream_mismatch|{run.preset}|{'+'.join(kinds) or 'plain'}{run.suffix}")
+
+
+def _check_output(run, mode, key, text, cores, seen, whole):
+    """Failures of one output text."""
+    failures = []
+    text_fold = fold(text)
+    is_restore = key == "restored"
+    for index, core in cores:
+        if leaked(core, text_fold) != is_restore and not (is_restore and not leaked(core, seen)):
+            failures.append(_core_failure(run, mode, key, text, index, core))
+            break  # one record per output is enough to cluster
+    if is_restore and run.preset.startswith("training") and text_fold not in (fold(_unescape_html(run.doc)), seen):
+        failures.append(_restore_exact(run, mode, text))
+    if mode == "stream" and text != whole:
+        failures.append(_stream_mismatch(run, mode, key, text, whole))
+    return failures
+
+
+def _short_windows(case):
+    """Stream windows too short for a value: a window keeps a spaced token whole only when it fits in the overlap;
+    a month-name date or a value written with escapes (6-10 characters per escaped one) may not (48/12)."""
+    return {f"{size}/{overlap}" for size, overlap in STREAM_PARAMS
+            if any((value["month"] or {"escaped", "entity", "cruft"} & set(value["kinds"]))
+                   and len(render(value)) > overlap
+                   for value in case["values"])}
+
+
+def _check_run(run, context_doc, modes, cores, short):
+    """(failures, stream BufferErrors) of one preset and fold setting."""
+    failures = _false_positive(run, context_doc)
+    whole = run.placeholder.process(run.doc).lm_text
+    failures += _slow(run)
+    # restore gives back what the cleaner read: its own normalised view (ftfy repairs mojibake "Î\u00ad" to
+    # "έ" before any redaction), so a value that view changed is compared there, not with the input
+    seen = fold(run.placeholder.normalise(run.doc))
+    stream_errors = 0
+    for mode in modes:
+        for key, text in run.outputs(run.doc, mode).items():
+            if text is None and mode == "stream":
+                stream_errors += 1
+                if key not in short:
+                    failures += _stream_error(run, key)
+            elif text is not None and not (mode == "stream" and key in short):
+                failures += _check_output(run, mode, key, text, cores, seen, whole)
+    return failures, stream_errors
+
+
+def check_case(seed: int, modes=MODES, folds=(True, False)) -> dict[str, Any]:
     plain_case = make_case(seed)
     context_doc = " ".join(plain_case["context"])
     failures, stream_errors = [], 0
@@ -867,95 +1060,12 @@ def check_case(seed: int, modes=MODES, folds=(True, False)) -> dict:
         decodes = cleaner(preset, True, "placeholder").cfg.check_decode_unicode_escapes
         case = escaped_case(escaped_case(plain_case) if decodes else plain_case, "entity", _entity, _unescape_html)
         doc = build_doc(case)
-        # a window keeps a spaced token whole only when it fits in the overlap; a month-name date or a value
-        # written with escapes (6-10 characters per escaped one) may not (48/12)
-        short = {f"{size}/{overlap}" for size, overlap in STREAM_PARAMS
-                 if any((value["month"] or {"escaped", "entity", "cruft"} & set(value["kinds"]))
-                        and len(render(value)) > overlap
-                        for value in case["values"])}
+        short = _short_windows(case)
         cores = active_cores(case, preset)
         for fold_styled in folds:
-            suffix = "" if fold_styled else "|fold_off"
-            placeholder = cleaner(preset, fold_styled, "placeholder")
-            # false positives: prose without PII comes out unchanged (training) or without PII tags (default)
-            prose = placeholder.process(context_doc).lm_text
-            if prose != context_doc if preset.startswith("training") else re.search(r"<[A-Z_]+>", prose):
-                failures.append(_record(case, context_doc, "false_positive", preset, fold_styled, "placeholder", prose,
-                                        signature=f"false_positive|{preset}|{'+'.join(case['scripts'])}{suffix}"))
-            whole = placeholder.process(doc).lm_text
-            # a long run of styled punctuation after a letter, with no letter or digit after it, stays linear
-            rng = random.Random(f"{seed}-slow-{preset}")  # noqa: S311
-            left = rng.choice("aZ7" + "".join(word[-1] for word in doc.split()))
-            run = rng.choices(STYLED_PUNCT + list("@.-_+:/?=&#%~"), k=8000)
-            small, large = (_seconds(placeholder, left + "".join(run[:n]) + " ") for n in (2000, 8000))
-            if large > 8 * small + 0.05:
-                failures.append(_record(case, left + "".join(run) + " ", "slow", preset, fold_styled, "placeholder",
-                                        f"{small:.3f}s -> {large:.3f}s", signature=f"slow|{preset}{suffix}"))
-            # restore gives back what the cleaner read: its own normalised view (ftfy repairs mojibake "Î\u00ad" to
-            # "έ" before any redaction), so a value that view changed is compared there, not with the input
-            seen = fold(placeholder.normalise(doc))
-            for mode in modes:
-                out = outputs(doc, preset, fold_styled, mode, seed)
-                for key, text in out.items():
-                    if text is None or (mode == "stream" and key in short):
-                        stream_errors += text is None and mode == "stream"
-                        # a styled spelling no longer than the plain one must not cost a split the plain one has
-                        # ("⑫" -> "12"); glue stays on in both, it drops the spaces a split needs. Compared on the
-                        # longest stretch with no split, not the whole document: a styled date that adds invisible
-                        # characters there can outgrow the window while a shorter styled phone elsewhere keeps the
-                        # document shorter (seed 11569)
-                        plain_off = {i: frozenset(v["kinds"]) - {"glue"} for i, v in enumerate(case["values"])}
-                        plain = build_doc(case, plain_off)
-                        # a token longer than size - overlap leaves no split in some feed whatever its spelling,
-                        # so there chunk alignment alone decides (the plain one fails on the same buffer)
-                        size, overlap = map(int, key.split("/")) if mode == "stream" else (len(doc), 0)
-                        fits = max(map(len, doc.split()), default=0) <= size - overlap
-                        no_longer = longest_stretch(case) <= longest_stretch(case, plain_off)
-                        if text is None and key not in short and fits and no_longer and outputs(
-                                plain, preset, fold_styled, mode, seed)[key] is not None:
-                            kinds = _shrink_all(case, lambda off, key=key: outputs(
-                                build_doc(case, off), preset, fold_styled, "stream", seed)[key] is None)
-                            failures.append(_record(
-                                case, doc, "stream_error", preset, fold_styled, mode, "BufferError", stream=key,
-                                minimal_kinds=kinds,
-                                signature=f"stream_error|{preset}|{'+'.join(kinds) or 'plain'}{suffix}"))
-                        continue
-                    text_fold = fold(text)
-                    is_restore = key == "restored"
-                    for index, core in cores:
-                        if leaked(core, text_fold) == is_restore or (is_restore and not leaked(core, seen)):
-                            continue
-                        value = case["values"][index]
-                        check = "restore" if is_restore else "leak"
-                        kinds = _shrink(case, index, lambda off, index=index, core=core, mode=mode, key=key: _leaks(
-                            case, preset, fold_styled, mode, index, core, off, key))
-                        failures.append(_record(
-                            case, doc, check, preset, fold_styled, mode, text, stream=key if mode == "stream" else None,
-                            type=value["type"], plain=value["plain"], rendered=render(value), core=list(core),
-                            steps=steps(value), minimal_kinds=kinds,
-                            signature=f"{check}|{value['type']}|{'+'.join(kinds) or 'plain'}|{mode}{suffix}"))
-                        break  # one record per output is enough to cluster
-                    if is_restore and preset.startswith("training") and text_fold not in (fold(_unescape_html(doc)), seen):
-                        # training keeps the prose, so restore gives the whole input back (up to the fold and the
-                        # cleaner's HTML entity decoding)
-                        def restore_differs(off):
-                            changed = build_doc(case, off)
-                            got = outputs(changed, preset, fold_styled, "reversible", seed)["restored"]
-                            return fold(got) not in (fold(_unescape_html(changed)), fold(placeholder.normalise(changed)))
-                        kinds = _shrink_all(case, restore_differs)
-                        failures.append(_record(
-                            case, doc, "restore_exact", preset, fold_styled, mode, text, minimal_kinds=kinds,
-                            signature=f"restore_exact|{preset}|{'+'.join(kinds) or 'plain'}{suffix}"))
-                    if mode == "stream" and text != whole:
-                        def mismatch(off, key=key):
-                            changed = build_doc(case, off)
-                            got = outputs(changed, preset, fold_styled, "stream", seed)[key]
-                            return got is not None and got != placeholder.process(changed).lm_text
-                        kinds = _shrink_all(case, mismatch)
-                        failures.append(_record(
-                            case, doc, "stream_mismatch", preset, fold_styled, mode, text, stream=key, whole=whole,
-                            minimal_kinds=kinds,
-                            signature=f"stream_mismatch|{preset}|{'+'.join(kinds) or 'plain'}{suffix}"))
+            found, errors = _check_run(_Run(case, doc, preset, fold_styled), context_doc, modes, cores, short)
+            failures += found
+            stream_errors += errors
     return {"seed": seed, "failures": failures, "stream_errors": stream_errors,
             "types": [v["type"] for v in plain_case["values"]]}
 
@@ -968,7 +1078,7 @@ def run(seeds, workers=1, modes=MODES):
     return [check(seed) for seed in seeds]
 
 
-def cluster(results):
+def cluster(results) -> dict[str, dict[str, Any]]:
     clusters = {}
     for result in results:
         for failure in result["failures"]:
@@ -1010,7 +1120,7 @@ def summary(results, clusters) -> str:
     return "\n".join(lines)
 
 
-def main(argv=None):
+def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     parser.add_argument("--seeds", type=int, default=200)
     parser.add_argument("--start", type=int, default=0)
@@ -1022,13 +1132,12 @@ def main(argv=None):
     results = run(range(args.start, args.start + args.seeds), args.workers, args.modes)
     clusters = cluster(results)
     if args.out:
-        with args.out.open("w", encoding="utf-8") as handle:
-            for result in results:
-                for failure in result["failures"]:
-                    handle.write(json.dumps(failure, ensure_ascii=False) + "\n")
+        write_text_atomic(args.out, "".join(
+            json.dumps(failure, ensure_ascii=False) + "\n" for result in results for failure in result["failures"]
+        ))
     text = summary(results, clusters)
     if args.report:
-        args.report.write_text(text + "\n", encoding="utf-8")
+        write_text_atomic(args.report, text + "\n")
     print(text)
     return 1 if any(entry["counts"] for entry in clusters.values()) else 0
 

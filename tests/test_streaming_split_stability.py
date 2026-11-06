@@ -4,6 +4,7 @@ Leak classes (research/streaming-leak-fuzz.md): a rule that reads past its match
 9th digit, "05 234 567 1"), a phone the cleaner finds only once an earlier step masked its neighbour (an IP or
 card next to "117 235 991"), and the numbers guard missing those earlier steps too.
 """
+import functools
 import random
 import re
 
@@ -13,15 +14,12 @@ from sct import TextCleaner, TextCleanerConfig
 from sct.presets import preset_config
 from sct.streaming import WindowedStreamingRedactor
 
-_CLEANERS = {}
 
-
+@functools.cache
 def _cleaner(preset):
-    if preset not in _CLEANERS:
-        cfg = TextCleanerConfig(check_ner_process=False) if preset == "default" \
-            else preset_config(preset, check_ner_process=False)
-        _CLEANERS[preset] = TextCleaner(cfg=cfg)
-    return _CLEANERS[preset]
+    cfg = TextCleanerConfig(check_ner_process=False) if preset == "default" \
+        else preset_config(preset, check_ner_process=False)
+    return TextCleaner(cfg=cfg)
 
 
 def _stream(cleaner, text, buf, overlap, chunks):
@@ -148,6 +146,15 @@ def test_one_feed_keeps_the_buffer_bounded():
     out = redactor.feed(text)
     assert len(redactor._buffer) <= 40
     assert (out + redactor.finish()).split() == cleaner.process(text).lm_text.split()
+
+
+def test_buffer_error_keeps_the_windows_already_processed():
+    cleaner = TextCleaner(preset_config("training", check_ner_process=False))
+    text = "alpha beta gamma delta epsilon zeta eta theta iota kappa lambda mu nu xi omicron " + "z" * 200
+    redactor = WindowedStreamingRedactor(cleaner, max_buffer_chars=40, overlap_chars=16)
+    with pytest.raises(BufferError):
+        redactor.feed(text)
+    assert redactor.finish() == cleaner.process(text).lm_text
 
 
 @pytest.mark.parametrize("text", ["hello " + " " * 100 + "world", " " * 60 + "hello", "hello" + " " * 60])

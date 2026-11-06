@@ -1,5 +1,5 @@
-import threading
 
+from tests.helpers import bare_ner, gliner_ner, set_cfg, set_policy
 from sct.privacy import (
     DetectedEntity,
     EntityRule,
@@ -10,7 +10,6 @@ from sct.privacy import (
     PrivacyPolicy,
 )
 from sct import TextCleaner, TextCleanerConfig
-from sct.utils.ner import GeneralNER
 from sct.utils.anonymization_map import AnonymizationMap
 
 
@@ -98,8 +97,8 @@ def test_text_cleaner_returns_policy_findings(monkeypatch):
     class FakeNER:
         device = "cpu"
 
-        def __init__(self, **kwargs):
-            pass
+        def __init__(self, cfg, *, privacy_policy, **kwargs):
+            self.policy = privacy_policy
 
         def uses_fallback_models(self, language):
             return False
@@ -107,16 +106,16 @@ def test_text_cleaner_returns_policy_findings(monkeypatch):
         def models_for(self, language):
             return [{"key": "ENGLISH", "id": "m", "revision": "r", "provider": "CPUExecutionProvider"}]
 
-        def ner_process_detailed(self, text, *, privacy_policy, **kwargs):
+        def ner_process_detailed(self, text, **kwargs):
             entity = DetectedEntity("PERSON", 0.95, "Maria", 0, 5)
-            findings = privacy_policy.evaluate((entity,))
+            findings = self.policy.evaluate((entity,))
             return NERProcessingResult(
-                text=privacy_policy.transform(text, findings),
+                text=self.policy.transform(text, findings),
                 findings=findings,
             )
 
-        def ner_process_batch_detailed(self, texts, languages, *, privacy_policy, **kwargs):
-            return [self.ner_process_detailed(t, privacy_policy=privacy_policy) for t in texts]
+        def ner_process_batch_detailed(self, texts, languages, **kwargs):
+            return [self.ner_process_detailed(t) for t in texts]
 
     monkeypatch.setattr("sct.sct.ner.GeneralNER", FakeNER)
     policy = PrivacyPolicy(
@@ -179,13 +178,7 @@ def test_general_ner_detailed_processing_returns_real_offsets():
                 "end": 5,
             }]]
 
-    ner = object.__new__(GeneralNER)
-    ner._ner_backend = "gliner"
-    ner._gliner_pipe = FakeGLiNER()
-    ner._replacement_mode = "placeholder"
-    ner._synthetic_replacer = None
-    ner._inference_locks = {}
-    ner._locks_lock = threading.Lock()
+    ner = gliner_ner(detector=FakeGLiNER())
     ner.tokenizer = None
     policy = PrivacyPolicy(
         name="strict",
@@ -193,12 +186,12 @@ def test_general_ner_detailed_processing_returns_real_offsets():
         rules={"PERSON": EntityRule(action="redact")},
     )
 
+    set_policy(ner, policy)
     result = ner.ner_process_detailed(
         "Maria arrived.",
         positional_tags=("PER",),
         ner_confidence_threshold=0.8,
         language="ENGLISH",
-        privacy_policy=policy,
     )
 
     assert result.text == "<REDACTED> arrived."
@@ -207,7 +200,7 @@ def test_general_ner_detailed_processing_returns_real_offsets():
     )
 
 
-def test_detailed_processing_maps_normalized_chunk_offsets_to_source():
+def test_detailed_processing_maps_normalized_chunk_offsets_to_source(monkeypatch):
     class FakeGLiNER:
         max_context_length = 512
         labels = ["person"]
@@ -223,27 +216,21 @@ def test_detailed_processing_maps_normalized_chunk_offsets_to_source():
                 "end": 12,
             }]]
 
-    ner = object.__new__(GeneralNER)
-    ner._ner_backend = "gliner"
-    ner._gliner_pipe = FakeGLiNER()
-    ner._replacement_mode = "placeholder"
-    ner._synthetic_replacer = None
-    ner._inference_locks = {}
-    ner._locks_lock = threading.Lock()
+    ner = gliner_ner(detector=FakeGLiNER())
     ner.tokenizer = None
-    ner._simple_chunk = lambda text, max_tokens: ["Intro. Maria"]
+    monkeypatch.setattr("sct.utils.ner.simple_chunk", lambda text, max_tokens: ["Intro. Maria"])
     policy = PrivacyPolicy(
         name="strict",
         version="1",
         rules={"PERSON": EntityRule(action="redact")},
     )
 
+    set_policy(ner, policy)
     result = ner.ner_process_detailed(
         "Intro.\n\nMaria",
         positional_tags=("PER",),
         ner_confidence_threshold=0.8,
         language="ENGLISH",
-        privacy_policy=policy,
     )
 
     assert result.text == "Intro.\n\n<REDACTED>"
@@ -254,7 +241,7 @@ def test_text_cleaner_stores_reversible_map_externally(monkeypatch):
     class FakeNER:
         device = "cpu"
 
-        def __init__(self, **kwargs):
+        def __init__(self, cfg, **kwargs):
             pass
 
         def uses_fallback_models(self, language):
@@ -380,13 +367,7 @@ def _gliner_ner_with_score(score):
                 "end": 5,
             }]]
 
-    ner = object.__new__(GeneralNER)
-    ner._ner_backend = "gliner"
-    ner._gliner_pipe = FakeGLiNER()
-    ner._replacement_mode = "placeholder"
-    ner._synthetic_replacer = None
-    ner._inference_locks = {}
-    ner._locks_lock = threading.Lock()
+    ner = gliner_ner(detector=FakeGLiNER())
     ner.tokenizer = None
     return ner
 
@@ -402,24 +383,45 @@ def test_pii_mode_final_threshold_keeps_what_gliner_keeps():
     ).effective_ner_confidence_threshold == 0.9
     assert TextCleanerConfig().effective_ner_confidence_threshold == 0.85
 
-    result = _gliner_ner_with_score(0.5).ner_process_detailed(
+    ner = _gliner_ner_with_score(0.5)
+    set_policy(ner, _REDACT_PERSON)
+    result = ner.ner_process_detailed(
         "Maria arrived.",
         positional_tags=cfg.positional_tags,
         ner_confidence_threshold=cfg.effective_ner_confidence_threshold,
         language="ENGLISH",
-        privacy_policy=_REDACT_PERSON,
     )
 
     assert result.text == "<REDACTED> arrived."
 
 
 def test_zero_ner_confidence_threshold_is_not_replaced_by_default():
-    result = _gliner_ner_with_score(0.5).ner_process_detailed(
+    ner = _gliner_ner_with_score(0.5)
+    set_policy(ner, _REDACT_PERSON)
+    result = ner.ner_process_detailed(
         "Maria arrived.",
         positional_tags=("PER",),
         ner_confidence_threshold=0.0,
         language="ENGLISH",
-        privacy_policy=_REDACT_PERSON,
     )
 
     assert result.text == "<REDACTED> arrived."
+
+
+def test_presidio_backend_honours_the_replacement_mode():
+    class _Result:
+        def __init__(self, entity_type, start, end):
+            self.entity_type, self.start, self.end, self.score = entity_type, start, end, 0.9
+
+    class _Analyzer:
+        def analyze(self, *, text, language):
+            return [_Result("PERSON", 0, 5)]
+
+    ner = bare_ner()
+    set_cfg(ner, ner_backend="presidio_gliner")
+    ner._analyzer, ner._presidio_types = _Analyzer(), {}
+    set_cfg(ner, replacement_mode="reversible")
+    anon_map = AnonymizationMap()
+    result = ner.ner_process_detailed("Maria arrived.", positional_tags=("PER",), anon_map=anon_map)
+    assert result.text == "<PERSON_0> arrived."
+    assert anon_map.deanonymize(result.text) == "Maria arrived."

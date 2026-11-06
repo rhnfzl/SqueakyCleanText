@@ -89,3 +89,24 @@ def test_cli_preset_training_keeps_non_latin_text_and_short_keys():
     )
 
     assert json.loads(output.getvalue()) == {"k": "日本語 <EMAIL> München"}
+
+
+# --- empty reversible input still carries a map, and the CLI writes it ---
+def test_cli_reversible_empty_input_writes_empty_map(tmp_path):
+    token_map = tmp_path / "tokens.json"
+    exit_code = main(
+        ["--no-ner", "--replacement-mode", "reversible", "--token-map", str(token_map)],
+        stdin=StringIO(""), stdout=StringIO(),
+    )
+    assert exit_code == 0
+    assert json.loads(token_map.read_text())["entries"] == []
+
+
+def test_cli_reports_duplicate_json_key_as_usage_error(monkeypatch):
+    import io
+    from sct import cli
+    monkeypatch.setattr(cli, "process_json", lambda *a: (_ for _ in ()).throw(
+        ValueError("Cleaning JSON keys produced a duplicate key")))
+    with pytest.raises(SystemExit) as exc:
+        cli.main(["--json-input", "--no-ner"], stdin=io.StringIO('{"a": 1}'), stdout=io.StringIO())
+    assert exc.value.code == 2

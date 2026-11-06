@@ -212,21 +212,13 @@ The module-level `DATE_REGEX`, `FUZZY_MONTH_VOCABULARY`, and `FUZZY_MONTH_VOCABU
 
 > **Skip this step for opt-in languages** — `build_detector()` dynamically handles any language in `supported_languages`. Only needed to add the language to the detector used with `detect_all_languages=False`; the default detector already covers all 75 Lingua languages.
 
-Add the language to `LANGUAGES` (module-level Lingua preset) and `DEFAULT_LANGUAGES`:
+Add the language to `DEFAULT_LANGUAGES`:
 
 ```python
-LANGUAGES = [Language.DUTCH, Language.ENGLISH, Language.FRENCH, Language.GERMAN, Language.SPANISH]
-LANGUAGE_NAME = [(language.name).lower() for language in LANGUAGES]
-
 DEFAULT_LANGUAGES = frozenset({'ENGLISH', 'DUTCH', 'FRENCH', 'GERMAN', 'SPANISH'})
 ```
 
 ### Step 3: `sct/config.py` — Update defaults
-
-**For full-default tier** — add to `DEFAULT_LANGUAGES`:
-```python
-DEFAULT_LANGUAGES = frozenset({'ENGLISH', 'DUTCH', 'FRENCH', 'GERMAN', 'SPANISH'})
-```
 
 **For NER model fallback** — add to `DEFAULT_NER_MODELS` and `DEFAULT_TORCH_NER_MODELS`.
 Start with the MULTILINGUAL fallback while a dedicated model is being prepared:
@@ -429,7 +421,7 @@ DEFAULT_NER_MODELS: dict[str, str] = {
 }
 ```
 
-The ONNX pipeline (`sct/utils/onnx_pipeline.py`) handles download, caching, and inference automatically. INT8 dynamic quantization is also available at load time via the `quantize=True` parameter, reducing model size ~4× with a small accuracy trade-off.
+The ONNX pipeline (`sct/utils/onnx_pipeline.py`) handles download, caching, and inference automatically. INT8 dynamic quantization is also available at load time via the `quantize=True` parameter (install `SqueakyCleanText[quantize]` first), reducing model size ~4× with a small accuracy trade-off.
 
 ---
 
@@ -483,8 +475,7 @@ Arabic, Bulgarian, Catalan, Chinese, Czech, Danish, Dutch, English, Finnish, Fre
 
 ### Full-default tier (also in the `detect_all_languages=False` detector)
 All of the above, plus:
-- [ ] Add `Language.XXX` to `LANGUAGES` list in `resources.py`
-- [ ] Add to `DEFAULT_LANGUAGES` in both `resources.py` and `config.py`
+- [ ] Add to `DEFAULT_LANGUAGES` in `resources.py`
 
 ### Do NOT change (backward-compat constraint)
 - `LANG_KEYS` in `config.py` — tied to the deprecated `ner_models_list` tuple; changing its length breaks existing users

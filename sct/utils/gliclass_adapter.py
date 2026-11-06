@@ -4,7 +4,7 @@ Optional dependency. Requires: ``pip install squeakycleantext[classify]``
 """
 
 import logging
-from typing import Dict, List, Tuple
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -12,14 +12,14 @@ logger = logging.getLogger(__name__)
 class GLiClassAdapter:
     """Zero-shot document classifier using GLiClass models.
 
-    __call__(text) returns a list of ``{"label": str, "score": float}`` dicts.
+    classify(text) returns a list of ``{"label": str, "score": float}`` dicts.
     """
 
     def __init__(
         self,
         model_id: str,
         revision: str | None = None,
-        labels: Tuple[str, ...] = (),
+        labels: tuple[str, ...] = (),
         threshold: float = 0.5,
         classification_type: str = 'single-label',
         onnx: bool = False,
@@ -53,11 +53,11 @@ class GLiClassAdapter:
         try:
             from gliclass import GLiClassModel, ZeroShotClassificationPipeline  # noqa: S404
             from transformers import AutoTokenizer
-        except ImportError:
+        except ImportError as exc:
             raise ImportError(
                 "gliclass is required for GLiClass classification backend. "
                 "Install with: pip install squeakycleantext[classify]"
-            )
+            ) from exc
 
         load_kwargs = {"revision": self._revision} if self._revision else {}
         model = GLiClassModel.from_pretrained(model_id, **load_kwargs)
@@ -69,7 +69,7 @@ class GLiClassAdapter:
             device=self._device,
         )
 
-    def classify(self, text: str) -> List[Dict[str, float]]:
+    def classify(self, text: str) -> list[dict[str, Any]]:
         """Classify text against configured labels.
 
         Returns:

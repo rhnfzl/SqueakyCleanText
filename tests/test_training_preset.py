@@ -7,7 +7,7 @@ import pytest
 
 from sct import TextCleaner, TextCleanerConfig, config, preset_config
 from sct.presets import PRESETS
-from tests.conftest import TEST_NER_MODELS
+from tests.conftest import TEST_NER_MODELS, TEST_NER_REVISIONS
 
 GOLDEN = Path(__file__).parent / "golden" / "training"
 CASES = ("prose_en", "prose_de_umlaut", "code_python", "markup_html_md",
@@ -43,7 +43,8 @@ def test_training_keeps_text_shape_and_replaces_pii(cleaner):
 
 
 def test_training_preset_ner_replaces_person():
-    cleaner = TextCleaner(cfg=preset_config(ner_models=TEST_NER_MODELS, language="ENGLISH"))
+    cleaner = TextCleaner(cfg=preset_config(ner_models=TEST_NER_MODELS,
+                                            ner_model_revisions=TEST_NER_REVISIONS, language="ENGLISH"))
     result = cleaner.process("Yesterday Barack Obama visited Paris.\n  Indented line.")
     assert "Obama" not in result.lm_text and "<PERSON>" in result.lm_text
     assert result.lm_text.endswith("\n  Indented line.")

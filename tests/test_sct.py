@@ -1,3 +1,4 @@
+import asyncio
 import gc
 import unittest
 import string
@@ -5,6 +6,8 @@ from types import MappingProxyType
 from hypothesis import given, settings
 from hypothesis.strategies import text, from_regex
 from faker import Faker
+from tests.helpers import assert_near_linear, bare_ner
+from sct.utils.ner_chunking import simple_chunk, split_text, token_count
 from sct import config
 from sct.config import (
     TextCleanerConfig,
@@ -13,11 +16,11 @@ from sct.config import (
 from sct.utils import contact, datetime, special, normtext, stopwords, constants, resources
 from sct.utils.constants import build_month_names_dict, build_date_regex
 from sct.utils.stopwords import ProcessStopwords
-from sct.utils.ner import GeneralNER
+from sct.utils.ner import GeneralNER, ModelLoadError
 from unittest.mock import patch, MagicMock
 from functools import wraps
 from sct.sct import TextCleaner
-from tests.conftest import TEST_NER_MODELS
+from tests.conftest import TEST_NER_MODELS, TEST_NER_REVISIONS
 
 
 def requires_ner(func):
@@ -25,7 +28,7 @@ def requires_ner(func):
     def wrapper(self, *args, **kwargs):
         if not hasattr(self, 'ner') or self.ner is None:
             self.skipTest("NER models not loaded")
-        if not hasattr(self.ner, '_pipelines') or 'ENGLISH' not in self.ner._pipelines:
+        if 'ENGLISH' not in self.ner.provenance:
             self.skipTest("NER models not properly loaded")
         return func(self, *args, **kwargs)
     return wrapper
@@ -57,14 +60,17 @@ class TextCleanerTest(unittest.TestCase):
         # Always use lightweight ONNX test model — never download production models
         cls.ner = None
         try:
-            cls.ner = GeneralNER(device='cpu', model_names=TEST_NER_MODELS)
+            cls.ner = GeneralNER(TextCleanerConfig(ner_device='cpu', ner_models=TEST_NER_MODELS,
+                                                   ner_model_revisions=TEST_NER_REVISIONS))
             cls.ner.ner_process(
                 "Test sentence.",
                 positional_tags=['PER', 'ORG', 'LOC'],
                 ner_confidence_threshold=0.85,
             )
             print("NER test models loaded successfully!")
-        except Exception as e:
+        except ModelLoadError as e:
+            if not isinstance(e.__cause__, OSError):  # download or network failure; anything else is a bug
+                raise
             print(f"NER models unavailable: {e}")
             cls.ner = None
 
@@ -81,10 +87,11 @@ class TextCleanerTest(unittest.TestCase):
 
     # --- Regex tests (non-NER, always run) ---
 
-    @settings(deadline=None)
+    # Derandomized: Hypothesis can replay draws from this regex inconsistently, which fails with no wrong output.
+    @settings(deadline=None, derandomize=True)
     @given(from_regex(constants.EMAIL_REGEX, fullmatch=True))
     def test_email_regex(self, rx):
-        self.assertEqual("", self.ProcessContacts.replace_emails(rx, ""))
+        self.assertEqual("", self.ProcessContacts.replace_emails_with_fn(rx, lambda _: ""))
 
     # The alternation is leftmost-first, so an earlier alternative may take only
     # part of a string a later one matches whole ("+000000000(0)" leaves "(0)").
@@ -92,17 +99,17 @@ class TextCleanerTest(unittest.TestCase):
     @settings(deadline=None, derandomize=True)
     @given(from_regex(constants.PHONE_REGEX, fullmatch=True))
     def test_phone_regex(self, rx):
-        self.assertNotRegex(self.ProcessContacts.replace_phone_numbers(rx, ""), r"\d{3}")
+        self.assertNotRegex(self.ProcessContacts.replace_phone_numbers_with_fn(rx, lambda _: ""), r"\d{3}")
 
     @settings(deadline=None)
     @given(from_regex(constants.NUMBERS_REGEX, fullmatch=True))
     def test_number_regex(self, rx):
-        self.assertEqual("", self.ProcessContacts.replace_numbers(rx, ""))
+        self.assertEqual("", contact.numbers_regex().sub("", rx))
 
     @settings(deadline=None)
     @given(from_regex(constants.URL_REGEX, fullmatch=True))
     def test_url_regex(self, rx):
-        self.assertNotEqual(rx, self.ProcessContacts.replace_urls(rx, ""))
+        self.assertNotEqual(rx, constants.URL_REGEX.sub("", rx))
 
     @settings(deadline=None)
     @given(from_regex(constants.YEAR_REGEX, fullmatch=True))
@@ -131,7 +138,7 @@ class TextCleanerTest(unittest.TestCase):
     def test_faker_email(self, fkw):
         """Check if generated emails are replaced correctly."""
         email = self.fake.email()
-        clean_email = self.ProcessContacts.replace_emails(email, replace_with=fkw)
+        clean_email = self.ProcessContacts.replace_emails_with_fn(email, lambda _: fkw)
         self.assertEqual(clean_email, fkw)
 
     @settings(deadline=None)
@@ -139,7 +146,7 @@ class TextCleanerTest(unittest.TestCase):
     def test_faker_phone_number(self, fkw):
         """Check if generated phone numbers are replaced correctly."""
         phonenum = self.fake.phone_number()
-        clean_phonenum = self.ProcessContacts.replace_phone_numbers(phonenum, replace_with=fkw)
+        clean_phonenum = self.ProcessContacts.replace_phone_numbers_with_fn(phonenum, lambda _: fkw)
         self.assertEqual(clean_phonenum, fkw)
 
     @settings(deadline=None)
@@ -147,7 +154,7 @@ class TextCleanerTest(unittest.TestCase):
     def test_faker_url(self, fkw):
         """Check if generated URLs are replaced correctly."""
         url = self.fake.url()
-        clean_url = self.ProcessContacts.replace_urls(url, replace_with=fkw)
+        clean_url = constants.URL_REGEX.sub(fkw, url)
         self.assertEqual(clean_url, fkw)
 
     # --- Stopwords tests (non-NER) ---
@@ -168,8 +175,8 @@ class TextCleanerTest(unittest.TestCase):
 
     def test_stopwords_set_performance(self):
         """Verify stopwords are stored as sets (O(1) lookup)."""
-        self.assertIsInstance(self.ProcessStopwords.STOP_WORDS_EN, set)
-        self.assertIsInstance(self.ProcessStopwords.STOP_WORDS_NL, set)
+        self.assertIsInstance(self.ProcessStopwords.get_stop_words("ENGLISH"), set)
+        self.assertIsInstance(self.ProcessStopwords.get_stop_words("DUTCH"), set)
 
     # --- Config dataclass tests ---
 
@@ -308,36 +315,29 @@ class TextCleanerTest(unittest.TestCase):
     def test_url_regex_unicode_domain(self):
         """Test URL regex handles non-ASCII domains."""
         text = "Visit https://www.example.com/path"
-        result = self.ProcessContacts.replace_urls(text, "<URL>")
+        result = constants.URL_REGEX.sub("<URL>", text)
         self.assertIn("<URL>", result)
 
     def test_email_regex_basic(self):
         """Test email regex handles standard emails."""
         text = "Send to user@example.com please"
-        result = self.ProcessContacts.replace_emails(text, "<EMAIL>")
+        result = self.ProcessContacts.replace_emails_with_fn(text, lambda _: "<EMAIL>")
         self.assertIn("<EMAIL>", result)
 
     # --- ACRONYM_REGEX ReDoS safety test ---
 
     def test_acronym_regex_no_redos(self):
         """Test that ACRONYM_REGEX doesn't catastrophically backtrack."""
-        import time
         # Adversarial input that would cause ReDoS with nested quantifiers
-        adversarial = "A." * 100
-        start = time.time()
-        constants.ACRONYM_REGEX.findall(adversarial)
-        elapsed = time.time() - start
-        self.assertLess(elapsed, 2.0, "ACRONYM_REGEX took too long - possible ReDoS")
+        assert_near_linear(constants.ACRONYM_REGEX.findall, lambda n: "A." * n, 100)
 
     def test_host_regex_no_redos(self):
         """A dotted host with no TLD fails fast (each label used to split every way: ~5 s / 10 s here)."""
-        import time
-        host = ".".join(["1" * 20] * 5) + " "
-        for name, rx, sample in (("EMAIL_REGEX", constants.EMAIL_REGEX, "a@" + host),
-                                 ("URL_REGEX", constants.URL_REGEX, "http://" + host)):
-            start = time.time()
-            rx.search(sample)
-            self.assertLess(time.time() - start, 1.0, f"{name} took too long - possible ReDoS")
+        def host(labels):
+            return ".".join(["1" * 20] * labels) + " "
+
+        assert_near_linear(constants.EMAIL_REGEX.search, lambda n: "a@" + host(n), 5, factor=5)
+        assert_near_linear(constants.URL_REGEX.search, lambda n: "http://" + host(n), 5, factor=5)
 
     # --- Consistent return type tests ---
 
@@ -433,7 +433,7 @@ class TextCleanerTest(unittest.TestCase):
             {'entity_group': 'PER', 'score': 0.90, 'word': 'Smith',
              'start': 12, 'end': 3},
         ]
-        results = self.ner.ner_data(mock_data, ['PER'])
+        results = self.ner.entities_with_position_key(mock_data, ['PER'])
         keys = [r['key'] for r in results]
         self.assertEqual(keys[0], "1:23")
         self.assertEqual(keys[1], "12:3")
@@ -446,7 +446,7 @@ class TextCleanerTest(unittest.TestCase):
             {'entity_group': 'PER', 'score': 0.90, 'word': 'John', 'key': '0:4', 'start': 0, 'end': 4},
             {'entity_group': 'PER', 'score': 0.85, 'word': 'John', 'key': '0:4', 'start': 0, 'end': 4},
         ]
-        ensemble = self.ner.ner_ensemble(mock_results, 0.80)
+        ensemble = self.ner.vote_entities(mock_results, 0.80)
         self.assertEqual(len(ensemble), 1)
         self.assertEqual(ensemble[0]['key'], '0:4')
 
@@ -465,10 +465,10 @@ class TextCleanerTest(unittest.TestCase):
             "Sarah lives in London.",
             "The quick brown fox.",
         ]
-        results = self.ner.process_batch(
+        results = self.ner.ner_process_batch(
             texts,
+            ['PER', 'ORG', 'LOC'],
             batch_size=2,
-            positional_tags=['PER', 'ORG', 'LOC'],
             ner_confidence_threshold=0.85,
         )
         self.assertEqual(len(results), len(texts))
@@ -520,7 +520,7 @@ class TextCleanerTest(unittest.TestCase):
     def test_load_language_is_public(self):
         """load_language() is public and pre-loads the model."""
         self.ner.load_language('ENGLISH')  # already loaded — must be a no-op, not crash
-        self.assertIn('ENGLISH', self.ner._pipelines)
+        self.assertIn('ENGLISH', self.ner.provenance)
 
     @requires_ner
     def test_ensure_loaded_shares_session_for_same_model(self):
@@ -534,7 +534,8 @@ class TextCleanerTest(unittest.TestCase):
             shared_model = "protectai/bert-base-NER-onnx"
             models = {'ENGLISH': shared_model, 'MULTILINGUAL': shared_model,
                       'FRENCH': shared_model}
-            ner2 = GeneralNER(device='cpu', model_names=models)
+            ner2 = GeneralNER(TextCleanerConfig(ner_device='cpu', ner_models=models,
+                                                ner_model_revisions=dict.fromkeys(models, TEST_NER_REVISIONS['ENGLISH'])))
             ner2._ensure_loaded('FRENCH')
             ner2._ensure_loaded('MULTILINGUAL')
             self.assertIs(ner2._pipelines['FRENCH'],
@@ -544,8 +545,8 @@ class TextCleanerTest(unittest.TestCase):
     def test_ner_lazy_loading(self):
         """Test that NER models are loaded lazily."""
         # English and multilingual should be loaded (eagerly for tokenizer)
-        self.assertIn('ENGLISH', self.ner._pipelines)
-        self.assertIn('MULTILINGUAL', self.ner._pipelines)
+        self.assertIn('ENGLISH', self.ner.provenance)
+        self.assertIn('MULTILINGUAL', self.ner.provenance)
 
     @requires_ner
     def test_ner_ensemble_key_selection(self):
@@ -568,7 +569,7 @@ class TextCleanerTest(unittest.TestCase):
         """Custom ner_ensemble_default_keys overrides the module-level fallback."""
         cfg = TextCleanerConfig(
             check_ner_process=True,
-            ner_models=TEST_NER_MODELS,
+            ner_models=TEST_NER_MODELS, ner_model_revisions=TEST_NER_REVISIONS,
             ner_ensemble_default_keys=('MULTILINGUAL',),
         )
         sx = TextCleaner(cfg=cfg)
@@ -583,7 +584,7 @@ class TextCleanerTest(unittest.TestCase):
         config.CHECK_NER_PROCESS = True
         cfg = TextCleanerConfig(
             check_ner_process=True,
-            ner_models=TEST_NER_MODELS,
+            ner_models=TEST_NER_MODELS, ner_model_revisions=TEST_NER_REVISIONS,
         )
         sx = TextCleaner(cfg=cfg)
 
@@ -593,7 +594,7 @@ class TextCleanerTest(unittest.TestCase):
             "Pablo vive en Madrid",
             "Willem woont in Amsterdam",
         ]
-        results = sx.process_batch(texts, batch_size=2)
+        results = sx.process_batch(texts, max_workers=2)
 
         # Check language detection
         languages = [lang for _, _, lang in results]
@@ -610,7 +611,7 @@ class TextCleanerTest(unittest.TestCase):
         """Test end-to-end text cleaning following the pipeline."""
         cfg = TextCleanerConfig(
             check_ner_process=True,
-            ner_models=TEST_NER_MODELS,
+            ner_models=TEST_NER_MODELS, ner_model_revisions=TEST_NER_REVISIONS,
         )
         sx = TextCleaner(cfg=cfg)
         lm_text, stat_text, lang = sx.process(TEST_TEXT)
@@ -649,7 +650,7 @@ class TextCleanerTest(unittest.TestCase):
         chunk2_text = "Sarah Johnson lives in Berlin and works at Google. "
         long_text = chunk1_text * 30 + chunk2_text * 30  # ~60 repetitions, forces splitting
 
-        chunks = self.ner.split_text(long_text, self.ner.min_token_length, self.ner.tokenizer)
+        chunks = split_text(long_text, self.ner.min_token_length, self.ner.tokenizer)
         self.assertGreater(len(chunks), 1, "Text should split into multiple chunks")
 
         processed = self.ner.ner_process(
@@ -671,7 +672,7 @@ class TextCleanerTest(unittest.TestCase):
         """
         cfg = TextCleanerConfig(
             check_ner_process=True,
-            ner_models=TEST_NER_MODELS,
+            ner_models=TEST_NER_MODELS, ner_model_revisions=TEST_NER_REVISIONS,
         )
 
         texts = [
@@ -704,11 +705,11 @@ class TextCleanerTest(unittest.TestCase):
         """
         from concurrent.futures import ThreadPoolExecutor
 
-        texts_and_entities = [
-            ("John Smith works at Microsoft.", "John Smith"),
-            ("Sarah Johnson lives in Berlin.", "Sarah Johnson"),
-            ("Pablo Garcia works in Madrid.", "Pablo Garcia"),
-            ("Willem de Vries lives in Amsterdam.", "Willem"),
+        texts = [
+            "John Smith works at Microsoft.",
+            "Sarah Johnson lives in Berlin.",
+            "Pablo Garcia works in Madrid.",
+            "Willem de Vries lives in Amsterdam.",
         ]
 
         def run_ner(text):
@@ -718,18 +719,12 @@ class TextCleanerTest(unittest.TestCase):
                 ner_confidence_threshold=0.85,
             )
 
-        # Run all NER calls concurrently
+        sequential = [run_ner(t) for t in texts]
         with ThreadPoolExecutor(max_workers=4) as executor:
-            futures = [executor.submit(run_ner, t) for t, _ in texts_and_entities]
+            futures = [executor.submit(run_ner, t) for t in texts]
             results = [f.result() for f in futures]
 
-        # Each result should have anonymized the person from its OWN text
-        for i, (result, (original_text, person)) in enumerate(zip(results, texts_and_entities)):
-            self.assertIsInstance(result, str)
-            self.assertNotEqual(result, "", f"Empty result for text {i}")
-            # At minimum, the result should be processed (not the raw input)
-            # Lightweight model may not catch every entity, so just verify no crash
-            # and that the output is a valid string
+        self.assertEqual(results, sequential)
 
     # --- split_text() unit tests (chunking only, no NER inference) ---
 
@@ -737,7 +732,7 @@ class TextCleanerTest(unittest.TestCase):
     def test_split_text_short_text_no_split(self):
         """Text under max_tokens returns as a single chunk."""
         text = "Hello world."
-        chunks = self.ner.split_text(text, 50, self.ner.tokenizer)
+        chunks = split_text(text, 50, self.ner.tokenizer)
         self.assertEqual(chunks, [text])
 
     @requires_ner
@@ -749,10 +744,10 @@ class TextCleanerTest(unittest.TestCase):
         text = f"{para1.strip()}\n\n{para2.strip()}\n\n{para3.strip()}"
 
         # Set max_tokens so that each paragraph fits but two don't
-        tokens_per_para = self.ner._token_count(para1.strip(), self.ner.tokenizer)
+        tokens_per_para = token_count(para1.strip(), self.ner.tokenizer)
         max_tokens = int(tokens_per_para * 1.5)
 
-        chunks = self.ner.split_text(text, max_tokens, self.ner.tokenizer)
+        chunks = split_text(text, max_tokens, self.ner.tokenizer)
         self.assertGreaterEqual(len(chunks), 2)
         # Chunks are exact source slices (original breaks kept) ending at a boundary
         for chunk in chunks:
@@ -771,10 +766,10 @@ class TextCleanerTest(unittest.TestCase):
         ]
         text = " ".join(s for s in sentences * 4)  # Repeat to ensure length
 
-        total_tokens = self.ner._token_count(text, self.ner.tokenizer)
+        total_tokens = token_count(text, self.ner.tokenizer)
         max_tokens = total_tokens // 3
 
-        chunks = self.ner.split_text(text, max_tokens, self.ner.tokenizer)
+        chunks = split_text(text, max_tokens, self.ner.tokenizer)
         self.assertGreater(len(chunks), 1)
         # Each chunk except the last should end at a sentence boundary
         for chunk in chunks[:-1]:
@@ -789,10 +784,10 @@ class TextCleanerTest(unittest.TestCase):
         clauses = [f"clause number {i} of the text" for i in range(30)]
         text = "; ".join(clauses)
 
-        total_tokens = self.ner._token_count(text, self.ner.tokenizer)
+        total_tokens = token_count(text, self.ner.tokenizer)
         max_tokens = total_tokens // 3
 
-        chunks = self.ner.split_text(text, max_tokens, self.ner.tokenizer)
+        chunks = split_text(text, max_tokens, self.ner.tokenizer)
         self.assertGreater(len(chunks), 1)
 
     @requires_ner
@@ -800,10 +795,10 @@ class TextCleanerTest(unittest.TestCase):
         """Long text without punctuation splits at word boundaries."""
         text = " ".join(["word"] * 200)
 
-        total_tokens = self.ner._token_count(text, self.ner.tokenizer)
+        total_tokens = token_count(text, self.ner.tokenizer)
         max_tokens = total_tokens // 4
 
-        chunks = self.ner.split_text(text, max_tokens, self.ner.tokenizer)
+        chunks = split_text(text, max_tokens, self.ner.tokenizer)
         self.assertGreater(len(chunks), 1)
         # No chunk should start or end with whitespace
         for chunk in chunks:
@@ -817,10 +812,10 @@ class TextCleanerTest(unittest.TestCase):
             "Third sentence here. Fourth sentence here."
         )
 
-        total_tokens = self.ner._token_count(text, self.ner.tokenizer)
+        total_tokens = token_count(text, self.ner.tokenizer)
         max_tokens = int(total_tokens * 0.6)
 
-        chunks = self.ner.split_text(text, max_tokens, self.ner.tokenizer)
+        chunks = split_text(text, max_tokens, self.ner.tokenizer)
         if len(chunks) == 2:
             # Should have split at paragraph break, not sentence break
             self.assertIn("First sentence", chunks[0])
@@ -834,12 +829,12 @@ class TextCleanerTest(unittest.TestCase):
         text = "The quick brown fox jumps. " * 100
         max_tokens = 30
 
-        chunks = self.ner.split_text(text, max_tokens, self.ner.tokenizer)
+        chunks = split_text(text, max_tokens, self.ner.tokenizer)
         for i, chunk in enumerate(chunks):
-            token_count = self.ner._token_count(chunk, self.ner.tokenizer)
+            tokens = token_count(chunk, self.ner.tokenizer)
             self.assertLessEqual(
-                token_count, max_tokens,
-                f"Chunk {i} has {token_count} tokens, exceeds limit {max_tokens}"
+                tokens, max_tokens,
+                f"Chunk {i} has {tokens} tokens, exceeds limit {max_tokens}"
             )
 
     @requires_ner
@@ -849,7 +844,7 @@ class TextCleanerTest(unittest.TestCase):
         text = "Hello world. This is a test. With multiple sentences.\n\nAnd paragraphs too."
         max_tokens = 15
 
-        chunks = self.ner.split_text(text, max_tokens, self.ner.tokenizer)
+        chunks = split_text(text, max_tokens, self.ner.tokenizer)
 
         # Normalize whitespace in original and joined chunks for comparison
         original_normalized = _re.sub(r'\s+', ' ', text).strip()
@@ -861,9 +856,9 @@ class TextCleanerTest(unittest.TestCase):
         """BERT maps long no-whitespace strings to [UNK] (1 token), returns single chunk."""
         text = "abcdefghij" * 100  # 1000 chars, no delimiters
         # BERT tokenizer produces [CLS] [UNK] [SEP] = 3 tokens
-        token_count = self.ner._token_count(text, self.ner.tokenizer)
-        self.assertLessEqual(token_count, 5, "Expected BERT to map to [UNK]")
-        chunks = self.ner.split_text(text, 50, self.ner.tokenizer)
+        tokens = token_count(text, self.ner.tokenizer)
+        self.assertLessEqual(tokens, 5, "Expected BERT to map to [UNK]")
+        chunks = split_text(text, 50, self.ner.tokenizer)
         self.assertEqual(len(chunks), 1)  # Under token limit, no split needed
         self.assertEqual(chunks[0], text)
 
@@ -887,7 +882,7 @@ class TextCleanerTest(unittest.TestCase):
         text = "x" * 100  # 100 chars, no delimiters
         max_tokens = 20
 
-        chunks = self.ner.split_text(text, max_tokens, mock_tokenizer)
+        chunks = split_text(text, max_tokens, mock_tokenizer)
         self.assertGreater(len(chunks), 1)
         self.assertEqual(''.join(chunks), text)
         # Each chunk should be at most max_tokens characters (1 char = 1 token)
@@ -902,7 +897,7 @@ class TextCleanerTest(unittest.TestCase):
         segment = "John Smith works at Microsoft in Seattle. Sarah Johnson lives in Berlin. "
         text = segment * 50  # Repeat to force multiple chunks
 
-        chunks = self.ner.split_text(text, self.ner.min_token_length, self.ner.tokenizer)
+        chunks = split_text(text, self.ner.min_token_length, self.ner.tokenizer)
         self.assertGreater(len(chunks), 1, "Text should require multiple chunks")
 
         processed = self.ner.ner_process(
@@ -935,10 +930,9 @@ class TextCleanerTest(unittest.TestCase):
 
     def test_aprocess_batch_uses_running_loop(self):
         """aprocess_batch() must call get_running_loop, not get_event_loop."""
-        import inspect
-        src = inspect.getsource(TextCleaner.aprocess_batch)
-        self.assertIn('get_running_loop', src)
-        self.assertNotIn('get_event_loop', src)
+        cleaner = TextCleaner(TextCleanerConfig(check_ner_process=False))
+        with patch('asyncio.get_event_loop', side_effect=AssertionError):
+            self.assertEqual(asyncio.run(cleaner.aprocess_batch(['hi there']))[0][0], 'hi there')
 
     def test_sentence_boundary_no_false_split_on_abbreviation(self):
         """SENTENCE_BOUNDARY_PATTERN must not split abbreviation-dot + space."""
@@ -959,10 +953,10 @@ class TextCleanerTest(unittest.TestCase):
 
     def test_simple_chunk_conservative_ratio(self):
         """_simple_chunk uses 2 chars/token (not 4) to handle CJK/Arabic safely."""
-        import inspect
-        src = inspect.getsource(GeneralNER._simple_chunk)
-        self.assertIn('max_tokens * 2', src)
-        self.assertNotIn('max_tokens * 4', src)
+        text = '\u6f22\u5b57' * 500
+        chunks = simple_chunk(text, max_tokens=50)
+        self.assertLessEqual(max(map(len, chunks)), 100)
+        self.assertEqual(''.join(chunks), text)
 
     def test_threadpool_single_text_no_threading(self):
         """Test that process_batch with 1 text skips ThreadPoolExecutor."""
@@ -1522,8 +1516,8 @@ class TextCleanerTest(unittest.TestCase):
         ]
         text = "I bought iPhone today"
         result = self.ner.anonymize_text(text, filtered)
-        self.assertIn('<PRODUCT>', result.text)
-        self.assertNotIn('iPhone', result.text)
+        self.assertIn('<PRODUCT>', result)
+        self.assertNotIn('iPhone', result)
 
     @requires_ner
     def test_anonymize_mixed_labels(self):
@@ -1536,8 +1530,8 @@ class TextCleanerTest(unittest.TestCase):
         ]
         text = "John bought an iPad today"
         result = self.ner.anonymize_text(text, filtered)
-        self.assertIn('<PERSON>', result.text)
-        self.assertIn('<PRODUCT>', result.text)
+        self.assertIn('<PERSON>', result)
+        self.assertIn('<PRODUCT>', result)
 
     @classmethod
     def tearDownClass(cls):
@@ -1812,13 +1806,11 @@ class SyntheticReplacementTest(unittest.TestCase):
         self.assertGreater(len(name), 0)
 
     def test_synthetic_replacer_unknown_type_fallback(self):
-        """Unknown entity types should fall back to name generation."""
+        """Unknown entity types are written as their tag, not a person name."""
         from sct.utils.synthetic import SyntheticReplacer
         replacer = SyntheticReplacer(seed=42)
 
-        result = replacer.get_replacement('UNKNOWN_TYPE', 'something')
-        self.assertIsInstance(result, str)
-        self.assertGreater(len(result), 0)
+        self.assertEqual(replacer.get_replacement('UNKNOWN_TYPE', 'something'), '<UNKNOWN_TYPE>')
 
     def test_synthetic_generate_for_entities(self):
         """generate_for_entities should replace entities in text."""
@@ -1917,16 +1909,6 @@ class ContactSyntheticMethodTest(unittest.TestCase):
         self.assertIn('REPLACED', result)
         self.assertEqual(len(replacements), 1)
         self.assertEqual(replacements[0], 'test@example.com')
-
-    def test_replace_urls_with_fn(self):
-        """replace_urls_with_fn should call the provided function."""
-        pc = contact.ProcessContacts()
-        result = pc.replace_urls_with_fn(
-            "Visit https://example.com today",
-            lambda m: 'FAKE_URL',
-        )
-        self.assertIn('FAKE_URL', result)
-        self.assertNotIn('https://example.com', result)
 
     def test_replace_phone_numbers_with_fn(self):
         """replace_phone_numbers_with_fn should call the provided function."""
@@ -2043,7 +2025,7 @@ class ReversibleAnonymizationTest(unittest.TestCase):
     def test_ner_anonymize_reversible(self):
         """GeneralNER._anonymize_reversible should produce indexed placeholders."""
         from sct.utils.anonymization_map import AnonymizationMap
-        ner_obj = GeneralNER.__new__(GeneralNER)
+        ner_obj = bare_ner()
 
         amap = AnonymizationMap()
         text = "Alice works at ACME in Paris."
@@ -2057,13 +2039,13 @@ class ReversibleAnonymizationTest(unittest.TestCase):
         ]
 
         result = ner_obj._anonymize_reversible(text, filtered, amap)
-        self.assertIn('<PERSON_0>', result.text)
-        self.assertIn('<ORGANISATION_0>', result.text)
-        self.assertIn('<LOCATION_0>', result.text)
+        self.assertIn('<PERSON_0>', result)
+        self.assertIn('<ORGANISATION_0>', result)
+        self.assertIn('<LOCATION_0>', result)
         self.assertEqual(len(amap.entries), 3)
 
         # Round-trip (anon_map is mutated in-place, use the passed-in reference)
-        self.assertEqual(amap.deanonymize(result.text), text)
+        self.assertEqual(amap.deanonymize(result), text)
 
 
 class GLiClassConfigTest(unittest.TestCase):

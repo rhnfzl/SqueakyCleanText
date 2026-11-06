@@ -18,6 +18,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+from huggingface_hub import HfApi
+
 # Source → ONNX repo mapping
 #
 # Naming convention for target repos: rhnfzl/xlm-roberta-large-ner-{language}-onnx
@@ -88,7 +90,6 @@ def export_model(source_model: str, output_dir: Path) -> None:
     cmd.append(str(output_dir))
     subprocess.run(cmd, check=True)  # noqa: S603
 
-    # Verify required files exist
     for fname in REQUIRED_FILES:
         fpath = output_dir / fname
         if not fpath.exists():
@@ -104,14 +105,10 @@ def upload_model(output_dir: Path, repo_id: str, dry_run: bool = False) -> None:
         print(f"  DRY RUN: Would upload {output_dir} → {repo_id}")
         return
 
-    from huggingface_hub import HfApi
-
     api = HfApi()
 
-    # Create repo if it doesn't exist
     api.create_repo(repo_id, exist_ok=True, repo_type="model")
 
-    # Upload each required file
     for fname in REQUIRED_FILES:
         fpath = output_dir / fname
         if fpath.exists():
@@ -126,7 +123,7 @@ def upload_model(output_dir: Path, repo_id: str, dry_run: bool = False) -> None:
     print(f"  Uploaded to: https://huggingface.co/{repo_id}")
 
 
-def main():
+def main() -> None:
     parser = argparse.ArgumentParser(description="Export NER models to ONNX format")
     parser.add_argument(
         "--models", nargs="+",
@@ -146,7 +143,6 @@ def main():
     )
     args = parser.parse_args()
 
-    # Determine which models to export
     if args.models:
         models = {m: MODEL_MAP[m] for m in args.models if m in MODEL_MAP}
         unknown = [m for m in args.models if m not in MODEL_MAP]
@@ -162,6 +158,7 @@ def main():
 
     args.output_base.mkdir(parents=True, exist_ok=True)
 
+    failed = []
     for source_model, onnx_repo in models.items():
         safe_name = source_model.replace("/", "__")
         output_dir = args.output_base / safe_name
@@ -169,13 +166,15 @@ def main():
         try:
             export_model(source_model, output_dir)
             upload_model(output_dir, onnx_repo, dry_run=args.dry_run)
-        except Exception as e:
+        except Exception as e:  # one model's export or Hub failure must not stop the others
             print(f"  FAILED: {e}")
-            continue
+            failed.append(source_model)
         finally:
             if not args.keep_exports and output_dir.exists():
                 shutil.rmtree(output_dir)
 
+    if failed:
+        sys.exit(f"\nFailed: {failed}")
     print("\nDone!")
 
 

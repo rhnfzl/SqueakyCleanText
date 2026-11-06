@@ -3,7 +3,8 @@
 import argparse
 import json
 from pathlib import Path
-from typing import Any, Optional, Sequence
+from typing import Any
+from collections.abc import Sequence
 
 from sct.presets import PRESETS, preset_config
 from sct.risk import assess_reidentification_risk
@@ -15,6 +16,8 @@ from sct.score import (
     score_records,
 )
 from sct.sct import TextCleaner
+from sct.utils.atomic_file import write_text_atomic
+from sct.utils.ner import ModelLoadError
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -41,10 +44,24 @@ def _read_rows(path: Path, parser: argparse.ArgumentParser) -> list[dict[str, An
         try:
             import pyarrow.parquet as pq
         except ImportError:
-            parser.error("Parquet input needs pyarrow: pip install pyarrow")
-        return pq.read_table(path).to_pylist()
-    with path.open(encoding="utf-8") as handle:
-        return [json.loads(line) for line in handle if line.strip()]
+            parser.error("Parquet input needs pyarrow: pip install squeakycleantext[parquet]")
+        try:
+            return pq.read_table(path).to_pylist()
+        except (OSError, ValueError) as exc:
+            parser.error(f"cannot read {path.name}: {exc}")
+    rows = []
+    try:
+        with path.open(encoding="utf-8") as handle:
+            for number, line in enumerate(handle, 1):
+                if not line.strip():
+                    continue
+                try:
+                    rows.append(json.loads(line))
+                except ValueError as exc:
+                    parser.error(f"{path.name} line {number}: {exc}")
+    except (OSError, ValueError) as exc:  # missing file or not UTF-8
+        parser.error(f"cannot read {path.name}: {exc}")
+    return rows
 
 
 def _hashable(value):
@@ -52,31 +69,69 @@ def _hashable(value):
     return json.dumps(value, sort_keys=True, ensure_ascii=False, default=str)
 
 
-def main(argv: Optional[Sequence[str]] = None) -> int:
+def _column_texts(rows: list[dict[str, Any]], column: str, parser: argparse.ArgumentParser) -> list[str]:
+    texts = []
+    for i, row in enumerate(rows):
+        if not isinstance(row, dict):
+            parser.error(f"row {i}: not a JSON object")
+        value = row.get(column)
+        if value is not None and not isinstance(value, str):
+            parser.error(f"row {i}: column {column!r} is not text")
+        texts.append(value or "")
+    return texts
+
+
+def _k_anonymity(rows: list[dict[str, Any]], columns: str, k_threshold: int,
+                 parser: argparse.ArgumentParser) -> dict[str, Any]:
+    names = tuple(c.strip() for c in columns.split(",") if c.strip())
+    # Only the named columns are read, so other columns never reach the report.
+    try:
+        records = [{c: _hashable(row[c]) for c in names} for row in rows]
+        risk = assess_reidentification_risk(
+            records, quasi_identifiers=names, k_threshold=k_threshold,
+        )
+    except KeyError as exc:
+        parser.error(f"quasi-identifier column missing: {exc}")
+    except ValueError as exc:
+        parser.error(str(exc))
+    return {
+        "quasi_identifiers": list(risk.quasi_identifiers),
+        "k_threshold": risk.k_threshold,
+        "minimum_k": risk.minimum_k,
+        "at_risk_records": risk.at_risk_records,
+        "at_risk_fraction": risk.at_risk_fraction,
+        "class_size_counts": {
+            str(k): v for k, v in sorted(risk.class_size_counts.items())
+        },
+    }
+
+
+def main(argv: Sequence[str] | None = None) -> int:
     """Run the report command."""
     parser = _parser()
     args = parser.parse_args(argv)
     rows = _read_rows(Path(args.input), parser)
 
-    texts = []
-    for i, row in enumerate(rows):
-        value = row.get(args.text_column)
-        if value is not None and not isinstance(value, str):
-            parser.error(f"row {i}: column {args.text_column!r} is not text")
-        texts.append(value or "")
+    texts = _column_texts(rows, args.text_column, parser)
 
     config = ScoreConfig(
         quality=args.quality_model is not None,
         quality_model=args.quality_model,
         minhash=args.minhash,
     )
+    # Fail before the corpus is cleaned, which can take far longer than this check.
+    if args.quality_model and not Path(args.quality_model, "model.onnx").is_file():
+        parser.error(f"no model.onnx in --quality-model folder {args.quality_model}")
     overrides = {"check_ner_process": False} if args.no_ner else {}
     try:
         cleaner = TextCleaner(cfg=preset_config(args.preset, **overrides))
         results = cleaner.process_batch(texts)
-        scored = score_records(results, texts, config)
-    except ImportError as exc:
+    except (ImportError, ModelLoadError, OSError, ValueError) as exc:
         parser.error(str(exc))
+    try:
+        scored = score_records(results, texts, config)
+    except Exception as exc:  # onnxruntime and tokenizers errors derive directly from Exception
+        parser.error(f"cannot score: {exc}")
     models = [m for result in results for m in result.signals["models"]]
 
     report: dict[str, Any] = {
@@ -88,50 +143,36 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     }
     if config.quality:
         manifest = Path(args.quality_model) / "sct_quality.json"
+        recorded = json.loads(manifest.read_text()) if manifest.is_file() else {}
+        if not isinstance(recorded, dict):
+            parser.error(f"{manifest.name} is not a JSON object")
         report["quality"] = {
             "model_dir": Path(args.quality_model).name,
             "input": "original text",
-            **(json.loads(manifest.read_text()) if manifest.is_file() else {}),
+            **recorded,
         }
     if config.minhash:
         report["minhash"] = minhash_metadata(config)
     if args.quasi_identifiers:
-        names = tuple(c.strip() for c in args.quasi_identifiers.split(",") if c.strip())
-        # Only the named columns are read, so other columns never reach the report.
-        try:
-            records = [{c: _hashable(row[c]) for c in names} for row in rows]
-            risk = assess_reidentification_risk(
-                records, quasi_identifiers=names, k_threshold=args.k,
-            )
-        except KeyError as exc:
-            parser.error(f"quasi-identifier column missing: {exc}")
-        except ValueError as exc:
-            parser.error(str(exc))
-        report["k_anonymity"] = {
-            "quasi_identifiers": list(risk.quasi_identifiers),
-            "k_threshold": risk.k_threshold,
-            "minimum_k": risk.minimum_k,
-            "at_risk_records": risk.at_risk_records,
-            "at_risk_fraction": risk.at_risk_fraction,
-            "class_size_counts": {
-                str(k): v for k, v in sorted(risk.class_size_counts.items())
-            },
-        }
+        report["k_anonymity"] = _k_anonymity(rows, args.quasi_identifiers, args.k, parser)
 
-    _write(args.out, json.dumps(report, indent=2, ensure_ascii=False) + "\n")
-    if args.card:
-        _write(args.card, render_data_card(report["summary"]))
-    if args.scores:
-        _write(args.scores, "".join(
-            json.dumps(row, ensure_ascii=False) + "\n" for row in scored
-        ))
+    try:
+        _write(args.out, json.dumps(report, indent=2, ensure_ascii=False) + "\n")
+        if args.card:
+            _write(args.card, render_data_card(report["summary"]))
+        if args.scores:
+            _write(args.scores, "".join(
+                json.dumps(row, ensure_ascii=False) + "\n" for row in scored
+            ))
+    except OSError as exc:
+        parser.error(f"cannot write output: {exc}")
     return 0
 
 
 def _write(path: str, text: str) -> None:
     target = Path(path)
     target.parent.mkdir(parents=True, exist_ok=True)
-    target.write_text(text, encoding="utf-8")
+    write_text_atomic(target, text)
 
 
 if __name__ == "__main__":

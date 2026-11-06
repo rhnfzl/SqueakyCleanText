@@ -1,16 +1,15 @@
 """All-75 language detection, confidence, pins and bring-your-own NER model (0.8.0)."""
 
 import json
-import threading
 from pathlib import Path
 
 import pytest
 from lingua import Language, LanguageDetectorBuilder
 
+from tests.helpers import bare_ner, gliner_ner, set_cfg
 import sct.config as config_module
 from sct import TextCleaner, TextCleanerConfig
-from sct.utils.ner import GeneralNER
-from tests.conftest import TEST_NER_MODELS
+from tests.conftest import TEST_NER_MODELS, TEST_NER_REVISIONS
 
 # EN/NL/DE/ES labels must not change when detection widens to 75 languages (decision 4).
 CORE_SENTENCES = [
@@ -183,7 +182,7 @@ def test_bring_your_own_model_routes_hindi(monkeypatch):
     cfg = TextCleanerConfig(
         check_ner_process=True,
         ner_models={**TEST_NER_MODELS, "HINDI": model},
-        ner_model_revisions={},
+        ner_model_revisions={**TEST_NER_REVISIONS, "HINDI": TEST_NER_REVISIONS["ENGLISH"]},
     )
     cleaner = TextCleaner(cfg=cfg)
     ner = cleaner.GeneralNER
@@ -194,7 +193,7 @@ def test_bring_your_own_model_routes_hindi(monkeypatch):
     monkeypatch.setattr(ner, "_ensure_loaded", lambda key: (loaded.append(key), original(key))[1])
     result = cleaner.process(OTHER_SCRIPTS["HINDI"])
     assert result.language == "HINDI"
-    assert "HINDI" in ner._pipelines
+    assert "HINDI" in ner.provenance
     assert "HINDI" in loaded and "MULTILINGUAL" not in loaded
     assert "ner_fallback_models" not in result.metadata["warnings"]
     french = cleaner.process("Bonjour, je m'appelle Marie et j'habite à Paris depuis dix ans.")
@@ -203,8 +202,8 @@ def test_bring_your_own_model_routes_hindi(monkeypatch):
 
 
 def test_builtin_fallback_keys_keep_default_route():
-    ner = object.__new__(GeneralNER)
-    ner._ner_backend = "onnx"
+    ner = bare_ner()
+    set_cfg(ner, ner_backend="onnx")
     ner._ensemble_models = config_module.DEFAULT_NER_ENSEMBLE
     ner._ensemble_default_keys = config_module.NER_ENSEMBLE_DEFAULT_KEYS
     ner._model_names = dict(config_module.DEFAULT_NER_MODELS)
@@ -217,7 +216,7 @@ def test_builtin_fallback_keys_keep_default_route():
     assert ner._get_ensemble_keys("FRENCH") == ("FRENCH",)
 
 
-class _FakeGLiNER:
+class FakeGLiNER:
     max_context_length = 512
     labels = ["person"]
     label_map = {"person": "PER"}
@@ -227,20 +226,12 @@ class _FakeGLiNER:
 
 
 def test_gliner_hindi_pin_runs(monkeypatch):
-    def fake_ner(**kwargs):
-        ner = object.__new__(GeneralNER)
-        ner._ner_backend = "gliner"
-        ner._ner_batch_size = 1
-        ner._ner_chunk_overlap = 0
-        ner._gliner_pipe = _FakeGLiNER()
-        ner._replacement_mode = "placeholder"
-        ner._synthetic_replacer = None
-        ner._inference_locks = {}
-        ner._locks_lock = threading.Lock()
-        ner._ensemble_models = {}
-        ner._ensemble_default_keys = ()
+    def fake_ner(cfg, **kwargs):
+        ner = gliner_ner(detector=FakeGLiNER())
+        set_cfg(ner, ner_batch_size=1)
+        set_cfg(ner, ner_chunk_overlap=0)
         ner._model_names = {}
-        ner._provenance = {}
+        ner.provenance = {}
         ner.tokenizer = None
         return ner
 

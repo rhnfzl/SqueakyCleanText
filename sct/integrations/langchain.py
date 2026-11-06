@@ -1,6 +1,7 @@
 """LangChain document transformer (``pip install squeakycleantext[langchain]``)."""
 
-from typing import Any, Sequence, Union
+from typing import Any
+from collections.abc import Sequence
 
 from langchain_core.documents import BaseDocumentTransformer, Document
 
@@ -18,7 +19,7 @@ class SCTDocumentTransformer(BaseDocumentTransformer):
         self,
         columns: Sequence[str] = ("page_content",),
         output: str = "overwrite",
-        config: Union[TextCleanerConfig, str, None] = None,
+        config: TextCleanerConfig | str | None = None,
     ):
         self.columns = as_columns(columns)
         self.output = output

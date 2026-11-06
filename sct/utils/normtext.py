@@ -1,13 +1,14 @@
 import logging
 import re
 import unicodedata
+from collections.abc import Callable
 from encodings.idna import dots as _idna_dots
-from typing import Optional, Set
+from typing import Literal
 from ftfy import fix_text
 from ftfy.chardata import HTML_ENTITY_RE
 from ftfy.fixes import unescape_html
 from unidecode import unidecode
-from emoji import demojize, replace_emoji
+from emoji import replace_emoji
 from sct.utils import constants
 
 logger = logging.getLogger(__name__)
@@ -23,7 +24,7 @@ _FULLWIDTH_JOINER_REGEX = re.compile(r'(?<=[0-9A-Za-z])[＠．－＿＋\u3000](?
                                      rf'|{_WORD_END}＠(?=[^\W_])|{_WORD_END}．(?=[0-9A-Za-z])|(?<=[0-9A-Za-z])．(?=[^\W_])')
 _FULLWIDTH_JOINER = {'＠': '@', '．': '.', '－': '-', '＿': '_', '＋': '+', '\u3000': ' '}
 # Invisible format characters (category Cf: ZWNJ/ZWJ, ZWSP, soft hyphen, bidi marks).
-_FORMAT_CHARS = re.escape(''.join(chr(cp) for cp in range(0x110000) if unicodedata.category(chr(cp)) == 'Cf'))
+_FORMAT_CHARS = re.escape(constants.CATEGORY_CHARS['Cf'])
 # Inside an address-shaped run (word characters around an @), full-width . - _ + fold whatever
 # script sits beside them (john@例え．テスト, josé＿smith@...); prose without an @ keeps them.
 # Format characters inside a word (ZWNJ in نامه\u200cای, ZWJ in क्\u200dष) continue the run and stay.
@@ -48,12 +49,11 @@ def _fold_email_runs(text):
 def _nfkc_ascii_alnum(tags):
     """Characters with one of the Unicode decomposition ``tags`` whose NFKC form is ASCII alnum."""
     table = {}
-    for cp in range(0x20000):  # BMP + SMP hold every such character (Unicode 15)
-        ch = chr(cp)
-        if unicodedata.decomposition(ch).split(' ', 1)[0] in tags:
+    for ch, decomposition in constants.DECOMPOSITIONS.items():
+        if decomposition.split(' ', 1)[0] in tags:
             folded = unicodedata.normalize('NFKC', ch)
             if folded.isascii() and folded.isalnum():
-                table[cp] = folded
+                table[ord(ch)] = folded
     return table
 
 
@@ -64,11 +64,11 @@ def _nfkc_ascii_alnum(tags):
 _STYLED_ALNUM = _nfkc_ascii_alnum({'<font>', '<wide>'})
 _CIRCLED_ALNUM = {**_nfkc_ascii_alnum({'<circle>'}),
                   **{cp: ch for cp, ch in _nfkc_ascii_alnum({'<square>'}).items() if len(ch) == 1}}
-_CIRCLED_RUN_REGEX = re.compile('[%s]+' % ''.join(map(chr, _CIRCLED_ALNUM)))
+_CIRCLED_RUN_REGEX = re.compile('[{}]+'.format(''.join(map(chr, _CIRCLED_ALNUM))))
 # Contact punctuation in every compatibility form (full-width ＠, small ﹫, font ﬩ for +), picked by
 # decomposition tag and NFKC value so every rule below folds the same set; ideographic space too.
-_COMPAT_PUNCT = {ch: unicodedata.normalize('NFKC', ch) for ch in map(chr, range(0x20000))
-                 if unicodedata.decomposition(ch).split(' ', 1)[0] in ('<wide>', '<small>', '<font>')
+_COMPAT_PUNCT = {ch: unicodedata.normalize('NFKC', ch) for ch, decomposition in constants.DECOMPOSITIONS.items()
+                 if decomposition.split(' ', 1)[0] in ('<wide>', '<small>', '<font>')
                  and unicodedata.normalize('NFKC', ch) in "@.-_+:/?=&#%~ !$'*"}
 _STYLED_SEP = {ch: plain for ch, plain in _COMPAT_PUNCT.items() if plain in '@.-_+:/?=&#%~ '}
 
@@ -81,16 +81,16 @@ def _forms(ascii_chars, table=_STYLED_SEP):
 _STYLED_PUNCT = _forms('@.-_+:/?=&#%~ ')
 # IDNA label separators (。 ｡ ．, as Python's idna codec reads them) are a dot in a mail domain or URL
 # host when an ASCII letter or digit follows (example。com); before other text 。 ends a CJK sentence.
-_IDNA_DOTS = re.escape(''.join(ch for ch in map(chr, range(0x80, 0x10000)) if _idna_dots.fullmatch(ch)))
+_IDNA_DOTS = re.escape(''.join(_idna_dots.findall(''.join(map(chr, range(0x80, 0x10000))))))
 _IDNA_DOT = f'[{_IDNA_DOTS}](?=[0-9A-Za-z])'
 _IDNA_DOT_REGEX = re.compile(_IDNA_DOT)
 _PUNCT_ANY = _STYLED_PUNCT + re.escape('@.-_+:/?=&#%~')
 # Dashes of any form (Pd: hyphen, non-breaking hyphen, en dash) join phone groups like "-" (06\u2011 12).
-_DASHES = re.escape(''.join(chr(cp) for cp in range(0x110000) if unicodedata.category(chr(cp)) == 'Pd'))
+_DASHES = re.escape(constants.CATEGORY_CHARS['Pd'])
 # In a URL host or mail domain any dash is a label hyphen and any character whose NFKC form is "." a label
 # dot (my\u2010site, a\u2024b.com, as copied from typeset text).
-_HOST_SEP = {cp: '-' if unicodedata.category(chr(cp)) == 'Pd' else '.' for cp in range(0x80, 0x110000)
-             if unicodedata.category(chr(cp)) == 'Pd' or unicodedata.normalize('NFKC', chr(cp)) == '.'}
+_HOST_SEP = {ord(ch): '-' if unicodedata.category(ch) == 'Pd' else '.'
+             for ch in sorted(constants.CATEGORY_CHARS['Pd'].lstrip('-') + constants.NFKC_DOTS)}
 _HOST_SEP_CHARS = re.escape(''.join(map(chr, _HOST_SEP)))
 _HOST_DOTS = re.escape(''.join(chr(cp) for cp, plain in _HOST_SEP.items() if plain == '.'))
 # A circled run folds beside ASCII alnum, a letter of the Latin script it folds to (ⓓé: décembre), any decimal
@@ -154,8 +154,7 @@ _STYLED_EMAIL_RUN_JOINER = {**str.maketrans({ch: plain for ch, plain in _COMPAT_
                             **_CIRCLED_ALNUM}
 # In the domain every format character but the join controls (ZWNJ/ZWJ, which spell words) is a
 # copied layout hint (例\u200bえ.jp), whatever script sits beside it.
-_DOMAIN_HINTS = {cp: None for cp in range(0x110000)
-                 if unicodedata.category(chr(cp)) == 'Cf' and chr(cp) not in '\u200c\u200d'}
+_DOMAIN_HINTS = {ord(ch): None for ch in constants.CATEGORY_CHARS['Cf'] if ch not in '\u200c\u200d'}
 
 
 def _fold_styled_email_run(m):
@@ -172,7 +171,7 @@ def _fold_styled_email_run(m):
 # text edge it joins nothing and drops too (1990년 6월\u2060 1일). Between two other letters they stay (ZWNJ in
 # Persian, ZWSP between Thai words).
 _INVISIBLE_REGEX = re.compile(f'[{_FORMAT_CHARS}]+')
-_RUN_CHAR = re.compile('[A-Za-z\\d\u00b7%s%s%s%s%s%s%s%s]' % (
+_RUN_CHAR = re.compile('[A-Za-z\\d\u00b7{}{}{}{}{}{}{}{}]'.format(
     ''.join(map(chr, _CIRCLED_ALNUM)), _PUNCT_ANY, _DASHES, _IDNA_DOTS, _HOST_DOTS, _LOCAL_FORMS, _LOCAL_ATEXT, _PARENS))
 _LETTER = re.compile(rf'[^\W_]|[{constants.MARKS}]')
 
@@ -190,9 +189,9 @@ def _drop_invisible(m):
 
 # A lone circled number between space-separated digit groups (06 ⑬ 01 68) or after two or more of
 # them (06 73 86 88 ㊺) is one group of them; a lone one before a number (① 2024年) is a list marker.
-_DIGIT_GROUP = '(?:\\d|[%s])' % ''.join(chr(cp) for cp, plain in _CIRCLED_ALNUM.items() if plain.isdigit())
+_DIGIT_GROUP = '(?:\\d|[{}])'.format(''.join(chr(cp) for cp, plain in _CIRCLED_ALNUM.items() if plain.isdigit()))
 # Groups may be set off by any space (Zs: no-break, thin, narrow no-break, ideographic), as the phone view reads them.
-_SPACE = '[%s]' % ''.join(chr(cp) for cp in range(0x110000) if unicodedata.category(chr(cp)) == 'Zs')
+_SPACE = '[{}]'.format(constants.CATEGORY_CHARS['Zs'])
 _DIGIT_BEFORE, _DIGIT_AFTER = re.compile(_DIGIT_GROUP + _SPACE), re.compile(_SPACE + _DIGIT_GROUP)
 _GROUPS_BEFORE = re.compile(rf'(?:{_DIGIT_GROUP}+{_SPACE}){{2,}}\Z')
 # An IDNA dot after a decimal digit is a host label dot (𖭗𖭗｡⑫｡15.example), so a circled run after it folds.
@@ -218,7 +217,7 @@ def _decode_entity(match):
     return match.group() if decoded in ('<', '>') else decoded
 
 
-def decode_html_entities(text):
+def decode_html_entities(text: str) -> str:
     """ftfy's entity decoding (to a fixpoint, "&amp;#64;" -> "@"), except escaped ``<`` and ``>``.
 
     Each entity decodes on its own, so a text split at whitespace decodes as the whole. ``&lt;`` and ``&gt;``
@@ -233,7 +232,7 @@ def decode_html_entities(text):
 _MARKUP_OR_ENTITY = re.compile(r'<[^<>\n]*>|&#?[0-9A-Za-z]{1,24};')
 
 
-def unescape_markup(text, protect=lambda value: value):
+def unescape_markup(text: str, protect: Callable[[str], str] = lambda value: value) -> str:
     """Decode the ``&lt;`` / ``&gt;`` that ``decode_html_entities`` kept, outside tags, through *protect*."""
     def replace(match):
         if match.group()[0] == '<':
@@ -243,7 +242,7 @@ def unescape_markup(text, protect=lambda value: value):
     return _MARKUP_OR_ENTITY.sub(replace, text)
 
 
-def fold_styled(text):
+def fold_styled(text: str) -> str:
     """Fold styled/compatibility letters, digits and in-run URL punctuation to ASCII."""
     text = _INVISIBLE_REGEX.sub(_drop_invisible, text.translate(_STYLED_ALNUM))
     text = _CIRCLED_RUN_REGEX.sub(_fold_circled_run, text)
@@ -254,11 +253,9 @@ def fold_styled(text):
 
 class NormaliseText:
 
-    def __init__(self):
-        pass
-
-    def fix_bad_unicode(self, text, normalization="NFC", decode_escapes=True, fix_character_width=False,
-                        fold_styled_characters=True):
+    def fix_bad_unicode(self, text: str, normalization: Literal["NFC", "NFD", "NFKC", "NFKD"] | None = "NFC",
+                        decode_escapes: bool = True, fix_character_width: bool = False,
+                        fold_styled_characters: bool = True) -> str:
         """
         Fix unicode text that's "broken" using `ftfy <http://ftfy.readthedocs.org/>`_;
         this includes mojibake, HTML entities and other code cruft,
@@ -287,25 +284,19 @@ class NormaliseText:
         text = text.translate(_FULLWIDTH_ALNUM)
         return _fold_email_runs(_FULLWIDTH_JOINER_REGEX.sub(lambda m: _FULLWIDTH_JOINER[m.group()], text))
 
-    def fix_strange_quotes(self, text):
+    def fix_strange_quotes(self, text: str) -> str:
         """Replace strange quotes with standard single/double quotes."""
         text = constants.SINGLE_QUOTE_REGEX.sub("'", text)
         text = constants.DOUBLE_QUOTE_REGEX.sub('"', text)
         return text
 
-    def to_ascii_unicode(self, text, no_emoji=True):
+    def to_ascii_unicode(self, text: str) -> str:
         """
         Convert non-ASCII characters into their closest ASCII equivalents.
         """
-        text = self.fix_strange_quotes(text)
+        return unidecode(self.fix_strange_quotes(text))
 
-        if not no_emoji:
-            text = demojize(text, use_aliases=True)
-
-        text = unidecode(text)
-        return text
-
-    def remove_emoji(self, text):
+    def remove_emoji(self, text: str) -> str:
         """Remove all emoji characters from text."""
         return replace_emoji(text, replace='')
 
@@ -314,7 +305,7 @@ class NormaliseText:
         """Detect lowercase-to-uppercase transition (e.g., GraphQL, DevOps)."""
         return bool(re.search(r'[a-z][A-Z]', text))
 
-    def smart_casefold(self, text: str, stop_words: Optional[Set[str]] = None) -> str:
+    def smart_casefold(self, text: str, stop_words: set[str] | None = None) -> str:
         """Case-fold text while preserving abbreviations and camelCase.
 
         Per-token rules (applied in order):
@@ -328,19 +319,12 @@ class NormaliseText:
         result = []
         for token in tokens:
             alpha = ''.join(c for c in token if c.isalpha())
-            if not alpha:
-                result.append(token.casefold())
-            elif alpha.casefold() in stop_words:
-                result.append(token.casefold())
-            elif alpha.isupper():
-                result.append(token)
-            elif self._has_camelcase(token):
-                result.append(token)
-            else:
-                result.append(token.casefold())
+            keep = alpha and alpha.casefold() not in stop_words and (alpha.isupper() or self._has_camelcase(token))
+            result.append(token if keep else token.casefold())
         return ' '.join(result)
 
-    def normalize_whitespace(self, text, strip_lines=True, no_line_breaks=False, keep_two_line_breaks=False):
+    def normalize_whitespace(self, text: str, strip_lines: bool = True, no_line_breaks: bool = False,
+                             keep_two_line_breaks: bool = False) -> str:
         """
         Given ``text`` str, replace one or more spacings with a single space, and one
         or more line breaks with a single newline. Also strip leading/trailing whitespace.

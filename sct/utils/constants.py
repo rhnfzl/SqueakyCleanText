@@ -2,10 +2,12 @@
 Constant symbols and compiled RegExs used for cleaning.
 """
 
+import functools
 import re
 import string
 import unicodedata
 import regex
+from collections.abc import Iterable, Mapping
 
 CURRENCIES = {
     "$": "USD",
@@ -50,6 +52,31 @@ LEGACY_TYPE_NAMES = {'PHONE': 'PHONE_NUMBER', 'IP': 'IP_ADDRESS'}
 _CJK_SYMBOL_LETTERS = ''.join(chr(c) for c in range(0x3000, 0x3040) if unicodedata.category(chr(c))[0] in 'LN')
 
 
+def _scan_unicode():
+    """One pass over Unicode: {general category: its characters in code point order} and {character: decomposition}.
+    Unassigned, private-use and surrogate code points are left out: no class is built from them, none decomposes."""
+    by_category: dict[str, list[str]] = {}
+    decompositions: dict[str, str] = {}
+    for ch in map(chr, range(0x110000)):
+        category = unicodedata.category(ch)
+        if category not in ('Cn', 'Co', 'Cs'):
+            by_category.setdefault(category, []).append(ch)
+            if decomposition := unicodedata.decomposition(ch):
+                decompositions[ch] = decomposition
+    return {category: ''.join(chars) for category, chars in by_category.items()}, decompositions
+
+
+# Read by every character class here and in normtext.py and contact.py, so none rescans Unicode at import.
+CATEGORY_CHARS, DECOMPOSITIONS = _scan_unicode()
+# Characters whose NFKC form is "." (U+2024, small and full-width dots).
+NFKC_DOTS = ''.join(ch for ch in DECOMPOSITIONS if unicodedata.normalize('NFKC', ch) == '.')
+
+
+def category_chars(*prefixes: str) -> list[str]:
+    """Characters, in code point order, of the general categories starting with one of *prefixes*."""
+    return sorted(''.join(chars for category, chars in CATEGORY_CHARS.items() if category.startswith(prefixes)))
+
+
 def _class_ranges(categories, *spans):
     """Character-class body (literal ranges) of the code points in *spans* whose category starts with one of *categories*."""
     out, start = [], None
@@ -67,39 +94,32 @@ def _class_ranges(categories, *spans):
     return ''.join(out)
 
 
-def _cp_spans(cps):
-    """(first, last) spans of consecutive code points in the ascending iterable *cps*."""
-    spans = []
-    for cp in cps:
+def _ranges(chars):
+    """Character-class body (literal ranges) of the ascending iterable *chars*."""
+    spans: list[list[int]] = []
+    for cp in map(ord, chars):
         if spans and spans[-1][1] == cp - 1:
             spans[-1][1] = cp
         else:
             spans.append([cp, cp])
-    return spans
+    return ''.join(f"{chr(lo)}-{chr(hi)}" if hi > lo else chr(lo) for lo, hi in spans)
 
 
 # Combining marks of every script (Mn/Mc/Me: the vowel signs of প্রিয়া, संपर्क), which \w leaves out.
-MARKS = _class_ranges('M', (0x300, 0x3FFFF), (0xE0000, 0xE0FFF))
+MARKS = _ranges(category_chars('M'))
 # Letters, marks and digits beyond the BMP (𠮷野.jp): the BMP ranges below stop at U+FFFF.
-_SUPPLEMENTARY_ALNUM = _class_ranges('LMN', (0x10000, 0x3FFFF))
+_SUPPLEMENTARY_ALNUM = _ranges(ch for ch in category_chars('L', 'M', 'N') if '\U00010000' <= ch <= '\U0003FFFF')
 # Latin, Greek and Cyrillic letters, which sit between spaces in prose.
 _SPACED_LETTERS = "A-Za-z\u00C0-\u024F\u0370-\u03FF\u0400-\u04FF"
 # Letters of the Latin script (Script=Latin, any block: é, ŀ, ḁ), which styled letters fold to.
-LATIN_LETTERS = ''.join(
-    f"{chr(lo)}-{chr(hi)}" if hi > lo else chr(lo) for lo, hi in _cp_spans(
-        cp for cp in range(0x110000)
-        if unicodedata.category(chr(cp))[0] == 'L' and regex.match(r'\p{Script=Latin}', chr(cp))))
+LATIN_LETTERS = _ranges(regex.findall(r'\p{Script=Latin}', ''.join(category_chars('L'))))
 # Letters and marks of scripts written without spaces between words (Thai, Lao, Khmer, Myanmar, CJK, kana:
 # Unicode line-break class SA, ID or CJ; not full-width Latin). Where one touches a Latin/Greek/Cyrillic letter or a digit, a
 # word ends, so prose glued to an address ("ดูa@b.jpกขค", "https://x.com/aปถว06 10") stays outside it.
 _SPACELESS_CHAR = regex.compile(r'(?V1)[[\p{Line_Break=SA}\p{Line_Break=ID}\p{Line_Break=CJ}]--\p{Script=Latin}]')
-_SPACELESS = ''.join(
-    f"{chr(lo)}-{chr(hi)}" if hi > lo else chr(lo) for lo, hi in _cp_spans(
-        cp for cp in range(0x110000)
-        if unicodedata.category(chr(cp))[0] in 'LM' and _SPACELESS_CHAR.match(chr(cp))))
+_SPACELESS = _ranges(_SPACELESS_CHAR.findall(''.join(category_chars('L', 'M'))))
 # A percent escape is one character (?email=a%40ตัวอย่าง.ไทย, its digits in any script), so it glues to nothing.
-_DECIMAL = ''.join(f"{chr(lo)}-{chr(hi)}" if hi > lo else chr(lo) for lo, hi in _cp_spans(
-    cp for cp in range(0x110000) if unicodedata.category(chr(cp)) == 'Nd'))
+_DECIMAL = _ranges(CATEGORY_CHARS['Nd'])
 _GLUE = (rf"(?<=[0-9{_SPACED_LETTERS}])(?<!%[{_DECIMAL}A-Fa-f]{{2}})[{_SPACELESS}]"
          rf"|(?<=[{_SPACELESS}])[0-9{_SPACED_LETTERS}]")
 # Before each character of a local part, TLD or URL path: it does not start a new word.
@@ -118,9 +138,9 @@ _MIDDLE_DOT = "(?<=l)\u00b7(?=l)"
 
 def _script_class(*scripts):
     """Character-class body of the code points of *scripts* (Unicode Script property)."""
-    script = regex.compile('[%s]' % ''.join(rf'\p{{Script={name}}}' for name in scripts))
-    return ''.join(f"{chr(lo)}-{chr(hi)}" if hi > lo else chr(lo)
-                   for lo, hi in _cp_spans(cp for cp in range(0x110000) if script.match(chr(cp))))
+    script = regex.compile('[{}]'.format(''.join(rf'\p{{Script={name}}}' for name in scripts)))
+    # Every code point: regex has its own Unicode tables, which may assign what unicodedata does not.
+    return _ranges(script.findall(''.join(map(chr, range(0x110000)))))
 
 
 # The other CONTEXTO punctuation of RFC 5892 (A.4, A.5, A.7): Hebrew geresh and gershayim after a Hebrew character
@@ -154,8 +174,8 @@ EMAIL_GATE = re.compile(r"@|[(<{\[]at[)>}\]]", re.IGNORECASE)
 
 # Area-code parentheses in compatibility form (full-width （ ）, small ﹙ ﹚): the phone view reads them as
 # "(" ")" (+49（30）123456) and the styled fold treats them as phone punctuation.
-PHONE_PARENS = {ch: unicodedata.normalize('NFKC', ch) for ch in map(chr, range(0x80, 0x20000))
-                if unicodedata.decomposition(ch).split(' ', 1)[0] in ('<wide>', '<small>')
+PHONE_PARENS = {ch: unicodedata.normalize('NFKC', ch) for ch, decomposition in DECOMPOSITIONS.items()
+                if decomposition.split(' ', 1)[0] in ('<wide>', '<small>')
                 and unicodedata.normalize('NFKC', ch) in '()'}
 
 # Digit boundaries are "not next to a digit", so numbers glued to letters of
@@ -256,17 +276,17 @@ PART_JOINERS = r"\-\u2010-\u2015/+*._|,"
 # A placeholder edge joined to the digits counts as a token part too ("<YEAR>", or the cleaner's protected
 # \U00100000..\U00100001 key for an emitted value), so "INV-<YEAR>-107683" keeps its tail instead of a
 # second, partial mask.
-_LEFT_EDGE, _RIGHT_EDGE = ">\U00100001", "<\U00100000"
-CURRENCY_SIGNS = ''.join(ch for ch in map(chr, range(0x110000)) if unicodedata.category(ch) == 'Sc')
+KEY_OPEN, KEY_CLOSE = "\U00100000", "\U00100001"
+_LEFT_EDGE, _RIGHT_EDGE = ">" + KEY_CLOSE, "<" + KEY_OPEN
+CURRENCY_SIGNS = CATEGORY_CHARS['Sc']
 
 
-def token_glue(in_words=False):
+def token_glue(in_words: bool = False) -> str:
     """Characters that glue to a digit run: digits, "_", and (unless in_words) Latin/Greek/Cyrillic letters.
     Letters of unspaced scripts (CJK, Thai) do not glue, as for NUMBERS_REGEX: 金额50000元 is a whole number."""
     return r"\d_" if in_words else rf"\d_{_SPACED_LETTERS}"
 
 
-_ID_NUMBER_CACHE = {}
 # A date written as a spaced/hyphen-joined digit run (05 11 2023, 2023 11-05): the year step keeps masking its
 # year rather than leaving it to the run's <NUMBER>, as before (the date step has no spaced date).
 SPACED_DATE_REGEX = re.compile(
@@ -277,8 +297,10 @@ SPACED_DATE_REGEX = re.compile(
 THOUSANDS_MAX_GROUPS = 6
 
 
-def identifier_numbers_regex(min_digits, in_words=False, *, letter_prefix=False, two_part=False, spaced_pair=False,
-                             keep_currency_code=False):
+@functools.cache
+def identifier_numbers_regex(min_digits: int, in_words: bool = False, *, letter_prefix: bool = False,
+                             two_part: bool = False, spaced_pair: bool = False,
+                             keep_currency_code: bool = False) -> re.Pattern[str]:
     """A whole digit run of at least *min_digits* digits that is not part of a longer token (glued to letters,
     digits or a joiner and another token part) and not an amount, decimal, percent, time or range: those
     shapes either join their parts (1,250.00, 100-200; 14:30 has 2-digit parts) or touch a % / currency sign.
@@ -297,48 +319,69 @@ def identifier_numbers_regex(min_digits, in_words=False, *, letter_prefix=False,
     keep_currency_code: a whole digit run right before or after an uppercase ISO 4217 code (_CURRENCY_CODES), with
     at most one space between ("1250 EUR", "EUR 1250"), is an amount. Only that amount shape: an SSN-, slash-,
     dot- or space-joined ID beside a code ("123-45-6789 USD", "EUR 123 45 6789") is still masked whole."""
-    key = (min_digits, in_words, letter_prefix, two_part, spaced_pair, keep_currency_code)
-    if key not in _ID_NUMBER_CACHE:
-        glue, j, unit = token_glue(in_words), PART_JOINERS, CURRENCY_SIGNS
-        hyphen, end = r"[\-\u2010\u2011]", rf"(?![\d{j}])"
-        date = rf"(?:\d{{1,2}}{hyphen}\d{{1,2}}{hyphen}(?:\d\d){{1,2}}|\d{{4}}{hyphen}\d{{1,2}}{hyphen}\d{{1,2}}){end}"
-        grouped = rf"(?!{date})(?=\d(?:{hyphen}?\d){{{min_digits - 1}}})\d+(?:{hyphen}\d+){{2,}}"
-        no_unit_before, no_unit_after = rf"(?<![{unit}])(?<![{unit}] )", rf"(?! ?[%‰{unit}])"
-        no_code_before = no_code_after = ""
-        if keep_currency_code:  # uppercase codes only, not inside a Latin/Greek/Cyrillic word ("PEUR", "EURO")
-            code = rf"(?:{_CURRENCY_CODES})"
-            no_code_before = rf"(?<!(?<![{_SPACED_LETTERS}]){code})(?<!(?<![{_SPACED_LETTERS}]){code} )"
-            no_code_after = rf"(?! ?{code}(?![{_SPACED_LETTERS}]))"
-        shapes = [
-            rf"(?<![{glue}])(?<![{glue}{_LEFT_EDGE}][{j}]){no_unit_before}"
-            rf"(?:{grouped}|{no_code_before}\d{{{min_digits},}}{no_code_after})"
-            rf"(?![{glue}])(?![{j}][{glue}{_RIGHT_EDGE}]){no_unit_after}"
-        ]
-        if letter_prefix:
-            shapes.append(rf"(?<![\w\-/.])(?!(?:{_CURRENCY_CODES})\d)[A-Z]{{1,3}}\d{{6,}}[A-Z]{{0,2}}(?!\w)")
-        if two_part:
-            slash = r"[/\-\u2010\u2011]"
-            year = r"(?:1[89]|20)\d\d"
-            shapes.append(
-                rf"(?<![\w\-/.,+]){no_unit_before}"
-                rf"(?!{year}{slash}{year}(?!\w))(?!\d*00{slash}\d*00(?!\w))"
-                rf"(?=(?:\d{slash}?){{7}})\d{{4,}}{slash}\d{{2,6}}[A-Z]?(?!\w|[\-/.,:]\d){no_unit_after}"
-            )
-            shapes.append(rf"(?<![\w\-/.,+]){no_unit_before}\d{{4,}}\.\d{{4,}}(?!\w|[\-/.,]\d){no_unit_after}")
-        if spaced_pair:
-            # A run of 3+ digit groups joined by spaces and/or hyphens with at least one space and 7+ digits
-            # (an ID or SSN written 123 45 6789, 123 45-6789, 1234 56-78-90) is one identifier, unless
-            # thousands-grouped (1 234 567, an amount, up to THOUSANDS_MAX_GROUPS groups); an all-hyphen run is
-            # the grouped rule's. It goes first, so no other shape takes part of the run.
-            sep = r"[ \-\u2010\u2011]"
-            tail = rf"(?!\w|[.,:]\d|{sep}\d){no_unit_after}"
-            shapes.insert(0, rf"(?<![\w.,:/\-\u2010\u2011])(?<!\d ){no_unit_before}"
-                             rf"(?!\d{{1,3}}(?: \d{{3}}){{1,{THOUSANDS_MAX_GROUPS - 1}}}{tail})(?=\d+(?:{sep}\d+)*? \d)"
-                             rf"(?=(?:\d{sep}?){{7}})\d+(?:{sep}\d+){{2,}}{tail}")
-            # "DDD DD", a 5-digit postal code
-            shapes.append(rf"(?<![\w.,:/\-])(?<!\d ){no_unit_before}\d{{3}} \d{{2}}{tail}")
-        _ID_NUMBER_CACHE[key] = re.compile("|".join(shapes))
-    return _ID_NUMBER_CACHE[key]
+    glue, j, unit = token_glue(in_words), PART_JOINERS, CURRENCY_SIGNS
+    hyphen, end = r"[\-\u2010\u2011]", rf"(?![\d{j}])"
+    date = rf"(?:\d{{1,2}}{hyphen}\d{{1,2}}{hyphen}(?:\d\d){{1,2}}|\d{{4}}{hyphen}\d{{1,2}}{hyphen}\d{{1,2}}){end}"
+    grouped = rf"(?!{date})(?=\d(?:{hyphen}?\d){{{min_digits - 1}}})\d+(?:{hyphen}\d+){{2,}}"
+    no_unit_before, no_unit_after = rf"(?<![{unit}])(?<![{unit}] )", rf"(?! ?[%‰{unit}])"
+    no_code_before = no_code_after = ""
+    if keep_currency_code:  # uppercase codes only, not inside a Latin/Greek/Cyrillic word ("PEUR", "EURO")
+        code = rf"(?:{_CURRENCY_CODES})"
+        no_code_before = rf"(?<!(?<![{_SPACED_LETTERS}]){code})(?<!(?<![{_SPACED_LETTERS}]){code} )"
+        no_code_after = rf"(?! ?{code}(?![{_SPACED_LETTERS}]))"
+    shapes = [
+        rf"(?<![{glue}])(?<![{glue}{_LEFT_EDGE}][{j}]){no_unit_before}"
+        rf"(?:{grouped}|{no_code_before}\d{{{min_digits},}}{no_code_after})"
+        rf"(?![{glue}])(?![{j}][{glue}{_RIGHT_EDGE}]){no_unit_after}"
+    ]
+    if letter_prefix:
+        shapes.append(rf"(?<![\w\-/.])(?!(?:{_CURRENCY_CODES})\d)[A-Z]{{1,3}}\d{{6,}}[A-Z]{{0,2}}(?!\w)")
+    if two_part:
+        slash = r"[/\-\u2010\u2011]"
+        year = r"(?:1[89]|20)\d\d"
+        shapes.append(
+            rf"(?<![\w\-/.,+]){no_unit_before}"
+            rf"(?!{year}{slash}{year}(?!\w))(?!\d*00{slash}\d*00(?!\w))"
+            rf"(?=(?:\d{slash}?){{7}})\d{{4,}}{slash}\d{{2,6}}[A-Z]?(?!\w|[\-/.,:]\d){no_unit_after}"
+        )
+        shapes.append(rf"(?<![\w\-/.,+]){no_unit_before}\d{{4,}}\.\d{{4,}}(?!\w|[\-/.,]\d){no_unit_after}")
+    if spaced_pair:
+        # A run of 3+ digit groups joined by spaces and/or hyphens with at least one space and 7+ digits
+        # (an ID or SSN written 123 45 6789, 123 45-6789, 1234 56-78-90) is one identifier, unless
+        # thousands-grouped (1 234 567, an amount, up to THOUSANDS_MAX_GROUPS groups); an all-hyphen run is
+        # the grouped rule's. It goes first, so no other shape takes part of the run.
+        sep = r"[ \-\u2010\u2011]"
+        tail = rf"(?!\w|[.,:]\d|{sep}\d){no_unit_after}"
+        shapes.insert(0, rf"(?<![\w.,:/\-\u2010\u2011])(?<!\d ){no_unit_before}"
+                         rf"(?!\d{{1,3}}(?: \d{{3}}){{1,{THOUSANDS_MAX_GROUPS - 1}}}{tail})(?=\d+(?:{sep}\d+)*? \d)"
+                         rf"(?=(?:\d{sep}?){{7}})\d+(?:{sep}\d+){{2,}}{tail}")
+        # "DDD DD", a 5-digit postal code
+        shapes.append(rf"(?<![\w.,:/\-])(?<!\d ){no_unit_before}\d{{3}} \d{{2}}{tail}")
+    return re.compile("|".join(shapes))
+
+
+# Reversible mode: a source placeholder hidden from the number step, beside the emitted KEY_OPEN..KEY_CLOSE keys.
+HIDDEN_OPEN, HIDDEN_CLOSE = "", ""
+
+
+@functools.cache
+def placeholder_glued_number_regex(min_digits: int, in_words: bool = False) -> re.Pattern[str]:
+    """A whole digit run of at least *min_digits* digits in all, joined groups included (107683, 123-45), that
+    touches a hidden placeholder or emitted key, directly or across one joiner. The identifier rule reads such a
+    placeholder as a token part and "_" as glue; reversible mode can restore the run, so it is masked instead.
+    A placeholder with a letter glued to its other side sits inside a longer token (INV-<YEAR>-107683) and does
+    not count."""
+    glue, j = token_glue(in_words), PART_JOINERS
+    letters, word = glue.removeprefix(r"\d_"), glue.replace("_", "")
+    key = f"[{KEY_OPEN}{HIDDEN_OPEN}].[{KEY_CLOSE}{HIDDEN_CLOSE}]"
+    alone_before = rf"(?<![{letters}])(?<![{letters}][{j}])" if letters else ""
+    alone_after = rf"(?![{letters}])(?![{j}][{letters}])" if letters else ""
+    run = rf"(?=(?:[{j}]?\d){{{min_digits}}})\d+(?:[{j}]\d+)*(?![{word}])(?![{j}]\d)(?! ?[%‰{CURRENCY_SIGNS}])"
+    return re.compile(
+        rf"(?:(?<={alone_before}{key})|(?<={alone_before}{key}[{j}])){run}"
+        rf"|(?<![{word}])(?<!\d[{j}])(?<![{CURRENCY_SIGNS}])(?<![{CURRENCY_SIGNS}] )"
+        rf"{run}(?=[{j}]?{key}{alone_after})"
+    )
 
 
 # phone_reject_embedded: a digit-only phone match with a letter or "_" on either side, directly or across a
@@ -555,7 +598,8 @@ _MONTH_ALTERNATION = '|'.join(
 # Module-level constants above remain the defaults.
 # ---------------------------------------------------------------------------
 
-def build_month_names_dict(extra_month_names=None, builtin_languages=None):
+def build_month_names_dict(extra_month_names: Mapping[str, Iterable[str]] | None = None,
+                           builtin_languages: Iterable[str] | None = None) -> dict[str, frozenset[str]]:
     """Build month-name lookup dict, merging defaults + custom names.
 
     Args:
@@ -606,10 +650,13 @@ _DATE_START = r'(?<![\d_' + _SPACED_LETTERS + r'])'
 _DATE_END = r'(?![\d_' + _SPACED_LETTERS + r'])'
 
 
+_HAN_NUMERIC = {ch: value for ch in map(chr, range(0x3000, 0x2FA20))
+                if (value := unicodedata.numeric(ch, None)) is not None and regex.match(r'\p{Script=Han}', ch)}
+
+
 def _han_numerals(*values):
     """Han-script numerals (〇 一 十 廿, financial forms) whose Unicode numeric value is in *values*."""
-    return ''.join(chr(cp) for cp in range(0x3000, 0x2FA20) if unicodedata.numeric(chr(cp), None) in values
-                   and regex.match(r'\p{Script=Han}', chr(cp)))
+    return ''.join(ch for ch, value in _HAN_NUMERIC.items() if value in values)
 
 
 _HAN_DIGIT, _HAN_1_9 = f'[{_han_numerals(*range(10))}]', f'[{_han_numerals(*range(1, 10))}]'
@@ -627,7 +674,8 @@ _CIRCLED_DAYS = ''.join(chr(cp) for cp in range(0x2460, 0x3300)
                         and 1 <= int(unicodedata.normalize('NFKC', chr(cp))) <= 31)
 
 
-def build_date_regex(month_names_dict=None, styled=False, slash_year=True):
+def build_date_regex(month_names_dict: Mapping[str, frozenset[str]] | None = None, styled: bool = False,
+                     slash_year: bool = True) -> re.Pattern[str]:
     """Build DATE_REGEX from a month-names dict.
 
     Args:
@@ -658,7 +706,10 @@ def build_date_regex(month_names_dict=None, styled=False, slash_year=True):
     )
 
 
-def build_fuzzy_vocabulary(month_names_dict=None, lang_to_vocab=None):
+def build_fuzzy_vocabulary(
+    month_names_dict: Mapping[str, frozenset[str]] | None = None,
+    lang_to_vocab: Mapping[str, str] | None = None,
+) -> tuple[tuple[str, ...], dict[str, tuple[str, ...]]]:
     """Build fuzzy month vocabulary (full names only, len > 4).
 
     Returns:
@@ -714,6 +765,10 @@ BRACE_INNER_REGEX = re.compile(r'\{[^{}]+\}')
 # A quote, dash, * or % is isolated unless a letter, digit or mark of any script touches it
 # (special.py checks the neighbours), so "ইসলাম-এর" and "東京-大阪" keep their hyphen.
 ISOLATED_QUOTES_REGEX = re.compile(r"['\"\-*%]")
+# Reversible mode: a run of those symbols glued to a placeholder or emitted key (group 1) stays, as the map cannot
+# restore it once dropped.
+ISOLATED_QUOTES_OR_GLUED_REGEX = re.compile(
+    rf"((?<=[{_LEFT_EDGE}])['\"\-*%]+|['\"\-*%]+(?=[{_RIGHT_EDGE}]))|['\"\-*%]")
 
 # Pre-compiled punctuation pattern (was re-compiled on every call in special.py)
 PUNCTUATION_REGEX = re.compile('[' + re.escape(string.punctuation) + ']')
@@ -750,7 +805,8 @@ CHUNK_DELIMITERS = (
 _TERM_GLUE = rf'[[\p{{L}}\p{{M}}\p{{N}}]--[{_SPACELESS}]]'
 
 
-def terms_regex(terms, case_sensitive=False, labels=None):
+def terms_regex(terms: Iterable[str], case_sensitive: bool = False,
+                labels: Mapping[str, str] | None = None) -> regex.Pattern:
     """One regex for *terms* as whole words (longest first, so an overlap keeps the longer term). With
     *labels* ({term: LABEL}) each term is a group named by its label, so ``match.lastgroup`` is the label
     (a case variant such as "İ" for "i" need not equal the term after casefold)."""

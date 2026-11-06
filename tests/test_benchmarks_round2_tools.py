@@ -318,13 +318,12 @@ def test_presidio_full_enables_every_pattern_recognizer_class():
 
 def test_sct_round2_configs_build():
     from sct.config import TextCleanerConfig
-    from sct.presets import PRESETS
 
     sct = adapter("sct_adapter.py")
-    cfg = TextCleanerConfig(**{**PRESETS["training"], **sct.SCORING})
+    cfg = TextCleanerConfig(**sct.cleaner_fields({"preset": "training"}))
     assert cfg.replacement_mode == "reversible" and not cfg.check_replace_dates
     run = entries.tool("sct-gliner-nvidia")["adapter_config"]
-    cfg = TextCleanerConfig(ner_mode="pii", **sct.SCORING, **run["overrides"])
+    cfg = TextCleanerConfig(**sct.cleaner_fields(run))
     assert cfg.gliner_model == "nvidia/gliner-PII" and cfg.gliner_revision == entries.ENTRIES["gliner-nvidia"]["revision"]
 
 

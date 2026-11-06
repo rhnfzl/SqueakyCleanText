@@ -3,7 +3,6 @@
 Optional backend. Requires: pip install squeakycleantext[torch]
 """
 import logging
-from typing import List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -16,19 +15,19 @@ class TorchNERPipeline:
     """
 
     def __init__(self, model_name: str, device: str = 'cpu',
-                 cache_dir: Optional[str] = None,
-                 revision: Optional[str] = None):
+                 cache_dir: str | None = None,
+                 revision: str | None = None):
         try:
             import torch  # noqa: S404
             from transformers import (  # noqa: S404
                 AutoTokenizer, AutoModelForTokenClassification,
                 pipeline as hf_pipeline,
             )
-        except ImportError:
+        except ImportError as exc:
             raise ImportError(
                 "torch and transformers are required for the torch NER backend. "
                 "Install with: pip install squeakycleantext[torch]"
-            )
+            ) from exc
 
         import transformers
         transformers.logging.set_verbosity_error()
@@ -51,7 +50,7 @@ class TorchNERPipeline:
 
         logger.info("Loaded Torch NER model: %s (device=%s)", model_name, device)
 
-    def __call__(self, texts, batch_size: int = 1) -> List[List[dict]]:
+    def __call__(self, texts, batch_size: int = 1) -> list[list[dict]]:
         """Run NER inference. Same interface as ONNXNERPipeline."""
         if isinstance(texts, str):
             texts = [texts]
@@ -64,21 +63,18 @@ class TorchNERPipeline:
             results = [results]
         return results
 
-    def cleanup(self):
+    def cleanup(self) -> None:
         """Release GPU memory."""
         if self._device.startswith('cuda'):
-            try:
-                self._torch.cuda.empty_cache()
-            except Exception:  # noqa: S110
-                pass
+            self._torch.cuda.empty_cache()
 
 
 def load_torch_ner_model(
     model_name: str,
     device: str = 'cpu',
-    cache_dir: Optional[str] = None,
-    revision: Optional[str] = None,
-) -> Tuple['TorchNERPipeline', object]:
+    cache_dir: str | None = None,
+    revision: str | None = None,
+) -> tuple['TorchNERPipeline', object]:
     """Load a PyTorch NER model and return (pipeline, tokenizer).
 
     Returns the same tuple shape as load_onnx_ner_model for interface parity.

@@ -4,6 +4,7 @@ from types import SimpleNamespace
 import pytest
 
 from sct import TextCleaner, TextCleanerConfig
+from sct.privacy import DetectedEntity, EntityRule, NERProcessingResult, PrivacyPolicy
 from sct.ocr import (
     OCRSpan,
     TesseractOCRProvider,
@@ -27,6 +28,88 @@ def test_ocr_region_selection_marks_only_sensitive_text():
     regions = select_redaction_regions(cleaner, spans)
 
     assert regions == (spans[0],)
+
+
+def test_ocr_region_selection_covers_dates_and_years_though_they_are_not_sensitive():
+    cleaner = TextCleaner(cfg=TextCleanerConfig(
+        check_ner_process=False,
+        check_detect_language=False,
+        check_statistical_model_processing=False,
+    ))
+    spans = (
+        OCRSpan("Signed 12-03-2021", (0, 0, 100, 20), 0.99),
+        OCRSpan("Since 2021", (0, 30, 100, 50), 0.99),
+        OCRSpan("Invoice", (0, 60, 60, 80), 0.98),
+    )
+
+    assert select_redaction_regions(cleaner, spans) == spans[:2]
+    assert not cleaner.process("Signed 12-03-2021").signals["sensitive"]
+
+
+class _NameDetector:
+    """Stands in for NER: the policy decides each capitalised name found in the text."""
+
+    def __init__(self, policy):
+        self.policy = policy
+
+    def ner_process_detailed(self, text, **_):
+        entities = tuple(
+            DetectedEntity("PERSON", 0.9, name, text.index(name), text.index(name) + len(name))
+            for name in ("Maria", "Jane") if name in text
+        )
+        findings = self.policy.evaluate(entities)
+        return NERProcessingResult(self.policy.transform(text, findings), findings)
+
+    def models_for(self, _language):
+        return []
+
+    def uses_fallback_models(self, _language):
+        return False
+
+
+def _policy_cleaner(policy):
+    cleaner = TextCleaner(
+        cfg=TextCleanerConfig(
+            check_ner_process=False,
+            check_detect_language=False,
+            check_statistical_model_processing=False,
+            ner_batch_size=1,
+        ),
+        privacy_policy=policy,
+    )
+    cleaner.GeneralNER = _NameDetector(policy)
+    return cleaner
+
+
+@pytest.mark.parametrize("rules, allowlist", [
+    ({}, frozenset({"Jane"})),
+    ({"PERSON": EntityRule(action="keep")}, frozenset()),
+    ({"PERSON": EntityRule(min_score=0.95)}, frozenset()),
+])
+def test_policy_exempted_entities_are_not_counted_or_covered(rules, allowlist):
+    policy = PrivacyPolicy("exempt", "1", rules, allowlist=allowlist)
+    cleaner = _policy_cleaner(policy)
+    span = OCRSpan("Jane", (0, 0, 40, 20), 0.99)
+
+    result = cleaner.process(span.text)
+
+    assert result.lm_text == "Jane" and len(result.metadata["findings"]) == 1
+    assert result.metadata["entity_counts"] == {}
+    assert result.signals["pii_count"] == 0 and result.signals["sensitive"] is False
+    assert select_redaction_regions(cleaner, (span,)) == ()
+
+
+def test_allowlist_counts_only_the_concealed_entity():
+    policy = PrivacyPolicy("allow", "1", {}, allowlist=frozenset({"Jane"}))
+    cleaner = _policy_cleaner(policy)
+
+    result = cleaner.process("Maria met Jane")
+
+    assert result.lm_text == "<PERSON> met Jane"
+    assert result.metadata["entity_counts"] == {"PERSON": {"count": 1, "chars": 5}}
+    assert result.signals["pii_count"] == 1 and result.signals["sensitive"] is True
+    spans = (OCRSpan("Maria", (0, 0, 40, 20), 0.99), OCRSpan("Jane", (0, 30, 40, 50), 0.99))
+    assert select_redaction_regions(cleaner, spans) == spans[:1]
 
 
 def test_redact_image_covers_sensitive_regions_with_fake_pillow(monkeypatch):

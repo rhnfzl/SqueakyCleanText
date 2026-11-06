@@ -1,5 +1,19 @@
-from scripts.benchmark_release import find_leaks, predicted_spans
+from benchmarks.score import predicted_spans
+from scripts.benchmark_release import _git_commit, find_leaks
 from sct.evaluation import EntitySpan, EvaluationExample
+from tests.conftest import TEST_NER_MODELS, TEST_NER_REVISIONS
+import builtins
+import importlib
+import subprocess
+import sys
+
+
+def test_digits_in_a_user_label_are_a_placeholder():
+    # Labels may hold digits (sct.config._USER_LABEL): the scorers must read such tags too.
+    assert predicted_spans("Ref AB-1 here", "Ref <EU1_0> here", {"<EU1_0>": "AB-1"}) == [EntitySpan("EU1", 4, 8)]
+    example = EvaluationExample(
+        id="doc", text="EU1 Smith", language="en", domain="test", expected=(EntitySpan("PERSON", 0, 9),))
+    assert find_leaks(example, "<EU1> here") == ([], [])
 
 
 def test_predicted_spans_maps_placeholders_in_order():
@@ -72,7 +86,6 @@ def test_predicted_spans_context_changed_by_cleanup():
 
 def test_run_batch_reports_throughput_keys(tmp_path):
     from scripts.benchmark_release import ROOT, run_batch
-    from tests.conftest import TEST_NER_MODELS
 
     lines = (ROOT / "evaluation" / "release_benchmark.jsonl").read_text(encoding="utf-8").splitlines()
     dataset = tmp_path / "two.jsonl"
@@ -80,7 +93,7 @@ def test_run_batch_reports_throughput_keys(tmp_path):
 
     result = run_batch(
         dataset, documents=4, batch_size=2, ner_batch_size=8, intra_op_threads=1,
-        repeats=1, long=False, ner_models=TEST_NER_MODELS,
+        repeats=1, long=False, ner_models=TEST_NER_MODELS, ner_model_revisions=TEST_NER_REVISIONS,
     )
 
     assert {"settings", "seconds", "docs_per_second", "peak_rss_mb", "output_sha256"} <= set(result)
@@ -88,13 +101,35 @@ def test_run_batch_reports_throughput_keys(tmp_path):
 
 
 def test_predicted_spans_map_unicode_folded_value_to_source_offsets():
-    # Codex bench round 1 #1: SCT folds full-width text before replacing it.
+    # SCT folds full-width text before replacing it.
     source = "Mail Ａｎｎａ＠ｅｘａｍｐｌｅ．ｃｏｍ ok"
     assert predicted_spans(source, "Mail <EMAIL_0> ok", {"<EMAIL_0>": "Anna@example.com"}) == [
         EntitySpan("EMAIL", 5, 21)]
     # A combining accent stays with its letter; a ligature maps to its one source char.
     assert predicted_spans("René met ﬁ", "<PERSON_0> met <X_0>", {"<PERSON_0>": "René", "<X_0>": "fi"}) == [
         EntitySpan("PERSON", 0, 5), EntitySpan("X", 10, 11)]
+
+
+def test_benchmark_imports_without_resource_module(monkeypatch):
+    real_import = builtins.__import__
+
+    def no_resource(name, *args, **kwargs):
+        if name == "resource":
+            raise ImportError("No module named 'resource'")
+        return real_import(name, *args, **kwargs)
+
+    monkeypatch.delitem(sys.modules, "scripts.benchmark_release", raising=False)
+    monkeypatch.setattr(builtins, "__import__", no_resource)
+    module = importlib.import_module("scripts.benchmark_release")
+    assert module._peak_rss_mb() is None
+
+
+def test_git_commit_is_none_when_git_hangs(monkeypatch):
+    def hang(cmd, **kwargs):
+        raise subprocess.TimeoutExpired(cmd, kwargs["timeout"])
+
+    monkeypatch.setattr(subprocess, "run", hang)
+    assert _git_commit() is None
 
 
 def test_predicted_spans_place_values_whose_whitespace_sct_collapsed():

@@ -10,6 +10,7 @@ from sct.evaluation import (
     load_evaluation_jsonl,
     load_predictions_jsonl,
 )
+from sct.utils.atomic_file import write_text_atomic
 
 
 def parse_args() -> argparse.Namespace:
@@ -32,10 +33,7 @@ def main() -> None:
     )
     output = Path(args.output)
     output.parent.mkdir(parents=True, exist_ok=True)
-    output.write_text(
-        json.dumps(report.to_dict(), indent=2, sort_keys=True) + "\n",
-        encoding="utf-8",
-    )
+    write_text_atomic(output, json.dumps(report.to_dict(), indent=2, sort_keys=True) + "\n")
 
 
 if __name__ == "__main__":

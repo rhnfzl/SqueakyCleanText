@@ -4,7 +4,7 @@ import pytest
 
 from sct import TextCleaner, TextCleanerConfig
 from sct.adapters import is_sensitive_result
-from tests.conftest import TEST_NER_MODELS
+from tests.conftest import TEST_NER_MODELS, TEST_NER_REVISIONS
 
 EMAIL = "maria@example.com"
 
@@ -80,14 +80,14 @@ def test_fuzzy_dates_counted():
 
 def test_batch_path_equals_single_path():
     cleaner = TextCleaner(cfg=TextCleanerConfig(
-        ner_models=TEST_NER_MODELS,
+        ner_models=TEST_NER_MODELS, ner_model_revisions=TEST_NER_REVISIONS,
         ner_batch_size=8,
         check_statistical_model_processing=False,
     ))
     docs = [f"John Smith mailed {EMAIL} in 2020.", "call +1-202-555-0147", "plain words"]
 
-    batched = cleaner.process_batch(docs, batch_size=1)
-    single = [cleaner._process_single(doc) for doc in docs]
+    batched = cleaner.process_batch(docs, max_workers=1)
+    single = [cleaner._process_single_isolated(doc) for doc in docs]
 
     for b, s in zip(batched, single):
         assert b.metadata["regex_counts"] == s.metadata["regex_counts"]

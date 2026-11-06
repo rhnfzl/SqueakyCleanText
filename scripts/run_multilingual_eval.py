@@ -19,15 +19,20 @@ Only the dataset labels are scored; other predicted labels (NUMBER, DATE, ...) a
 
 import argparse
 from datetime import date
-import hashlib
 import json
-import platform
 import time
 from pathlib import Path
+from typing import Any
 
-from scripts.benchmark_release import CORRECTNESS_OVERRIDES, _git_commit, predicted_spans
+from huggingface_hub import model_info
+
+from benchmarks.score import predicted_spans
+from scripts.benchmark_release import CORRECTNESS_OVERRIDES, dataset_header
 from scripts.build_multilingual_eval import LABELS, OUTPUT as DATASET
+from sct.config import TextCleanerConfig
 from sct.evaluation import EntitySpan, evaluate_pii, load_evaluation_jsonl
+from sct.sct import TextCleaner
+from sct.utils.atomic_file import write_text_atomic
 
 RESULTS = DATASET.parent / "results"
 DEFAULT_MODELS = ("sct-default", "gliner:urchade/gliner_multi-v2.1", "gliner:urchade/gliner_multi_pii-v1")
@@ -47,9 +52,6 @@ def keep_labels(spans) -> tuple[EntitySpan, ...]:
 
 
 def predict_sct(examples) -> tuple[dict, dict]:
-    from sct.config import TextCleanerConfig
-    from sct.sct import TextCleaner
-
     cleaner = TextCleaner(cfg=TextCleanerConfig(**CORRECTNESS_OVERRIDES))
     predictions = {}
     for example in examples:
@@ -76,16 +78,12 @@ def predict_gliner(examples, model_id: str, threshold: float) -> tuple[dict, dic
 
 def hub_licence(model_id: str) -> str | None:
     try:
-        from huggingface_hub import model_info
-
         return (model_info(model_id).card_data or {}).get("license")
     except Exception:  # noqa: BLE001  # offline or gated: record unknown
         return None
 
 
-def run(dataset: Path, models: list[str], threshold: float) -> dict:
-    import sct
-
+def run(dataset: Path, models: list[str], threshold: float) -> dict[str, Any]:
     examples = load_evaluation_jsonl(dataset)
     reports = {}
     for name in models:
@@ -106,17 +104,7 @@ def run(dataset: Path, models: list[str], threshold: float) -> dict:
                 key: [span.__dict__ for span in spans] for key, spans in predictions.items()
             },
         }
-    return {
-        "sct_version": sct.__version__,
-        "git_commit": _git_commit(),
-        "python": platform.python_version(),
-        "platform": platform.platform(),
-        "dataset": dataset.name,
-        "dataset_sha256": hashlib.sha256(dataset.read_bytes()).hexdigest(),
-        "documents": len(examples),
-        "entities": sum(len(e.expected) for e in examples),
-        "models": reports,
-    }
+    return {**dataset_header(dataset, examples), "models": reports}
 
 
 def to_markdown(result: dict) -> str:
@@ -147,7 +135,7 @@ def main() -> None:
     args = parser.parse_args()
     result = run(args.dataset, args.models, args.threshold)
     args.output.parent.mkdir(parents=True, exist_ok=True)
-    args.output.write_text(json.dumps(result, indent=2, ensure_ascii=False, sort_keys=True) + "\n", encoding="utf-8")
+    write_text_atomic(args.output, json.dumps(result, indent=2, ensure_ascii=False, sort_keys=True) + "\n")
     print(to_markdown(result))
 
 

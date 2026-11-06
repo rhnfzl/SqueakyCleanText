@@ -3,7 +3,8 @@
 import math
 import time
 from dataclasses import asdict, dataclass
-from typing import Any, Callable, Sequence
+from typing import Any
+from collections.abc import Callable, Sequence
 
 from sct.evaluation import (
     EntitySpan,
@@ -50,7 +51,7 @@ class AdoptionDecision:
 
 def candidate_config(candidate: ModelCandidate) -> TextCleanerConfig:
     """Build a span-preserving configuration for one supported candidate."""
-    common = {
+    common: dict[str, Any] = {
         "check_fix_bad_unicode": False,
         "check_to_ascii_unicode": False,
         "check_replace_html": False,

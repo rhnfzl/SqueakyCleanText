@@ -31,10 +31,6 @@ def table(lines):
     emit(*([] if out and out[-1] == "" else [""]), *lines, "")
 
 
-def f3(x):
-    return report._fmt(x)
-
-
 def res(track, entry, dataset, without=False):
     root = bundle / ("norecover/" + track if without else track)
     return json.loads((root / entry / f"{dataset}-test.json").read_text())
@@ -44,7 +40,7 @@ def mr(track, entry, dataset, without=False, metric="masked_recall"):
     return report.claimed_macro(res(track, entry, dataset, without)["views"]["full"]["compare"], entry, metric)
 
 
-def left_clean():
+def left_clean() -> list[str]:
     rows = ["| entry | privacy-synthetic | privacy-real | NER | claimed languages | round 1 status |",
             "|---|---|---|---|---|---|"]
     for e in ENTRIES:

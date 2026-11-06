@@ -1,10 +1,11 @@
 """Optional OCR and image redaction interfaces."""
 
 from dataclasses import dataclass
-from typing import Any, Protocol, Sequence
+from typing import Any, Protocol
+from collections.abc import Sequence
 
-from sct.adapters import is_sensitive_result
 from sct.sct import TextCleaner
+from sct.utils.process_result import ProcessResult
 
 
 @dataclass(frozen=True)
@@ -31,15 +32,21 @@ class ImageRedactionResult:
     regions: tuple[OCRSpan, ...]
 
 
+def _was_replaced(result: ProcessResult) -> bool:
+    """Whether the cleaned text replaced anything, dates and years included; policy exemptions are not counted."""
+    metadata = result.metadata or {}
+    return bool(metadata.get("regex_counts") or metadata.get("entity_counts"))
+
+
 def select_redaction_regions(
     cleaner: TextCleaner,
     spans: Sequence[OCRSpan],
 ) -> tuple[OCRSpan, ...]:
-    """Select OCR spans that contain privacy replacements or findings."""
+    """Select OCR spans whose text the cleaner replaced anything in."""
     selected = []
     for span in spans:
         result = cleaner.process(span.text)
-        if is_sensitive_result(result):
+        if _was_replaced(result):
             selected.append(span)
     return tuple(selected)
 
@@ -51,7 +58,7 @@ def redact_image(
     *,
     fill: str = "black",
 ) -> ImageRedactionResult:
-    """Cover sensitive OCR regions on a copied Pillow image."""
+    """Cover the regions ``select_redaction_regions`` selects on a copied Pillow image."""
     try:
         from PIL import ImageDraw
     except ImportError as exc:
@@ -88,7 +95,7 @@ class TesseractOCRProvider:
             lang=self.language,
             output_type=pytesseract.Output.DICT,
         )
-        lines = {}
+        lines: dict[tuple, list] = {}
         for index, text in enumerate(data["text"]):
             text = text.strip()
             if not text:

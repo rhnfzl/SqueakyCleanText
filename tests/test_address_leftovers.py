@@ -1,12 +1,11 @@
 """0.8.0 fuzz leftovers: a long mail local part, IDNA CONTEXTO punctuation in a host, circled letters in an address."""
 
-import time
-
 import pytest
 
 from sct import TextCleaner
 from sct.presets import preset_config
 from sct.utils import constants
+from tests.helpers import assert_near_linear
 
 
 def _cleaner(**kw):
@@ -30,16 +29,8 @@ def test_long_local_part_with_punctuation_or_script_change(local):
 
 @pytest.mark.parametrize("make", [lambda n: "a" * n + "@example.com", lambda n: "a!" * n, lambda n: "a" * n + " "])
 def test_long_local_part_linear(make):
-    def seconds(text):
-        best = float("inf")
-        for _ in range(3):
-            start = time.perf_counter()
-            constants.EMAIL_REGEX.search(text)
-            best = min(best, time.perf_counter() - start)
-        return best
-    seconds(make(10))
-    small, large = seconds(make(2000)), seconds(make(8000))
-    assert large < 8 * small + 0.05, (small, large)
+    constants.EMAIL_REGEX.search(make(10))  # warm up
+    assert_near_linear(constants.EMAIL_REGEX.search, make, 8000, factor=4)
 
 
 def test_short_local_part_after_punctuation_unchanged():
@@ -69,9 +60,7 @@ def test_contexto_punctuation_with_wide_query_folds():
 @pytest.mark.parametrize("regex, head", [(constants.EMAIL_REGEX, "info@"), (constants.URL_REGEX, "https://")])
 def test_middle_dot_run_without_tld_is_linear(regex, head):
     # each dot between Han used to have two parses, so a host with no TLD backtracked 2^n ways
-    start = time.perf_counter()
-    regex.search(head + "例・" * 40 + "え")
-    assert time.perf_counter() - start < 1.0
+    assert_near_linear(regex.search, lambda n: head + "例・" * n + "え", 40)
 
 
 @pytest.mark.parametrize("text", ["see x・y.com ok", "リスト①・②です", "a@b.c・d", "見て・https://x.jp"])

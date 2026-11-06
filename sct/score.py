@@ -12,14 +12,20 @@ from collections import Counter
 from dataclasses import dataclass
 from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
-from typing import Any, Iterable, Optional, Protocol, Sequence, Union
+from typing import TYPE_CHECKING, Any, Protocol
+from collections.abc import Iterable, Sequence
 
 import regex
 
-SCORE_A_COLUMNS = (
-    "sct_language", "sct_language_score", "sct_pii_count",
-    "sct_pii_share", "sct_pii_types", "sct_warnings",
-)
+if TYPE_CHECKING:
+    from sct.utils.process_result import ProcessResult
+
+# Column -> Arrow type name; a list means a list of that type.
+SCORE_A_TYPES = {
+    "sct_language": "string", "sct_language_score": "float64", "sct_pii_count": "int64",
+    "sct_pii_share": "float64", "sct_pii_types": ["string"], "sct_warnings": ["string"],
+}
+SCORE_A_COLUMNS = tuple(SCORE_A_TYPES)
 SCORE_B_COLUMNS = ("sct_quality", "sct_minhash")
 
 # Placeholders count as one token; reversible ``<PERSON_3>`` normalises to ``<PERSON>``.
@@ -46,8 +52,8 @@ class ScoreConfig:
     """Score B switches; every one is off by default."""
 
     quality: bool = False
-    quality_model: Optional[str] = None
-    quality_revision: Optional[str] = None
+    quality_model: str | None = None
+    quality_revision: str | None = None
     minhash: bool = False
     minhash_num_perm: int = 128
     minhash_seed: int = 1
@@ -63,7 +69,7 @@ class ScoreConfig:
             raise ValueError("minhash_min_tokens must be >= 0")
 
 
-def _package_version(name: str) -> Optional[str]:
+def _package_version(name: str) -> str | None:
     try:
         return version(name)
     except PackageNotFoundError:
@@ -79,7 +85,7 @@ def minhash_tokens(text: str) -> list[str]:
     return [t if t.startswith("<") else t.casefold() for t in pattern.findall(text)]
 
 
-def minhash_signature(text: str, config: ScoreConfig) -> Optional[list[int]]:
+def minhash_signature(text: str, config: ScoreConfig) -> list[int] | None:
     """MinHash of ``config.minhash_shingle``-token shingles of anonymised text.
 
     ``None`` when fewer than ``minhash_min_tokens`` non-placeholder tokens.
@@ -116,11 +122,11 @@ def minhash_metadata(config: ScoreConfig) -> dict[str, Any]:
 
 
 def score_record(
-    result,
+    result: "ProcessResult",
     *,
-    original: Optional[str] = None,
-    quality: Union[QualityScorer, float, None] = None,
-    minhash: Optional[ScoreConfig] = None,
+    original: str | None = None,
+    quality: QualityScorer | float | None = None,
+    minhash: ScoreConfig | None = None,
 ) -> dict[str, Any]:
     """Flat ``sct_*`` columns for one ``ProcessResult``.
 
@@ -155,13 +161,17 @@ def score_records(
     originals: Sequence[str],
     config: ScoreConfig = ScoreConfig(),
     *,
-    scorer: Optional[QualityScorer] = None,
+    scorer: QualityScorer | None = None,
 ) -> list[dict[str, Any]]:
-    """Score a batch; the quality scorer runs once over all originals."""
+    """Score a batch; the quality scorer runs once over all originals.
+
+    Passing ``scorer`` turns quality on, as ``ScoreConfig(quality=True)`` does.
+    """
     if len(results) != len(originals):
         raise ValueError("results and originals must have the same length")
-    qualities: list[Optional[float]] = [None] * len(results)
-    if config.quality:
+    qualities: list[float | None] = [None] * len(results)
+    quality_on = config.quality or scorer is not None
+    if quality_on:
         if scorer is None:
             if not config.quality_model:
                 raise ValueError("quality=True needs quality_model or a scorer")
@@ -169,9 +179,9 @@ def score_records(
                 config.quality_model, revision=config.quality_revision,
             )
         qualities = list(scorer(list(originals))) if originals else []
-    b_on = config.quality or config.minhash
+    b_on = quality_on or config.minhash
     rows = []
-    for result, original, q in zip(results, originals, qualities):
+    for result, q in zip(results, qualities, strict=True):
         row = score_record(result, minhash=config if config.minhash else None)
         if b_on:
             row["sct_quality"] = None if q is None else float(q)
@@ -189,9 +199,9 @@ class ONNXQualityScorer:
     revision recorded at export time.
     """
 
-    def __init__(self, model_dir, *, revision: Optional[str] = None,
+    def __init__(self, model_dir: str | Path, *, revision: str | None = None,
                  batch_size: int = 32, max_length: int = 512,
-                 providers: Optional[list] = None):
+                 providers: list | None = None):
         import onnxruntime as ort
         from tokenizers import Tokenizer
 

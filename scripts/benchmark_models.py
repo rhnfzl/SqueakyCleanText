@@ -9,6 +9,7 @@ from sct.evaluation import load_evaluation_jsonl
 from sct.model_benchmark import candidate_config, run_model_benchmark
 from sct.model_candidates import MODEL_CANDIDATES
 from sct.sct import TextCleaner
+from sct.utils.atomic_file import write_text_atomic
 
 
 def parse_args() -> argparse.Namespace:
@@ -39,10 +40,7 @@ def main() -> None:
     )
     output = Path(args.output)
     output.parent.mkdir(parents=True, exist_ok=True)
-    output.write_text(
-        json.dumps(benchmark.to_dict(), indent=2, sort_keys=True) + "\n",
-        encoding="utf-8",
-    )
+    write_text_atomic(output, json.dumps(benchmark.to_dict(), indent=2, sort_keys=True) + "\n")
 
 
 if __name__ == "__main__":

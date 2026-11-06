@@ -16,8 +16,27 @@ import argparse
 import json
 from pathlib import Path
 
+import huggingface_hub
+import torch
+from transformers import AutoModel, AutoTokenizer
+
+from sct.utils.atomic_file import write_text_atomic
+
 HEAD_REPO = "epfml/FineWeb2-HQ-Plus-Classifier"
 BACKBONE_REPO = "FacebookAI/xlm-roberta-base"
+
+
+class QualityModel(torch.nn.Module):
+    def __init__(self, backbone, head):
+        super().__init__()
+        self.backbone, self.head = backbone, head
+
+    def forward(self, input_ids, attention_mask):
+        hidden = self.backbone(input_ids=input_ids, attention_mask=attention_mask).last_hidden_state
+        mask = attention_mask.unsqueeze(-1).to(hidden.dtype)
+        # Masked mean = the model card's mean(1) for unpadded single texts.
+        pooled = (hidden * mask).sum(1) / mask.sum(1).clamp(min=1)
+        return torch.sigmoid(self.head(pooled)).squeeze(-1)
 
 
 def main() -> None:
@@ -27,10 +46,6 @@ def main() -> None:
     parser.add_argument("--backbone-revision", default="main")
     parser.add_argument("--opset", type=int, default=17)
     args = parser.parse_args()
-
-    import huggingface_hub
-    import torch
-    from transformers import AutoModel, AutoTokenizer
 
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
@@ -44,19 +59,7 @@ def main() -> None:
     backbone = AutoModel.from_pretrained(BACKBONE_REPO, revision=args.backbone_revision)
     tokenizer = AutoTokenizer.from_pretrained(BACKBONE_REPO, revision=args.backbone_revision)
 
-    class QualityModel(torch.nn.Module):
-        def __init__(self):
-            super().__init__()
-            self.backbone, self.head = backbone, head
-
-        def forward(self, input_ids, attention_mask):
-            hidden = self.backbone(input_ids=input_ids, attention_mask=attention_mask).last_hidden_state
-            mask = attention_mask.unsqueeze(-1).to(hidden.dtype)
-            # Masked mean = the model card's mean(1) for unpadded single texts.
-            pooled = (hidden * mask).sum(1) / mask.sum(1).clamp(min=1)
-            return torch.sigmoid(self.head(pooled)).squeeze(-1)
-
-    model = QualityModel().eval()
+    model = QualityModel(backbone, head).eval()
     sample = tokenizer(["export sample", "a second, longer export sample"],
                        return_tensors="pt", padding=True)
     torch.onnx.export(
@@ -72,7 +75,7 @@ def main() -> None:
     )
     tokenizer.backend_tokenizer.save(str(out / "tokenizer.json"))
     info = huggingface_hub.HfApi()
-    (out / "sct_quality.json").write_text(json.dumps({
+    write_text_atomic(out / "sct_quality.json", json.dumps({
         "head": HEAD_REPO,
         "head_revision": info.model_info(HEAD_REPO, revision=args.head_revision).sha,
         "backbone": BACKBONE_REPO,

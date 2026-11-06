@@ -7,6 +7,7 @@ import pytest
 from sct import TextCleaner, TextCleanerConfig
 from sct.browser import _unicode_word, build_browser_manifest
 from sct.utils import constants, contact
+from tests.helpers import assert_near_linear
 
 
 def _clean(text, **overrides):
@@ -344,15 +345,13 @@ def test_year_group_of_an_id_run_masked_with_the_run(text):
 
 
 def test_streaming_guard_is_linear_on_a_long_digit_run():
-    import time
-
     from sct.streaming import _DIGIT_GROUP_HEAD, _DIGIT_GROUP_TAIL
-    start = time.perf_counter()
     for regex in (_DIGIT_GROUP_HEAD, _DIGIT_GROUP_TAIL):  # was ~5 s (quadratic restarts inside the run)
         assert regex.search("1" * 32000 + "!") is None
         assert regex.search(" ".join(["1" * 3000] * 40) + "!")
         assert regex.search("x 123 45-6789 y").group() == "123 45-6789"
-    assert time.perf_counter() - start < 0.5
+        assert_near_linear(regex.search, lambda n: "1" * n + "!", 32000)
+        assert_near_linear(regex.search, lambda n: " ".join(["1" * 3000] * n) + "!", 40)
 
 
 def test_streaming_guard_lets_a_long_number_table_split():

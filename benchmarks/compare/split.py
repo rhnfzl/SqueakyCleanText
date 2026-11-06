@@ -15,6 +15,7 @@ import argparse
 import hashlib
 import json
 from collections import Counter
+from typing import Any
 
 from benchmarks.datasets import MODULES, get, sample_per_lang
 
@@ -41,7 +42,7 @@ def load(dataset: str, part: str, n: int | None = None, seed: int = SEED) -> lis
     return sample_per_lang(split(dataset, records, part, seed), n, seed)
 
 
-def sizes(dataset: str, seed: int = SEED) -> dict:
+def sizes(dataset: str, seed: int = SEED) -> dict[str, dict[str, Any]]:
     """Docs, groups and languages per part (no ids, safe for scores-only data)."""
     records = get(dataset).load(None, seed)
     out = {}

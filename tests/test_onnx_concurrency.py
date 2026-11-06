@@ -1,17 +1,19 @@
 """ONNX runs lock-free, GLiNER stays serialised, models are cached by (name, revision)."""
 
+import multiprocessing
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
 
 import pytest
 
+from tests.helpers import gliner_ner
 from sct import config
 from sct.config import TextCleanerConfig
 from sct.utils import ner as ner_module
 from sct.utils.ner import GeneralNER
 from sct.utils.onnx_pipeline import load_onnx_ner_model
-from tests.conftest import TEST_NER_MODELS
+from tests.conftest import TEST_NER_MODELS, TEST_NER_REVISIONS
 
 TAGS = ('PER', 'LOC', 'ORG', 'MISC')
 NAMES = ["John Smith", "Angela Merkel", "Barack Obama", "Marie Curie"]
@@ -33,7 +35,7 @@ def _key(result):
 
 @pytest.fixture(scope="module")
 def onnx_ner():
-    return GeneralNER(model_names=TEST_NER_MODELS)
+    return GeneralNER(TextCleanerConfig(ner_models=TEST_NER_MODELS, ner_model_revisions=TEST_NER_REVISIONS))
 
 
 def test_onnx_threaded_matches_sequential_and_takes_no_lock(onnx_ner):
@@ -68,13 +70,7 @@ def test_gliner_calls_stay_serialised():
                 state["inside"] -= 1
             return [[]]
 
-    ner = object.__new__(GeneralNER)
-    ner._ner_backend = "gliner"
-    ner._gliner_pipe = FakeGLiNER()
-    ner._replacement_mode = "placeholder"
-    ner._synthetic_replacer = None
-    ner._inference_locks = {}
-    ner._locks_lock = threading.Lock()
+    ner = gliner_ner(detector=FakeGLiNER())
     ner.tokenizer = None
 
     with ThreadPoolExecutor(max_workers=4) as pool:
@@ -98,19 +94,20 @@ def test_model_cache_is_keyed_by_revision(monkeypatch, revisions, loads):
         calls.append((model_name, revision))
         return object(), _FakeTok()
 
-    monkeypatch.setattr(ner_module, "load_onnx_ner_model", fake_load)
-    ner = GeneralNER(model_names={'ENGLISH': 'm', 'MULTILINGUAL': 'm'},
-                     model_revisions=revisions)
+    monkeypatch.setattr("sct.utils.onnx_pipeline.load_onnx_ner_model", fake_load)
+    ner = GeneralNER(TextCleanerConfig(ner_models={'ENGLISH': 'm', 'MULTILINGUAL': 'm'},
+                                       ner_model_revisions=revisions))
     assert calls == loads
     assert (ner._pipelines['ENGLISH'] is ner._pipelines['MULTILINGUAL']) == (len(loads) == 1)
 
 
 def test_thread_knobs_reach_the_onnx_session():
     model = TEST_NER_MODELS['ENGLISH']
-    pipe, _ = load_onnx_ner_model(model, intra_op_threads=2, inter_op_threads=3)
+    revision = TEST_NER_REVISIONS['ENGLISH']
+    pipe, _ = load_onnx_ner_model(model, revision=revision, intra_op_threads=2, inter_op_threads=3)
     opts = pipe._session.get_session_options()
     assert (opts.intra_op_num_threads, opts.inter_op_num_threads) == (2, 3)
-    default_pipe, _ = load_onnx_ner_model(model)
+    default_pipe, _ = load_onnx_ner_model(model, revision=revision)
     assert default_pipe._session.get_session_options().intra_op_num_threads == 0
 
 
@@ -121,9 +118,9 @@ def test_thread_knob_passed_from_general_ner(monkeypatch):
         seen.append((kwargs["intra_op_threads"], kwargs["inter_op_threads"]))
         return object(), _FakeTok()
 
-    monkeypatch.setattr(ner_module, "load_onnx_ner_model", fake_load)
-    GeneralNER(model_names={'ENGLISH': 'a', 'MULTILINGUAL': 'b'},
-               onnx_intra_op_threads=2, onnx_inter_op_threads=1)
+    monkeypatch.setattr("sct.utils.onnx_pipeline.load_onnx_ner_model", fake_load)
+    GeneralNER(TextCleanerConfig(ner_models={'ENGLISH': 'a', 'MULTILINGUAL': 'b'},
+                                 onnx_intra_op_threads=2, onnx_inter_op_threads=1))
     assert seen == [(2, 1), (2, 1)]
 
 
@@ -145,7 +142,15 @@ def test_fork_child_pins_live_ner(monkeypatch):
     # A forked child must never free an inherited GeneralNER (ONNX teardown crashes there);
     # the at-fork hook keeps a strong reference to every live one. Called directly: no real fork on macOS.
     monkeypatch.setattr(ner_module, "_FORK_PINNED", [])
-    ner = GeneralNER(model_names=TEST_NER_MODELS)
+    ner = GeneralNER(TextCleanerConfig(ner_models=TEST_NER_MODELS, ner_model_revisions=TEST_NER_REVISIONS))
     assert ner in ner_module._LIVE_NER
     ner_module._pin_live_ner_in_child()
     assert any(p is ner for p in ner_module._FORK_PINNED)
+
+
+def test_import_sct_leaves_onnxruntime_unloaded():
+    code = "import sys, sct; sys.exit('onnxruntime' in sys.modules)"
+    child = multiprocessing.get_context("spawn").Process(target=exec, args=(code,))  # a fresh interpreter
+    child.start()
+    child.join()
+    assert child.exitcode == 0

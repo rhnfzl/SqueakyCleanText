@@ -1,20 +1,29 @@
-"""Boundary adapters for structured data and retrieval pipelines."""
+"""Boundary adapters for structured data and retrieval pipelines.
 
-import copy
+``findings`` stay empty unless the cleaner collects them (``include_entities=True``
+or a privacy policy). ``sensitive`` and ``signals`` are always filled.
+"""
+
 from dataclasses import dataclass, field, replace
-from typing import Any, Iterable, Mapping, Optional
+from typing import Any, cast
+from collections.abc import Hashable, Iterable, Mapping
 
+from sct.config import require_adapter_mode
 from sct.presets import PRESETS
 from sct.privacy import EntityFinding
 from sct.sct import TextCleaner
-from sct.signals import merge_views
+from sct.signals import Signals, is_sensitive_result, merge_views
+
+
+def _no_signals() -> Signals:
+    return merge_views(())
 
 
 @dataclass(frozen=True)
 class PathFinding:
     """Entity finding with its path in structured input."""
 
-    path: tuple[str | int, ...]
+    path: tuple[Hashable, ...]
     finding: EntityFinding
 
 
@@ -26,7 +35,7 @@ class StructuredResult:
     findings: tuple[PathFinding, ...]
     sensitive: bool
     # merge_views over every string leaf, keys included.
-    signals: dict = field(default_factory=dict)
+    signals: Signals = field(default_factory=_no_signals)
 
 
 @dataclass(frozen=True)
@@ -40,13 +49,20 @@ class RAGChunk:
 
 @dataclass(frozen=True)
 class ProcessedRAGChunk:
-    """Retrieval chunk with cleaned text and sensitivity metadata."""
+    """Retrieval chunk with cleaned text and sensitivity metadata.
+
+    ``findings`` and ``metadata["sct"]`` cover the text only. ``metadata_findings``
+    covers the metadata; ``sensitive`` and ``signals`` cover both.
+    """
 
     id: str
     text: str
-    language: Optional[str]
+    language: str | None
     metadata: Mapping[str, Any]
     findings: tuple[EntityFinding, ...]
+    sensitive: bool = False
+    signals: Signals = field(default_factory=_no_signals)
+    metadata_findings: tuple[PathFinding, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -55,41 +71,29 @@ class DataFrameResult:
 
     frame: Any
     findings: tuple[PathFinding, ...]
+    sensitive: bool = False
+    # merge_views over every processed cell.
+    signals: Signals = field(default_factory=_no_signals)
 
 
-def _require_adapter_mode(cleaner: TextCleaner) -> None:
-    if cleaner.cfg.replacement_mode == "reversible":
-        raise ValueError(
-            "Structured adapters do not support reversible mode. "
-            "Process each text directly and retain its token map."
-        )
-
-
-def is_sensitive_result(result: Any) -> bool:
-    """Return whether processing found an entity or made a regex replacement."""
-    metadata = result.metadata or {}
-    return bool(
-        metadata.get("regex_counts")
-        or metadata.get("entity_counts")
-        or metadata.get("findings")
-    )
+class _DuplicateKeyError(ValueError):
+    """Two JSON keys became the same text after cleaning."""
 
 
 def _pii_only_cleaner(cleaner: TextCleaner, ner: bool = True) -> TextCleaner:
     """Return a view of *cleaner* that runs only its PII steps, sharing its NER models."""
-    key_cleaner = copy.copy(cleaner)
     # Everything the training preset turns off (folding, letter/number removal, casefold...).
-    off = {name: value for name, value in PRESETS['training'].items() if value is False}
+    off: dict[str, Any] = {name: value for name, value in PRESETS['training'].items() if value is False}
     if not ner:
         off['check_ner_process'] = False
-    key_cleaner.cfg = replace(cleaner.cfg, **off)
-    key_cleaner._pipeline, key_cleaner._post_fuzzy_pipeline = [], []
-    key_cleaner._init_pipeline()
-    return key_cleaner
+    return cleaner._with_config(replace(cleaner.cfg, **off))
 
 
 def process_json(cleaner: TextCleaner, value: Any) -> StructuredResult:
     """Process every string in a JSON-compatible value.
+
+    Tuples come back as lists and any ``Mapping`` as a dict. A tuple key stays a
+    tuple, with the strings inside it cleaned as keys, since a list cannot be a key.
 
     Keys follow ``cfg.json_key_cleaning``: ``'pii'`` (default) replaces regex
     PII only (emails, phones, URLs...), so short keys such as ``"k"`` and
@@ -97,47 +101,47 @@ def process_json(cleaner: TextCleaner, value: Any) -> StructuredResult:
     context); ``'pii_ner'`` also runs NER on keys; ``'full'`` uses the whole
     config; ``'off'`` keeps keys as written.
     """
-    _require_adapter_mode(cleaner)
-    findings = []
-    views = []
+    require_adapter_mode(cleaner.cfg)
+    findings: list[PathFinding] = []
+    views: list[Signals] = []
     key_mode = cleaner.cfg.json_key_cleaning
-    key_cleaner = None
+    key_cleaner: TextCleaner | None = None
 
-    def visit(item: Any, path: tuple[str | int, ...], text_cleaner: TextCleaner = cleaner) -> Any:
+    def clean_key(key: Hashable, path: tuple[Hashable, ...]) -> Any:
         nonlocal key_cleaner
+        if isinstance(key, tuple):
+            return tuple(clean_key(part, path) for part in key)
+        if not isinstance(key, str) or key_mode == 'off':
+            return key
+        if key_mode in ('pii', 'pii_ner') and key_cleaner is None:
+            key_cleaner = _pii_only_cleaner(cleaner, ner=key_mode == 'pii_ner')
+        return visit(key, path, cleaner if key_mode == 'full' else cast(TextCleaner, key_cleaner))
+
+    def visit(item: Any, path: tuple[Hashable, ...], text_cleaner: TextCleaner = cleaner) -> Any:
         if isinstance(item, str):
             result = text_cleaner.process(item)
             views.append(result.signals)
-            if result.metadata:
-                findings.extend(
-                    PathFinding(path, finding)
-                    for finding in result.metadata.get("findings", ())
-                )
+            findings.extend(
+                PathFinding(path, finding)
+                for finding in result.metadata.get("findings", ())
+            )
             return result.lm_text
-        if isinstance(item, dict):
+        if isinstance(item, Mapping):
             processed = {}
             for index, (key, child) in enumerate(item.items()):
                 # The raw key may itself be PII, so its path uses the index.
-                if isinstance(key, str) and key_mode != 'off':
-                    if key_mode in ('pii', 'pii_ner') and key_cleaner is None:
-                        key_cleaner = _pii_only_cleaner(cleaner, ner=key_mode == 'pii_ner')
-                    processed_key = visit(
-                        key,
-                        path + ("@key", index),
-                        cleaner if key_mode == 'full' else key_cleaner,
-                    )
-                else:
-                    processed_key = key
+                processed_key = clean_key(key, path + ("@key", index))
                 if processed_key in processed:
-                    raise ValueError(
-                        "Cleaning JSON keys produced a duplicate key"
+                    raise _DuplicateKeyError(
+                        "Cleaning JSON keys produced a duplicate key. "
+                        "Pass a JSON value whose keys stay unique after cleaning."
                     )
                 processed[processed_key] = visit(
                     child,
                     path + (processed_key,),
                 )
             return processed
-        if isinstance(item, list):
+        if isinstance(item, (list, tuple)):
             return [
                 visit(child, path + (index,))
                 for index, child in enumerate(item)
@@ -158,15 +162,16 @@ def process_rag_chunks(
     cleaner: TextCleaner,
     chunks: Iterable[RAGChunk],
 ) -> list[ProcessedRAGChunk]:
-    """Process retrieval chunks without changing their identifiers."""
-    _require_adapter_mode(cleaner)
+    """Process retrieval chunks without changing their identifiers.
+
+    Writes ``metadata["sensitive"]`` and ``metadata["sct"]``, replacing caller keys
+    with those names.
+    """
+    require_adapter_mode(cleaner.cfg)
     processed = []
     for chunk in chunks:
         result = cleaner.process(chunk.text)
-        findings = (
-            tuple(result.metadata.get("findings", ()))
-            if result.metadata else ()
-        )
+        signals = result.signals
         processed_metadata = process_json(
             cleaner,
             dict(chunk.metadata),
@@ -176,13 +181,19 @@ def process_rag_chunks(
             is_sensitive_result(result)
             or processed_metadata.sensitive
         )
-        metadata["sct"] = result.signals
+        metadata["sct"] = signals
+        # A value with no text has no view to add: its empty view would only add warnings.
+        if processed_metadata.signals["chars"]:
+            signals = merge_views([signals, processed_metadata.signals])
         processed.append(ProcessedRAGChunk(
             id=chunk.id,
             text=result.lm_text,
             language=result.language,
             metadata=metadata,
-            findings=findings,
+            findings=tuple(result.metadata.get("findings", ())),
+            sensitive=metadata["sensitive"],
+            signals=signals,
+            metadata_findings=processed_metadata.findings,
         ))
     return processed
 
@@ -191,16 +202,19 @@ def process_dataframe(
     cleaner: TextCleaner,
     frame: Any,
     *,
-    columns: tuple[str, ...],
+    columns: tuple[str, ...] | str,
 ) -> DataFrameResult:
     """Process selected string columns in a copied DataFrame-like object."""
-    _require_adapter_mode(cleaner)
+    require_adapter_mode(cleaner.cfg)
+    if isinstance(columns, str):  # "text" is not ("t", "e", "x", "t")
+        columns = (columns,)
     unknown = set(columns).difference(frame.columns)
     if unknown:
         raise KeyError(f"Unknown columns: {sorted(unknown)}")
 
     output = frame.copy(deep=True)
-    findings = []
+    findings: list[PathFinding] = []
+    views: list[Signals] = []
     # Positional access: a duplicate row or column label makes .at return a Series.
     selected = [j for j, name in enumerate(output.columns) if name in columns]
     for i, row in enumerate(output.index):
@@ -210,9 +224,10 @@ def process_dataframe(
                 continue
             result = cleaner.process(value)
             output.iat[i, j] = result.lm_text
-            if result.metadata:
-                findings.extend(
-                    PathFinding((row, output.columns[j]), finding)
-                    for finding in result.metadata.get("findings", ())
-                )
-    return DataFrameResult(output, tuple(findings))
+            views.append(result.signals)
+            findings.extend(
+                PathFinding((row, output.columns[j]), finding)
+                for finding in result.metadata.get("findings", ())
+            )
+    signals = merge_views(views)
+    return DataFrameResult(output, tuple(findings), signals["sensitive"], signals)

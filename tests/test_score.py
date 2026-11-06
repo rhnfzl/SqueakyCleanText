@@ -177,3 +177,9 @@ def test_onnx_quality_scorer_batches_and_pads(tmp_path, monkeypatch):
     assert scorer(["a", "a a a", "a a"]) == [1.0, 3.0, 2.0]
     with pytest.raises(ValueError, match="expected 'other'"):
         ONNXQualityScorer(tmp_path, revision="other")
+
+
+@pytest.mark.parametrize("scores", [[0.5], [0.5, 0.5, 0.5]])
+def test_score_records_rejects_scorer_of_wrong_length(scores):
+    with pytest.raises(ValueError):
+        score_records([FakeResult("a"), FakeResult("b")], ["a", "b"], scorer=lambda texts: scores)

@@ -23,12 +23,15 @@ import sys
 import time
 from collections import Counter
 from pathlib import Path
+from typing import Any, NamedTuple
 
 from benchmarks.compare import entries as registry
 from benchmarks.compare import scorer, split
+from benchmarks.compare.views import rule_views
 from benchmarks.datasets import ROUND2, get
 from benchmarks.labels import DATASET_LABELS, unknown_gold_labels
 from benchmarks.speed import environment
+from sct.utils.atomic_file import write_text_atomic
 
 HERE = Path(__file__).resolve().parent
 ADAPTERS = HERE / "adapters"
@@ -89,9 +92,9 @@ def ensure_env(name: str, requirements: Path | None, envs_root: Path, python: st
         subprocess.run([uv, "pip", "install", "--python", str(py), "--reinstall", "--no-deps", gpu],  # noqa: S603
                        check=True)
     freeze = subprocess.run([uv, "pip", "freeze", "--python", str(py)], check=True,  # noqa: S603
-                            capture_output=True, text=True).stdout
-    (venv / "freeze.txt").write_text(freeze)
-    stamp.write_text(digest)
+                            capture_output=True, text=True, timeout=30).stdout
+    write_text_atomic(venv / "freeze.txt", freeze)
+    write_text_atomic(stamp, digest)
     return py
 
 
@@ -111,12 +114,15 @@ def freeze(py: Path) -> str:
         return frozen.read_text()
     uv = shutil.which("uv")
     cmd = [uv, "pip", "freeze", "--python", str(py)] if uv else [str(py), "-m", "pip", "freeze"]
-    done = subprocess.run(cmd, capture_output=True, text=True)  # noqa: S603
-    return done.stdout
+    try:
+        done = subprocess.run(cmd, capture_output=True, text=True, timeout=30)  # noqa: S603
+    except subprocess.TimeoutExpired:
+        return ""
+    return done.stdout if done.returncode == 0 else ""
 
 
 def child_env(threads: int | None = None, device: str = "cpu", gpu: str | None = None,
-              hf_hub_cache: str | None = None) -> dict:
+              hf_hub_cache: str | None = None) -> dict[str, str]:
     env = {k: v for k, v in os.environ.items() if k not in ("PYTHONPATH", "PYTHONHOME", "VIRTUAL_ENV")}
     env["TOKENIZERS_PARALLELISM"] = "false"
     env["PYTHONUNBUFFERED"] = "1"
@@ -152,7 +158,7 @@ def pick_gpu(min_free_gb: float = 6.0) -> str:
     if smi is None:
         raise RuntimeError("no nvidia-smi: use --device cpu")
     out = subprocess.run([smi, "--query-gpu=index,memory.free", "--format=csv,noheader,nounits"],  # noqa: S603
-                         capture_output=True, text=True, check=True).stdout
+                         capture_output=True, text=True, check=True, timeout=30).stdout
     index, free = max((line.split(", ") for line in out.strip().splitlines()), key=lambda x: float(x[1]))
     if float(free) < min_free_gb * 1024:
         raise RuntimeError(f"GPU {index} has only {float(free) / 1024:.1f} GB free (< {min_free_gb})")
@@ -165,6 +171,39 @@ def _read_lines(path: Path, offset: int) -> tuple[list[dict], int]:
         data = f.read()
     end = data.rfind(b"\n") + 1
     return [json.loads(line) for line in data[:end].decode("utf-8").splitlines() if line.strip()], offset + end
+
+
+def _take(lines: list[dict], expected: set[str], results: dict[str, dict]) -> int:
+    fresh = [line for line in lines if line.get("id") in expected]
+    results.update((line["id"], line) for line in fresh)
+    return len(fresh)
+
+
+def _watch(proc: subprocess.Popen, out: Path, expected: set[str], results: dict[str, dict], doc_limit: float,
+           start_timeout: float) -> tuple[int, str | None]:
+    """Collect *proc*'s lines until it exits or goes silent; returns (lines taken, why it stopped early)."""
+    marker = Path(f"{out}.ready")
+    offset, last, got, ready = 0, time.monotonic(), 0, False
+    while True:
+        lines, offset = _read_lines(out, offset)
+        got += _take(lines, expected, results)
+        if lines or (not ready and marker.exists()):
+            ready, last = True, time.monotonic()
+        code = proc.poll()
+        if code is not None:
+            got += _take(_read_lines(out, offset)[0], expected, results)
+            return got, None if code == 0 else f"crash: exit {code}"
+        limit = doc_limit + (0 if ready else start_timeout)
+        if time.monotonic() - last > limit:
+            proc.kill()
+            proc.wait()
+            return got, f"timeout: no output for {limit:.0f}s"
+        time.sleep(POLL_SECONDS)
+
+
+def _abort(docs: list[dict], streak: int, reason: str) -> dict[str, dict]:
+    message = f"aborted: {streak} docs in a row failed without output ({reason})"
+    return {d["id"]: {"id": d["id"], "spans": [], "error": message, "seconds": None} for d in docs}
 
 
 def supervise(cmd: list[str], docs: list[dict], work: Path, env: dict, doc_timeout: float, start_timeout: float,
@@ -191,34 +230,7 @@ def supervise(cmd: list[str], docs: list[dict], work: Path, env: dict, doc_timeo
         with err.open("w") as errf:
             proc = subprocess.Popen([*cmd, "--input", str(inp), "--output", str(out), "--batch-size", str(batch_size)],  # noqa: S603
                                     stdout=subprocess.DEVNULL, stderr=errf, env=env)
-        expected = {d["id"] for d in pending}
-        marker = Path(f"{out}.ready")
-        offset, last, got, ready, reason = 0, time.monotonic(), 0, False, None
-
-        def take(lines):
-            nonlocal got
-            for line in lines:
-                if line.get("id") in expected:
-                    results[line["id"]] = line
-                    got += 1
-
-        while True:
-            lines, offset = _read_lines(out, offset)
-            take(lines)
-            if lines or (not ready and marker.exists()):
-                ready, last = True, time.monotonic()
-            code = proc.poll()
-            if code is not None:
-                take(_read_lines(out, offset)[0])
-                reason = None if code == 0 else f"crash: exit {code}"
-                break
-            limit = doc_timeout * batch_size + (0 if ready else start_timeout)
-            if time.monotonic() - last > limit:
-                proc.kill()
-                proc.wait()
-                reason = f"timeout: no output for {limit:.0f}s"
-                break
-            time.sleep(POLL_SECONDS)
+        got, reason = _watch(proc, out, {d["id"] for d in pending}, results, doc_timeout * batch_size, start_timeout)
         inp.unlink()
         pending = [d for d in pending if d["id"] not in results]
         if not pending:
@@ -233,9 +245,7 @@ def supervise(cmd: list[str], docs: list[dict], work: Path, env: dict, doc_timeo
             pending = pending[1:]
             streak += 1
             if streak >= MAX_FAILED_STREAK:
-                for d in pending:
-                    results[d["id"]] = {"id": d["id"], "spans": [], "error": f"aborted: {streak} docs in a row failed "
-                                        f"without output ({reason})", "seconds": None}
+                results.update(_abort(pending, streak, reason))
                 pending = []
     return results, {"processes": attempts, "restarts": dict(restarts)}
 
@@ -299,96 +309,50 @@ def _jsonable(value):
 
 def _write(path: Path, data) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(data, indent=1, ensure_ascii=False, sort_keys=True) + "\n", encoding="utf-8")
+    write_text_atomic(path, json.dumps(data, indent=1, ensure_ascii=False, sort_keys=True) + "\n")
 
 
-def _pick(docs: list, keep) -> list:
-    return [x for x in docs if keep(x[2])]
-
-
-def _agg(per_doc: dict, datasets, keep) -> dict | None:
-    """Group macro over *datasets* using only the docs whose language passes *keep*; None when no doc does."""
-    chosen = {d: [(lang, c) for _, _, lang, c in _pick(per_doc[d], keep)] for d in datasets}
-    chosen = {d: v for d, v in chosen.items() if v}
-    return scorer.aggregate(chosen) if chosen else None
-
-
-def rule_views(per_doc: dict, baseline: str, views=("shared", "full"), samples: int = scorer.BOOTSTRAP_SAMPLES) -> dict:
-    """Decision 21 + claimed languages (PROTOCOL.md sections 12, 17), from ``per_doc[entry][dataset][view]``.
-
-    - ``own[entry][view][group]``: per contamination status (clean / unknown / excluded) the datasets and the
-      group macro on the entry's claimed languages (``claimed``) and outside them (``outside_claim``); the
-      clean, claimed cell (the headline) carries a 95% bootstrap CI (``ci``).
-    - ``same_set[view][group][pool]``: datasets clean for every entry of the pool, languages all of them claim
-      (``all``: every entry; ``others``: the non-SCT entries with a clean set in the group). Empty: none.
-    - ``pairwise[entry][view][group]``: baseline minus entry, paired bootstrap, on the datasets clean for both
-      (``clean``) and on those clean or unknown for both with at least one unknown (``unknown``), languages
-      both claim.
-    """
-    own: dict = {}
-    pairwise: dict = {}
-    same_set: dict = {}
-    entries = list(per_doc)
-    for view in views:
-        for group, members in scorer.GROUPS.items():
-            present = [d for d in members if all(d in per_doc[e] for e in entries)]
-            for e in entries:
-                cells = own.setdefault(e, {}).setdefault(view, {})
-                by_doc = {d: per_doc[e][d][view] for d in members if d in per_doc[e]}
-                if not by_doc:
-                    continue
-                cell = {}
-                mine = (lambda lang, e=e: registry.claims(e, lang))  # noqa: E731
-                for status in ("clean", "unknown", "excluded"):
-                    sets = [d for d in by_doc if registry.status(e, d) == status]
-                    if not sets:
-                        continue
-                    cell[status] = {"datasets": sets,
-                                    "claimed": _agg(by_doc, sets, mine),
-                                    "outside_claim": _agg(by_doc, sets, lambda lang, mine=mine: not mine(lang))}
-                    if status == "clean" and cell[status]["claimed"]:
-                        pairs = {d: (v, v) for d in sets if (v := _pick(by_doc[d], mine))}
-                        res = scorer.macro_bootstrap(pairs, samples=samples)["metrics"]
-                        cell[status]["ci"] = {k: {"value": m["a"], "ci": m["a_ci"]} for k, m in res.items()}
-                cells[group] = cell
-            others = [e for e in entries if e != baseline and not e.startswith("sct")
-                      and any(registry.status(e, d) == "clean" for d in present)]
-            for pool, chosen in (("all", entries), ("others", others)):
-                sets = [d for d in present if chosen and all(registry.status(e, d) == "clean" for e in chosen)]
-                keep = (lambda lang, chosen=chosen: all(registry.claims(e, lang) for e in chosen))  # noqa: E731
-                scores = {e: _agg({d: per_doc[e][d][view] for d in sets}, sets, keep) for e in chosen} if sets else {}
-                same_set.setdefault(view, {}).setdefault(group, {})[pool] = {
-                    "entries": chosen, "datasets": sets, "scores": {e: a for e, a in scores.items() if a}}
-            base = per_doc.get(baseline, {})
-            for e in entries:
-                if e == baseline:
-                    continue
-                keep = (lambda lang, e=e: registry.claims(e, lang) and registry.claims(baseline, lang))  # noqa: E731
-                both = [d for d in members if d in base and d in per_doc[e]]
-                statuses = {d: {registry.status(e, d), registry.status(baseline, d)} for d in both}
-                for kind, sets in (("clean", [d for d in both if statuses[d] == {"clean"}]),
-                                   ("unknown", [d for d in both if statuses[d] in ({"unknown"}, {"clean", "unknown"})])):
-                    pairs = {d: (a, b) for d in sets
-                             if (a := _pick(base[d][view], keep)) and (b := _pick(per_doc[e][d][view], keep))}
-                    if pairs:
-                        pairwise.setdefault(e, {}).setdefault(view, {}).setdefault(group, {})[kind] = {
-                            "datasets": list(pairs), **scorer.macro_bootstrap(pairs, samples=samples)}
-    return {"own": own, "same_set": same_set, "pairwise": pairwise}
-
-
-def main(argv=None) -> None:
-    parser = argparse.ArgumentParser(description=(__doc__ or "").splitlines()[0])
+def add_entry_args(parser: argparse.ArgumentParser) -> None:
+    """The arguments ``runner.py`` and ``speed.py`` share: which entries, where, on what hardware."""
     parser.add_argument("--entries", nargs="+", required=True)
+    parser.add_argument("--out", type=Path, required=True)
+    parser.add_argument("--cache", type=Path, default=CACHE, help="raw outputs (hold dataset text) and venvs")
+    parser.add_argument("--python", action="append", default=[], metavar="ENTRY=PATH",
+                        help="use this interpreter instead of building the entry's venv")
+    parser.add_argument("--threads", type=int, help="thread caps (env + adapter config)")
+    parser.add_argument("--cpus", help="taskset CPU list, e.g. 0-15")
+    parser.add_argument("--device", choices=["cpu", "cuda"], default="cpu")
+    parser.add_argument("--gpu", help="GPU index (default: the one with most free memory)")
+    parser.add_argument("--gpu-mem-gb", type=float, default=5.0)
+    parser.add_argument("--hf-hub-cache", help="HF_HUB_CACHE for the adapters")
+
+
+def device_env(args: argparse.Namespace) -> tuple[str | None, dict[str, str]]:
+    """The GPU the run uses (None on CPU) and the adapters' environment."""
+    gpu = None if args.device == "cpu" else (args.gpu or pick_gpu(args.gpu_mem_gb + 1))
+    return gpu, child_env(args.threads, args.device, gpu, args.hf_hub_cache)
+
+
+def entry_python(name: str, tool: dict[str, Any], args: argparse.Namespace) -> Path:
+    """The ``--python`` interpreter of the entry, else its venv (built when needed)."""
+    pythons = dict(item.split("=", 1) for item in args.python)
+    return Path(pythons[name]) if name in pythons else ensure_env(name, tool["requirements"], args.cache / "venvs")
+
+
+def entry_config(tool: dict[str, Any], args: argparse.Namespace, overrides: dict | None = None) -> dict[str, Any]:
+    return {**tool["adapter_config"], "threads": args.threads, "device": entry_device(tool["device"], args.device),
+            "gpu_mem_gb": args.gpu_mem_gb, **(overrides or {})}
+
+
+def _parse_args(argv: list[str] | None) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description=(__doc__ or "").splitlines()[0])
+    add_entry_args(parser)
     parser.add_argument("--datasets", nargs="+", required=True)
     parser.add_argument("--part", choices=split.PARTS, required=True)
     parser.add_argument("--track", choices=registry.TRACKS, default="gold",
                         help="language track for every entry (PROTOCOL.md section 12; gold is the main track)")
     parser.add_argument("--n", type=int, help="docs per language (default: all of the part)")
     parser.add_argument("--seed", type=int, default=split.SEED)
-    parser.add_argument("--out", type=Path, required=True)
-    parser.add_argument("--cache", type=Path, default=CACHE, help="raw outputs (hold dataset text) and venvs")
-    parser.add_argument("--python", action="append", default=[], metavar="ENTRY=PATH",
-                        help="use this interpreter instead of building the entry's venv")
     parser.add_argument("--config", action="append", default=[], metavar="ENTRY=JSON",
                         help="adapter config overrides (tuning on dev only; logged)")
     parser.add_argument("--tuned", type=Path, help="frozen tune.py configs (tuned track), applied under --config")
@@ -397,116 +361,100 @@ def main(argv=None) -> None:
     parser.add_argument("--start-timeout", type=float, default=1800.0, help="model download + load allowance")
     parser.add_argument("--retries", type=int, default=1)
     parser.add_argument("--batch-size", type=int, default=1)
-    parser.add_argument("--threads", type=int, help="thread caps (env + adapter config)")
-    parser.add_argument("--cpus", help="taskset CPU list, e.g. 0-15")
-    parser.add_argument("--device", choices=["cpu", "cuda"], default="cpu")
-    parser.add_argument("--gpu", help="GPU index (default: the one with most free memory)")
-    parser.add_argument("--gpu-mem-gb", type=float, default=5.0)
-    parser.add_argument("--hf-hub-cache", help="HF_HUB_CACHE for the adapters")
     parser.add_argument("--reuse", action="store_true", help="score cached raw outputs when their cache key matches")
     parser.add_argument("--skip-offset-check", action="store_true")
     parser.add_argument("--no-recover", action="store_true",
                         help="score without recovered dropped copies (scorer.recover_dropped): the round-1 mapping")
-    args = parser.parse_args(argv)
+    return parser.parse_args(argv)
 
-    pythons = dict(item.split("=", 1) for item in args.python)
+
+def _config_overrides(args: argparse.Namespace) -> dict[str, dict]:
     tuned = json.loads(args.tuned.read_text())["entries"] if args.tuned else {}
     overrides = {k: v["config"] for k, v in tuned.items()}
     for k, v in (item.split("=", 1) for item in args.config):
         overrides[k] = {**overrides.get(k, {}), **json.loads(v)}
-    tools = {name: registry.tool(name, args.track) for name in args.entries}
-    for name, t in tools.items():
-        if t["adapter"] is None:
-            raise SystemExit(f"entry {name!r} has no adapter yet")
-    gpu = None if args.device == "cpu" else (args.gpu or pick_gpu(args.gpu_mem_gb + 1))
-    # The shared view is the types every comparison entry of the round supports, whichever entries this run
-    # scores, so a partial run (SCT alone with --no-recover) has the same shared view as the full one. A run
-    # on round-1 datasets only keeps round 1's eight entries, so round-1 scores do not move with round 2.
-    shared = shared_view(args.datasets, tools)
-    run_info = {"command": " ".join(["python -m benchmarks.compare.runner", *(argv or sys.argv[1:])]),
-                "part": args.part, "track": args.track,
-                "tuned": str(args.tuned) if args.tuned else None, "n_per_language": args.n, "seed": args.seed,
-                "threads": args.threads,
-                "cpus": args.cpus, "device": args.device, "gpu": gpu, "gpu_mem_gb": args.gpu_mem_gb,
-                "batch_size": args.batch_size, "doc_timeout": args.doc_timeout, "retries": args.retries,
-                "shared_types": list(shared), "environment": environment()}
-    _write(args.out / "run.json", run_info)
-    per_doc: dict[str, dict[str, list]] = {name: {} for name in tools}
-    records_by_dataset = {}
-    for name, t in tools.items():
-        py = Path(pythons[name]) if name in pythons else ensure_env(name, t["requirements"], args.cache / "venvs")
-        device = entry_device(t["device"], args.device)  # a CPU-only entry gets no GPU (no idle CUDA context)
-        config = {**t["adapter_config"], "threads": args.threads, "device": device,
-                  "gpu_mem_gb": args.gpu_mem_gb, **overrides.get(name, {})}
-        cmd = command(py, t["adapter"], config, args.cpus)
-        env = child_env(args.threads, device, gpu, args.hf_hub_cache)
-        (args.out / "envs").mkdir(parents=True, exist_ok=True)
-        frozen = freeze(py)
-        (args.out / "envs" / f"{name}.freeze.txt").write_text(frozen)
-        meta = {"entry": name, "entry_config": _jsonable({k: v for k, v in t.items() if k != "requirements"}),
-                "adapter_config": config, "python": str(py)}
-        if not args.skip_offset_check:
-            fixtures = [{"id": k, "lang": lang, "text": text} for k, (lang, text) in OFFSET_FIXTURES.items()]
-            res, _ = supervise(cmd, fixtures, args.cache / name / "offsets", env, args.doc_timeout, args.start_timeout)
-            problems, misses = check_offsets(res, t["labels"])
-            _write(args.out / name / "offset-check.json",
-                   {"passed": not problems, "problems": problems, "detection_errors": misses})
-            if problems:
-                print(f"[{name}] offset check failed, skipped: {problems}", file=sys.stderr)
-                continue
-        for dataset in args.datasets:
-            module = get(dataset)
-            if dataset not in records_by_dataset:
-                records_by_dataset[dataset] = split.load(dataset, args.part, args.n, args.seed)
-                unknown = unknown_gold_labels(dataset, records_by_dataset[dataset])
-                if unknown:  # label names and counts only
-                    raise SystemExit(f"{dataset}: gold labels neither mapped nor out of scope: {unknown}; add each to "
-                                     "labels.DATASET_LABELS or labels.DATASET_OUT_OF_SCOPE")
-            records = records_by_dataset[dataset]
-            raw = args.cache / name / f"{dataset}-{args.part}.jsonl"
-            stamp = raw.with_suffix(".key")
-            key = cache_key(config, t["adapter"], frozen, records)
-            outputs = {}
-            if args.reuse and raw.exists() and stamp.exists() and stamp.read_text().strip() == key:
-                outputs = {line["id"]: line for line in map(json.loads, raw.read_text(encoding="utf-8").splitlines())}
-            started = time.perf_counter()
-            if not {r["id"] for r in records} <= set(outputs):
-                print(f"[{name}] {dataset} {args.part}: {len(records)} docs", file=sys.stderr, flush=True)
-                outputs, process_info = supervise(cmd, records, args.cache / name / f"{dataset}-{args.part}", env,
-                                                  DOC_TIMEOUT.get(dataset, args.doc_timeout), args.start_timeout,
-                                                  args.retries, args.batch_size)
-                raw.write_text("".join(json.dumps(outputs[r["id"]], ensure_ascii=False) + "\n" for r in records),
-                               encoding="utf-8")
-                stamp.write_text(key)
-            else:
-                process_info = {"reused": str(raw)}
-            views = scorer.views_for(t["supports"], shared, registry.SCT_TYPES)
-            result, docs = scorer.score_run(records, outputs, t["labels"], DATASET_LABELS[dataset], views,
-                                            curve_floor=curve_floor(config, t),
-                                            curve_by_filter=t.get("curve_by_filter", True),
-                                            recover=t.get("recover_dropped", False) and not args.no_recover)
-            per_doc[name][dataset] = docs
-            if getattr(module, "DELETE_PREDICTIONS", False):  # licence (SHORTLIST section 3): no prediction cache kept
-                raw.unlink(missing_ok=True)
-                stamp.unlink(missing_ok=True)
-                shutil.rmtree(args.cache / name / f"{dataset}-{args.part}", ignore_errors=True)
-                process_info = {**process_info, "predictions_deleted": True}
-            ids = sorted(r["id"] for r in records)
-            result.update(meta, dataset={"name": dataset, "source": module.HF_ID, "revision": module.REVISION,
-                                         "licence": module.LICENCE, "publish": module.PUBLISH},
-                          contamination=registry.contamination(name, dataset), process=process_info,
-                          wall_seconds=round(time.perf_counter() - started, 1),
-                          sample_id_sha256=hashlib.sha256("\n".join(ids).encode()).hexdigest(),
-                          seconds_total=round(sum(o.get("seconds") or 0 for o in outputs.values()), 3))
-            if module.PUBLISH == "scores-and-ids":
-                result["failed_ids"] = sorted(r["id"] for r in records if "error" in outputs[r["id"]])
-                (args.out / "predictions" / name).mkdir(parents=True, exist_ok=True)
-                (args.out / "predictions" / name / f"{dataset}-{args.part}.jsonl").write_text("".join(
-                    json.dumps({"id": r["id"], "start": s["start"], "end": s["end"], "label": s["label"],
-                                "score": s.get("score")}) + "\n"
-                    for r in records for s in outputs[r["id"]]["spans"]), encoding="utf-8")
-            _write(args.out / name / f"{dataset}-{args.part}.json", result)
-    summary = {"aggregate": {}, "paired": {}}
+    return overrides
+
+
+class _EntryRun(NamedTuple):
+    """One entry made ready to run: what each of its datasets needs."""
+
+    name: str
+    tool: dict[str, Any]
+    cmd: list[str]
+    env: dict[str, str]
+    config: dict[str, Any]
+    frozen: str
+    shared: tuple[str, ...]
+    meta: dict[str, Any]
+
+
+def _offsets_pass(run: _EntryRun, args: argparse.Namespace) -> bool:
+    fixtures = [{"id": k, "lang": lang, "text": text} for k, (lang, text) in OFFSET_FIXTURES.items()]
+    res, _ = supervise(run.cmd, fixtures, args.cache / run.name / "offsets", run.env, args.doc_timeout, args.start_timeout)
+    problems, misses = check_offsets(res, run.tool["labels"])
+    _write(args.out / run.name / "offset-check.json",
+           {"passed": not problems, "problems": problems, "detection_errors": misses})
+    if problems:
+        print(f"[{run.name}] offset check failed, skipped: {problems}", file=sys.stderr)
+    return not problems
+
+
+def _cached_outputs(raw: Path, stamp: Path, key: str) -> dict[str, dict]:
+    if raw.exists() and stamp.exists() and stamp.read_text().strip() == key:
+        return {line["id"]: line for line in map(json.loads, raw.read_text(encoding="utf-8").splitlines())}
+    return {}
+
+
+def _score_dataset(run: _EntryRun, dataset: str, records: list[dict], args: argparse.Namespace) -> dict[str, list]:
+    """Run (or reuse) one entry on one dataset, write its result files, return its ``per_doc``."""
+    name, tool = run.name, run.tool
+    module = get(dataset)
+    raw = args.cache / name / f"{dataset}-{args.part}.jsonl"
+    stamp = raw.with_suffix(".key")
+    key = cache_key(run.config, tool["adapter"], run.frozen, records)
+    outputs = _cached_outputs(raw, stamp, key) if args.reuse else {}
+    started = time.perf_counter()
+    if {r["id"] for r in records} <= set(outputs):
+        process_info = {"reused": str(raw)}
+    else:
+        print(f"[{name}] {dataset} {args.part}: {len(records)} docs", file=sys.stderr, flush=True)
+        outputs, process_info = supervise(run.cmd, records, args.cache / name / f"{dataset}-{args.part}", run.env,
+                                          DOC_TIMEOUT.get(dataset, args.doc_timeout), args.start_timeout,
+                                          args.retries, args.batch_size)
+        write_text_atomic(raw, "".join(json.dumps(outputs[r["id"]], ensure_ascii=False) + "\n" for r in records))
+        write_text_atomic(stamp, key)
+    views = scorer.views_for(tool["supports"], run.shared, registry.SCT_TYPES)
+    result, docs = scorer.score_run(records, outputs, tool["labels"], DATASET_LABELS[dataset], views,
+                                    curve_floor=curve_floor(run.config, tool),
+                                    curve_by_filter=tool.get("curve_by_filter", True),
+                                    recover=tool.get("recover_dropped", False) and not args.no_recover)
+    if getattr(module, "DELETE_PREDICTIONS", False):
+        raw.unlink(missing_ok=True)
+        stamp.unlink(missing_ok=True)
+        shutil.rmtree(args.cache / name / f"{dataset}-{args.part}", ignore_errors=True)
+        process_info = {**process_info, "predictions_deleted": True}
+    ids = sorted(r["id"] for r in records)
+    result.update(run.meta, dataset={"name": dataset, "source": module.HF_ID, "revision": module.REVISION,
+                                     "licence": module.LICENCE, "publish": module.PUBLISH},
+                  contamination=registry.contamination(name, dataset), process=process_info,
+                  wall_seconds=round(time.perf_counter() - started, 1),
+                  sample_id_sha256=hashlib.sha256("\n".join(ids).encode()).hexdigest(),
+                  seconds_total=round(sum(o.get("seconds") or 0 for o in outputs.values()), 3))
+    if module.PUBLISH == "scores-and-ids":
+        result["failed_ids"] = sorted(r["id"] for r in records if "error" in outputs[r["id"]])
+        predictions = args.out / "predictions" / name / f"{dataset}-{args.part}.jsonl"
+        predictions.parent.mkdir(parents=True, exist_ok=True)
+        write_text_atomic(predictions, "".join(
+            json.dumps({"id": r["id"], "start": s["start"], "end": s["end"], "label": s["label"],
+                        "score": s.get("score")}) + "\n"
+            for r in records for s in outputs[r["id"]]["spans"]))
+    _write(args.out / name / f"{dataset}-{args.part}.json", result)
+    return docs
+
+
+def _summary(per_doc: dict[str, dict[str, Any]], baseline: str) -> dict[str, Any]:
+    summary: dict[str, Any] = {"aggregate": {}, "paired": {}}
     for name, by_dataset in per_doc.items():
         summary["aggregate"][name] = {}
         for view in ("supported", "shared", "full"):
@@ -516,19 +464,62 @@ def main(argv=None) -> None:
                 if chosen:
                     agg[group] = scorer.aggregate(chosen)
             summary["aggregate"][name][view] = agg
-    base = per_doc.get(args.baseline, {})
+    base = per_doc.get(baseline, {})
     for name, by_dataset in per_doc.items():
-        if name == args.baseline:
+        if name == baseline:
             continue
         for dataset, docs in by_dataset.items():
             if dataset in base:
                 summary["paired"].setdefault(name, {})[dataset] = scorer.paired_bootstrap(base[dataset]["shared"],
                                                                                           docs["shared"])
-    summary.update(rule_views(per_doc, args.baseline))
-    summary["paired_note"] = (f"a = {args.baseline}, b = entry, effective protection (failed docs unmasked); paired: "
+    summary.update(rule_views(per_doc, baseline))
+    summary["paired_note"] = (f"a = {baseline}, b = entry, effective protection (failed docs unmasked); paired: "
                               "shared view per dataset, every cell; own / same_set / pairwise: decision 21 and the "
                               "claimed-language rule (PROTOCOL.md sections 12 and 17)")
-    _write(args.out / "summary.json", summary)
+    return summary
+
+
+def main(argv=None) -> None:
+    args = _parse_args(argv)
+    overrides = _config_overrides(args)
+    tools = {name: registry.tool(name, args.track) for name in args.entries}
+    for name, t in tools.items():
+        if t["adapter"] is None:
+            raise SystemExit(f"entry {name!r} has no adapter yet")
+    gpu, _ = device_env(args)
+    shared = shared_view(args.datasets, tools)
+    run_info = {"command": " ".join(["python -m benchmarks.compare.runner", *(argv or sys.argv[1:])]),
+                "part": args.part, "track": args.track,
+                "tuned": str(args.tuned) if args.tuned else None, "n_per_language": args.n, "seed": args.seed,
+                "threads": args.threads,
+                "cpus": args.cpus, "device": args.device, "gpu": gpu, "gpu_mem_gb": args.gpu_mem_gb,
+                "batch_size": args.batch_size, "doc_timeout": args.doc_timeout, "retries": args.retries,
+                "shared_types": list(shared), "environment": environment()}
+    _write(args.out / "run.json", run_info)
+    per_doc: dict[str, dict[str, Any]] = {name: {} for name in tools}
+    records_by_dataset = {}
+    for name, t in tools.items():
+        py = entry_python(name, t, args)
+        config = entry_config(t, args, overrides.get(name))
+        cmd = command(py, t["adapter"], config, args.cpus)
+        env = child_env(args.threads, config["device"], gpu, args.hf_hub_cache)
+        (args.out / "envs").mkdir(parents=True, exist_ok=True)
+        frozen = freeze(py)
+        write_text_atomic(args.out / "envs" / f"{name}.freeze.txt", frozen)
+        meta = {"entry": name, "entry_config": _jsonable({k: v for k, v in t.items() if k != "requirements"}),
+                "adapter_config": config, "python": str(py)}
+        run = _EntryRun(name, t, cmd, env, config, frozen, shared, meta)
+        if not args.skip_offset_check and not _offsets_pass(run, args):
+            continue
+        for dataset in args.datasets:
+            if dataset not in records_by_dataset:
+                records_by_dataset[dataset] = split.load(dataset, args.part, args.n, args.seed)
+                unknown = unknown_gold_labels(dataset, records_by_dataset[dataset])
+                if unknown:
+                    raise SystemExit(f"{dataset}: gold labels neither mapped nor out of scope: {unknown}; add each to "
+                                     "labels.DATASET_LABELS or labels.DATASET_OUT_OF_SCOPE")
+            per_doc[name][dataset] = _score_dataset(run, dataset, records_by_dataset[dataset], args)
+    _write(args.out / "summary.json", _summary(per_doc, args.baseline))
     print(args.out / "summary.json")
 
 

@@ -10,7 +10,9 @@ from sct import TextCleaner, config
 from sct.config import TextCleanerConfig
 from sct.utils import ner as ner_module
 from sct.utils.ner import GeneralNER
-from tests.conftest import TEST_NER_MODELS
+from tests.conftest import TEST_NER_MODELS, TEST_NER_REVISIONS
+import sys
+import types
 
 CPU = 'CPUExecutionProvider'
 CUDA = 'CUDAExecutionProvider'
@@ -19,7 +21,8 @@ TEXT = "John Smith visited the office in London yesterday afternoon."
 
 def _cfg(**overrides):
     return TextCleanerConfig(
-        ner_models=TEST_NER_MODELS, language="en", check_statistical_model_processing=False,
+        ner_models=TEST_NER_MODELS,
+        ner_model_revisions=TEST_NER_REVISIONS, language="en", check_statistical_model_processing=False,
         **overrides,
     )
 
@@ -100,8 +103,8 @@ def test_torch_backend_gets_indexed_cuda_device(monkeypatch):
         return object(), Tok()
 
     monkeypatch.setattr("sct.utils.torch_pipeline.load_torch_ner_model", fake_load)
-    ner = GeneralNER(device="cuda", cuda_device_id=2, ner_backend="torch",
-                     torch_model_names={"ENGLISH": "a", "MULTILINGUAL": "b"})
+    ner = GeneralNER(TextCleanerConfig(ner_device="cuda", cuda_device_id=2, ner_backend="torch",
+                                       torch_ner_models={"ENGLISH": "a", "MULTILINGUAL": "b"}))
     assert seen == ["cuda:2", "cuda:2"]
     assert [m["provider"] for m in ner.models_for("ENGLISH")] == ["cuda:2", "cuda:2"]
 
@@ -116,9 +119,9 @@ def test_onnx_loader_gets_device_id_and_options(monkeypatch):
         seen.append((kwargs["device"], kwargs["cuda_device_id"], kwargs["cuda_provider_options"]))
         return object(), Tok()
 
-    monkeypatch.setattr(ner_module, "load_onnx_ner_model", fake_load)
-    GeneralNER(device="cuda", cuda_device_id=3, onnx_cuda_provider_options={"a": 1},
-               model_names={"ENGLISH": "a", "MULTILINGUAL": "b"})
+    monkeypatch.setattr("sct.utils.onnx_pipeline.load_onnx_ner_model", fake_load)
+    GeneralNER(TextCleanerConfig(ner_device="cuda", cuda_device_id=3, onnx_cuda_provider_options={"a": 1},
+                                 ner_models={"ENGLISH": "a", "MULTILINGUAL": "b"}))
     assert seen == [("cuda", 3, {"a": 1})] * 2
 
 
@@ -166,8 +169,8 @@ def _fake_torch_loader(monkeypatch):
 def test_mps_moves_torch_or_falls_back_to_cpu(monkeypatch, available, device):
     monkeypatch.setattr(ner_module, "_mps_available", lambda: available)
     seen = _fake_torch_loader(monkeypatch)
-    ner = GeneralNER(device="mps", ner_backend="torch",
-                     torch_model_names={"ENGLISH": "a", "MULTILINGUAL": "b"})
+    ner = GeneralNER(TextCleanerConfig(ner_device="mps", ner_backend="torch",
+                                       torch_ner_models={"ENGLISH": "a", "MULTILINGUAL": "b"}))
     assert seen == [device, device]
     assert [m["provider"] for m in ner.models_for("ENGLISH")] == [device, device]
 
@@ -183,7 +186,7 @@ def test_mps_keeps_onnx_on_cpu(spy_sessions, monkeypatch):
 def test_mps_fallback_warning(monkeypatch):
     monkeypatch.setattr(ner_module, "_mps_available", lambda: False)
     cleaner = TextCleaner(cfg=_cfg(ner_device="mps"))
-    cleaner.GeneralNER._provenance["ENGLISH"]["provider"] = "cpu"  # a torch model that fell back
+    cleaner.GeneralNER.provenance["ENGLISH"]["provider"] = "cpu"  # a torch model that fell back
     assert "mps_fallback" in cleaner.process(TEXT).metadata["warnings"]
     assert TextCleanerConfig(check_ner_process=False, ner_device="mps").ner_device == "mps"
 
@@ -209,3 +212,226 @@ def test_real_torch_model_on_mps_matches_cpu():
         assert {m["provider"] for m in result.metadata["provenance"]["models"]} == {device}
         assert "mps_fallback" not in result.metadata["warnings"]
     assert outs["mps"] == outs["cpu"]
+
+
+# --- GLiNER device follows the effective backend; Presidio gets the device ---
+class _Model:
+    def __init__(self):
+        self.moved = None
+
+    def to(self, device):
+        self.moved = device
+        return self
+
+
+def _fake_gliner(monkeypatch, has_onnx=False):
+    class GLiNER:
+        @staticmethod
+        def from_pretrained(model_id, load_onnx_model=False, **kwargs):
+            if load_onnx_model and not has_onnx:
+                raise FileNotFoundError("no model.onnx")
+            return _Model()
+
+    class GLiNER2:
+        @staticmethod
+        def from_pretrained(model_id, **kwargs):
+            return _Model()
+
+    monkeypatch.setitem(sys.modules, "gliner", types.SimpleNamespace(GLiNER=GLiNER))
+    monkeypatch.setitem(sys.modules, "gliner2", types.SimpleNamespace(GLiNER2=GLiNER2))
+
+
+def test_gliner_onnx_fallback_and_gliner2_move_to_cuda(monkeypatch):
+    _fake_gliner(monkeypatch)
+    from sct.utils.gliner_adapter import GLiNERAdapter
+
+    fallback = GLiNERAdapter("m", device="cuda:2", onnx=True)
+    assert fallback._onnx is False and fallback.model.moved == "cuda:2"
+    assert GLiNERAdapter("m", variant="gliner2", device="cuda:2", onnx=True).model.moved == "cuda:2"
+
+
+def _fake_presidio(monkeypatch, seen):
+    class Recognizer:
+        def __init__(self, **kwargs):
+            seen.update(kwargs)
+
+    class Engine:
+        registry = types.SimpleNamespace(add_recognizer=lambda r: None)
+
+    monkeypatch.setitem(sys.modules, "presidio_analyzer", types.SimpleNamespace(AnalyzerEngine=Engine))
+    monkeypatch.setitem(sys.modules, "presidio_analyzer.predefined_recognizers",
+                        types.SimpleNamespace(GLiNERRecognizer=Recognizer))
+
+
+def test_presidio_gliner_gets_device_and_torch_provenance(monkeypatch):
+    seen = {}
+    _fake_presidio(monkeypatch, seen)
+
+    ner = GeneralNER(TextCleanerConfig(ner_backend="presidio_gliner", ner_device="cuda", cuda_device_id=2,
+                                       gliner_model="m"))
+    assert seen["map_location"] == "cuda:2"
+    assert ner.provenance["GLINER"]["provider"] == "cuda:2"
+
+
+# --- ner_device=None: the ONNX provider list says CUDA, torch decides what torch components get ---
+def _torch_sees(monkeypatch, gpus):
+    cuda = types.SimpleNamespace(is_available=lambda: gpus > 0, device_count=lambda: gpus)
+    monkeypatch.setitem(sys.modules, "torch", types.SimpleNamespace(cuda=cuda))
+    monkeypatch.setattr(ort, "get_available_providers", lambda: [CUDA, CPU])
+
+
+def _fake_onnx_loader(monkeypatch):
+    seen = []
+
+    class Tok:
+        max_len_single_sentence = 510
+
+    def fake_load(model_name, **kwargs):
+        seen.append(kwargs["device"])
+        return types.SimpleNamespace(provider=CPU), Tok()
+
+    monkeypatch.setattr("sct.utils.onnx_pipeline.load_onnx_ner_model", fake_load)
+    return seen
+
+
+@pytest.mark.parametrize("gpus, device_id, torch_device", [(0, 0, "cpu"), (1, 1, "cpu"), (2, 1, "cuda:1")])
+def test_auto_gliner_follows_torch_not_the_provider_list(monkeypatch, gpus, device_id, torch_device):
+    _torch_sees(monkeypatch, gpus)
+    _fake_gliner(monkeypatch)
+    ner = GeneralNER(TextCleanerConfig(ner_backend="gliner", gliner_model="m", cuda_device_id=device_id))
+    assert ner._gliner_pipe.model.moved == (None if torch_device == "cpu" else torch_device)
+    assert ner.provenance["GLINER"]["provider"] == torch_device
+
+
+@pytest.mark.parametrize("gpus, map_location", [(0, "cpu"), (1, "cuda:0")])
+def test_auto_presidio_follows_torch_not_the_provider_list(monkeypatch, gpus, map_location):
+    _torch_sees(monkeypatch, gpus)
+    seen = {}
+    _fake_presidio(monkeypatch, seen)
+    ner = GeneralNER(TextCleanerConfig(ner_backend="presidio_gliner", gliner_model="m"))
+    assert seen["map_location"] == map_location
+    assert ner.provenance["GLINER"]["provider"] == map_location
+
+
+def _cpu_onnx_runtime_with_a_gpu(monkeypatch):
+    _torch_sees(monkeypatch, 1)
+    monkeypatch.setattr(ort, "get_available_providers", lambda: [CPU])
+
+
+def test_auto_gliner_uses_the_gpu_with_a_cpu_onnx_runtime(monkeypatch):
+    _cpu_onnx_runtime_with_a_gpu(monkeypatch)
+    _fake_gliner(monkeypatch)
+    ner = GeneralNER(TextCleanerConfig(ner_backend="gliner", gliner_model="m"))
+    assert ner._gliner_pipe.model.moved == "cuda:0"
+    assert ner.provenance["GLINER"]["provider"] == "cuda:0"
+
+
+def test_auto_presidio_uses_the_gpu_with_a_cpu_onnx_runtime(monkeypatch):
+    _cpu_onnx_runtime_with_a_gpu(monkeypatch)
+    seen = {}
+    _fake_presidio(monkeypatch, seen)
+    GeneralNER(TextCleanerConfig(ner_backend="presidio_gliner", gliner_model="m"))
+    assert seen["map_location"] == "cuda:0"
+
+
+def test_auto_ensemble_onnx_splits_devices_with_a_cpu_onnx_runtime(monkeypatch):
+    _cpu_onnx_runtime_with_a_gpu(monkeypatch)
+    _fake_gliner(monkeypatch)
+    seen = _fake_onnx_loader(monkeypatch)
+    ner = GeneralNER(TextCleanerConfig(ner_backend="ensemble_onnx", gliner_model="m",
+                                       ner_models={"ENGLISH": "a", "MULTILINGUAL": "b"}))
+    assert seen == ["cpu", "cpu"]
+    assert ner._gliner_pipe.model.moved == "cuda:0"
+    assert ner.provenance["GLINER"]["provider"] == "cuda:0"
+
+
+def test_auto_gliner_in_onnx_mode_stays_off_the_gpu_with_a_cpu_onnx_runtime(monkeypatch):
+    _cpu_onnx_runtime_with_a_gpu(monkeypatch)
+    _fake_gliner(monkeypatch, has_onnx=True)
+    ner = GeneralNER(TextCleanerConfig(ner_mode="pii"))
+    assert ner._torch_device == "cpu"
+    assert ner.provenance["GLINER"]["provider"] == "onnx"
+
+
+def test_auto_ensemble_onnx_keeps_trying_cuda_for_onnx_only(monkeypatch):
+    _torch_sees(monkeypatch, 0)
+    _fake_gliner(monkeypatch)
+    seen = _fake_onnx_loader(monkeypatch)
+    ner = GeneralNER(TextCleanerConfig(ner_backend="ensemble_onnx", gliner_model="m",
+                                       ner_models={"ENGLISH": "a", "MULTILINGUAL": "b"}))
+    assert seen == ["cuda", "cuda"]
+    assert ner._gliner_pipe.model.moved is None
+    assert ner.provenance["GLINER"]["provider"] == "cpu"
+
+
+def test_auto_ensemble_torch_stays_on_cpu_without_a_gpu(monkeypatch, caplog):
+    _torch_sees(monkeypatch, 0)
+    _fake_gliner(monkeypatch)
+    seen = _fake_torch_loader(monkeypatch)
+    ner = GeneralNER(TextCleanerConfig(ner_backend="ensemble_torch", gliner_model="m",
+                                       torch_ner_models={"ENGLISH": "a", "MULTILINGUAL": "b"}))
+    assert seen == ["cpu", "cpu"]
+    assert ner._gliner_pipe.model.moved is None
+    # Torch backends just run on CPU: no warning, so the docs only promise provider "cpu" for them.
+    assert ner.device == "cpu" and "Torch models run on CPU" not in caplog.text
+
+
+def test_auto_torch_backend_skips_a_gpu_index_torch_cannot_see(monkeypatch):
+    _torch_sees(monkeypatch, 1)
+    seen = _fake_torch_loader(monkeypatch)
+    GeneralNER(TextCleanerConfig(ner_backend="torch", cuda_device_id=1,
+                                 torch_ner_models={"ENGLISH": "a", "MULTILINGUAL": "b"}))
+    assert seen == ["cpu", "cpu"]
+
+
+def test_auto_gliner_on_cpu_sets_cuda_fallback(monkeypatch, caplog):
+    _torch_sees(monkeypatch, 0)
+    _fake_gliner(monkeypatch)
+    monkeypatch.setattr(_Model, "predict_entities", lambda self, *a, **k: [], raising=False)
+    result = TextCleaner(cfg=TextCleanerConfig(
+        ner_backend="gliner", gliner_model="m", language="en", check_statistical_model_processing=False,
+    )).process(TEXT)
+    assert "cuda_fallback" in result.metadata["warnings"]
+    assert "Torch models run on CPU" in caplog.text
+
+
+def test_auto_gliner_in_onnx_mode_does_not_warn_about_torch(monkeypatch, caplog):
+    _torch_sees(monkeypatch, 0)
+    _fake_gliner(monkeypatch, has_onnx=True)
+    ner = GeneralNER(TextCleanerConfig(ner_mode="pii"))
+    assert ner._gliner_pipe._onnx is True
+    assert ner.provenance["GLINER"]["provider"] == "onnx"
+    assert "Torch models run on CPU" not in caplog.text
+
+
+def test_auto_gliner_warns_when_missing_onnx_weights_force_torch(monkeypatch, caplog):
+    _torch_sees(monkeypatch, 0)
+    _fake_gliner(monkeypatch)
+    ner = GeneralNER(TextCleanerConfig(ner_mode="pii"))
+    assert ner._gliner_pipe._onnx is False
+    assert ner.provenance["GLINER"]["provider"] == "cpu"
+    assert "Torch models run on CPU" in caplog.text
+
+
+def test_explicit_cuda_is_not_downgraded_when_torch_sees_no_gpu(monkeypatch):
+    _torch_sees(monkeypatch, 0)
+    _fake_gliner(monkeypatch)
+    ner = GeneralNER(TextCleanerConfig(ner_backend="gliner", gliner_model="m", ner_device="cuda"))
+    assert ner._gliner_pipe.model.moved == "cuda:0"
+
+
+def test_auto_plain_onnx_never_asks_torch(monkeypatch):
+    monkeypatch.setattr(ort, "get_available_providers", lambda: [CUDA, CPU])
+    monkeypatch.setattr(ner_module, "_torch_cuda_usable", lambda _: pytest.fail("torch was consulted"))
+    seen = _fake_onnx_loader(monkeypatch)
+    GeneralNER(TextCleanerConfig(ner_models={"ENGLISH": "a", "MULTILINGUAL": "b"}))
+    assert seen == ["cuda", "cuda"]
+
+
+def test_gliclass_stays_on_cpu_unless_cuda_is_explicit(monkeypatch):
+    seen = []
+    monkeypatch.setattr("sct.sct.GLiClassAdapter", lambda **kwargs: seen.append(kwargs["device"]))
+    for device, expected in ((None, "cpu"), ("cuda", "cuda:1")):
+        cfg = TextCleanerConfig(check_ner_process=False, ner_device=device, cuda_device_id=1)
+        TextCleaner._build_gliclass(types.SimpleNamespace(cfg=cfg))
+        assert seen.pop() == expected

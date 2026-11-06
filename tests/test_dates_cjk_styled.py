@@ -1,7 +1,6 @@
 """Dates glued to unspaced scripts, CJK/Korean unit dates, Han-numeral dates and styled month-name dates
 (fuzz date shapes): redacted in every mode and in the stream, with fold_styled_characters as the switch for styled forms."""
 
-import time
 
 import pytest
 
@@ -9,6 +8,7 @@ from sct import TextCleaner
 from sct.presets import preset_config
 from sct.streaming import WindowedStreamingRedactor
 from sct.utils import constants
+from tests.helpers import assert_near_linear
 
 GLUED_AND_UNITS = [
     ("生日是", "15 January 1990", "谢谢"),
@@ -70,14 +70,16 @@ def test_buddhist_era_years_and_custom_thai_months():
         assert "2533" not in cleaner.process(text).lm_text
 
 
-@pytest.mark.parametrize("text", [
-    "1990年1月" * 5000, "1990年 1 月 1 " * 5000, "1990. 1. " * 5000, "一九九〇年十" * 5000, "〇" * 20000,
-    "⑮ January " * 5000, "1990년 1월 " * 5000, "January 1 " * 5000, "ⓐé" * 5000, "월⁠ " * 5000,
+@pytest.mark.parametrize("unit, n", [
+    ("1990年1月", 5000), ("1990年 1 月 1 ", 5000), ("1990. 1. ", 5000), ("一九九〇年十", 5000), ("〇", 20000),
+    ("⑮ January ", 5000), ("1990년 1월 ", 5000), ("January 1 ", 5000), ("ⓐé", 5000), ("월⁠ ", 5000),
 ])
-def test_new_date_patterns_are_linear(text):
-    regex = constants.build_date_regex(styled=True)
-    start = time.perf_counter()
-    list(regex.finditer(text))
-    list(constants.FUZZY_DATE_CANDIDATE_REGEX.finditer(text))
-    _cleaner().process(text)
-    assert time.perf_counter() - start < 2
+def test_new_date_patterns_are_linear(unit, n):
+    regex, cleaner = constants.build_date_regex(styled=True), _cleaner()
+
+    def scan(text):
+        list(regex.finditer(text))
+        list(constants.FUZZY_DATE_CANDIDATE_REGEX.finditer(text))
+        cleaner.process(text)
+
+    assert_near_linear(scan, lambda size: unit * size, n)

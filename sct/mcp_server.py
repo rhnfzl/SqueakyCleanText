@@ -1,6 +1,6 @@
 """Optional Model Context Protocol server.
 
-Server settings come from the environment only:
+Server settings come from create_mcp_server arguments, else the environment:
 
 ``SCT_MCP_ROOT``
     Folder the ``path`` input may read from. Unset means ``path`` is off.
@@ -17,18 +17,25 @@ Server settings come from the environment only:
 import os
 import stat
 import threading
-from typing import Any, Literal, NotRequired, Optional, TypedDict
+from collections.abc import Callable, Iterator
+from contextlib import contextmanager
+from typing import TYPE_CHECKING, Any, Literal, NotRequired, TypedDict, cast
 
 from sct.adapters import process_json
+from sct.config import require_adapter_mode
 from sct.presets import preset_config
-from sct.sct import TextCleaner
-from sct.signals import public_view
+from sct.sct import CustomPatternTimeout, TextCleaner
+from sct.signals import Signals, public_view
+from sct.utils.ner import ModelLoadError
 
-try:
+if TYPE_CHECKING:
     from fastmcp.exceptions import ToolError
-except ImportError:  # the helpers below stay usable (and testable) without the mcp extra
-    class ToolError(Exception):
-        """Stand-in for ``fastmcp.exceptions.ToolError``."""
+else:
+    try:
+        from fastmcp.exceptions import ToolError
+    except ImportError:  # the helpers below stay usable (and testable) without the mcp extra
+        class ToolError(Exception):
+            """Stand-in for ``fastmcp.exceptions.ToolError``."""
 
 DEFAULT_MAX_BYTES = 1_048_576
 # path needs a dir-fd walk with O_NOFOLLOW; without it (Windows) path stays off.
@@ -54,7 +61,7 @@ class TextOutput(TypedDict):
     warnings: list[str]
     summary: str
     text: str
-    signals: dict[str, Any]
+    signals: Signals
     findings: NotRequired[list[Finding]]
 
 
@@ -62,7 +69,7 @@ class JsonOutput(TypedDict):
     warnings: list[str]
     summary: str
     value: Any
-    signals: dict[str, Any]
+    signals: Signals
     findings: NotRequired[list[JsonFinding]]
 
 
@@ -78,7 +85,14 @@ def _public_finding(finding) -> Finding:
     }
 
 
-def summarize(signals: dict[str, Any]) -> str:
+def _full_warnings(signals: Signals, findings: list) -> list[str]:
+    """Warn when entities were counted but the cleaner did not collect their findings."""
+    if signals["entity_counts"] and not findings:
+        return sorted({*signals["warnings"], "findings_not_collected"})
+    return signals["warnings"]
+
+
+def summarize(signals: Signals) -> str:
     """One value-free sentence, e.g. ``2 PII items (EMAIL, PERSON), 4% of text, language HINDI 0.93``."""
     count = signals["pii_count"]
     if count:
@@ -101,6 +115,10 @@ def sanitize_text(
     detail: Literal["concise", "full"] = "concise",
 ) -> TextOutput:
     """Return a JSON-safe, value-free text cleaning result."""
+    try:
+        require_adapter_mode(cleaner.cfg)
+    except ValueError as exc:
+        raise ToolError(str(exc)) from None
     result = cleaner.process(text)
     signals = public_view(result)
     output: TextOutput = {
@@ -112,8 +130,9 @@ def sanitize_text(
     if detail == "full":
         output["findings"] = [
             _public_finding(finding)
-            for finding in (result.metadata or {}).get("findings", ())
+            for finding in result.metadata.get("findings", ())
         ]
+        output["warnings"] = _full_warnings(signals, output["findings"])
     return output
 
 
@@ -126,7 +145,7 @@ def sanitize_json(
     try:
         result = process_json(cleaner, value)
     except ValueError as exc:
-        raise ToolError(f"{exc}. Pass a JSON value whose keys stay unique after cleaning.") from None
+        raise ToolError(str(exc)) from None
     signals = result.signals
     output: JsonOutput = {
         "warnings": signals["warnings"],
@@ -136,9 +155,10 @@ def sanitize_json(
     }
     if detail == "full":
         output["findings"] = [
-            {"path": list(item.path), **_public_finding(item.finding)}
+            {"path": cast(list[str | int], list(item.path)), **_public_finding(item.finding)}
             for item in result.findings
         ]
+        output["warnings"] = _full_warnings(signals, output["findings"])
     return output
 
 
@@ -156,19 +176,31 @@ def read_under_root(root: str, path: str, max_bytes: int = DEFAULT_MAX_BYTES) ->
         raise ToolError(
             "path must be relative to SCT_MCP_ROOT, with no empty, hidden, '.' or '..' parts."
         )
-    dir_fd = os.open(root, os.O_RDONLY | os.O_DIRECTORY)
+    return _read_capped(_open_below(root, parts), max_bytes)
+
+
+def _open_below(root: str, parts: list[str]) -> int:
+    """Descriptor of the file *parts* names below *root*, each folder opened from its parent's descriptor."""
+    try:
+        dir_fd = os.open(root, os.O_RDONLY | os.O_DIRECTORY)
+    except OSError:
+        raise ToolError("SCT_MCP_ROOT cannot be opened. Check that the folder exists and is readable.") from None
     try:
         for part in parts[:-1]:
             next_fd = os.open(part, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=dir_fd)
             os.close(dir_fd)
             dir_fd = next_fd
-        file_fd = os.open(parts[-1], os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK, dir_fd=dir_fd)
+        return os.open(parts[-1], os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK, dir_fd=dir_fd)
     except OSError:
         raise ToolError(
             "path not found under SCT_MCP_ROOT, or it goes through a symlink or a non-folder."
         ) from None
     finally:
         os.close(dir_fd)
+
+
+def _read_capped(file_fd: int, max_bytes: int) -> str:
+    """Read and close *file_fd*: a regular UTF-8 file of at most *max_bytes* bytes."""
     try:
         if not stat.S_ISREG(os.fstat(file_fd).st_mode):
             raise ToolError("path must name a regular file, not a folder, link, pipe or device.")
@@ -194,48 +226,32 @@ _ANNOTATIONS = {
     "readOnlyHint": True,
     "destructiveHint": False,
     "idempotentHint": True,
-    "openWorldHint": False,
+    "openWorldHint": True,  # a cold cache downloads NER models from the Hugging Face Hub
 }
 
 
-def create_mcp_server(
-    cleaner: Optional[TextCleaner] = None,
-    *,
-    root: Optional[str] = None,
-    max_bytes: Optional[int] = None,
-    preset: Optional[str] = None,
-):
-    """Create a FastMCP server without importing FastMCP at package import.
-
-    *root*, *max_bytes* and *preset* default to ``SCT_MCP_ROOT`` /
-    ``SCT_MCP_MAX_BYTES`` / ``SCT_MCP_PRESET``.
-    """
-    try:
-        from fastmcp import FastMCP
-    except ImportError as exc:
-        raise ImportError(
-            "FastMCP is required for the MCP server. "
-            "Install with: pip install squeakycleantext[mcp]"
-        ) from exc
-
+def _server_settings(root: str | None, max_bytes: int | None, preset: str | None) -> tuple[str | None, int, str]:
+    """Arguments, else the environment, else the defaults; a bad value fails at start-up, not per call."""
     root = root or os.environ.get("SCT_MCP_ROOT") or None
     if root is not None and not os.path.isdir(root):
-        raise ValueError("SCT_MCP_ROOT must be an existing directory")  # fail at start-up, not per call
+        raise ValueError("SCT_MCP_ROOT must be an existing directory")
     if max_bytes is None:
-        max_bytes = int(os.environ.get("SCT_MCP_MAX_BYTES") or DEFAULT_MAX_BYTES)
+        try:
+            max_bytes = int(os.environ.get("SCT_MCP_MAX_BYTES") or DEFAULT_MAX_BYTES)
+        except ValueError as exc:
+            raise ValueError("SCT_MCP_MAX_BYTES must be a whole number") from exc
     if max_bytes < 0:
         raise ValueError("SCT_MCP_MAX_BYTES must be zero or more")
     preset = preset or os.environ.get("SCT_MCP_PRESET") or "sct"
-    preset_config(preset)  # fail at start-up on an unknown name
-    ascii_override = {"check_to_ascii_unicode": True} if os.environ.get("SCT_MCP_TO_ASCII") == "1" else {}
+    preset_config(preset)
+    return root, max_bytes, preset
 
-    server = FastMCP(
-        "SqueakyCleanText",
-        instructions=(
-            "Remove or replace sensitive text before passing content to "
-            "models, logs, or retrieval systems."
-        ),
-    )
+
+def _cleaner_getter(cleaner: TextCleaner | None, preset: str) -> Callable[[bool], TextCleaner]:
+    """``get_cleaner(pii)``: the given cleaner, else one built on first use for each mode."""
+    if cleaner is not None:
+        require_adapter_mode(cleaner.cfg)
+    ascii_override = {"check_to_ascii_unicode": True} if os.environ.get("SCT_MCP_TO_ASCII") == "1" else {}
     cleaners: dict[bool, TextCleaner] = {}
     cleaners_lock = threading.Lock()  # sync tools run on worker threads
 
@@ -255,11 +271,55 @@ def create_mcp_server(
                         include_entities=True,
                     )
         return cleaners[pii]
+    return get_cleaner
+
+
+@contextmanager
+def _tool_errors() -> Iterator[None]:
+    """Turn the failures the cleaner documents into tool errors the caller can act on."""
+    try:
+        yield
+    except (ImportError, ModelLoadError) as exc:
+        raise ToolError(f"{exc}. Install the extra it names or check the Hugging Face connection.") from None
+    except CustomPatternTimeout as exc:
+        raise ToolError(str(exc)) from None
+
+
+def create_mcp_server(
+    cleaner: TextCleaner | None = None,
+    *,
+    root: str | None = None,
+    max_bytes: int | None = None,
+    preset: str | None = None,
+) -> Any:
+    """Create a FastMCP server without importing FastMCP at package import.
+
+    *root*, *max_bytes* and *preset* default to ``SCT_MCP_ROOT`` /
+    ``SCT_MCP_MAX_BYTES`` / ``SCT_MCP_PRESET``.
+    """
+    try:
+        from fastmcp import FastMCP
+    except ImportError as exc:
+        raise ImportError(
+            "FastMCP is required for the MCP server. "
+            "Install with: pip install squeakycleantext[mcp]"
+        ) from exc
+
+    root, max_bytes, preset = _server_settings(root, max_bytes, preset)
+
+    server = FastMCP(
+        "SqueakyCleanText",
+        instructions=(
+            "Remove or replace sensitive text before passing content to "
+            "models, logs, or retrieval systems."
+        ),
+    )
+    get_cleaner = _cleaner_getter(cleaner, preset)
 
     @server.tool(title="Clean text", annotations={**_ANNOTATIONS, "title": "Clean text"})
     def clean_text(
-        text: Optional[str] = None,
-        path: Optional[str] = None,
+        text: str | None = None,
+        path: str | None = None,
         pii: bool = False,
         detail: Literal["concise", "full"] = "concise",
     ) -> TextOutput:
@@ -274,7 +334,8 @@ def create_mcp_server(
             if root is None:
                 raise ToolError("path input is off. Set SCT_MCP_ROOT to a folder to allow it, or pass text.")
             text = read_under_root(root, path, max_bytes)
-        return sanitize_text(get_cleaner(pii), text, detail)
+        with _tool_errors():
+            return sanitize_text(get_cleaner(pii), cast(str, text), detail)
 
     @server.tool(title="Clean JSON", annotations={**_ANNOTATIONS, "title": "Clean JSON"})
     def clean_json(
@@ -283,7 +344,8 @@ def create_mcp_server(
         detail: Literal["concise", "full"] = "concise",
     ) -> JsonOutput:
         """Clean every string (keys included) in a JSON value and return value-free signals."""
-        return sanitize_json(get_cleaner(pii), value, detail)
+        with _tool_errors():
+            return sanitize_json(get_cleaner(pii), value, detail)
 
     return server
 

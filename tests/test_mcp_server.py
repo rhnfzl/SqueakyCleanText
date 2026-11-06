@@ -1,4 +1,3 @@
-import asyncio
 import json
 import sys
 
@@ -13,7 +12,13 @@ from sct.mcp_server import (
     summarize,
 )
 from sct.privacy import DetectedEntity, EntityFinding
+from sct.sct import CustomPatternTimeout
+from sct.utils.ner import ModelLoadError
 from sct.utils.process_result import ProcessResult
+from tests.helpers import client_call
+import asyncio
+import threading
+import time
 
 SIGNAL_KEYS = [
     "language", "language_confidence", "language_source", "chars",
@@ -163,20 +168,28 @@ def test_mcp_server_reports_missing_optional_package(monkeypatch):
         create_mcp_server()
 
 
+def test_sanitize_text_refuses_reversible():
+    with pytest.raises(ToolError, match="retain its token map"):
+        sanitize_text(_cleaner(replacement_mode="reversible"), "Email maria@example.com")
+
+
+def test_server_refuses_a_reversible_cleaner_at_start_up():
+    pytest.importorskip("fastmcp")
+    with pytest.raises(ValueError, match="retain its token map"):
+        create_mcp_server(_cleaner(replacement_mode="reversible"))
+
+
 def test_bad_max_bytes_rejected():
     pytest.importorskip("fastmcp")
     with pytest.raises(ValueError, match="SCT_MCP_MAX_BYTES"):
         create_mcp_server(_cleaner(), max_bytes=-1)
 
 
-def _client_call(server, coro):
-    from fastmcp import Client
-
-    async def run():
-        async with Client(server) as client:
-            return await coro(client)
-
-    return asyncio.run(run())
+def test_non_numeric_max_bytes_names_the_setting(monkeypatch):
+    pytest.importorskip("fastmcp")
+    monkeypatch.setenv("SCT_MCP_MAX_BYTES", "1MB")
+    with pytest.raises(ValueError, match="SCT_MCP_MAX_BYTES must be a whole number"):
+        create_mcp_server(_cleaner())
 
 
 def test_tools_declare_output_schema_and_annotations():
@@ -185,7 +198,7 @@ def test_tools_declare_output_schema_and_annotations():
     async def list_tools(client):
         return await client.list_tools()
 
-    tools = {t.name: t for t in _client_call(create_mcp_server(_cleaner()), list_tools)}
+    tools = {t.name: t for t in client_call(create_mcp_server(_cleaner()), list_tools)}
 
     assert set(tools) == {"clean_text", "clean_json"}
     for tool in tools.values():
@@ -194,7 +207,7 @@ def test_tools_declare_output_schema_and_annotations():
         assert notes.read_only_hint is True
         assert notes.destructive_hint is False
         assert notes.idempotent_hint is True
-        assert notes.open_world_hint is False
+        assert notes.open_world_hint is True  # a cold cache downloads models
         schema = tool.output_schema
         assert set(schema["required"]) >= {"warnings", "summary", "signals"}
         assert "findings" in schema["properties"]
@@ -212,7 +225,7 @@ def test_tool_calls_return_structured_content_and_tool_errors():
         data = await client.call_tool("clean_json", {"value": {"email": "maria@example.com"}})
         return text.structured_content, data.structured_content
 
-    text, data = _client_call(server, calls)
+    text, data = client_call(server, calls)
     assert list(text) == ["warnings", "summary", "text", "signals"]
     assert text["text"] == "Email <EMAIL>"
     assert data["value"] == {"email": "<EMAIL>"}
@@ -221,7 +234,38 @@ def test_tool_calls_return_structured_content_and_tool_errors():
         return await client.call_tool("clean_text", {"text": "Maria", "pii": True})
 
     with pytest.raises(FastToolError, match="not configured for PII mode"):
-        _client_call(server, pii)
+        client_call(server, pii)
+
+
+@pytest.mark.parametrize("error, match", [
+    (ModelLoadError("no weights"), "no weights. Install the extra it names"),
+    (ImportError("needs gliner"), "needs gliner. Install the extra it names"),
+    (CustomPatternTimeout("ticket", 1.0), r"custom_patterns\['ticket'\]"),
+])
+def test_cleaner_failures_render_as_tool_errors(monkeypatch, error, match):
+    pytest.importorskip("fastmcp")
+    from fastmcp.exceptions import ToolError as FastToolError
+    import sct.mcp_server as mcp_module
+
+    def fail(*_args, **_kwargs):
+        raise error
+
+    async def clean_text(client):
+        return await client.call_tool("clean_text", {"text": "hello there"})
+
+    async def clean_json(client):
+        return await client.call_tool("clean_json", {"value": "hello there"})
+
+    cleaner = _cleaner()
+    monkeypatch.setattr(cleaner, "process", fail)
+    for call in (clean_text, clean_json):
+        with pytest.raises(FastToolError, match=match):
+            client_call(create_mcp_server(cleaner), call)
+
+    # A failure while building the cleaner, on first use.
+    monkeypatch.setattr(mcp_module, "TextCleaner", fail)
+    with pytest.raises(FastToolError, match=match):
+        client_call(create_mcp_server(), clean_text)
 
 
 def test_preset_picks_the_built_in_cleaner_config(monkeypatch):
@@ -233,5 +277,45 @@ def test_preset_picks_the_built_in_cleaner_config(monkeypatch):
     seen = []
     monkeypatch.setattr(mcp_module, "TextCleaner", lambda cfg, **_: seen.append(cfg) or _cleaner())
     monkeypatch.setenv("SCT_MCP_PRESET", "training")
-    _client_call(create_mcp_server(), lambda c: c.call_tool("clean_text", {"text": "x"}))
+    client_call(create_mcp_server(), lambda c: c.call_tool("clean_text", {"text": "x"}))
     assert seen[0].check_to_ascii_unicode is False
+
+
+# --- concurrent first MCP calls build one cleaner ---
+def test_concurrent_first_calls_build_one_cleaner(monkeypatch):
+    pytest.importorskip("fastmcp")
+    from fastmcp import Client
+
+    import sct.mcp_server as mcp_module
+
+    built = []
+    real = TextCleaner(cfg=TextCleanerConfig(
+        check_ner_process=False, check_detect_language=False,
+        check_statistical_model_processing=False))
+
+    def slow_cleaner(cfg, **_):
+        built.append(threading.get_ident())
+        time.sleep(0.3)
+        return real
+
+    monkeypatch.setattr(mcp_module, "TextCleaner", slow_cleaner)
+    server = mcp_module.create_mcp_server()
+
+    async def run():
+        async with Client(server) as client:
+            return await asyncio.gather(*[
+                client.call_tool("clean_text", {"text": "hi"}) for _ in range(4)])
+
+    results = asyncio.run(run())
+    assert len(built) == 1
+    assert all(r.structured_content["text"] == "hi" for r in results)
+
+
+# --- an MCP root that does not exist fails at start-up, not on every call ---
+def test_mcp_missing_root_fails_at_start(tmp_path):
+    pytest.importorskip("fastmcp")
+    from sct.mcp_server import create_mcp_server
+
+    with pytest.raises(ValueError, match="SCT_MCP_ROOT"):
+        create_mcp_server(TextCleaner(TextCleanerConfig(check_ner_process=False)),
+                          root=str(tmp_path / "missing"))

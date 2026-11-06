@@ -209,7 +209,7 @@ def test_wheel_excludes_benchmarks():
 
 
 def test_adjacent_bio_person_entities_stay_separate():
-    # Codex bench round 1 #3: two B-PER entities are two people, not one invented name.
+    # two B-PER entities are two people, not one invented name.
     text = "Alice Bob"
     gold, _ = normalise_gold(text, [span(0, 5, "PER"), span(6, 9, "PER")], DATASET_LABELS["naamapadam"])
     assert gold == [span(0, 5, "PERSON"), span(6, 9, "PERSON")]
@@ -220,14 +220,14 @@ def test_adjacent_bio_person_entities_stay_separate():
 
 
 def test_leak_counts_unicode_folded_value():
-    # Codex bench round 1 #4: SCT folds full-width text, so the name is still visible.
+    # SCT folds full-width text, so the name is still visible.
     assert leak("Ａｌｉｃｅ", "Hi Alice") == "full"
     assert leak("Ａｌｉｃｅ Ｂｅｒｇ", "Hi <PERSON_0> Berg") == "partial"
     assert leak("Ａｌｉｃｅ", "Hi <PERSON_0>") is None
 
 
 def test_leak_by_language_excludes_dates_like_overall():
-    # Codex bench round 1 #5: per-language rate uses the same denominator as overall.
+    # per-language rate uses the same denominator as overall.
     text = "Anna on 2020-01-01"
     rec = record(text, [span(0, 4, "GIVENNAME"), span(8, 18, "DATE")])
     result = score_pii([rec], {"d1": [span(0, 4, "PERSON")]}, {"d1": "<PERSON_0> on 2020-01-01"}, MAP)

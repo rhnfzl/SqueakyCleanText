@@ -4,7 +4,8 @@ from collections import Counter
 from dataclasses import asdict, dataclass
 import json
 from pathlib import Path
-from typing import Any, Mapping, Sequence
+from typing import Any
+from collections.abc import Mapping, Sequence
 
 
 @dataclass(frozen=True)
@@ -160,35 +161,46 @@ def _span_from_dict(data: Mapping[str, Any]) -> EntitySpan:
     return span
 
 
+def _json_line(path: str | Path, number: int, line: str) -> Any:
+    try:
+        return json.loads(line)
+    except json.JSONDecodeError as exc:
+        # Same type as json.loads raised, for callers that catch it.
+        raise json.JSONDecodeError(f"{path} line {number}: {exc.msg}", exc.doc, exc.pos) from exc
+
+
 def load_evaluation_jsonl(path: str | Path) -> list[EvaluationExample]:
     """Load reviewed examples from a JSON Lines file."""
     examples = []
     seen_ids = set()
     with Path(path).open(encoding="utf-8") as source:
-        for line in source:
+        for number, line in enumerate(source, 1):
             if not line.strip():
                 continue
-            data = json.loads(line)
-            example_id = str(data["id"])
-            if example_id in seen_ids:
-                raise ValueError(f"Duplicate evaluation ID: {example_id}")
-            seen_ids.add(example_id)
-            text = str(data["text"])
-            expected = tuple(
-                _span_from_dict(entity) for entity in data["entities"]
-            )
-            if any(span.end > len(text) for span in expected):
-                raise ValueError(
-                    f"Entity span exceeds text length for ID: {example_id}"
+            data = _json_line(path, number, line)
+            try:
+                example_id = str(data["id"])
+                if example_id in seen_ids:
+                    raise ValueError(f"Duplicate evaluation ID: {example_id}")
+                seen_ids.add(example_id)
+                text = str(data["text"])
+                expected = tuple(
+                    _span_from_dict(entity) for entity in data["entities"]
                 )
-            examples.append(EvaluationExample(
-                id=example_id,
-                text=text,
-                language=str(data["language"]),
-                domain=str(data["domain"]),
-                expected=expected,
-                slices=tuple(str(value) for value in data.get("slices", ())),
-            ))
+                if any(span.end > len(text) for span in expected):
+                    raise ValueError(
+                        f"Entity span exceeds text length for ID: {example_id}"
+                    )
+                examples.append(EvaluationExample(
+                    id=example_id,
+                    text=text,
+                    language=str(data["language"]),
+                    domain=str(data["domain"]),
+                    expected=expected,
+                    slices=tuple(str(value) for value in data.get("slices", ())),
+                ))
+            except KeyError as exc:
+                raise KeyError(f"{path} line {number}: missing field {exc}") from exc
     return examples
 
 
@@ -196,14 +208,17 @@ def load_predictions_jsonl(path: str | Path) -> dict[str, tuple[EntitySpan, ...]
     """Load model predictions from a JSON Lines file."""
     predictions = {}
     with Path(path).open(encoding="utf-8") as source:
-        for line in source:
+        for number, line in enumerate(source, 1):
             if not line.strip():
                 continue
-            data = json.loads(line)
-            prediction_id = str(data["id"])
-            if prediction_id in predictions:
-                raise ValueError(f"Duplicate prediction ID: {prediction_id}")
-            predictions[prediction_id] = tuple(
-                _span_from_dict(entity) for entity in data["entities"]
-            )
+            data = _json_line(path, number, line)
+            try:
+                prediction_id = str(data["id"])
+                if prediction_id in predictions:
+                    raise ValueError(f"Duplicate prediction ID: {prediction_id}")
+                predictions[prediction_id] = tuple(
+                    _span_from_dict(entity) for entity in data["entities"]
+                )
+            except KeyError as exc:
+                raise KeyError(f"{path} line {number}: missing field {exc}") from exc
     return predictions

@@ -64,27 +64,31 @@ class Diagram:
         self.text(x + 12, y + 46, sub, 15, color=MUTED, mono=mono)
 
     # ---------- checks ----------
-    def check(self):
-        errors = []
+    def _box_around(self, x, y):
+        """The smallest box holding (x, y), or the canvas."""
+        inside = [r for r in self.rects if r[1] <= x <= r[1] + r[3] and r[2] <= y <= r[2] + r[4]]
+        return min(inside, key=lambda r: r[3] * r[4])[1:5] if inside else (0, 0, W, self.h)
 
-        def width(s, size, bold, mono):  # conservative Helvetica / monospace estimate
-            return len(s) * size * (0.6 if mono else 0.59 if bold else 0.54)
+    def _off_canvas(self):
+        return [f"off canvas: {r}" for r in self.rects
+                if r[1] < 0 or r[2] < 0 or r[1] + r[3] > W or r[2] + r[4] > self.h]
 
-        for i, x, y, s, size, bold, _, anchor, mono in self.texts:
+    def check(self) -> None:
+        errors = self._off_canvas()
+        for _, x, y, s, size, bold, _, anchor, mono in self.texts:
             if size * 900 / W < 13:
                 errors.append(f"too small: {s!r}")
-            w = width(s, size, bold, mono)
+            # conservative Helvetica / monospace estimate
+            w = len(s) * size * (0.6 if mono else 0.59 if bold else 0.54)
             x0 = x - w / 2 if anchor == "middle" else x - w if anchor == "end" else x
-            inside = [r for r in self.rects if r[1] <= x <= r[1] + r[3] and r[2] <= y <= r[2] + r[4]]
-            rx, ry, rw, rh = min(inside, key=lambda r: r[3] * r[4])[1:5] if inside else (0, 0, W, self.h)
+            rx, ry, rw, rh = self._box_around(x, y)
             if not (rx + 4 <= x0 and x0 + w <= rx + rw - 4 and ry <= y - size and y + 4 <= ry + rh):
                 errors.append(f"overflows its box by {x0 + w - (rx + rw - 4):.0f} px: {s!r}")
-        errors += [f"off canvas: {r}" for r in self.rects
-                   if r[1] < 0 or r[2] < 0 or r[1] + r[3] > W or r[2] + r[4] > self.h]
-        assert not errors, f"{self.name}:\n  " + "\n  ".join(errors)
+        if errors:
+            raise ValueError(f"{self.name}:\n  " + "\n  ".join(errors))
 
     # ---------- SVG ----------
-    def svg(self):
+    def svg(self) -> str:
         out = [f'<svg xmlns="http://www.w3.org/2000/svg" width="{W}" height="{self.h}" '
                f'viewBox="0 0 {W} {self.h}" font-family="{FONT}">',
                f'<title>{escape(self.title)}</title>',
@@ -109,7 +113,7 @@ class Diagram:
         return "\n".join(out)
 
     # ---------- Excalidraw ----------
-    def excalidraw(self):
+    def excalidraw(self) -> dict[str, object]:
         def base(i, typ, x, y, w, h, stroke, fill="transparent", dashed=False):
             return {"id": f"{self.name}-{i}", "type": typ, "x": x, "y": y, "width": w, "height": h,
                     "angle": 0, "strokeColor": stroke, "backgroundColor": fill, "fillStyle": "solid",
@@ -132,7 +136,7 @@ class Diagram:
             a.update({"points": rel, "startBinding": None, "endBinding": None, "startArrowhead": None,
                       "endArrowhead": "arrow" if head else None, "elbowed": False})
             els.append(a)
-        for i, x, y, s, size, bold, color, anchor, mono in self.texts:
+        for i, x, y, s, size, _, color, anchor, mono in self.texts:
             w = round(len(s) * size * (0.6 if mono else 0.55))
             x = x - w / 2 if anchor == "middle" else x - w if anchor == "end" else x
             e = base(i, "text", x, y - size, w, round(size * 1.25), color)
@@ -149,7 +153,7 @@ class Diagram:
         (out_dir / f"{self.name}.excalidraw").write_text(json.dumps(self.excalidraw(), indent=1) + "\n")
 
 
-def overview():
+def overview() -> Diagram:
     d = Diagram("sct_overview", 600, "What SqueakyCleanText offers")
     top, row_h, gap = 20, 58, 10
     body_h = 52 + 5 * (row_h + gap) + 4
@@ -196,7 +200,7 @@ def overview():
     return d
 
 
-def flow():
+def flow() -> Diagram:
     d = Diagram("sct_flow", 766, "SqueakyCleanText pipeline, in the order the code runs it")
     d.rect(20, 20, 960, 52, "grey")
     d.text(36, 52, "Any entry point (process(), process_batch(), sct-clean, sct-mcp, the adapters) "
@@ -257,7 +261,7 @@ def flow():
     return d
 
 
-def pii_modes():
+def pii_modes() -> Diagram:
     # Real SCT 0.8.1 output: preset_config("training", replacement_mode=...).process(SENTENCE)
     sentence = "Maria Chen lives in Utrecht. Mail her at maria.chen@example.com."
     d = Diagram("sct_pii_modes", 636, "One sentence, three PII modes")

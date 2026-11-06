@@ -27,7 +27,7 @@ class _FakeCleaner:
     def __init__(self, cfg):
         self.cfg = cfg
 
-    def process_batch(self, texts):
+    def process_batch(self, texts, max_workers=None):
         out = []
         for text in texts:
             result = type("R", (), {})()
@@ -107,3 +107,56 @@ def test_report_cli_end_to_end_real_cleaner_ner_off(tmp_path):
     assert report["summary"]["records"] == 3
     assert report["summary"]["pii_types"] == {"EMAIL": 2}
     assert report["ner"] is False
+
+
+# --- k-anonymity keeps values of different types in separate classes ---
+@pytest.mark.parametrize("a,b", [([1], "[1]"), (True, 1)])
+def test_report_cli_k_anonymity_distinct_types(tmp_path, a, b):
+    src = tmp_path / "a.jsonl"
+    src.write_text("".join(json.dumps({"text": t, "q": v}) + "\n" for t, v in [("x", a), ("y", b)]))
+    out = tmp_path / "r.json"
+    assert report_cli.main([str(src), "--no-ner", "--quasi-identifiers", "q", "--k", "2",
+                            "--out", str(out)]) == 0
+    k = json.loads(out.read_text())["k_anonymity"]
+    assert k["minimum_k"] == 1 and k["at_risk_records"] == 2
+
+
+def test_report_cli_usage_errors_instead_of_tracebacks(tmp_path, monkeypatch):
+    monkeypatch.setattr(report_cli, "TextCleaner", _FakeCleaner)
+    source, out = str(_jsonl(tmp_path)), str(tmp_path / "r.json")
+
+    for args in (
+        [source, "--no-ner", "--quality-model", str(tmp_path / "missing"), "--out", out],
+        [source, "--no-ner", "--out", "/dev/null/x.json"],
+    ):
+        with pytest.raises(SystemExit) as exit_info:
+            report_cli.main(args)
+        assert exit_info.value.code == 2
+
+    def bad_scores(*_args):
+        raise ValueError("wrong number of scores")
+
+    monkeypatch.setattr(report_cli, "score_records", bad_scores)
+    with pytest.raises(SystemExit) as exit_info:
+        report_cli.main([source, "--no-ner", "--out", out])
+    assert exit_info.value.code == 2
+
+
+def test_report_cli_bad_quality_model_is_a_usage_error(tmp_path, monkeypatch, capsys):
+    monkeypatch.setattr(report_cli, "TextCleaner", _FakeCleaner)
+    source, out = str(_jsonl(tmp_path)), str(tmp_path / "r.json")
+    model = tmp_path / "model"
+    model.mkdir()
+    (model / "model.onnx").write_bytes(b"")  # onnxruntime's Fail for this is not an OSError or ValueError
+    args = [source, "--no-ner", "--quality-model", str(model), "--out", out]
+
+    with pytest.raises(SystemExit) as exit_info:
+        report_cli.main(args)
+    assert exit_info.value.code == 2
+    assert "cannot score" in capsys.readouterr().err
+
+    monkeypatch.setattr(report_cli, "score_records", lambda *_args: [])
+    (model / "sct_quality.json").write_text("[]")
+    with pytest.raises(SystemExit) as exit_info:
+        report_cli.main(args)
+    assert exit_info.value.code == 2

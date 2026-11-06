@@ -17,6 +17,15 @@ cleaned_chunks = process_rag_chunks(
 )
 ```
 
+`process_json` also walks tuples and any `Mapping`, and returns them in JSON shape (lists and dicts).
+A tuple key stays a tuple, with the strings inside it cleaned as keys. `json.dumps` rejects any tuple key.
+
+`findings` on these results stay empty unless the cleaner has `include_entities=True` or a privacy
+policy. `sensitive` (`pii_count > 0`) and `signals` are always filled: `StructuredResult` and `DataFrameResult` cover every
+processed string, and `ProcessedRAGChunk` covers text and metadata (`findings` and `metadata["sct"]` cover
+the text only, `metadata_findings` the metadata). `process_rag_chunks` writes `metadata["sensitive"]` and
+`metadata["sct"]`, replacing any caller keys with those names.
+
 ```sh
 printf 'Email maria@example.com' | sct-clean --no-ner
 printf 'München 日本語' | sct-clean --no-ner --to-ascii   # 0.7 folding: Munchen Ri Ben Yu
@@ -26,6 +35,7 @@ pip install 'SqueakyCleanText[mcp]'
 sct-mcp
 ```
 
+Both streaming redactors refuse a reversible cleaner (`ValueError`): a stream cannot hand back a token map, so process each text directly and retain its map.
 `BufferedStreamingRedactor` holds a full document for cross-chunk NER safety.
 `WindowedStreamingRedactor` provides bounded latency for contact tokens. It refuses `custom_allow_terms` (`ValueError`): whether an allowed value is kept depends on the whole document.
 When its buffer passes `max_buffer_chars` (default 4096) and has no safe whitespace split, it raises

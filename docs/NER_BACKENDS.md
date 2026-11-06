@@ -34,7 +34,13 @@ SqueakyCleanText supports six NER backends, selectable via the `ner_backend` con
 | `gliner` | GLiNER zero-shot NER with custom entity labels | `[gliner]` or `[gliner2]` extra | Custom entity types, PII detection, bi-encoder models |
 | `ensemble_onnx` | ONNX + GLiNER ensemble voting | `[gliner]` extra | Maximum recall with custom entities |
 | `ensemble_torch` | Torch + GLiNER ensemble voting | `[torch,gliner]` extra | Maximum recall with PyTorch |
-| `presidio_gliner` | Presidio + GLiNER recognizer (beta) | `presidio-analyzer`, `[gliner]` | Context-aware NER via Presidio's pipeline |
+| `presidio_gliner` | Presidio + GLiNER recognizer (beta) | `[presidio]` extra | Context-aware NER via Presidio's pipeline |
+
+`presidio_gliner` reads the text after the regex steps, so its recognizers can tag the word inside `<EMAIL>`. As on
+the other backends, a result inside a tag the pipeline wrote (`<EMAIL>`, `<EMAIL_0>`, `replace_with_email="EMAIL"`)
+is dropped and is not a finding. A result that also covers text outside the tag masks that text and the tag with it.
+The same marker text in your source (`<LONDON>`, `<John>`) gets no protection, so Presidio can still mask it. Its
+other results are not filtered by `positional_tags` or the confidence threshold.
 
 ## Default NER Models (ONNX)
 
@@ -72,6 +78,8 @@ gliner_label_map={
 # 'product' → <PRODUCT>, 'event' → <EVENT>, 'skill' → <SKILL>
 ```
 
+With `gliner_label_map=None`, the ensemble backends map `person`, `organization` and `location` to `PER`, `ORG` and `LOC`, so GLiNER's spans reach the vote and become `<PERSON>`, `<ORGANISATION>` and `<LOCATION>`. Your own map replaces this one entirely. The plain `gliner` backend has no default map, so those labels become `<PERSON>`, `<ORGANIZATION>` and `<LOCATION>`.
+
 ## GLiNER: Zero-Shot Custom NER
 
 Use [GLiNER](https://github.com/urchade/GLiNER) to recognize any entity type without retraining:
@@ -108,7 +116,6 @@ cfg = TextCleanerConfig(
     ner_backend='ensemble_onnx',  # or 'ensemble_torch'
     gliner_model='urchade/gliner_large-v2.1',
     gliner_labels=('person', 'organization', 'location'),
-    gliner_label_map={'person': 'PER', 'organization': 'ORG', 'location': 'LOC'},
 )
 
 cleaner = TextCleaner(cfg=cfg)

@@ -4,7 +4,7 @@ import random
 
 import pytest
 
-from sct import TextCleaner
+from sct import TextCleaner, TextCleanerConfig
 from sct.presets import preset_config
 from sct.streaming import WindowedStreamingRedactor
 
@@ -67,7 +67,7 @@ def test_cut_escape_at_buffer_end_does_not_hide_a_date():
 
 
 def test_split_jump_maps_expanding_characters_back_to_the_source():
-    # Codex round 34: "⑫" normalises to "12", so the view distance to the phone start overshot in the source
+    # "⑫" normalises to "12", so the view distance to the phone start overshot in the source
     # and the jump skipped the safe split after "Call" (BufferError)
     cleaner = TextCleaner(cfg=preset_config("training", check_ner_process=False))
     text = "Call 06 ⑫㉞ ⑤⑥⑦⑧ now please."
@@ -90,3 +90,25 @@ def test_split_keeps_overlap_of_read_text_before_unspaced_run(chunk):
             assert not safe  # no split outside the phone: fail closed, never emit part of it
             continue
         assert out == cleaner.process(text).lm_text and "+49" not in out
+
+
+@pytest.mark.parametrize("head_length", [232, 233, 251, 254])
+def test_cut_escape_keeps_a_date_in_its_token_whole(head_length):
+    # Dropping the whole token "1990,Q...\\U000000" hid the year from the guard and left a head shorter than the
+    # overlap, whose negative cutoff wrapped the slice: the split landed inside the date.
+    cleaner = TextCleaner(cfg=TextCleanerConfig(check_ner_process=False))
+    padding = head_length - len("line\\n March 15, ")
+    head = "line\\n " + " " * (padding % 2) + "w " * (padding // 2) + "March 15, "
+    chunks = [head + "1990," + "Q" * 3900 + "\\U000000", "41 more words end here"]
+    stream = WindowedStreamingRedactor(cleaner)
+    out = "".join(stream.feed(chunk) for chunk in chunks) + stream.finish()
+    assert out == cleaner.process("".join(chunks)).lm_text
+    assert "<DATE>" in out and "March" not in out
+
+
+def test_head_shorter_than_the_overlap_refuses_to_split():
+    # An escape cut before a long token leaves too little in view to keep the overlap: a value may run past it.
+    cleaner = TextCleaner(cfg=TextCleanerConfig(check_ner_process=False))
+    head = "line\\n " + " " + "w " * 117 + "March 15, "
+    with pytest.raises(BufferError):
+        WindowedStreamingRedactor(cleaner).feed(head + "1990,\\U000000" + "Q" * 3900)

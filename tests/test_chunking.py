@@ -2,22 +2,24 @@
 document-relative reversible map offsets. No model download needed."""
 
 import re
-import threading
 from types import SimpleNamespace
 
 import pytest
 from hypothesis import given, settings
 from hypothesis import strategies as st
-from presidio_anonymizer import AnonymizerEngine
 
+from tests.helpers import bare_ner, FakeRunDetector, gliner_ner, numbered_words, set_cfg, windows_for, word_ner
+from sct.utils.ner_chunking import align_chunk, simple_chunk, split_text, token_count
 from sct.utils.anonymization_map import AnonymizationMap
+from sct.config import TextCleanerConfig
 from sct.utils.ner import GeneralNER
+from tests.conftest import TEST_NER_MODELS, TEST_NER_REVISIONS
 
-BUDGET = 384  # _simple_chunk max_tokens -> 768 chars
+BUDGET = 384  # simple_chunk max_tokens -> 768 chars
 
 
 def _ner():
-    return object.__new__(GeneralNER)
+    return bare_ner()
 
 
 @pytest.mark.parametrize("text", [
@@ -28,7 +30,7 @@ def _ner():
     "தமிழ்" * 200 + "॥" + "தமிழ்" * 200,           # Tamil runs, double danda
 ])
 def test_simple_chunk_caps_every_chunk(text):
-    chunks = _ner()._simple_chunk(text, BUDGET)
+    chunks = simple_chunk(text, BUDGET)
     assert max(len(c) for c in chunks) <= BUDGET * 2
     assert "".join("".join(chunks).split()) == "".join(text.split())  # no content lost
     for chunk in chunks:
@@ -36,9 +38,8 @@ def test_simple_chunk_caps_every_chunk(text):
 
 
 def test_simple_chunk_splits_after_cjk_and_danda_terminators():
-    ner = _ner()
-    assert ner._simple_chunk("甲。乙！丙？", 1) == ["甲。", "乙！", "丙？"]
-    assert ner._simple_chunk("क। ख॥ ग", 1) == ["क।", "ख॥", "ग"]
+    assert simple_chunk("甲。乙！丙？", 1) == ["甲。", "乙！", "丙？"]
+    assert simple_chunk("क। ख॥ ग", 1) == ["क।", "ख॥", "ग"]
 
 
 def test_split_text_rejoins_cjk_without_spaces():
@@ -49,7 +50,7 @@ def test_split_text_rejoins_cjk_without_spaces():
         )
 
     text = "甲。乙。" * 20
-    chunks = _ner().split_text(text, 10, char_tokenizer)
+    chunks = split_text(text, 10, char_tokenizer)
     assert "".join(chunks) == text
     assert all(len(c) <= 10 and c.endswith("。") for c in chunks)
 
@@ -62,10 +63,9 @@ def test_split_text_offset_fallback_reserves_special_tokens():
             offset_mapping=[(0, 0)] + [(i, i + 1) for i in range(len(text))] + [(0, 0)],
         )
 
-    ner = _ner()
-    chunks = ner.split_text("x" * 100, 20, bert_like)
+    chunks = split_text("x" * 100, 20, bert_like)
     assert "".join(chunks) == "x" * 100
-    assert all(ner._token_count(c, bert_like) <= 20 for c in chunks)
+    assert all(token_count(c, bert_like) <= 20 for c in chunks)
 
 
 def test_split_text_offset_fallback_rechecks_retokenized_slices():
@@ -76,10 +76,9 @@ def test_split_text_offset_fallback_rechecks_retokenized_slices():
             offset_mapping=[(0, 0)] + [(i, i + 1) for i in range(len(text))],
         )
 
-    ner = _ner()
-    chunks = ner.split_text("x" * 100, 20, marker_tokenizer)
+    chunks = split_text("x" * 100, 20, marker_tokenizer)
     assert "".join(chunks) == "x" * 100
-    assert all(ner._token_count(c, marker_tokenizer) <= 20 for c in chunks)
+    assert all(token_count(c, marker_tokenizer) <= 20 for c in chunks)
 
 
 def test_split_text_ignores_tokenizer_file_truncation():
@@ -93,7 +92,7 @@ def test_split_text_ignores_tokenizer_file_truncation():
     wrapper = TokenizerWrapper(tok, model_max_length=20)
 
     text = "x" * 100 + "Alice"
-    chunks = _ner().split_text(text, 20, wrapper)
+    chunks = split_text(text, 20, wrapper)
     assert "".join(chunks) == text
     assert chunks[-1].endswith("Alice") and len(chunks[-1]) <= 20
     assert tok.truncation is not None  # inference tokenizer keeps its own setting
@@ -110,43 +109,7 @@ def test_split_text_ignores_tokenizer_file_padding():
     wrapper = TokenizerWrapper(tok, model_max_length=20)
 
     assert len(wrapper("xx").input_ids) == 2
-    assert _ner().split_text("x" * 30, 20, wrapper) == ["x" * 20, "x" * 10]
-
-
-class _FakeGLiNER:
-    """Finds every occurrence of NAMES in a chunk, like a perfect detector."""
-
-    max_context_length = 100  # -> 90 tokens -> 180-char chunks
-    labels = ["person"]
-    label_map = {"person": "PER"}
-    names = ("王小明", "राहुल", "ரவி")
-
-    def __call__(self, texts, batch_size=1):
-        out = []
-        for text in texts:
-            found = []
-            for name in self.names:
-                start = text.find(name)
-                while start != -1:
-                    found.append({"entity_group": "PER", "score": 0.99, "word": name,
-                                  "start": start, "end": start + len(name)})
-                    start = text.find(name, start + 1)
-            out.append(found)
-        return out
-
-
-def _gliner_ner(mode):
-    ner = _ner()
-    ner._ner_backend = "gliner"
-    ner._gliner_pipe = _FakeGLiNER()
-    ner._replacement_mode = mode
-    ner._synthetic_replacer = None
-    ner._inference_locks = {}
-    ner._locks_lock = threading.Lock()
-    ner._ensemble_models = {}
-    ner._ensemble_default_keys = ()
-    ner.tokenizer = None
-    return ner
+    assert split_text("x" * 30, 20, wrapper) == ["x" * 20, "x" * 10]
 
 
 @pytest.mark.parametrize("text, name", [
@@ -157,7 +120,7 @@ def _gliner_ner(mode):
 ])
 def test_reversible_map_offsets_are_document_relative(text, name):
     anon_map = AnonymizationMap()
-    result = _gliner_ner("reversible").ner_process_detailed(
+    result = gliner_ner("reversible").ner_process_detailed(
         text, positional_tags=("PER",), ner_confidence_threshold=0.5, anon_map=anon_map,
     )
     assert name not in result.text
@@ -176,7 +139,7 @@ def test_reversible_map_offsets_are_document_relative(text, name):
 ])
 def test_whitespace_at_hard_cuts_keeps_alignment(text):
     anon_map = AnonymizationMap()
-    result = _gliner_ner("reversible").ner_process_detailed(
+    result = gliner_ner("reversible").ner_process_detailed(
         text, positional_tags=("PER",), ner_confidence_threshold=0.5, anon_map=anon_map,
     )
     assert "王小明" not in result.text
@@ -185,57 +148,21 @@ def test_whitespace_at_hard_cuts_keeps_alignment(text):
 
 
 def test_align_chunk_maps_normalized_whitespace():
-    source_chunk, start, offsets = GeneralNER._align_chunk("x  a\t\tb", "a b", 0)
+    source_chunk, start, offsets = align_chunk("x  a\t\tb", "a b", 0)
     assert (source_chunk, start) == ("a\t\tb", 3)
     assert offsets[2] == 3 and offsets[3] == 4
 
 
 # --- ner_chunk_overlap: token windows, document-level merge, replace once ---
 
-def _word_tokenizer(text, **kwargs):
-    spans = [m.span() for m in re.finditer(r"\S+", text)]
-    return SimpleNamespace(input_ids=spans, offset_mapping=spans)
-
-
-class _FakeRunDetector(_FakeGLiNER):
-    """Tags capitalised words as PER; with min_words=2 only runs of two or more."""
-
-    def __init__(self, min_words=1):
-        self.pattern = re.compile(r"[A-Z][a-z]+(?: [A-Z][a-z]+){%d,}" % (min_words - 1))
-
-    def __call__(self, texts, batch_size=1):
-        return [
-            [{"entity_group": "PER", "score": 0.99, "word": m.group(),
-              "start": m.start(), "end": m.end()} for m in self.pattern.finditer(text)]
-            for text in texts
-        ]
-
-
-def _word_ner(overlap, detector, budget=12, mode="placeholder"):
-    ner = _gliner_ner(mode)
-    ner._gliner_pipe = detector
-    ner.tokenizer = _word_tokenizer
-    ner.min_token_length = budget
-    ner._ner_chunk_overlap = overlap
-    ner._engine = AnonymizerEngine()
-    return ner
-
-
-def _words(n, names):
-    words = [f"w{i}" for i in range(n)]
-    for index, name in names.items():
-        words[index] = name
-    return " ".join(words)
-
-
 def test_overlap_finds_name_split_between_chunks():
     # Cores of 12 (overlap 0) and 8 (overlap 2) words both end right after "John".
-    text = _words(40, {23: "John", 24: "Smith"})
-    old = _word_ner(0, _FakeRunDetector(min_words=2)).ner_process_detailed(
+    text = numbered_words(40, {23: "John", 24: "Smith"})
+    old = word_ner(0, FakeRunDetector(min_words=2)).ner_process_detailed(
         text, positional_tags=("PER",), ner_confidence_threshold=0.5)
     assert "John Smith" in old.text and not old.findings  # the 0.7.1 limit
 
-    result = _word_ner(2, _FakeRunDetector(min_words=2)).ner_process_detailed(
+    result = word_ner(2, FakeRunDetector(min_words=2)).ner_process_detailed(
         text, positional_tags=("PER",), ner_confidence_threshold=0.5)
     assert result.text == text.replace("John Smith", "<PERSON>")
     [finding] = result.findings
@@ -244,9 +171,9 @@ def test_overlap_finds_name_split_between_chunks():
 
 def test_overlap_keeps_one_copy_of_a_span_seen_by_two_windows():
     # Window 3 (core w16..w23) also sees "Paul Smith" in its left overlap.
-    text = _words(40, {13: "John", 14: "Paul", 15: "Smith"})
+    text = numbered_words(40, {13: "John", 14: "Paul", 15: "Smith"})
     anon_map = AnonymizationMap()
-    ner = _word_ner(2, _FakeRunDetector(min_words=2), mode="reversible")
+    ner = word_ner(2, FakeRunDetector(min_words=2), mode="reversible")
     result = ner.ner_process_detailed(
         text, positional_tags=("PER",), ner_confidence_threshold=0.5, anon_map=anon_map)
     [finding] = result.findings
@@ -263,35 +190,35 @@ def test_overlap_windows_fit_the_budget_at_hard_cuts():
             offset_mapping=[(0, 0)] + [(i, i + 1) for i in range(len(text))] + [(0, 0)],
         )
 
-    ner = _word_ner(3, _FakeRunDetector(), budget=20)
+    ner = word_ner(3, FakeRunDetector(), budget=20)
     ner.tokenizer = bert_like
-    windows = ner._plan_windows("x" * 100)
-    assert all(ner._token_count(w[0], bert_like) <= 20 for w in windows)
+    windows = windows_for(ner, "x" * 100)
+    assert all(token_count(w[0], bert_like) <= 20 for w in windows)
     assert any(w[1] > 0 and len(w[0]) > 14 for w in windows)  # overlap was added
     owned = [(w[3], w[4]) for w in windows]
     assert owned[0][0] == 0 and all(a[1] == b[0] for a, b in zip(owned, owned[1:]))
 
-    gliner = _gliner_ner("placeholder")
-    gliner._ner_chunk_overlap = 10
+    gliner = gliner_ner("placeholder")
+    set_cfg(gliner, ner_chunk_overlap=10)
     budget = gliner._chunk_budget()
-    windows = gliner._plan_windows("张" * 2841)
+    windows = windows_for(gliner, "张" * 2841)
     assert len(windows) > 1 and all(len(w[0]) <= budget * 2 for w in windows)
     assert "".join(w[0][w[3] - w[1]:w[4] - w[1]] for w in windows) == "张" * 2841
 
 
 def _finalize_071(ner, text, threshold):
     """Frozen 0.7.1 path: vote and replace chunk by chunk (placeholder mode)."""
-    chunks = ner.split_text(text, ner.min_token_length, ner.tokenizer)
+    chunks = split_text(text, ner.min_token_length, ner.tokenizer)
     out, findings, search_start = [], [], 0
     for chunk, results in zip(chunks, ner._detect(chunks, [None] * len(chunks), ("PER",))):
-        source_chunk, chunk_start, offsets = ner._align_chunk(text, chunk, search_start)
+        source_chunk, chunk_start, offsets = align_chunk(text, chunk, search_start)
         out.append(text[search_start:chunk_start])
         search_start = chunk_start + len(source_chunk)
         voted = [
             {**item, "start": offsets[item["start"]], "end": offsets[item["end"]]}
-            for item in ner.ner_ensemble(results, threshold)
+            for item in ner.vote_entities(results, threshold)
         ]
-        out.append(ner.anonymize_text(source_chunk, voted).text if voted else source_chunk)
+        out.append(ner.anonymize_text(source_chunk, voted) if voted else source_chunk)
         findings += [(i["start"] + chunk_start, i["end"] + chunk_start) for i in voted]
     out.append(text[search_start:])
     return "".join(out), findings
@@ -305,7 +232,7 @@ def _finalize_071(ner, text, threshold):
 )
 def test_overlap_zero_matches_071_per_chunk_replacement(words, seps):
     text = "".join(word + sep for word, sep in zip(words, seps))
-    ner = _word_ner(0, _FakeRunDetector(), budget=6)
+    ner = word_ner(0, FakeRunDetector(), budget=6)
     result = ner.ner_process_detailed(text, positional_tags=("PER",), ner_confidence_threshold=0.5)
     expected_text, expected_spans = _finalize_071(ner, text, 0.5)
     assert result.text == expected_text
@@ -315,8 +242,8 @@ def test_overlap_zero_matches_071_per_chunk_replacement(words, seps):
 def test_whole_document_replacement_merges_names_across_chunk_boundary():
     # Deliberate 0.8.0 change: Presidio merges same-type spans split only by
     # spaces, now also when a chunk boundary falls between them.
-    text = _words(30, {11: "Ann", 12: "Bob"})
-    ner = _word_ner(0, _FakeRunDetector())
+    text = numbered_words(30, {11: "Ann", 12: "Bob"})
+    ner = word_ner(0, FakeRunDetector())
     result = ner.ner_process_detailed(text, positional_tags=("PER",), ner_confidence_threshold=0.5)
     assert result.text == text.replace("Ann Bob", "<PERSON>")
     assert _finalize_071(ner, text, 0.5)[0] == text.replace("Ann Bob", "<PERSON> <PERSON>")
@@ -325,7 +252,6 @@ def test_whole_document_replacement_merges_names_across_chunk_boundary():
 
 def test_overlap_config_validation_and_module_global(monkeypatch):
     from sct import config
-    from sct.config import TextCleanerConfig
 
     with pytest.raises(ValueError, match="ner_chunk_overlap"):
         TextCleanerConfig(check_ner_process=False, ner_chunk_overlap=-1)
@@ -337,16 +263,16 @@ def test_overlap_config_validation_and_module_global(monkeypatch):
 
 
 def test_overlap_with_real_tokenizer():
-    from tests.conftest import TEST_NER_MODELS
-
     with pytest.raises(ValueError, match="ner_chunk_overlap"):
-        GeneralNER(model_names=TEST_NER_MODELS, ner_chunk_overlap=200)
-    ner = GeneralNER(model_names=TEST_NER_MODELS, ner_chunk_overlap=32,
-                     replacement_mode="reversible")
+        GeneralNER(TextCleanerConfig(ner_models=TEST_NER_MODELS,
+                                     ner_model_revisions=TEST_NER_REVISIONS, ner_chunk_overlap=200))
+    ner = GeneralNER(TextCleanerConfig(ner_models=TEST_NER_MODELS,
+                                       ner_model_revisions=TEST_NER_REVISIONS, ner_chunk_overlap=32,
+                                       replacement_mode="reversible"))
     text = "Marie Curie worked in Paris with Pierre Curie. " * 80
-    windows = ner._plan_windows(text)
+    windows = windows_for(ner, text)
     assert len(windows) > 1
-    assert all(ner._token_count(w[0], ner.tokenizer) <= ner.min_token_length for w in windows)
+    assert all(token_count(w[0], ner.tokenizer) <= ner.min_token_length for w in windows)
     anon_map = AnonymizationMap()
     result = ner.ner_process_detailed(text, ("PER", "LOC"), 0.85, "ENGLISH", anon_map)
     assert "Paris" not in result.text
@@ -356,9 +282,9 @@ def test_overlap_with_real_tokenizer():
 
 def test_ner_span_inside_regex_placeholder_is_dropped():
     # Old code: a model tagging "PHONE" in "<PHONE>" gave "call <<PERSON>>" (0.7.1 too).
-    detector = _FakeRunDetector()
+    detector = FakeRunDetector()
     detector.pattern = re.compile(r"[A-Z]{2,}|Ann")
-    ner = _word_ner(0, detector)
+    ner = word_ner(0, detector)
     result = ner.ner_process_detailed(
         "call <PHONE> or <EMAIL_0>, ask Ann", positional_tags=("PER",), ner_confidence_threshold=0.5)
     assert result.text == "call <PHONE> or <EMAIL_0>, ask <PERSON>"

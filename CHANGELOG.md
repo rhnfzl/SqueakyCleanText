@@ -1,5 +1,73 @@
 # Changelog
 
+## Unreleased
+
+**Leak fixes, cleaner internals, faster import, clearer errors.**
+
+- **Leak fixes:** `process_json` now masks strings in tuples and non-dict mappings, and reversible mode masks digits glued to a placeholder.
+- **Ensembles use GLiNER:** with default labels, the ONNX + GLiNER vote used to ignore GLiNER's spans.
+- **Honest signals:** `sensitive` now means PII was found, and values your policy keeps no longer count.
+- **Faster start:** `import sct` is about 1.1 seconds faster and loads NER libraries only when needed.
+- **Clearer errors:** `sct-clean`, `sct-report` and MCP report bad input and failed model loads as usage errors, not tracebacks.
+- **Type checkers work:** the package ships `py.typed`, and CI checks it with mypy.
+
+Heads-up: reversible output changes, and streaming and MCP now refuse reversible cleaners. `sensitive` is false for a date or number alone. `process_batch` refuses a plain string, and `batch_size` is now `max_workers` there. Legacy `config.*` globals that were ignored now take effect. Importers of private names must update, see below.
+
+### Behaviour changes
+- In reversible mode, a digit run glued to a placeholder is now masked and restores exactly: `a@b.com-107683` gives `<EMAIL_0>-<NUMBER_0>`, and `John Smith-107683` gives `<PERSON_0>-<NUMBER_0>`. A quote, dash, `*` or `%` touching a placeholder is now kept, so it comes back on restore.
+- The streaming redactors and the MCP server refuse a reversible cleaner with a clear error, because they have no way to return its token map.
+- `signals['sensitive']` and `is_sensitive_result` now mean `pii_count > 0`, so a replaced date, year, number, currency or HTML tag alone is no longer sensitive.
+- `entity_counts`, `pii_count` and the metrics callback no longer count entities a `PrivacyPolicy` kept, allowed or ignored. `metadata['findings']` still lists them.
+- OCR redaction no longer covers regions that hold only entities a policy exempted. It still covers everything replaced in the text, including dates and years.
+- Framework adapters (DataTrove, LangChain, Haystack) write `metadata['sct']` merged over all listed columns, so PII in a later column marks the document as sensitive. Score columns stay on the first column.
+- `process_batch` and `aprocess_batch` take `max_workers` for the worker thread limit. `batch_size` is a deprecated keyword alias, and passing both raises `TypeError`.
+- Every `TextCleanerConfig` field now has a legacy module global with its upper-case name, for example `config.NER_BACKEND`. These were silently ignored before and now take effect. The exceptions are the computed `supported_languages` and the deprecated `ner_models_list`, which `NER_MODELS_LIST` still feeds. New global `config.NER_MODELS` takes a language-keyed dict and wins over `NER_MODELS_LIST`, and `config.NER_ENSEMBLE_DEFAULT_KEYS` now takes effect when changed.
+- `process_batch` raises `ValueError` for a plain string instead of treating each character as a text. Use `process()` for one text.
+- `WindowedStreamingRedactor` raises `BufferError` for a broken or cut escape followed by a very long token. It used to stream this input with output that differed from whole-text cleaning.
+- ONNX model loading raises `ModelLoadError` when a network or auth error hits `model.onnx_data` or `tokenizer_config.json`, instead of treating the file as missing. GLiNER and Presidio construction errors are also wrapped as `ModelLoadError`.
+- `score_records` now runs a supplied scorer when `ScoreConfig.quality` is False, and adds the `sct_quality` and `sct_minhash` columns. Before, the scorer was silently ignored.
+- `sct-clean` refuses reversible mode before cleaning on any non-POSIX platform, including Windows on Python 3.13+, where `os.fchmod` exists but cannot restrict the token map.
+- Importing SCT no longer changes the process-wide ONNX Runtime log level or adds a warnings filter for lingua. Other ONNX Runtime output in the host application is no longer silenced.
+- The `torch` extra now requires `transformers>=5.0`; 4.x could not be installed alongside the `huggingface-hub>=1.5.0` requirement.
+
+### Added
+- The `presidio` extra now also installs GLiNER. New `quantize` extra installs `onnx` for `load_onnx_ner_model(quantize=True)`.
+- `process_dataframe` and `process_rag_chunks` results gain `sensitive` and `signals`; `ProcessedRAGChunk` also gains `metadata_findings`.
+- `process_dataframe` accepts a single column name as a string.
+- `ModelLoadError` is exported from `sct`.
+- MCP `detail='full'` adds the warning `findings_not_collected`, and its `outputSchema` describes the `signals` keys.
+
+### Fixed
+- With `ner_device=None`, GLiNER and Presidio backends no longer crash at load when `onnxruntime-gpu` is installed but no GPU is usable, for example with `CUDA_VISIBLE_DEVICES` empty. GLiNER running in torch uses CPU, SCT logs a warning, `cuda_fallback` is set and provenance shows `cpu`. GLiNER in ONNX mode gets no such warning, and ONNX models still try CUDA first. An explicit `ner_device='cuda'` still fails to load.
+- With `ner_device=None`, GLiNER and Presidio backends use the GPU when torch can, even with the CPU `onnxruntime` package. They used to stay on CPU without saying so. GLiNER in ONNX mode is unchanged.
+- With `ner_device=None`, a `cuda_device_id` that torch cannot see falls back to CPU with a warning instead of failing at load.
+- `docs/PERFORMANCE.md` no longer claims a CUDA version for the `onnxruntime-gpu` 1.29 benchmark run, because the build was not recorded. It adds notes on older NVIDIA drivers and on GPU memory use on shared GPUs.
+- Synthetic mode gives each type a fake of its own kind, including Presidio's types: a company stays a company, a date stays a date, and a number stays a number. A type with no fake generator, such as your own label, is written as `<TYPE>` instead of a person name. A fake no longer contains the original value as a whole word.
+- `presidio_gliner` no longer masks inside SCT's own tags, so `<EMAIL>` stays `<EMAIL>` and is not counted as a finding. Text outside a tag and tag-shaped text from your source are still masked.
+- Without Faker, synthetic mode raises one clear `ImportError` naming `squeakycleantext[synthetic]`.
+- `process_json` and RAG chunk metadata mask strings inside tuples and non-dict mappings, returned as lists and dicts, and inside tuple dict keys, following `json_key_cleaning`. Sets and bytes are still not masked.
+- The ensemble backends no longer ignore GLiNER's spans with default labels. `person`, `organization` and `location` reach the vote as `PER`, `ORG` and `LOC`. A tag you request as `PERSON`, `ORGANIZATION` or `LOCATION` stays under that name, and your own `gliner_label_map` still wins.
+- `ner_propagate_masked` and `ner_merge_location_gap` also work on the `PERSON`, `ORGANIZATION` and `LOCATION` spans of the plain `gliner` backend, with the same output tokens.
+- `presidio_gliner` honours `replacement_mode='reversible'` and `'synthetic'`. Masked spans are unchanged.
+- `process_json` masks a `custom_deny_terms` value in a JSON key when `check_to_ascii_unicode` is on (a key `José` stayed readable).
+- Empty input includes `metadata['policy']` and `metadata['findings']` under the same conditions as other documents.
+- `WindowedStreamingRedactor` no longer raises a false `BufferError` with a one-character `custom_patterns` rule, keeps processed windows across a caught `BufferError`, and keeps a date whole when a cut escape ends the buffer.
+- `TextCleaner` no longer keeps document text in per-thread state after processing, including after a step raises.
+- `AnonymizationMap.to_dict` and `from_dict` keep reserved tokens, so placeholders allocated after a round trip do not collide.
+- `sct-clean` writes the token map before printing masked text.
+- MCP no longer names the root folder when `SCT_MCP_ROOT` cannot be opened, and gives the unique-keys remedy only for duplicate-key errors.
+- A plain string for `quasi_identifiers` in `assess_reidentification_risk` means one field, not separate characters.
+- A float, zero or negative `model_max_length` in `tokenizer_config.json` is read safely, with a fallback to 512.
+
+### Deprecated
+- `batch_size` on `process_batch` and `aprocess_batch`; use `max_workers`.
+- `TextCleaner.NormaliseText`, `ProcessStopwords`, `ProcessDateTime`, `ProcessContacts` and `ProcessSpecialSymbols` are now private attributes. The old names still work and raise a `DeprecationWarning`.
+
+### Removed or changed for deep importers (undocumented names)
+- `GeneralNER` now takes a `TextCleanerConfig` plus its collaborators. `process_batch` is now `ner_process_batch`, `ner_data` is `entities_with_position_key`, `ner_ensemble` is `vote_entities`, and `positional_tags` is required on `ner_process*`.
+- Removed: `AnonymizeResult`, eight unused `ProcessContacts` methods, `ProcessStopwords.STOP_WORDS_*`, the `no_emoji` argument of `to_ascii_unicode`, and `DETECTOR`, `LANGUAGES`, `LANGUAGE_NAME` in `sct.utils.resources`.
+- Removed the stub `setup.py` and the root `requirements.txt`; use `pyproject.toml` and its extras.
+
 ## 0.8.2 - 2026-11-03
 
 **Smarter numbers, your own rules, safer streaming.**

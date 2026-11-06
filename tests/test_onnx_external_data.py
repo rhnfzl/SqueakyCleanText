@@ -274,3 +274,43 @@ def test_warns_when_cuda_silently_falls_back_to_cpu(tmp_path, snapshot, monkeypa
     with caplog.at_level("WARNING", logger=onnx_pipeline.logger.name):
         onnx_pipeline.load_onnx_ner_model(REPO, cache_dir=str(tmp_path / "cache"), device="cuda")
     assert "runs on CPU: CUDA was requested" in caplog.text
+
+
+@pytest.mark.parametrize("content, expected", [
+    ('{"model_max_length": 128}', 128),
+    ('{}', 512),
+    ('{"model_max_length": null}', 512),
+    ('{"model_max_length": "big"}', 512),
+    ('{"model_max_length": 1e30}', 512),
+    ('not json', 512),
+    ('[]', 512),
+])
+def test_unusable_model_max_length_falls_back(tmp_path, content, expected):
+    config = tmp_path / "tokenizer_config.json"
+    config.write_text(content)
+    assert onnx_pipeline._read_model_max_length(str(config)) == expected
+
+
+@pytest.mark.parametrize("content, expected", [
+    ('{"model_max_length": 256.0}', 256),  # a JSON float is still a token count
+    ('{"model_max_length": -Infinity}', 512),
+    ('{"model_max_length": 0}', 512),
+])
+def test_model_max_length_is_a_positive_int(tmp_path, content, expected):
+    config = tmp_path / "tokenizer_config.json"
+    config.write_text(content)
+    value = onnx_pipeline._read_model_max_length(str(config))
+    assert value == expected and type(value) is int
+
+
+def test_failed_optional_download_is_not_taken_for_a_missing_file(tmp_path, snapshot, monkeypatch):
+    real = onnx_pipeline.hf_hub_download
+
+    def flaky(repo_id, filename, **kwargs):
+        if filename == "model.onnx_data":
+            raise ConnectionResetError("network down")
+        return real(repo_id, filename, **kwargs)
+
+    monkeypatch.setattr(onnx_pipeline, "hf_hub_download", flaky)
+    with pytest.raises(ConnectionResetError):
+        onnx_pipeline.load_onnx_ner_model(REPO, cache_dir=str(tmp_path / "cache"))

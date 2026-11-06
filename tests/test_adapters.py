@@ -1,12 +1,19 @@
+import json
+from dataclasses import replace
+from types import MappingProxyType
+
 import pytest
 
 from sct import TextCleaner, TextCleanerConfig
 from sct.adapters import (
     RAGChunk,
+    StructuredResult,
     process_dataframe,
     process_json,
     process_rag_chunks,
 )
+from sct.signals import PUBLIC_VIEW_KEYS
+from sct.utils.process_result import ProcessResult
 
 
 def _regex_cleaner():
@@ -33,6 +40,54 @@ def test_process_json_preserves_structure_and_non_text_values():
         "messages": ["Call <PHONE>", None],
     }
     assert source["user"]["email"] == "maria@example.com"
+
+
+def test_process_json_masks_tuples_and_mappings():
+    source = MappingProxyType({
+        "pair": ("maria@example.com", ("Call +1-202-555-0147", 1)),
+        "nested": MappingProxyType({"maria@example.com": "maria@example.com"}),
+    })
+
+    result = process_json(_regex_cleaner(), source)
+
+    assert result.value == {
+        "pair": ["<EMAIL>", ["Call <PHONE>", 1]],
+        "nested": {"<EMAIL>": "<EMAIL>"},
+    }
+    assert type(result.value) is dict and type(result.value["nested"]) is dict
+    assert result.signals["pii_types"] == {"EMAIL": 3, "PHONE": 1} and result.sensitive
+    json.dumps(result.value)
+
+
+def test_process_json_masks_strings_in_tuple_keys():
+    source = {("maria@example.com", 1, ("Call +1-202-555-0147",)): "plain", (1, 2): 3}
+
+    result = process_json(_regex_cleaner(), source)
+
+    assert result.value[("<EMAIL>", 1, ("Call <PHONE>",))]
+    assert result.value[(1, 2)] == 3
+    assert result.signals["pii_types"] == {"EMAIL": 1, "PHONE": 1} and result.sensitive
+
+
+def test_process_json_tuple_keys_follow_key_mode_and_uniqueness():
+    source = {("maria@example.com", 1): 1}
+    off = TextCleaner(cfg=replace(_regex_cleaner().cfg, json_key_cleaning="off"))
+    assert process_json(off, source).value == source
+
+    with pytest.raises(ValueError, match="duplicate key"):
+        process_json(_regex_cleaner(), {("a@example.com",): 1, ("b@example.com",): 2})
+
+
+def test_process_rag_chunks_masks_tuple_metadata_keys():
+    chunk = RAGChunk(id="1", text="plain text", metadata={("maria@example.com",): 1})
+    processed = process_rag_chunks(_regex_cleaner(), [chunk])[0]
+    assert processed.metadata[("<EMAIL>",)] == 1 and processed.sensitive
+
+
+def test_process_rag_chunks_masks_tuple_metadata():
+    chunk = RAGChunk(id="1", text="plain text", metadata={"authors": ("maria@example.com",)})
+    processed = process_rag_chunks(_regex_cleaner(), [chunk])[0]
+    assert processed.metadata["authors"] == ["<EMAIL>"] and processed.sensitive
 
 
 def test_process_json_cleans_string_keys():
@@ -117,11 +172,12 @@ def test_sensitive_from_entity_counts_not_markers():
 
     # NER output as observed with ONNX models; no model download here.
     found = SimpleNamespace(
+        language=None,
         lm_text="<PERSON>",
         metadata={"regex_counts": {}, "entity_counts": {"PERSON": {"count": 1, "chars": 5}}},
     )
     assert is_sensitive_result(found) is True
-    assert is_sensitive_result(SimpleNamespace(lm_text="<PERSON>", metadata=None)) is False
+    assert is_sensitive_result(SimpleNamespace(language=None, lm_text="<PERSON>", metadata=None)) is False
 
 
 def test_process_json_keys_get_pii_steps_only_by_default():
@@ -150,3 +206,35 @@ def test_process_json_key_cleaning_full_and_off():
     assert off.value == {"to maria@example.com": ""}
     with pytest.raises(ValueError, match="json_key_cleaning"):
         TextCleanerConfig(json_key_cleaning="raw")
+
+
+class _StubNerCleaner:
+    """Reports *backend* for values; its key view has NER off, as the real cleaner's does."""
+
+    cfg = TextCleanerConfig(check_ner_process=False)
+
+    def __init__(self, backend):
+        self.backend = backend
+
+    def _with_config(self, cfg):
+        return _StubNerCleaner(None)
+
+    def process(self, text):
+        return ProcessResult(text, None, None, metadata={
+            "source_chars": len(text), "provenance": {"backend": self.backend},
+        })
+
+
+def test_process_json_key_view_does_not_report_ner_off():
+    on = process_json(_StubNerCleaner("onnx"), {"k": "some text"})
+    assert "ner_off" not in on.signals["warnings"]
+
+    off = process_json(_StubNerCleaner(None), {"k": "some text"})
+    assert "ner_off" in off.signals["warnings"]
+
+
+def test_structured_result_default_signals_has_every_key():
+    signals = StructuredResult(1, (), False).signals
+
+    assert signals["sensitive"] is False
+    assert tuple(signals) == PUBLIC_VIEW_KEYS

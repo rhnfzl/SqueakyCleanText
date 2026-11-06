@@ -26,26 +26,26 @@ lm_text, stat_text, lang = result  # backward-compatible 3-tuple unpacking
 
 - `TextCleaner(cfg=TextCleanerConfig(...))` — main pipeline class
 - `cleaner.process(text) -> ProcessResult` — process single text (unpacks as 3-tuple)
-- `cleaner.process_batch(texts) -> List[ProcessResult]` — thread-parallel batch
-- `cleaner.aprocess_batch(texts) -> List[ProcessResult]` — async (FastAPI/aiohttp)
+- `cleaner.process_batch(texts, max_workers=None) -> List[ProcessResult]` — thread-parallel batch (`batch_size` is a deprecated alias of `max_workers`)
+- `cleaner.aprocess_batch(texts, max_workers=None) -> List[ProcessResult]` — async (FastAPI/aiohttp)
 - `cleaner.warmup(languages=None)` — pre-load NER models at startup
-- `ProcessResult.metadata` — always a dict: `regex_counts` and `entity_counts` (`{TYPE: {"count", "chars"}}`, value-free), `language_confidence` (float, 1.0 pinned, None unknown), `language_source` (`pinned`/`detected`/`fallback`/`none`), `warnings` (sorted codes: `language_unknown`, `language_fallback`, `language_low_confidence`, `ner_fallback_models`, `cuda_fallback`, `mps_fallback`), `provenance` (`{"backend", "models": [{"key", "id", "revision", "provider"}]}` of the NER models run), plus `anon_map` (reversible mode), `classes` (GLiClass), `findings` (opt-in)
+- `ProcessResult.metadata` — always a dict: `regex_counts` and `entity_counts` (`{TYPE: {"count", "chars"}}`, value-free; policy-exempted entities are not counted), `language_confidence` (float, 1.0 pinned, None unknown), `language_source` (`pinned`/`detected`/`fallback`/`none`), `warnings` (sorted codes: `language_unknown`, `language_fallback`, `language_low_confidence`, `ner_fallback_models`, `cuda_fallback`, `mps_fallback`), `provenance` (`{"backend", "models": [{"key", "id", "revision", "provider"}]}` of the NER models run), plus `anon_map` (reversible mode), `classes` (GLiClass), `findings` (opt-in)
 - `ProcessResult.signals` — value-free view, same keys for every input: `language`, `language_confidence`, `language_source`, `chars`, `pii_count`, `pii_chars`, `pii_share`, `pii_types`, `regex_counts`, `entity_counts`, `sensitive`, `warnings` (adds `ner_off`, `empty_input`), `models`. Never entity text (`sct.signals.public_view`, `merge_views`, `PUBLIC_VIEW_KEYS`)
 - `preset_config(name, **overrides)` / `TextCleanerConfig.from_preset(name, ...)` / `PRESETS` — `"training"` (PII only) or `"sct"` (library defaults)
-- `sct.adapters.is_sensitive_result(result)` — True when any regex replacement or NER finding was counted
+- `sct.adapters.is_sensitive_result(result)` — `signals["sensitive"]`: True when `pii_count > 0`; a date, year, number, currency or HTML tag alone is not sensitive
 - `AnonymizationMap.deanonymize(text)` — restore original text from reversible placeholders
 - `AnonymizationMap.to_dict()` / `.from_dict(data)` — serialization for storage
 - `sct.evaluation.evaluate_pii(examples, predictions, model=...)` — exact-span PII evaluation
 - `EvaluationReport` — overall metrics plus label, language, domain, and slice metrics
 - `PrivacyPolicy` / `EntityRule` — versioned entity actions and score thresholds
 - `TokenStore` — external storage boundary for reversible token maps
-- `process_json` / `process_dataframe` / `process_rag_chunks` — boundary adapters
-- `BufferedStreamingRedactor` / `WindowedStreamingRedactor` — streaming interfaces
+- `process_json` / `process_dataframe` / `process_rag_chunks` — boundary adapters (`process_json` also walks tuples and any `Mapping`, returned as lists and dicts; strings inside a tuple key are cleaned and the key stays a tuple)
+- `BufferedStreamingRedactor` / `WindowedStreamingRedactor` — streaming interfaces (both refuse a reversible cleaner)
 - `redact_image` / `TesseractOCRProvider` — optional OCR image redaction
 - `assess_reidentification_risk` — corpus k-anonymity summary
 - `MODEL_CANDIDATES` / `run_model_benchmark` — pinned model evaluation
 - `sct.integrations.hf.clean_dataset(ds, columns=, output=, config=, score=, **map_kwargs)` — Hugging Face datasets (`[datasets]` extra)
-- `sct.integrations.datatrove.SCTCleaner` / `sct.integrations.langchain.SCTDocumentTransformer` / `sct.integrations.haystack.SCTDocumentCleaner` — framework adapters (`[datatrove]`, `[langchain]`, `[haystack]`); shared options `columns`, `output='overwrite'|'new_column'`, `config` (default `"training"` preset); write `metadata["sct"]`
+- `sct.integrations.datatrove.SCTCleaner` / `sct.integrations.langchain.SCTDocumentTransformer` / `sct.integrations.haystack.SCTDocumentCleaner` — framework adapters (`[datatrove]`, `[langchain]`, `[haystack]`); shared options `columns`, `output='overwrite'|'new_column'`, `config` (default `"training"` preset); write `metadata["sct"]`, merged over all listed columns
 - `sct.integrations._runtime.CleanerHandle` / `clean_columns` — one cleaner per process for Ray, Spark, Polars, DuckDB, dlt, Daft (docs/RECIPES.md)
 - `sct.score.score_record(result)` / `score_records(results, texts, ScoreConfig(...))` — flat `sct_*` columns; Score B (quality, MinHash, `[score]` extra) off by default; `build_data_card` / `render_data_card`
 
@@ -172,14 +172,14 @@ torch             — PyTorch/Transformers pipeline — pip install squeakyclean
 gliner            — Zero-shot custom entities, PII mode, bi-encoder — pip install squeakycleantext[gliner]
 ensemble_onnx     — ONNX + GLiNER voting — pip install squeakycleantext[gliner]
 ensemble_torch    — Torch + GLiNER voting — pip install squeakycleantext[torch,gliner]
-presidio_gliner   — Presidio + GLiNER recognizer (beta) — pip install presidio-analyzer squeakycleantext[gliner]
+presidio_gliner   — Presidio + GLiNER recognizer (beta) — pip install squeakycleantext[presidio]
 ```
 
 ## Replacement Modes
 
 ```
 placeholder (default)  — Entities become <TAG> tokens: "John" → "<PERSON>"
-synthetic              — Faker-generated values: "John" → "Robert Chen" (pip install squeakycleantext[synthetic])
+synthetic              — Faker-generated values: "John" → "Robert Chen" (pip install squeakycleantext[synthetic]); a type with no generator becomes <TYPE>
 reversible             — Indexed placeholders: "John" → "<PERSON_0>" with AnonymizationMap for round-trip restore
 ```
 
@@ -249,6 +249,9 @@ sct/utils/anonymization_map.py   — AnonymizationMap: reversible anonymization 
 sct/utils/process_result.py      — ProcessResult: backward-compatible result with metadata
 sct/utils/synthetic.py           — SyntheticReplacer: Faker-based entity replacement
 sct/utils/onnx_pipeline.py       — ONNXNERPipeline: ONNX inference, BIO aggregation
+sct/utils/ner_spans.py           — Span merging and propagation
+sct/utils/ner_chunking.py        — Window chunking
+sct/utils/atomic_file.py         — Atomic file writes
 sct/signals.py                   — public value-free view (ProcessResult.signals)
 sct/presets.py                   — training / sct presets
 sct/integrations/                — HF datasets, DataTrove, LangChain, Haystack adapters
@@ -256,8 +259,26 @@ sct/score.py / sct/report_cli.py — score columns, data card, sct-report
 sct/mcp_server.py                — FastMCP server (sct-mcp)
 sct/utils/constants.py           — Pre-compiled regexes (URL, email, phone, date, currency, etc.)
 sct/utils/stopwords.py           — Language-aware stopword removal (O(1) set lookup)
-sct/utils/resources.py           — Lingua language detector (lazy singleton)
-tests/test_sct.py                — Full test suite (hypothesis, faker, pytest-timeout)
+sct/utils/resources.py           — Lingua language names and detectors
+sct/utils/contact.py             — URL, email and phone masking step
+sct/utils/datetime.py            — Date and time masking step
+sct/utils/normtext.py            — Text normalization steps
+sct/utils/special.py             — Special symbol and number handling steps
+sct/utils/torch_pipeline.py      — PyTorch/Transformers NER pipeline
+sct/adapters.py                  — Boundary adapters for structured data and retrieval pipelines
+sct/privacy.py                   — Policy and audit types for sensitive-data processing
+sct/streaming.py                 — Streaming interfaces with explicit privacy guarantees
+sct/ocr.py                       — Optional OCR and image redaction interfaces
+sct/risk.py                      — Corpus-level re-identification risk measurements
+sct/evaluation.py                — Ground-truth evaluation for PII entity detection
+sct/browser.py                   — Browser deployment manifest for ONNX Runtime Web integrations
+sct/model_benchmark.py           — Ground-truth quality and latency benchmarks for model candidates
+sct/model_candidates.py          — Pinned model candidates for repeatable PII evaluation
+sct/cli.py                       — Command-line interface for text and JSON cleaning (sct-clean)
+tests/                           — pytest suite (hypothesis, faker, pytest-timeout)
+scripts/                         — Evaluation, export and fuzz tools
+benchmarks/                      — Benchmark and comparison harness
+evaluation/                      — Reviewed evaluation sets
 ```
 
 ## Docs

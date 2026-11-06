@@ -10,8 +10,9 @@ from bisect import bisect_left, bisect_right
 
 import pytest
 
-from scripts.benchmark_release import (
-    GENERIC_MARKER, LABEL_ALIASES, PLACEHOLDER_REGEX, WHITESPACE_RUN, _collapse_whitespace, _find_value,
+from benchmarks.score import (
+    GENERIC_MARKER, _LABEL_ALIASES as LABEL_ALIASES, _NUMBERED_PLACEHOLDER as PLACEHOLDER_REGEX,
+    WHITESPACE_RUN, _collapse_whitespace, _find_value,
     _nfkc_view, _sct_cleanup, predicted_spans,
 )
 from sct.config import TextCleanerConfig

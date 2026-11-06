@@ -20,6 +20,14 @@ The same entity always maps to the same fake value within a document, and the sa
 always gets the same fakes (`synthetic_seed`, `synthetic_per_document`). The exact fakes depend
 on the installed Faker version (this output: Faker 40.44). Works with `ner_mode='pii'` too.
 
+Each type gets a fake of its kind, including the types Presidio reports (`ORGANIZATION` a company, `DATE_TIME` a
+date, `CREDIT_CARD` a card number, `US_PASSPORT` a passport number). A type with no generator, such as your own
+`gliner_labels` label or a type the document's Faker locale lacks, is written as its tag (`<ANIMAL>`), never as a
+person name. See `FAKER_GENERATORS` in `sct/utils/synthetic.py`. A fake never holds the original value as a whole word.
+
+Without Faker, synthetic mode raises `ImportError` with the install command, at the first value it replaces.
+Other modes do not need Faker.
+
 > **Note**: Synthetic replacement preserves data utility for downstream ML tasks but is NOT GDPR-compliant anonymization. Same-document consistency is maintained (same entity text always maps to the same fake value).
 
 ## Reversible Anonymization
@@ -42,6 +50,12 @@ print(anon_map.deanonymize(result.lm_text))  # -> John Smith works at Google in 
 stored = json.dumps(anon_map.to_dict())
 ```
 
+A digit run glued to a placeholder, directly or across one joiner, is masked and restored with the rest of the text: `a@b.com-107683` and `John Smith-107683` give `<EMAIL_0>-<NUMBER_0>` and `<PERSON_0>-<NUMBER_0>`, and `<REF_1>|123-45` gives `<REF_1>|<NUMBER_0>`. It needs `replace_numbers_min_digits` digits in all (joined groups count together). A placeholder with a letter glued to its other side, directly or across a joiner, is inside a longer code and does not count, so `INV-2023-107683` gives `INV-<YEAR_0>-107683`. Placeholder and synthetic modes keep such a run as a token part.
+
+A quote, dash, `*` or `%` touching a placeholder also stays, so it restores with the text: `"a@b.com"` gives `"<EMAIL_0>"`. Placeholder and synthetic modes drop it.
+
+The streaming redactors, the MCP server and the adapters refuse this mode, as they cannot return a map per text.
+
 
 ## User term lists
 
@@ -62,7 +76,7 @@ TextCleaner(cfg).process("Blue Sky: ask support@acme.com or bob@x.com, EMP-12345
   and win over everything, also over your own deny terms and patterns.
 - Placeholder mode writes `<LABEL>`; reversible mode writes `<LABEL_0>` and records the original in the map,
   so `deanonymize` restores it; synthetic mode writes a Faker value when the label has one (`PERSON`, `CITY`,
-  `EMAIL`, ...; see `FAKER_GENERATORS` in `sct/utils/synthetic.py`) and `<LABEL>` otherwise.
+  `EMAIL`, `ORGANIZATION`, ...; see `FAKER_GENERATORS` in `sct/utils/synthetic.py`) and `<LABEL>` otherwise.
 - `metadata['regex_counts']` and `signals` count each label (count and characters, never values); user labels
   count as PII in `signals['pii_types']`.
 - Whole-word and case rules: see `custom_deny_terms` and `custom_terms_case_sensitive` in

@@ -5,11 +5,13 @@ import json
 import os
 import sys
 from pathlib import Path
-from typing import Optional, Sequence, TextIO
+from typing import TextIO
+from collections.abc import Sequence
 
 from sct.adapters import process_json
 from sct.presets import PRESETS, preset_config
 from sct.sct import TextCleaner
+from sct.utils.ner import ModelLoadError
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -41,13 +43,49 @@ def _parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--token-map",
-        help="Restricted JSON output for reversible token mappings",
+        help="JSON output for reversible token mappings (mode 0600 on POSIX)",
     )
     return parser
 
 
+def _write_token_map(token_path: Path, anon_map) -> None:
+    token_path.parent.mkdir(parents=True, exist_ok=True)
+    if token_path.is_symlink():
+        raise ValueError("--token-map must not be a symbolic link")
+    flags = os.O_WRONLY | os.O_CREAT | os.O_TRUNC
+    if hasattr(os, "O_NOFOLLOW"):
+        flags |= os.O_NOFOLLOW
+    descriptor = os.open(
+        token_path,
+        flags,
+        0o600,
+    )
+    try:
+        os.fchmod(descriptor, 0o600)
+    except Exception:
+        os.close(descriptor)
+        raise
+    with os.fdopen(descriptor, "w", encoding="utf-8") as token_file:
+        json.dump(
+            anon_map.to_dict(),
+            token_file,
+            indent=2,
+            sort_keys=True,
+        )
+        token_file.write("\n")
+
+
+def _check_reversible_args(parser: argparse.ArgumentParser, args: argparse.Namespace) -> None:
+    if not args.token_map:
+        parser.error("--token-map is required for reversible mode")
+    if args.json_input:
+        parser.error("reversible mode currently supports text input only")
+    if os.name != "posix":
+        parser.error("reversible mode is unavailable here: the token map can only be restricted on POSIX")
+
+
 def main(
-    argv: Optional[Sequence[str]] = None,
+    argv: Sequence[str] | None = None,
     *,
     stdin: TextIO = sys.stdin,
     stdout: TextIO = sys.stdout,
@@ -55,14 +93,12 @@ def main(
     """Run the command-line cleaner."""
     parser = _parser()
     args = parser.parse_args(argv)
-    if args.replacement_mode == "reversible" and not args.token_map:
-        parser.error("--token-map is required for reversible mode")
-    if args.json_input and args.replacement_mode == "reversible":
-        parser.error("reversible mode currently supports text input only")
-    if args.input == "-":
-        source = stdin.read()
-    else:
-        source = Path(args.input).read_text(encoding="utf-8")
+    if args.replacement_mode == "reversible":
+        _check_reversible_args(parser, args)
+    try:
+        source = stdin.read() if args.input == "-" else Path(args.input).read_text(encoding="utf-8")
+    except (OSError, ValueError) as exc:  # missing file or not UTF-8
+        parser.error(f"cannot read input: {exc}")
 
     try:
         cleaner = TextCleaner(cfg=preset_config(
@@ -72,44 +108,18 @@ def main(
             replacement_mode=args.replacement_mode,
             **({"check_to_ascii_unicode": True} if args.to_ascii else {}),
         ))
-    except ImportError as exc:
+        if args.json_input:
+            output = json.dumps(process_json(cleaner, json.loads(source)).value, ensure_ascii=False)
+        else:
+            result = cleaner.process(source)
+            output = result.lm_text
+            if args.replacement_mode == "reversible":
+                # Before stdout: masked text with no map could never be reversed.
+                _write_token_map(Path(args.token_map), result.metadata["anon_map"])
+    # ValueError: bad JSON, two keys cleaned to the same text, or a symlinked --token-map.
+    except (ImportError, ModelLoadError, OSError, ValueError) as exc:
         parser.error(str(exc))
-    if args.json_input:
-        try:
-            cleaned = process_json(cleaner, json.loads(source)).value
-        except ValueError as exc:  # bad JSON or two keys cleaned to the same text
-            parser.error(str(exc))
-        stdout.write(json.dumps(cleaned, ensure_ascii=False) + "\n")
-    else:
-        result = cleaner.process(source)
-        stdout.write(result.lm_text + "\n")
-        if args.replacement_mode == "reversible":
-            anon_map = result.metadata["anon_map"]
-            token_path = Path(args.token_map)
-            token_path.parent.mkdir(parents=True, exist_ok=True)
-            if token_path.is_symlink():
-                raise ValueError("--token-map must not be a symbolic link")
-            flags = os.O_WRONLY | os.O_CREAT | os.O_TRUNC
-            if hasattr(os, "O_NOFOLLOW"):
-                flags |= os.O_NOFOLLOW
-            descriptor = os.open(
-                token_path,
-                flags,
-                0o600,
-            )
-            try:
-                os.fchmod(descriptor, 0o600)
-            except Exception:
-                os.close(descriptor)
-                raise
-            with os.fdopen(descriptor, "w", encoding="utf-8") as token_file:
-                json.dump(
-                    anon_map.to_dict(),
-                    token_file,
-                    indent=2,
-                    sort_keys=True,
-                )
-                token_file.write("\n")
+    stdout.write(output + "\n")
     return 0
 
 

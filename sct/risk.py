@@ -3,7 +3,8 @@
 from collections import Counter
 from dataclasses import dataclass
 from types import MappingProxyType
-from typing import Any, Mapping, Sequence
+from typing import Any
+from collections.abc import Mapping, Sequence
 
 
 @dataclass(frozen=True)
@@ -31,16 +32,18 @@ def _tagged(value: Any) -> Any:
 def assess_reidentification_risk(
     records: Sequence[Mapping[str, Any]],
     *,
-    quasi_identifiers: tuple[str, ...],
+    quasi_identifiers: tuple[str, ...] | str,
     k_threshold: int = 5,
 ) -> ReidentificationRiskReport:
-    """Measure k-anonymity for selected quasi-identifiers."""
+    """Measure k-anonymity for selected quasi-identifiers; a plain string names one."""
     if not quasi_identifiers:
         raise ValueError("quasi_identifiers must not be empty")
     if k_threshold < 2:
         raise ValueError("k_threshold must be >= 2")
+    if isinstance(quasi_identifiers, str):
+        quasi_identifiers = (quasi_identifiers,)
 
-    combinations = Counter()
+    combinations: Counter[tuple] = Counter()
     for record in records:
         missing = set(quasi_identifiers).difference(record)
         if missing:

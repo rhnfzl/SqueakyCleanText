@@ -1,6 +1,7 @@
 import json
 import re
 import unicodedata
+from collections.abc import Callable
 
 from sct.utils import constants
 
@@ -67,29 +68,20 @@ def _remove_bracketed(text, remove_brackets, remove_braces, max_chars, max_words
 
 class ProcessSpecialSymbols:
 
-    def __init__(self):
-        pass
-
-    def replace_currency_symbols(self, text, replace_with="<CUR>"):
-        """
-        Replace currency symbols in ``text`` str with string specified by ``replace_with`` str.
-        Args:
-            text (str): raw text
-            replace_with (str): if None (default), replace symbols with
-                their standard 3-letter abbreviations (e.g. '$' with 'USD', '£' with 'GBP');
-                otherwise, pass in a string with which to replace all symbols
-                (e.g. "*CURRENCY*")
-        """
+    def replace_currency_symbols(self, text: str,
+                                 replace_with: str | Callable[[re.Match[str]], str] | None = "<CUR>") -> str:
+        """Replace runs of currency symbols with ``replace_with``, a string or a callable as ``re.sub`` takes;
+        None replaces each symbol with its ISO code ('$' with 'USD', '£' with 'GBP')."""
         if replace_with is None:
             return self.replace_currency_symbols_with_fn(text, constants.CURRENCIES.__getitem__)
         return constants.CURRENCY_REGEX.sub(replace_with, text)
 
-    def replace_currency_symbols_with_fn(self, text, replace_fn):
+    def replace_currency_symbols_with_fn(self, text: str, replace_fn: Callable[[str], str]) -> str:
         """Replace each single currency symbol: replace_fn(symbol) -> replacement."""
         return constants.CURRENCY_SYMBOL_REGEX.sub(lambda m: replace_fn(m.group()), text)
 
 
-    def remove_isolated_letters(self, text):
+    def remove_isolated_letters(self, text: str) -> str:
         """
         Removes any isolated letters which doesn't add any value to the text.
         """
@@ -97,8 +89,9 @@ class ProcessSpecialSymbols:
 
         return cleaned_text
 
-    def remove_isolated_special_symbols(self, text, remove_brackets=True, remove_braces=True,
-                                        max_chars=0, max_words=0, keep_json=False):
+    def remove_isolated_special_symbols(self, text: str, remove_brackets: bool = True, remove_braces: bool = True,
+                                        max_chars: int = 0, max_words: int = 0, keep_json: bool = False,
+                                        keep_glued_to_placeholder: bool = False) -> str:
         """
         Removes any isolated symbols which shouldn't be present in the text.
 
@@ -109,6 +102,7 @@ class ProcessSpecialSymbols:
             max_chars, max_words: when either is > 0, only innermost spans within both limits
                 are removed; 0 and 0 = remove every span (0.8.0).
             keep_json: never remove a {...} that parses as a JSON object, nor anything inside it.
+            keep_glued_to_placeholder: keep a quote, dash, * or % that touches a placeholder (reversible mode).
         """
         spans = _json_object_spans(text) if keep_json and (remove_brackets or remove_braces) else []
         parts, last = [], 0
@@ -119,9 +113,12 @@ class ProcessSpecialSymbols:
         parts.append(_remove_bracketed(text[last:], remove_brackets, remove_braces, max_chars, max_words))
         cleaned_text = ''.join(parts)
         cleaned_text = constants.ISOLATED_SPECIAL_SYMBOLS_REGEX.sub('', cleaned_text)
+        if keep_glued_to_placeholder:
+            return constants.ISOLATED_QUOTES_OR_GLUED_REGEX.sub(
+                lambda m: m.group(1) or _drop_if_isolated(m), cleaned_text)
         cleaned_text = constants.ISOLATED_QUOTES_REGEX.sub(_drop_if_isolated, cleaned_text)
 
         return cleaned_text
 
-    def remove_punctuation(self, text):
+    def remove_punctuation(self, text: str) -> str:
         return constants.PUNCTUATION_REGEX.sub('', text)

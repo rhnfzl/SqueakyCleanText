@@ -7,10 +7,12 @@ and escapes in code stay as written. ``"sct"`` is the library default config.
 """
 
 from types import MappingProxyType
-from typing import Any, Mapping
+from typing import Any
+from collections.abc import Mapping
 
 from sct.config import TextCleanerConfig
 
+# sct.adapters._pii_only_cleaner reads the False values here: a change also changes JSON key cleaning.
 _TRAINING = {
     # On (library defaults, listed so the preset reads on its own)
     'check_replace_urls': True,
@@ -49,7 +51,7 @@ PRESETS: Mapping[str, Mapping[str, Any]] = MappingProxyType({
 })
 
 
-def preset_config(name: str = "training", **overrides) -> TextCleanerConfig:
+def preset_config(name: str = "training", **overrides: Any) -> TextCleanerConfig:
     """Return the ``name`` preset as a config; ``overrides`` are any config fields."""
     if name not in PRESETS:
         raise ValueError(f"unknown preset {name!r}; valid presets: {sorted(PRESETS)}")

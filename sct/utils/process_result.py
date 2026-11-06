@@ -5,7 +5,30 @@ while exposing ``.metadata`` for new features (reversible anonymization maps,
 document classification, etc.).
 """
 
-from typing import Optional
+from typing import TYPE_CHECKING, Any, TypedDict
+from collections.abc import Sequence
+
+if TYPE_CHECKING:
+    from sct.privacy import EntityFinding
+    from sct.signals import Signals
+    from sct.utils.anonymization_map import AnonymizationMap
+
+
+class ProcessMetadata(TypedDict, total=False):
+    """Keys of ``ProcessResult.metadata``; see the ``ProcessResult`` docstring."""
+
+    source_chars: int
+    regex_counts: dict[str, dict[str, int]]
+    entity_counts: dict[str, dict[str, int]]
+    language_confidence: float | None
+    language_source: str
+    warnings: list[str]
+    provenance: dict[str, Any]
+    anon_map: "AnonymizationMap"
+    anon_map_reference: str
+    classes: list[dict]
+    findings: "Sequence[EntityFinding]"
+    policy: dict[str, str]
 
 
 class ProcessResult:
@@ -18,16 +41,17 @@ class ProcessResult:
     Always present (from ``TextCleaner``; value-free):
         ``source_chars``  — ``len`` of the input text
         ``regex_counts``  — ``{TYPE: {"count": int, "chars": int}}`` per regex replacement
-        ``entity_counts`` — same shape, per NER entity type
+        ``entity_counts`` — same shape, per NER entity type, concealed entities only
         ``language_confidence``, ``language_source``, ``warnings``, ``provenance``
 
     ``.signals`` is the value-free public view of these (see :mod:`sct.signals`).
 
-    Metadata keys (all optional, ``None`` when feature is inactive):
+    Metadata keys present only while their feature is active (absent otherwise):
         ``anon_map``  — :class:`AnonymizationMap` when ``replacement_mode='reversible'``
         ``anon_map_reference`` — opaque external token-store reference
         ``classes``   — ``list[dict]`` when ``check_classify_document=True``
-        ``findings``  — policy decisions and detected entity spans
+        ``findings``  — policy decisions and detected entity spans, with
+        ``include_entities=True`` or a privacy policy
         ``policy``    — active policy name and version
     """
 
@@ -36,9 +60,9 @@ class ProcessResult:
     def __init__(
         self,
         lm_text: str,
-        stat_text: Optional[str],
-        language: Optional[str],
-        metadata: Optional[dict] = None,
+        stat_text: str | None,
+        language: str | None,
+        metadata: ProcessMetadata | None = None,
     ):
         self.lm_text = lm_text
         self.stat_text = stat_text
@@ -46,8 +70,9 @@ class ProcessResult:
         self.metadata = {} if metadata is None else metadata
 
     @property
-    def signals(self) -> dict:
+    def signals(self) -> "Signals":
         """Value-free view: counts, shares, types, language, models; never entity text."""
+        # deferred: sct.signals imports this module at load
         from sct.signals import public_view
         return public_view(self)
 
