@@ -1,5 +1,7 @@
 # SCT v0.8.2 versus other PII tools: charts
 
+For X, use the [six redesigned social images and draft thread](social/README.md). The full charts below remain supporting evidence.
+
 SCT prepares text datasets: it detects language, repairs text, handles PII, and scores and documents the result.
 
 PII is one stage of that pipeline. It combines SCT’s own regex detection with language-based model routing. Configurable backends include ONNX, PyTorch, GLiNER, ensembles, and the beta Presidio/GLiNER integration. Users can bring supported models. This is backend flexibility within documented interfaces, not automatic integration of every tool benchmarked here.
@@ -36,7 +38,7 @@ Shared types are EMAIL, PHONE and NUMBER, as specified by the protocol for the h
 
 Masking recall counts any overlap with a gold mention, regardless of predicted type. It does not require full coverage. Masking precision measures how many predicted mask spans overlap a gold mention. Document exposure is the share of eligible documents where at least one letter or digit of a gold mention remains visible. These measures are not privacy guarantees.
 
-Points and intervals come from the archived summary JSON, without new inference. Differences are SCT minus the other entry, in percentage points. A positive difference favours SCT for recall and precision; a negative difference favours SCT for document exposure. Whiskers are recorded paired bootstrap 95% intervals from 1,000 resamples (seed 13). They are not adjusted for multiple comparisons. An interval crossing zero does not establish a difference.
+Points and intervals come from the archived summary JSON, without new inference. The dashed line is the SCT reference: zero means equal scores. The axis labels show which side favours SCT. Interactive charts show both tools’ scores on hover. Differences are SCT minus the other entry, in percentage points. A positive difference favours SCT for recall and precision; a negative difference favours SCT for document exposure. Whiskers are recorded paired bootstrap 95% intervals from 1,000 resamples (seed 13). They are not adjusted for multiple comparisons. An interval crossing zero does not establish a difference.
 
 The default track uses vendor quick-start settings. SCT default runs on CPU. Other entries can run on CPU or a shared GPU with a memory cap; this report makes no speed ranking. The source report documents placement-code changes, completion rules, dataset provenance, licenses, and deviations from the original protocol. SCT’s RedactionBench placement fix is included in the archived run.
 

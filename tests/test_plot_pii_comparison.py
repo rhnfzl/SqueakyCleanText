@@ -5,7 +5,11 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from scripts.plot_pii_comparison import extract
+from unittest.mock import patch
+
+import pytest
+
+from scripts.plot_pii_comparison import extract, render
 
 SOURCE = Path(__file__).resolve().parents[1] / "benchmarks/results/compare-2026-11-04/default/summary.json"
 
@@ -35,3 +39,24 @@ class PIIChartTests(unittest.TestCase):
             path.write_text(json.dumps(data))
             with self.assertRaisesRegex(ValueError, "14"):
                 extract(path)
+
+
+    def test_charts_identify_sct_and_reverse_exposure_direction(self):
+        go = pytest.importorskip("plotly.graph_objects", reason="Install the plotting script's pinned extras")
+
+        figures = []
+        with tempfile.TemporaryDirectory() as folder, \
+             patch.object(go.Figure, "write_image"), \
+             patch.object(go.Figure, "write_html", autospec=True,
+                          side_effect=lambda fig, *args, **kwargs: figures.append(fig)):
+            render(extract(SOURCE), Path(folder))
+        self.assertEqual(len(figures), 3)
+        for fig in figures:
+            labels = [a.text for a in fig.layout.annotations]
+            self.assertTrue(any("SCT reference" in label for label in labels))
+            self.assertTrue(all("SCT v0.8.2:" in trace.hovertemplate for trace in fig.data))
+            self.assertTrue(all(len(trace.customdata[0]) == 4 for trace in fig.data))
+        self.assertIn("Other tool better", figures[0].layout.xaxis.title.text)
+        self.assertIn("SCT better", figures[0].layout.xaxis.title.text)
+        self.assertIn("Other tool better", figures[2].layout.xaxis.title.text.split("<br>")[1].split("|")[0])
+        self.assertIn("SCT better", figures[2].layout.xaxis2.title.text.split("<br>")[1].split("|")[0])

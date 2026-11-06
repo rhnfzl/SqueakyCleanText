@@ -68,21 +68,29 @@ def render(data: dict, output: Path) -> None:
                                         marker={"size": 11, "color": "#087f8c", "symbol": "diamond"},
                                         error_x={"type": "data", "symmetric": False,
                                                  "array": [max(0, hi - x)], "arrayminus": [max(0, x - lo)]},
-                                        customdata=[[lo, hi]],
-                                        hovertemplate="%{y}: %{x:.2f} pp<br>95% CI [%{customdata[0]:.2f}, "
+                                        customdata=[[lo, hi, 100 * metric["sct"], 100 * metric["other"]]],
+                                        hovertemplate="SCT v0.8.2: %{customdata[2]:.2f}%<br>%{y}: %{customdata[3]:.2f}%"
+                                                      "<br>SCT minus other: %{x:.2f} pp<br>95% CI [%{customdata[0]:.2f}, "
                                                       "%{customdata[1]:.2f}]<extra></extra>"), row=1, col=col)
-            fig.add_vline(x=0, line_dash="dash", line_color="#697586", row=1, col=col)
+            fig.add_vline(x=0, line_dash="dash", line_color="#697586", row=1, col=col,
+                          annotation_text="SCT reference<br>0 = equal scores",
+                          annotation_position="top", annotation_font_size=13)
             lower = min(0, *(100 * metric["ci95"][0] for metric in values)) - 5
             upper = max(0, *(100 * metric["ci95"][1] for metric in values)) + 5
-            fig.update_xaxes(title_text="SCT minus other tool (percentage points)", row=1, col=col,
+            direction = ("← SCT better | Other tool better →" if name == "doc_leak_rate"
+                         else "← Other tool better | SCT better →")
+            fig.update_xaxes(title_text=f"SCT minus other tool (percentage points)<br>{direction}", row=1, col=col,
                              range=[lower, upper])
+        for annotation in fig.layout.annotations[:len(metrics)]:
+            annotation.y = 1.08
         label_note = "Shared types: EMAIL, PHONE, NUMBER." if view == "shared" else "Full scored taxonomy; DATE excluded."
         fig.update_layout(template="plotly_white", width=1400, height=1050,
                           title={"text": title, "x": 0.03}, font={"family": "Arial, sans-serif", "size": 18},
-                          margin={"l": 205, "r": 70, "t": 145, "b": 220})
+                          margin={"l": 205, "r": 70, "t": 195, "b": 250})
         fig.add_annotation(x=0, y=-0.15, xref="paper", yref="paper", showarrow=False,
                            xanchor="left", yanchor="top", align="left",
                            font={"size": 15}, text=f"{label_note} Synthetic datasets only. Default track.<br>"
+                           "SCT is the dashed reference line, not a separate tool row. Zero means equal scores.<br>"
                            "Each row: same documents, clean sets, languages both claim; rows use different subsets.<br>"
                            "Points: macro differences. Whiskers: paired bootstrap 95% intervals.<br>"
                            "Intervals are not adjusted for multiple tests.<br>"
