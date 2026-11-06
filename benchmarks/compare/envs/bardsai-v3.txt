@@ -2,4 +2,5 @@
 # The bundled decoder imports torch even on the ONNX path (model card: "Requires transformers and torch").
 transformers==5.22.1
 onnxruntime==1.31.1
-torch==2.15.0
+# CUDA 12 (round 2): torch 2.14.1+cu126, the newest cu126 build; round 1 used torch==2.15.0 (CUDA 13, ran on CPU).
+torch @ https://download-r2.pytorch.org/whl/cu126/torch-2.14.1%2Bcu126-cp312-cp312-manylinux_2_28_x86_64.whl

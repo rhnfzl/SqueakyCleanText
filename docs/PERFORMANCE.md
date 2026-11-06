@@ -5,7 +5,7 @@ ensemble), on the release benchmark set (`evaluation/release_benchmark.jsonl`). 
 are the benchmark documents (up to about 900 characters); "long" docs join 8 of them.
 Numbers are docs per second, median of 3 runs. Output text is identical on CPU and GPU.
 
-Machine: Linux x86_64, AMD Ryzen Threadripper PRO 7985WX (64 cores), RTX 4090 (24 GB),
+Machine: Linux x86_64 workstation with a high-end GPU,
 onnxruntime 1.30/1.31 (CPU) and onnxruntime-gpu 1.29 (CUDA 12). CPU runs were pinned to 16 or
 64 physical cores. Correctness and the 16-core CPU commands:
 `evaluation/results/comparison-0.7.1-0.8.0.md`.
@@ -16,7 +16,7 @@ onnxruntime 1.30/1.31 (CPU) and onnxruntime-gpu 1.29 (CUDA 12). CPU runs were pi
   (about 200 ms each), on 4 cores or 64. More cores do not help a single document.
 - **Bulk on CPU: use `process_batch` with `batch_size` about 16.** Keep
   `ner_batch_size=8` (default) and let ONNX use the cores you give it.
-- **Bulk and speed: use a GPU.** With an RTX 4090, single documents are about 17x faster
+- **Bulk and speed: use a GPU.** With a high-end GPU, single documents are about 17x faster
   and batches about 4.5x faster than 64 CPU cores.
 - **Containers or `taskset`:** set `onnx_intra_op_threads` to your core count. Without it,
   ONNX Runtime starts one thread per core of the whole machine.
@@ -75,7 +75,7 @@ requested") and adds `mps_fallback` to `metadata['warnings']`; `metadata['proven
 then shows `cpu` as the provider. Set `PYTORCH_ENABLE_MPS_FALLBACK=1` if a model uses an
 operator MPS does not support.
 
-Measured on an M4 Max, GLiNER, 500 synthetic docs, `process_batch` (docs/s):
+Measured on an Apple Silicon Mac, GLiNER, 500 synthetic docs, `process_batch` (docs/s):
 
 | Run pair (same machine load) | CPU | MPS | Speed-up |
 |---|---|---|---|

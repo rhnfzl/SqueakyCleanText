@@ -1,6 +1,6 @@
 # SCT 0.8.0 vs unreleased (fix/benchmark-findings) benchmark
 
-Run on 2026-11-02 on the same CPU host as the 0.7.1 vs 0.8.0 run (AMD Threadripper PRO 7985WX, Python
+Run on 2026-11-02 on the same CPU host as the 0.7.1 vs 0.8.0 run (Python
 3.12.3, onnxruntime 1.31.1, same package pins as the 0.8.0 venv). Branch commit `2078e8c4` (fixes F1-F6,
 F8, F9, F11, F12 and scorer change S1), installed from a `git archive` of that commit. Same seed (13) and
 default sample sizes as the 0.8.0 run (PII 300 docs per language, TAB all 127, speed and clean 100 per

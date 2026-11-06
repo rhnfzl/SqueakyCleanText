@@ -3,7 +3,8 @@
     python -m benchmarks.compare.report benchmarks/results/compare-2026-11-02 > TABLES.md
 
 The bundle holds ``<track>/summary.json`` and ``<track>/<entry>/<dataset>-<part>.json`` per
-track (``default``, ``tuned``) and optionally ``speed-16t/speed.json`` and ``speed-1t/speed.json``.
+track (``default``, ``tuned``) and optionally ``speed-16t/speed.json``, ``speed-1t/speed.json`` and
+``speed-gpu/speed.json`` (``speed.py --device cuda``: the GPU column, per entry device + docs/s + peak VRAM).
 Group scores are the macro over datasets of each dataset's language macro (PROTOCOL.md section 13),
 effective protection (failed docs unmasked), DATE out.
 """
@@ -17,6 +18,15 @@ from benchmarks.compare import scorer
 
 TRACKS = ("default", "tuned")
 LOWER_IS_BETTER = {"doc_leak_rate", "char_survival", "overmask_rate"}
+LOW = "† = under 99% complete on a dataset in this row or cell (PROTOCOL section 15; see the completion table)."
+
+
+def _low(track_dir: Path | None, entry: str, datasets) -> str:
+    """"†" when any of *datasets* has ``flag_low_completion`` for *entry* (PROTOCOL section 15)."""
+    if track_dir is None:
+        return ""
+    files = (track_dir / entry / f"{d}-test.json" for d in datasets)
+    return "†" if any(f.exists() and json.loads(f.read_text()).get("flag_low_completion") for f in files) else ""
 
 
 def _fmt(value) -> str:
@@ -77,42 +87,73 @@ def dataset_table(track_dir: Path, entries, view: str = "full", metric: str = "m
             other = without_dir / e / f"{dataset}-test.json" if without_dir else None
             without = (claimed_macro(json.loads(other.read_text())["views"][view]["compare"], e, metric, inside)
                        if other and other.exists() else False)
-            cells.append(("°" if inside else "-") if value is False else _mark(value, e, dataset, without))
+            cells.append(("°" if inside else "-") if value is False
+                         else _mark(value, e, dataset, without) + _low(track_dir, e, [dataset]))
         out.append(f"| {dataset} | {' | '.join(cells)} |")
     return out
+
+
+def _vram(s: dict) -> str:
+    """Peak VRAM MB: nvidia-smi for the adapter's PID (speed.vram_mb), else torch's own peak; "-" when none."""
+    for key in ("peak_vram_mb", "torch_peak_vram_mb"):
+        if (s.get(key) or {}).get("median"):
+            return f"{s[key]['median']:,.0f}"
+    return "-"
+
+
+def gpu_speed(bundle: Path, entry: str) -> str:
+    """Own-table GPU cell from ``speed-gpu/speed.json``: device, batch-8 docs/s, peak VRAM (n/a without that run)."""
+    path = bundle / "speed-gpu" / "speed.json"
+    s = json.loads(path.read_text())["entries"].get(entry) if path.exists() else None
+    if not s:
+        return "n/a"
+    docs = (s["common_batch_docs_per_second"] or {}).get("median")
+    return f"{s.get('device', '?')}, {f'{docs:,.1f}' if docs else 'fail'} docs/s, {_vram(s)} MB"
 
 
 def speed_table(speed: dict) -> list[str]:
     def med(x):
         return "fail" if x is None else f"{x['median']:.4g}"
 
-    out = [f"device {speed['device']}, cpus {speed['cpus']}, threads {speed['threads']}, {speed['docs']} docs, "
+    out = [f"run device {speed['device']} (gpu {speed.get('gpu')}), cpus {speed['cpus']}, threads {speed['threads']}, "
+           f"{speed['docs']} docs, "
            f"{speed['repeats']} repeats, median; peak RSS from "
            + ("/proc VmHWM" if any("peak_rss_mb_getrusage" in s for s in speed["entries"].values()) else
               "getrusage (on Linux it never reads below the runner's own ~2 GB: values at that floor are an upper bound)"),
            "",
-           "| entry | cold start s | latency median ms | p95 ms | batch-8 docs/s | chars/s | peak RSS MB | venv MB | failed |",
-           "|---|---|---|---|---|---|---|---|---|"]
+           "| entry | device | cold start s | latency median ms | p95 ms | batch-8 docs/s | chars/s | peak RSS MB "
+           "| peak VRAM MB | venv MB | failed |",
+           "|---|---|---|---|---|---|---|---|---|---|---|"]
     for entry, s in sorted(speed["entries"].items(), key=lambda x: -((x[1]["common_batch_docs_per_second"] or {})
                                                                      .get("median") or 0)):
-        out.append(f"| {entry} | {med(s['cold_start_seconds'])} | {med(s['latency_median_ms'])} | "
-                   f"{med(s['latency_p95_ms'])} | {med(s['common_batch_docs_per_second'])} | "
-                   f"{med(s['common_batch_chars_per_second'])} | {med(s['peak_rss_mb'])} | {s['install_mb']} | "
-                   f"{len(s['failed'])} |")
+        out.append(f"| {entry} | {s.get('device', speed['device'])} | {med(s['cold_start_seconds'])} | "
+                   f"{med(s['latency_median_ms'])} | {med(s['latency_p95_ms'])} | "
+                   f"{med(s['common_batch_docs_per_second'])} | {med(s['common_batch_chars_per_second'])} | "
+                   f"{med(s['peak_rss_mb'])} | {_vram(s)} | {s['install_mb']} | {len(s['failed'])} |")
     return out
 
 
 LICENCES = {"sct-default": "MIT", "sct-gliner": "MIT + Apache-2.0 model", "presidio": "MIT", "datafog": "MIT",
             "gliner-nvidia": "Apache-2.0 + NVIDIA Open Model", "gliner2-fastino": "Apache-2.0", "opf": "Apache-2.0",
-            "bardsai-v3": "Apache-2.0"}
+            "bardsai-v3": "Apache-2.0", "gliner-knowledgator": "Apache-2.0",
+            "piiranha": "CC-BY-NC-ND-4.0 model (benchmark only)", "llm-guard": "MIT + CC-BY-NC-4.0 model",
+            "scrubadub": "Apache-2.0 / MIT + MIT spaCy model", "ai4privacy": "MIT", "openmed": "Apache-2.0",
+            "pii-tracer": "MIT", "presidio-full": "MIT", "sct-training": "MIT",
+            "sct-gliner-nvidia": "MIT + NVIDIA Open Model"}
 HEAD = (("masked_recall", "mR"), ("masked_precision", "mP"), ("strict_f1", "strict F1"),
         ("doc_leak_rate", "doc leak"), ("overmask_rate", "over-mask"))
+
+
+# why an entry other than SCT has no language list (never default to "regex": two of these are models)
+NO_CLAIM = {"datafog": "all (regex, no language claim)",
+            "pii-tracer": "all (model card: en + multilingual)",
+            "presidio-full": "all (spaCy engine per gold language + recognizers)"}
 
 
 def claimed(entry: str) -> str:
     langs = registry.CLAIMED_LANGUAGES.get(entry)
     if langs is None:
-        return "all (multilingual claim)" if entry.startswith("sct") else "all (regex, no language claim)"
+        return "all (multilingual claim)" if entry.startswith("sct") else NO_CLAIM.get(entry, "all (no language claim)")
     return "24 EU" if langs == registry.EU24 else " ".join(langs)
 
 
@@ -132,7 +173,8 @@ def _point(agg: dict | None, metric: str = "masked_recall") -> str:
     return "-" if not agg else f"{_fmt(agg['macro'].get(metric))} ({len(agg['datasets'])})"
 
 
-def own_table(summary: dict, bundle: Path, view: str, group: str, without: dict | None = None) -> list[str]:
+def own_table(summary: dict, bundle: Path, view: str, group: str, without: dict | None = None,
+              track_dir: Path | None = None) -> list[str]:
     """Headline (decision 21): each entry on its own clean datasets, claimed languages, 95% bootstrap CI.
 
     Beside it, for information: clean sets outside the claimed languages, unknown-training-data sets
@@ -143,7 +185,7 @@ def own_table(summary: dict, bundle: Path, view: str, group: str, without: dict 
             + " | ".join(f"{n} [95% CI]" for _, n in HEAD)
             + " | mR clean, outside claimed langs | mR unknown (U) sets | mR U sets, outside claimed langs"
             " | (mR excluded sets, info only) | docs/s CPU"
-            " | peak RAM | claimed languages | licence |")
+            " | peak RAM | GPU: device, docs/s, peak VRAM | claimed languages | licence |")
     rows = []
     for entry, views in summary.get("own", {}).items():
         cell = views.get(view, {}).get(group)
@@ -163,17 +205,20 @@ def own_table(summary: dict, bundle: Path, view: str, group: str, without: dict 
         docs, rss = _speed(bundle, entry)
         excluded = info(lambda c: ((c or {}).get("excluded") or {}).get("claimed"))
         used = (clean.get("claimed") or {}).get("datasets", [])
+        low = _low(track_dir, entry, (d for kind in ("clean", "unknown", "excluded")
+                                      for d in (cell.get(kind) or {}).get("datasets", [])))
         rows.append((ci.get("masked_recall", {}).get("value") or -1,
-                     f"| {entry} | {', '.join(used) or 'none'} ({len(clean.get('datasets', []))}) | " + " | ".join(cells)
+                     f"| {entry}{low} | {', '.join(used) or 'none'} ({len(clean.get('datasets', []))}) | " + " | ".join(cells)
                      + f" | {info(lambda c: ((c or {}).get('clean') or {}).get('outside_claim'))}"
                      + f" | {info(lambda c: ((c or {}).get('unknown') or {}).get('claimed'))}"
                      + f" | {info(lambda c: ((c or {}).get('unknown') or {}).get('outside_claim'))}"
-                     + f" | {'(' + excluded + ')' if excluded != '-' else '-'} | {docs} | {rss}"
+                     + f" | {'(' + excluded + ')' if excluded != '-' else '-'} | {docs} | {rss} | {gpu_speed(bundle, entry)}"
                      + f" | {claimed(entry)} | {LICENCES.get(entry, '?')} |"))
-    return [head, "|" + "---|" * (len(HEAD) + 10), *(row for _, row in sorted(rows, reverse=True))]
+    return [head, "|" + "---|" * (len(HEAD) + 11), *(row for _, row in sorted(rows, reverse=True))]
 
 
-def pairwise_table(summary: dict, view: str, group: str, kind: str = "clean", baseline: str = "sct-default") -> list[str]:
+def pairwise_table(summary: dict, view: str, group: str, kind: str = "clean", baseline: str = "sct-default",
+                   track_dir: Path | None = None) -> list[str]:
     """SCT vs each entry on the datasets *kind* for both (clean, or unknown), languages both claim.
 
     Cell: the entry's score, then the 95% paired bootstrap CI of (entry - SCT); * = the CI excludes 0.
@@ -197,16 +242,18 @@ def pairwise_table(summary: dict, view: str, group: str, kind: str = "clean", ba
             lo, hi = m[k]["diff_ci"]  # a - b: flip to entry - SCT
             cells.append(f"{m[k]['b']:.3f} ({-hi:+.3f}, {-lo:+.3f}){'*' if m[k]['excludes_zero'] else ''}")
         sct = [_fmt(m.get(k, {}).get("a")) for k in ("masked_recall", "masked_precision")]
+        low = _low(track_dir, entry, r["datasets"]) or _low(track_dir, baseline, r["datasets"])
         rows.append((m.get("masked_recall", {}).get("b") or 0,
-                     f"| {entry} | {', '.join(r['datasets'])} | " + " | ".join(cells) + f" | {' | '.join(sct)} |"))
+                     f"| {entry}{low} | {', '.join(r['datasets'])} | " + " | ".join(cells) + f" | {' | '.join(sct)} |"))
     if not rows:
         return [f"No dataset in this group is {kind} for both {baseline} and any other entry (languages both claim)."]
-    missing = [e for e in summary.get("own", {}) if e != baseline and not any(f"| {e} |" in row for _, row in rows)]
+    missing = [e for e in summary.get("own", {}) if e != baseline
+               and not any(row.startswith((f"| {e} |", f"| {e}† |")) for _, row in rows)]
     return out + [row for _, row in sorted(rows, reverse=True)] + (
         ["", f"No {kind} dataset in common with {baseline}: {', '.join(missing)}."] if missing else [])
 
 
-def same_set_table(summary: dict, view: str, group: str, pool: str) -> list[str]:
+def same_set_table(summary: dict, view: str, group: str, pool: str, track_dir: Path | None = None) -> list[str]:
     s = summary.get("same_set", {}).get(view, {}).get(group, {}).get(pool)
     if not s or not s["datasets"] or not s["scores"]:
         names = ", ".join(s["entries"]) if s else "-"
@@ -216,7 +263,8 @@ def same_set_table(summary: dict, view: str, group: str, pool: str) -> list[str]
            "entry claims; point values.", "",
            "| entry | " + " | ".join(n for _, n in HEAD) + " |", "|---|" + "---|" * len(HEAD)]
     rows = sorted(s["scores"].items(), key=lambda x: -(x[1]["macro"].get("masked_recall") or 0))
-    return out + [f"| {e} | " + " | ".join(_fmt(a["macro"].get(k)) for k, _ in HEAD) + " |" for e, a in rows]
+    return out + [f"| {e}{_low(track_dir, e, a['datasets'])} | " + " | ".join(_fmt(a["macro"].get(k)) for k, _ in HEAD)
+                  + " |" for e, a in rows]
 
 
 def language_table(track_dir: Path, entries, group: str, view: str = "full", metric: str = "masked_recall",
@@ -227,12 +275,15 @@ def language_table(track_dir: Path, entries, group: str, view: str = "full", met
     """
     entries = list(entries)
     cells: dict[str, dict[str, list]] = {}
+    flags: dict[str, dict[str, str]] = {}
     for dataset in scorer.GROUPS[group]:
         for e in entries:
             f = track_dir / e / f"{dataset}-test.json"
             if f.exists() and registry.status(e, dataset) == status:
                 for lang, m in json.loads(f.read_text())["views"][view]["compare"]["by_language"].items():
                     cells.setdefault(lang, {}).setdefault(e, []).append((m.get(metric), dataset))
+                    flags.setdefault(lang, {}).setdefault(e, "")
+                    flags[lang][e] = flags[lang][e] or _low(track_dir, e, [dataset])
     entries = [e for e in entries if any(e in v for v in cells.values())]
     if not entries:
         return [f"No {status} dataset in this group."]
@@ -241,7 +292,7 @@ def language_table(track_dir: Path, entries, group: str, view: str = "full", met
         sets = sorted({d for v in cells[lang].values() for _, d in v})
         vals = [scorer._mean(v for v, _ in cells[lang][e]) if e in cells[lang] else None for e in entries]
         out.append(f"| {lang} | {', '.join(sets)} | " + " | ".join(
-            "-" if v is None else _fmt(v) + ("" if registry.claims(e, lang) else "°")
+            "-" if v is None else _fmt(v) + ("" if registry.claims(e, lang) else "°") + flags[lang][e]
             for v, e in zip(vals, entries, strict=True)) + " |")
     return out
 
@@ -320,20 +371,24 @@ def tables(bundle: Path) -> str:
                 if not any(group in v.get(view, {}) for v in summary.get("own", {}).values()):
                     continue
                 lines += ["", f"## {track} track, {view} view, {group}: each entry on its own clean sets, claimed languages",
-                          "", *own_table(summary, bundle, view, group, without)]
+                          "", LOW, "", *own_table(summary, bundle, view, group, without, bundle / track)]
                 for pool in ("all", "others"):
                     lines += ["", f"### same-set ({'every entry' if pool == 'all' else 'non-SCT entries with clean sets'})",
-                              "", *same_set_table(summary, view, group, pool)]
+                              "", *same_set_table(summary, view, group, pool, bundle / track)]
                 for kind in ("clean", "unknown"):
                     lines += ["", f"### SCT vs each entry, datasets {kind} for both, languages both claim", "",
-                              *pairwise_table(summary, view, group, kind)]
+                              *pairwise_table(summary, view, group, kind, track_dir=bundle / track)]
         for group in scorer.GROUPS:
+            if not any((bundle / track / e / f"{d}-test.json").exists()
+                       for e in summary["aggregate"] for d in scorer.GROUPS[group]):
+                continue  # group not run in this bundle (round-1 groups in a round-2 run, and back)
             for status in ("clean", "unknown"):
                 lines += ["", f"## {track} track, per language, full view, masked recall, {group}, {status} sets "
-                          "(° = outside the entry's claimed languages)", "",
+                          "(° = outside the entry's claimed languages)", "", LOW, "",
                           *language_table(bundle / track, summary["aggregate"], group, status=status)]
         lines += ["", f"## {track} track, per dataset, full view, masked F2, claimed languages only (completed docs; "
                   "(x) = excluded, information only; x? = unknown training data; ° = no doc in a claimed language)", "",
+                  LOW, "",
                   *dataset_table(bundle / track, summary["aggregate"], without_dir=wo_dir)]
         lines += ["", f"### {track} track, per dataset, outside claimed languages (information only, not a loss; "
                   "- = every doc is in a claimed language)", "",
@@ -347,7 +402,7 @@ def tables(bundle: Path) -> str:
             lines += ["", f"### {track} track, audit of the recovered copies (seeded sample, counts only)", "", *audit]
     lines += ["", "## contamination (bold = excluded, italic = unknown, plain = clean)", "",
               *contamination_table(registry.ENTRIES)]
-    for name in ("speed-16t", "speed-16t-rss", "speed-1t"):
+    for name in ("speed-16t", "speed-16t-rss", "speed-1t", "speed-gpu"):
         path = bundle / name / "speed.json"
         if path.exists():
             lines += ["", f"## speed ({name})", "", *speed_table(json.loads(path.read_text()))]

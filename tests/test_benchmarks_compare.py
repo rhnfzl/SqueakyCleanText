@@ -63,7 +63,7 @@ def test_new_datasets_registered_with_pins_and_publish_rules():
 
 
 def test_entries_are_complete_and_map_to_sct_types():
-    assert len(entries.ENTRIES) == 8 and {"sct-default", "sct-gliner"} <= set(entries.ENTRIES)
+    assert len(entries.ENTRIES) == 18 and {"sct-default", "sct-gliner"} <= set(entries.ENTRIES)  # 8 + 10 round-2
     for name, entry in entries.ENTRIES.items():
         for key in ("package", "checkpoint", "revision", "config", "threshold", "mask", "device", "gpu_gb"):
             assert key in entry, (name, key)
@@ -278,6 +278,8 @@ def test_offset_check_separates_detection_errors_from_offset_bugs():
     assert check([]) == (False, True)  # missed: detection error
     assert check([(start + 2, end + 2)]) == (True, False)  # misplaced: offset bug
     assert check([(start, end - 1)]) == (True, False)  # cut short: offset bug
+    assert check([(start, start + 3)]) == (False, True)  # stops at the e-mail's own ".": partial detection
+    assert check([(start + 1, start + 3)]) == (True, False)  # does not start on the e-mail: offset bug
     assert "latin-combining" in runner.check_offsets({}, labels)[0]  # no output at all
 
 
@@ -303,6 +305,19 @@ def test_runner_end_to_end_with_dummy(tmp_path, monkeypatch):
     assert summary["aggregate"]["dummy"]["full"]["privacy-synthetic"]["datasets"] == ["gretel_en"]
 
 
+def test_cuda_run_keeps_a_cpu_only_entry_off_the_gpu(tmp_path, monkeypatch):
+    monkeypatch.setattr(runner.split, "load", lambda dataset, part, n, seed: [gold_record("b", spans=[span(0, 7, "name")])])
+    seen = []
+    real = runner.supervise
+    monkeypatch.setattr(runner, "supervise", lambda cmd, docs, work, env, *a, **k: seen.append(env["CUDA_VISIBLE_DEVICES"])
+                        or real(cmd, docs, work, env, *a, **k))
+    out = tmp_path / "out"
+    runner.main(["--entries", "dummy", "--datasets", "gretel_en", "--part", "dev", "--out", str(out), "--device", "cuda",
+                 "--gpu", "3", "--cache", str(tmp_path / "cache"), "--doc-timeout", "30", "--start-timeout", "30"])
+    assert json.loads((out / "dummy" / "gretel_en-dev.json").read_text())["adapter_config"]["device"] == "cpu"
+    assert seen and set(seen) == {""}
+
+
 def test_registry_has_pinned_envs_and_contamination():
     from benchmarks.compare import entries as reg
 
@@ -311,7 +326,8 @@ def test_registry_has_pinned_envs_and_contamination():
         assert t["requirements"].exists(), name
         pins = [line for line in t["requirements"].read_text().splitlines() if line and not line.startswith("#")]
         assert pins and all("==" in p or " @ https://" in p for p in pins), name
-        assert reg.contamination(name, "gretel_en") in {"-", "U", "E, T-family", "T", "D-family", "U, D-family"}
+        assert reg.contamination(name, "gretel_en") in {"-", "U", "E, T-family", "T", "D-family", "U, D-family", "E",
+                                                        "E, T-family, D-family"}, name
     assert reg.tool("sct-default")["adapter"] == "sct_adapter.py" and reg.tool("dummy")["requirements"] is None
     assert reg.contamination("gliner-nvidia", "nemotron") == "T, E-family"
     assert reg.contamination("sct-default", "redact") == "D"
@@ -331,6 +347,22 @@ def test_speed_mode_reports_cold_start_latency_throughput_and_rss(tmp_path):
     summary = speed.summarise([run, run, {"error": "timeout after 1s"}])
     assert summary["repeats"] == 3 and summary["failed"] == ["timeout after 1s"]
     assert summary["common_batch_docs_per_second"]["median"] > 0 and len(summary["other_batch"]) == 2
+
+
+def test_speed_mode_records_a_batch_size_that_raises(tmp_path):
+    from benchmarks.compare import speed
+
+    run = speed.measure(dummy_cmd({"raise_batch": 8}), docs(30), tmp_path, runner.child_env(), batch_size=4, timeout=60,
+                        poll_vram=False)
+    assert "error" not in run and run["latency"]["docs"] == 30 and "done" in run
+    by_size = {t["batch_size"]: t for t in run["throughput"]}
+    assert by_size[4]["docs_per_second"] > 0 and by_size[8]["error"] == "RuntimeError: dummy batch too large"
+    summary = speed.summarise([run])
+    assert summary["common_batch_docs_per_second"] is None and summary["latency_median_ms"] is not None
+    assert summary["common_batch_errors"] == ["RuntimeError: dummy batch too large"]
+    crashed = speed.measure([sys.executable, "-c", "import sys; sys.exit('adapter could not start')"], docs(2), tmp_path,
+                            runner.child_env(), batch_size=1, timeout=60, poll_vram=False)
+    assert crashed["error"] == "crash: exit 1: adapter could not start"
 
 
 def _adapter_module(name):
@@ -458,6 +490,32 @@ def test_c6_sct_offsets_survive_entity_decoding_and_invisible_chars():
     assert [(s.start, s.end) for s in got] == [(25, len(text))]
 
 
+def test_c6_sct_offsets_survive_whitespace_collapse_and_report_why_unplaced():
+    from sct.utils.normtext import NormaliseText, unescape_markup
+
+    from scripts.benchmark_release import predicted_spans
+
+    sct = _adapter_module("sct_adapter.py")
+    fix = NormaliseText().fix_bad_unicode
+
+    def normalise(token):
+        return unescape_markup(fix(token))
+
+    text = "To  Jan\u00a0\u00a0Kowalski,\n\tana&#64;example.org ok"
+    got = predicted_spans(text, "To <PERSON_0>, <EMAIL_0> ok",
+                          {"<PERSON_0>": "Jan Kowalski", "<EMAIL_0>": "ana@example.org"}, sct.sct_view(text, normalise))
+    assert [text[s.start:s.end] for s in got] == ["Jan\u00a0\u00a0Kowalski", "ana&#64;example.org"]
+    view = sct.sct_view("Call 555 - 123 now", normalise)[0]
+    assert sct.unplaced_reason("", view) == "no_value"
+    assert sct.unplaced_reason("555123", view) == "separators"
+    assert sct.unplaced_reason("Ann", view) == "absent"
+    assert sct.unplaced_reason("555 -  123", view) == "in_view"
+    full = sct.sct_view("Bob met Ann. Cy saw Ann.", normalise)
+    assert sct.misplaced("Bob met ", full, 8) is False
+    assert sct.misplaced(". Cy saw ", full, 8) is True
+    assert sct.misplaced(" - ", full, 8) is None
+
+
 def test_c7_nvidia_postcode_is_a_number_like_gold_and_fastino():
     assert entries.NVIDIA_CARD["postcode"] == DATASET_LABELS["nemotron"]["postcode"] == entries.FASTINO_CARD["postal_code"]
 
@@ -574,8 +632,9 @@ def test_report_tables_from_a_tiny_bundle(tmp_path):
     out = report.tables(tmp_path)
     assert "| x | 10 | 1 | tab 0.900 |" in out
     assert "paired bootstrap vs baseline" not in out  # every set excluded/unknown for SCT: section dropped
-    assert "| tab | 0.500 |" in out
-    assert "| en | tab | 0.600 |" in out
+    assert "| tab | 0.500† |" in out  # tab is under 99% complete: flagged beyond the completion table
+    assert "| en | tab | 0.600† |" in out
+    assert "masked recall, ner," not in out  # no ner set in the bundle: no empty per-language section
 
 
 def test_vm_hwm_reads_proc_status_or_gives_none():
@@ -615,7 +674,8 @@ def test_contamination_status_and_claimed_languages():
     assert entries.contamination("gliner-nvidia", "gretel") == "T-family, E-family"
     assert entries.contamination("sct-gliner", "gretel_en") == "U, D-family"
     assert entries.contamination("presidio", "gretel") == "-" and entries.status("presidio", "gretel") == "clean"
-    assert not [d for g in scorer.GROUPS.values() for d in g if entries.status("sct-default", d) == "clean"]
+    round1 = [d for g, members in scorer.GROUPS.items() if not g.startswith("r2-") for d in members]
+    assert not [d for d in round1 if entries.status("sct-default", d) == "clean"]
     assert entries.status("opf", "tab") == "unknown" and entries.status("sct-gliner", "gretel_en") == "excluded"
     assert entries.status("sct-gliner", "tab") == "excluded"  # U, D
     assert entries.claims("gliner-nvidia", "en") and not entries.claims("gliner-nvidia", "de")
@@ -690,8 +750,25 @@ def test_pairwise_and_own_tables(tmp_path):
     assert own[2].startswith("| x | none (1) | 0.800 [0.700, 0.900] |")
     assert own[3].startswith("| sct-default | none (0) | - |") and "((0.950 (1))" not in own[3] and "(0.950 (1))" in own[3]
     assert report.same_set_table({}, "full", "privacy-real", "all")[0].startswith("No dataset")
+    (tmp_path / "x").mkdir()
+    (tmp_path / "x" / "tab-test.json").write_text(json.dumps({"flag_low_completion": True}))
+    assert report.own_table(summary, tmp_path, "full", "privacy-real", track_dir=tmp_path)[2].startswith("| x† |")
+    assert report.pairwise_table(summary, "full", "privacy-real", track_dir=tmp_path)[2].startswith("| x† | tab, redact |")
     empty = report.pairwise_table({"own": {"sct-default": {}, "x": {}}}, "full", "privacy-real")
     assert empty == ["No dataset in this group is clean for both sct-default and any other entry (languages both claim)."]
+
+
+@pytest.mark.parametrize("category", ["unknown", "excluded"])
+def test_own_table_flags_incomplete_information_cells(tmp_path, category):
+    from benchmarks.compare import report
+
+    (tmp_path / "x").mkdir()
+    (tmp_path / "x" / "tab-test.json").write_text(json.dumps({"flag_low_completion": True}))
+    cell = {category: {"datasets": ["tab"], "claimed": {
+        "datasets": ["tab"], "macro": {"masked_recall": 0.5}}}}
+    summary = {"own": {"x": {"full": {"privacy-real": cell}}}}
+    row = report.own_table(summary, tmp_path, "full", "privacy-real", track_dir=tmp_path)[2]
+    assert row.startswith("| x† |") and "0.500 (1)" in row
 
 
 def test_audit_recover_flags_folded_traces():

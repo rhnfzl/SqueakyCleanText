@@ -1,0 +1,46 @@
+{
+ "batch_size": 1,
+ "command": "python -m benchmarks.compare.runner --entries sct-default sct-gliner presidio gliner-nvidia gliner2-fastino opf bardsai-v3 datafog gliner-knowledgator piiranha llm-guard scrubadub ai4privacy openmed pii-tracer presidio-full sct-gliner-nvidia sct-training --datasets newmean dialogpii kdpii nus_lt redmadrobot redactionbench tonic meddeid greek_deid neonredact pl_pii europii --part test --n 300 --track gold --gpu-mem-gb 5 --cpus 0-63 --threads 16 --hf-hub-cache <hf-hub-cache> --device cuda --gpu 3 --out <out>/default --reuse --skip-offset-check --config sct-training={\"device\":\"cpu\"}",
+ "cpus": "0-63",
+ "device": "cuda",
+ "doc_timeout": 120.0,
+ "environment": {
+  "cpus_usable": 64,
+  "git_commit": null,
+  "git_dirty": null,
+  "machine": "x86_64",
+  "onnxruntime_providers": [
+   "AzureExecutionProvider",
+   "CPUExecutionProvider"
+  ],
+  "packages": {
+   "SqueakyCleanText": "0.8.2",
+   "emoji": "2.16.0",
+   "ftfy": "6.3.1",
+   "huggingface-hub": "2.4.0",
+   "lingua-language-detector": "2.2.0",
+   "numpy": "2.5.4",
+   "onnxruntime": "1.31.1",
+   "presidio_anonymizer": "2.2.366",
+   "pyarrow": "26.0.1",
+   "regex": "2026.9.29",
+   "tokenizers": "0.23.3"
+  },
+  "platform": "Linux-6.11.0-26-generic-x86_64-with-glibc2.39",
+  "python": "3.12.3"
+ },
+ "gpu": "3",
+ "gpu_mem_gb": 5.0,
+ "n_per_language": 300,
+ "part": "test",
+ "retries": 1,
+ "seed": 13,
+ "shared_types": [
+  "EMAIL",
+  "PHONE",
+  "NUMBER"
+ ],
+ "threads": 16,
+ "track": "gold",
+ "tuned": null
+}

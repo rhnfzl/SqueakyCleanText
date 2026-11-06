@@ -13,7 +13,8 @@ For each repeat, entries run in a seeded random order, each in a fresh process o
   adapter's own ``getrusage`` peak is kept too but on Linux it carries the parent's peak over
   fork + exec, so it never reads below the runner's size; peak VRAM: ``nvidia-smi`` polled for the
   adapter's PID only (never other users' processes), plus torch's own peak when torch is used;
-- install size: the venv on disk (models are in the HF cache, shared, not counted).
+- install size: the venv on disk (models are in the HF cache, shared, not counted);
+- device per entry: the run's device, or cpu for an entry that only runs on CPU (``entries.py`` ``device``).
 
 Median over repeats with min and max. CPU pinning and thread caps as in the runner.
 """
@@ -30,7 +31,8 @@ import time
 from pathlib import Path
 
 from benchmarks.compare import entries as registry
-from benchmarks.compare.runner import CACHE, _read_lines, _write, child_env, command, ensure_env, pick_gpu
+from benchmarks.compare.runner import (CACHE, _read_lines, _write, child_env, command, ensure_env, entry_device,
+                                       pick_gpu)
 from benchmarks.datasets import get
 from benchmarks.speed import environment
 
@@ -67,12 +69,13 @@ def measure(cmd: list[str], docs: list[dict], work: Path, env: dict, batch_size:
             poll_vram: bool) -> dict:
     """One fresh adapter process in speed mode; returns its timing lines plus cold start and VRAM peak."""
     work.mkdir(parents=True, exist_ok=True)
-    inp, out = work / "speed-in.jsonl", work / "speed-out.jsonl"
+    inp, out, err = work / "speed-in.jsonl", work / "speed-out.jsonl", work / "speed-err.log"
     inp.write_text("".join(json.dumps(d, ensure_ascii=False) + "\n" for d in docs), encoding="utf-8")
     out.write_bytes(b"")
     started = time.perf_counter()
-    proc = subprocess.Popen([*cmd, "--input", str(inp), "--output", str(out), "--speed", "--batch-size", str(batch_size)],  # noqa: S603
-                            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, env=env)
+    with err.open("w") as errf:  # the adapter's stderr stays in the cache (it may quote doc text): only the last line is kept
+        proc = subprocess.Popen([*cmd, "--input", str(inp), "--output", str(out), "--speed",  # noqa: S603
+                                 "--batch-size", str(batch_size)], stdout=subprocess.DEVNULL, stderr=errf, env=env)
     peak = {"vram_mb": None}
     stop = threading.Event()
 
@@ -117,7 +120,8 @@ def measure(cmd: list[str], docs: list[dict], work: Path, env: dict, batch_size:
         stop.set()
         inp.unlink(missing_ok=True)
     if proc.returncode not in (0, None) and "error" not in result:
-        result["error"] = f"crash: exit {proc.returncode}"
+        last = [line for line in err.read_text(errors="replace").splitlines() if line.strip()][-1:]
+        result["error"] = f"crash: exit {proc.returncode}" + (f": {last[0].strip()[:300]}" if last else "")
     result["peak_vram_mb_nvidia_smi"] = peak["vram_mb"]
     return result
 
@@ -139,6 +143,7 @@ def summarise(runs: list[dict]) -> dict:
         "common_batch_docs_per_second": _spread([t.get("docs_per_second") for t in common]),
         "common_batch_chars_per_second": _spread([t.get("chars_per_second") for t in common]),
         "other_batch": [t for r in ok for t in r.get("throughput", []) if not t["common"]],
+        "common_batch_errors": [t["error"] for t in common if "error" in t],
         "peak_rss_mb": _spread([r["peak_rss_mb_proc"] for r in ok]),
         "peak_rss_mb_getrusage": _spread([r["done"]["peak_rss_mb"] for r in ok]),
         "peak_vram_mb": _spread([r["peak_vram_mb_nvidia_smi"] for r in ok]),
@@ -167,13 +172,14 @@ def main(argv=None) -> None:
     pythons = dict(item.split("=", 1) for item in args.python)
     docs = [{"id": r["id"], "text": r["text"], "lang": r["lang"]} for r in get("fineweb2").load(args.n, args.seed)]
     gpu = None if args.device == "cpu" else (args.gpu or pick_gpu(args.gpu_mem_gb + 1))
-    env = child_env(args.threads, args.device, gpu, args.hf_hub_cache)
     tools = {name: registry.tool(name) for name in args.entries}
-    commands, sizes = {}, {}
+    commands, sizes, envs = {}, {}, {}
     for name, t in tools.items():
         py = Path(pythons[name]) if name in pythons else ensure_env(name, t["requirements"], args.cache / "venvs")
-        config = {**t["adapter_config"], "threads": args.threads, "device": args.device, "gpu_mem_gb": args.gpu_mem_gb}
+        device = entry_device(t["device"], args.device)
+        config = {**t["adapter_config"], "threads": args.threads, "device": device, "gpu_mem_gb": args.gpu_mem_gb}
         commands[name] = command(py, t["adapter"], config, args.cpus)
+        envs[name] = child_env(args.threads, device, gpu, args.hf_hub_cache)
         sizes[name] = dir_mb(py.parent.parent) if name not in pythons and t["requirements"] else None
     runs: dict[str, list] = {name: [] for name in tools}
     rng = random.Random(args.seed)  # noqa: S311  # run order, not crypto
@@ -182,12 +188,13 @@ def main(argv=None) -> None:
         rng.shuffle(order)
         for name in order:
             print(f"[speed] repeat {repeat + 1}/{args.repeats} {name}", file=sys.stderr, flush=True)
-            runs[name].append(measure(commands[name], docs, args.cache / name / "speed", env, args.batch_size,
+            runs[name].append(measure(commands[name], docs, args.cache / name / "speed", envs[name], args.batch_size,
                                       args.timeout, poll_vram=args.device == "cuda"))
     result = {"docs": len(docs), "chars": sum(len(d["text"]) for d in docs), "threads": args.threads, "cpus": args.cpus,
               "device": args.device, "gpu": gpu, "repeats": args.repeats, "seed": args.seed,
               "environment": environment(),
-              "entries": {name: {**summarise(runs[name]), "install_mb": sizes[name]} for name in tools}}
+              "entries": {name: {**summarise(runs[name]), "install_mb": sizes[name],
+                                 "device": entry_device(t["device"], args.device)} for name, t in tools.items()}}
     _write(args.out / "speed.json", result)
     print(args.out / "speed.json")
 

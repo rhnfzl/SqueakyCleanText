@@ -1,0 +1,827 @@
+{
+ "chars": 2280498,
+ "cpus": "0-15",
+ "device": "cpu",
+ "docs": 1000,
+ "entries": {
+  "ai4privacy": {
+   "cold_start_seconds": {
+    "max": 4.871,
+    "median": 3.466,
+    "min": 3.415
+   },
+   "common_batch_chars_per_second": {
+    "max": 4047.6,
+    "median": 3115.0,
+    "min": 2998.3
+   },
+   "common_batch_docs_per_second": {
+    "max": 1.775,
+    "median": 1.366,
+    "min": 1.315
+   },
+   "common_batch_errors": [],
+   "device": "cpu",
+   "failed": [],
+   "install_mb": 6449.8,
+   "latency_median_ms": {
+    "max": 489.13,
+    "median": 485.02,
+    "min": 420.41
+   },
+   "latency_p95_ms": {
+    "max": 2559.33,
+    "median": 2467.2,
+    "min": 2247.59
+   },
+   "load_seconds": {
+    "max": 2.953,
+    "median": 2.722,
+    "min": 2.684
+   },
+   "other_batch": [],
+   "peak_rss_mb": {
+    "max": 1668.2,
+    "median": 1533.6,
+    "min": 1529.1
+   },
+   "peak_rss_mb_getrusage": {
+    "max": 2801.2,
+    "median": 2801.2,
+    "min": 2777.2
+   },
+   "peak_vram_mb": null,
+   "repeats": 3,
+   "torch_peak_vram_mb": null
+  },
+  "bardsai-v3": {
+   "cold_start_seconds": {
+    "max": 4.926,
+    "median": 3.771,
+    "min": 3.666
+   },
+   "common_batch_chars_per_second": {
+    "max": 5531.2,
+    "median": 5510.2,
+    "min": 5463.6
+   },
+   "common_batch_docs_per_second": {
+    "max": 2.425,
+    "median": 2.416,
+    "min": 2.396
+   },
+   "common_batch_errors": [],
+   "device": "cpu",
+   "failed": [],
+   "install_mb": 6483.5,
+   "latency_median_ms": {
+    "max": 342.61,
+    "median": 342.56,
+    "min": 341.17
+   },
+   "latency_p95_ms": {
+    "max": 1068.43,
+    "median": 1060.25,
+    "min": 988.51
+   },
+   "load_seconds": {
+    "max": 3.907,
+    "median": 3.364,
+    "min": 3.245
+   },
+   "other_batch": [],
+   "peak_rss_mb": {
+    "max": 6976.7,
+    "median": 6975.1,
+    "min": 6966.4
+   },
+   "peak_rss_mb_getrusage": {
+    "max": 6975.7,
+    "median": 6975.1,
+    "min": 6966.4
+   },
+   "peak_vram_mb": null,
+   "repeats": 3,
+   "torch_peak_vram_mb": null
+  },
+  "datafog": {
+   "cold_start_seconds": {
+    "max": 0.151,
+    "median": 0.101,
+    "min": 0.101
+   },
+   "common_batch_chars_per_second": {
+    "max": 3807732.9,
+    "median": 3547236.6,
+    "min": 3530052.1
+   },
+   "common_batch_docs_per_second": {
+    "max": 1669.694,
+    "median": 1555.466,
+    "min": 1547.93
+   },
+   "common_batch_errors": [],
+   "device": "cpu",
+   "failed": [],
+   "install_mb": 9.3,
+   "latency_median_ms": {
+    "max": 0.38,
+    "median": 0.37,
+    "min": 0.36
+   },
+   "latency_p95_ms": {
+    "max": 2.0,
+    "median": 1.99,
+    "min": 1.86
+   },
+   "load_seconds": {
+    "max": 0.071,
+    "median": 0.064,
+    "min": 0.061
+   },
+   "other_batch": [],
+   "peak_rss_mb": {
+    "max": 34.4,
+    "median": 34.3,
+    "min": 34.3
+   },
+   "peak_rss_mb_getrusage": {
+    "max": 2801.2,
+    "median": 2801.2,
+    "min": 2801.2
+   },
+   "peak_vram_mb": null,
+   "repeats": 3,
+   "torch_peak_vram_mb": null
+  },
+  "gliner-knowledgator": {
+   "cold_start_seconds": null,
+   "common_batch_chars_per_second": null,
+   "common_batch_docs_per_second": null,
+   "common_batch_errors": [],
+   "device": "cpu",
+   "failed": [
+    "timeout after 3600s",
+    "timeout after 3600s",
+    "timeout after 3600s"
+   ],
+   "install_mb": 6454.9,
+   "latency_median_ms": null,
+   "latency_p95_ms": null,
+   "load_seconds": null,
+   "other_batch": [],
+   "peak_rss_mb": null,
+   "peak_rss_mb_getrusage": null,
+   "peak_vram_mb": null,
+   "repeats": 3,
+   "torch_peak_vram_mb": null
+  },
+  "gliner-nvidia": {
+   "cold_start_seconds": null,
+   "common_batch_chars_per_second": null,
+   "common_batch_docs_per_second": null,
+   "common_batch_errors": [],
+   "device": "cpu",
+   "failed": [
+    "timeout after 3600s",
+    "timeout after 3600s",
+    "timeout after 3600s"
+   ],
+   "install_mb": 6454.9,
+   "latency_median_ms": null,
+   "latency_p95_ms": null,
+   "load_seconds": null,
+   "other_batch": [],
+   "peak_rss_mb": null,
+   "peak_rss_mb_getrusage": null,
+   "peak_vram_mb": null,
+   "repeats": 3,
+   "torch_peak_vram_mb": null
+  },
+  "gliner2-fastino": {
+   "cold_start_seconds": {
+    "max": 8.283,
+    "median": 7.177,
+    "min": 7.134
+   },
+   "common_batch_chars_per_second": {
+    "max": 1555.6,
+    "median": 1437.2,
+    "min": 1360.4
+   },
+   "common_batch_docs_per_second": {
+    "max": 0.682,
+    "median": 0.63,
+    "min": 0.597
+   },
+   "common_batch_errors": [],
+   "device": "cpu",
+   "failed": [],
+   "install_mb": 6468.6,
+   "latency_median_ms": {
+    "max": 345.17,
+    "median": 320.93,
+    "min": 240.25
+   },
+   "latency_p95_ms": {
+    "max": 4373.91,
+    "median": 4281.97,
+    "min": 3986.32
+   },
+   "load_seconds": {
+    "max": 7.279,
+    "median": 6.178,
+    "min": 6.107
+   },
+   "other_batch": [],
+   "peak_rss_mb": {
+    "max": 34386.8,
+    "median": 34355.7,
+    "min": 34341.6
+   },
+   "peak_rss_mb_getrusage": {
+    "max": 34386.8,
+    "median": 34355.7,
+    "min": 34341.6
+   },
+   "peak_vram_mb": null,
+   "repeats": 3,
+   "torch_peak_vram_mb": null
+  },
+  "llm-guard": {
+   "cold_start_seconds": {
+    "max": 5.023,
+    "median": 4.727,
+    "min": 4.068
+   },
+   "common_batch_chars_per_second": {
+    "max": 3202.6,
+    "median": 3191.7,
+    "min": 3141.2
+   },
+   "common_batch_docs_per_second": {
+    "max": 1.404,
+    "median": 1.4,
+    "min": 1.377
+   },
+   "common_batch_errors": [],
+   "device": "cpu",
+   "failed": [],
+   "install_mb": 6800.6,
+   "latency_median_ms": {
+    "max": 441.39,
+    "median": 434.26,
+    "min": 424.13
+   },
+   "latency_p95_ms": {
+    "max": 2542.85,
+    "median": 2515.7,
+    "min": 2454.14
+   },
+   "load_seconds": {
+    "max": 3.9,
+    "median": 3.691,
+    "min": 3.421
+   },
+   "other_batch": [],
+   "peak_rss_mb": {
+    "max": 2282.1,
+    "median": 2271.1,
+    "min": 2266.4
+   },
+   "peak_rss_mb_getrusage": {
+    "max": 2801.2,
+    "median": 2801.2,
+    "min": 2801.2
+   },
+   "peak_vram_mb": null,
+   "repeats": 3,
+   "torch_peak_vram_mb": null
+  },
+  "openmed": {
+   "cold_start_seconds": {
+    "max": 4.172,
+    "median": 4.095,
+    "min": 4.018
+   },
+   "common_batch_chars_per_second": {
+    "max": 1029.3,
+    "median": 960.65,
+    "min": 892.0
+   },
+   "common_batch_docs_per_second": {
+    "max": 0.451,
+    "median": 0.421,
+    "min": 0.391
+   },
+   "common_batch_errors": [],
+   "device": "cpu",
+   "failed": [
+    "timeout after 3600s"
+   ],
+   "install_mb": 6465.2,
+   "latency_median_ms": {
+    "max": 414.74,
+    "median": 403.515,
+    "min": 392.29
+   },
+   "latency_p95_ms": {
+    "max": 3554.65,
+    "median": 3463.285,
+    "min": 3371.92
+   },
+   "load_seconds": {
+    "max": 3.515,
+    "median": 3.493,
+    "min": 3.471
+   },
+   "other_batch": [],
+   "peak_rss_mb": {
+    "max": 25665.5,
+    "median": 25637.15,
+    "min": 25608.8
+   },
+   "peak_rss_mb_getrusage": {
+    "max": 25665.5,
+    "median": 25637.15,
+    "min": 25608.8
+   },
+   "peak_vram_mb": null,
+   "repeats": 3,
+   "torch_peak_vram_mb": null
+  },
+  "opf": {
+   "cold_start_seconds": null,
+   "common_batch_chars_per_second": null,
+   "common_batch_docs_per_second": null,
+   "common_batch_errors": [],
+   "device": "cpu",
+   "failed": [
+    "timeout after 3600s",
+    "timeout after 3600s",
+    "timeout after 3600s"
+   ],
+   "install_mb": 6467.0,
+   "latency_median_ms": null,
+   "latency_p95_ms": null,
+   "load_seconds": null,
+   "other_batch": [],
+   "peak_rss_mb": null,
+   "peak_rss_mb_getrusage": null,
+   "peak_vram_mb": null,
+   "repeats": 3,
+   "torch_peak_vram_mb": null
+  },
+  "pii-tracer": {
+   "cold_start_seconds": {
+    "max": 4.326,
+    "median": 3.868,
+    "min": 3.616
+   },
+   "common_batch_chars_per_second": {
+    "max": 3086.2,
+    "median": 3036.0,
+    "min": 2878.2
+   },
+   "common_batch_docs_per_second": {
+    "max": 1.353,
+    "median": 1.331,
+    "min": 1.262
+   },
+   "common_batch_errors": [],
+   "device": "cpu",
+   "failed": [],
+   "install_mb": 6449.4,
+   "latency_median_ms": {
+    "max": 371.41,
+    "median": 368.56,
+    "min": 367.71
+   },
+   "latency_p95_ms": {
+    "max": 3880.44,
+    "median": 3712.25,
+    "min": 3641.3
+   },
+   "load_seconds": {
+    "max": 2.615,
+    "median": 2.45,
+    "min": 2.313
+   },
+   "other_batch": [],
+   "peak_rss_mb": {
+    "max": 3133.1,
+    "median": 3097.6,
+    "min": 3095.0
+   },
+   "peak_rss_mb_getrusage": {
+    "max": 3133.1,
+    "median": 3097.6,
+    "min": 3095.0
+   },
+   "peak_vram_mb": null,
+   "repeats": 3,
+   "torch_peak_vram_mb": null
+  },
+  "piiranha": {
+   "cold_start_seconds": {
+    "max": 4.63,
+    "median": 4.417,
+    "min": 4.117
+   },
+   "common_batch_chars_per_second": {
+    "max": 4553.8,
+    "median": 4104.0,
+    "min": 4065.7
+   },
+   "common_batch_docs_per_second": {
+    "max": 1.997,
+    "median": 1.8,
+    "min": 1.783
+   },
+   "common_batch_errors": [],
+   "device": "cpu",
+   "failed": [],
+   "install_mb": 6449.8,
+   "latency_median_ms": {
+    "max": 291.2,
+    "median": 286.56,
+    "min": 284.18
+   },
+   "latency_p95_ms": {
+    "max": 1483.11,
+    "median": 1448.43,
+    "min": 1413.84
+   },
+   "load_seconds": {
+    "max": 3.852,
+    "median": 3.702,
+    "min": 3.605
+   },
+   "other_batch": [],
+   "peak_rss_mb": {
+    "max": 2422.6,
+    "median": 2418.2,
+    "min": 2414.4
+   },
+   "peak_rss_mb_getrusage": {
+    "max": 2801.2,
+    "median": 2801.2,
+    "min": 2801.2
+   },
+   "peak_vram_mb": null,
+   "repeats": 3,
+   "torch_peak_vram_mb": null
+  },
+  "presidio": {
+   "cold_start_seconds": {
+    "max": 1.458,
+    "median": 1.458,
+    "min": 1.406
+   },
+   "common_batch_chars_per_second": {
+    "max": 60484.4,
+    "median": 59463.4,
+    "min": 58472.7
+   },
+   "common_batch_docs_per_second": {
+    "max": 26.522,
+    "median": 26.075,
+    "min": 25.64
+   },
+   "common_batch_errors": [],
+   "device": "cpu",
+   "failed": [],
+   "install_mb": 11397.8,
+   "latency_median_ms": {
+    "max": 23.16,
+    "median": 22.87,
+    "min": 22.81
+   },
+   "latency_p95_ms": {
+    "max": 125.37,
+    "median": 124.12,
+    "min": 123.8
+   },
+   "load_seconds": {
+    "max": 1.261,
+    "median": 1.25,
+    "min": 1.196
+   },
+   "other_batch": [],
+   "peak_rss_mb": {
+    "max": 1081.6,
+    "median": 1080.2,
+    "min": 1072.2
+   },
+   "peak_rss_mb_getrusage": {
+    "max": 2801.2,
+    "median": 2801.2,
+    "min": 2801.2
+   },
+   "peak_vram_mb": null,
+   "repeats": 3,
+   "torch_peak_vram_mb": null
+  },
+  "presidio-full": {
+   "cold_start_seconds": {
+    "max": 31.304,
+    "median": 31.02,
+    "min": 30.264
+   },
+   "common_batch_chars_per_second": {
+    "max": 31385.9,
+    "median": 31259.7,
+    "min": 31077.2
+   },
+   "common_batch_docs_per_second": {
+    "max": 13.763,
+    "median": 13.707,
+    "min": 13.627
+   },
+   "common_batch_errors": [],
+   "device": "cpu",
+   "failed": [],
+   "install_mb": 11398.5,
+   "latency_median_ms": {
+    "max": 33.09,
+    "median": 32.45,
+    "min": 32.41
+   },
+   "latency_p95_ms": {
+    "max": 205.77,
+    "median": 204.48,
+    "min": 200.82
+   },
+   "load_seconds": {
+    "max": 30.934,
+    "median": 30.654,
+    "min": 29.911
+   },
+   "other_batch": [],
+   "peak_rss_mb": {
+    "max": 19754.0,
+    "median": 19753.3,
+    "min": 19751.4
+   },
+   "peak_rss_mb_getrusage": {
+    "max": 19754.0,
+    "median": 19753.3,
+    "min": 19751.4
+   },
+   "peak_vram_mb": null,
+   "repeats": 3,
+   "torch_peak_vram_mb": null
+  },
+  "scrubadub": {
+   "cold_start_seconds": {
+    "max": 6.278,
+    "median": 5.926,
+    "min": 5.424
+   },
+   "common_batch_chars_per_second": {
+    "max": 2753.7,
+    "median": 2746.8,
+    "min": 2721.1
+   },
+   "common_batch_docs_per_second": {
+    "max": 1.207,
+    "median": 1.204,
+    "min": 1.193
+   },
+   "common_batch_errors": [],
+   "device": "cpu",
+   "failed": [],
+   "install_mb": 7348.2,
+   "latency_median_ms": {
+    "max": 354.76,
+    "median": 352.93,
+    "min": 350.49
+   },
+   "latency_p95_ms": {
+    "max": 3371.25,
+    "median": 3231.75,
+    "min": 3117.39
+   },
+   "load_seconds": {
+    "max": 5.848,
+    "median": 5.57,
+    "min": 5.048
+   },
+   "other_batch": [],
+   "peak_rss_mb": {
+    "max": 5212.4,
+    "median": 5180.1,
+    "min": 5116.4
+   },
+   "peak_rss_mb_getrusage": {
+    "max": 5212.4,
+    "median": 5180.1,
+    "min": 5116.4
+   },
+   "peak_vram_mb": null,
+   "repeats": 3,
+   "torch_peak_vram_mb": null
+  },
+  "sct-default": {
+   "cold_start_seconds": {
+    "max": 8.438,
+    "median": 8.184,
+    "min": 8.133
+   },
+   "common_batch_chars_per_second": {
+    "max": 3551.9,
+    "median": 3533.6,
+    "min": 3530.7
+   },
+   "common_batch_docs_per_second": {
+    "max": 1.558,
+    "median": 1.549,
+    "min": 1.548
+   },
+   "common_batch_errors": [],
+   "device": "cpu",
+   "failed": [],
+   "install_mb": 473.8,
+   "latency_median_ms": {
+    "max": 588.02,
+    "median": 581.1,
+    "min": 575.58
+   },
+   "latency_p95_ms": {
+    "max": 2076.83,
+    "median": 2012.98,
+    "min": 1979.38
+   },
+   "load_seconds": {
+    "max": 5.243,
+    "median": 5.126,
+    "min": 5.052
+   },
+   "other_batch": [],
+   "peak_rss_mb": {
+    "max": 10164.8,
+    "median": 10022.7,
+    "min": 9968.7
+   },
+   "peak_rss_mb_getrusage": {
+    "max": 10164.8,
+    "median": 10022.7,
+    "min": 9968.7
+   },
+   "peak_vram_mb": null,
+   "repeats": 3,
+   "torch_peak_vram_mb": null
+  },
+  "sct-gliner": {
+   "cold_start_seconds": {
+    "max": 8.035,
+    "median": 8.034,
+    "min": 7.83
+   },
+   "common_batch_chars_per_second": {
+    "max": 1758.5,
+    "median": 1383.8,
+    "min": 1195.4
+   },
+   "common_batch_docs_per_second": {
+    "max": 0.771,
+    "median": 0.607,
+    "min": 0.524
+   },
+   "common_batch_errors": [],
+   "device": "cpu",
+   "failed": [],
+   "install_mb": 6835.6,
+   "latency_median_ms": {
+    "max": 882.93,
+    "median": 794.03,
+    "min": 711.18
+   },
+   "latency_p95_ms": {
+    "max": 5244.36,
+    "median": 4317.19,
+    "min": 4147.02
+   },
+   "load_seconds": {
+    "max": 7.011,
+    "median": 6.874,
+    "min": 6.625
+   },
+   "other_batch": [],
+   "peak_rss_mb": {
+    "max": 6732.5,
+    "median": 6714.6,
+    "min": 6706.5
+   },
+   "peak_rss_mb_getrusage": {
+    "max": 6732.5,
+    "median": 6714.6,
+    "min": 6706.5
+   },
+   "peak_vram_mb": null,
+   "repeats": 3,
+   "torch_peak_vram_mb": null
+  },
+  "sct-gliner-nvidia": {
+   "cold_start_seconds": null,
+   "common_batch_chars_per_second": null,
+   "common_batch_docs_per_second": null,
+   "common_batch_errors": [],
+   "device": "cpu",
+   "failed": [
+    "timeout after 3600s",
+    "timeout after 3600s",
+    "timeout after 3600s"
+   ],
+   "install_mb": 6835.6,
+   "latency_median_ms": null,
+   "latency_p95_ms": null,
+   "load_seconds": null,
+   "other_batch": [],
+   "peak_rss_mb": null,
+   "peak_rss_mb_getrusage": null,
+   "peak_vram_mb": null,
+   "repeats": 3,
+   "torch_peak_vram_mb": null
+  },
+  "sct-training": {
+   "cold_start_seconds": {
+    "max": 8.183,
+    "median": 8.046,
+    "min": 7.984
+   },
+   "common_batch_chars_per_second": {
+    "max": 3579.4,
+    "median": 3557.4,
+    "min": 3555.8
+   },
+   "common_batch_docs_per_second": {
+    "max": 1.57,
+    "median": 1.56,
+    "min": 1.559
+   },
+   "common_batch_errors": [],
+   "device": "cpu",
+   "failed": [],
+   "install_mb": 3860.4,
+   "latency_median_ms": {
+    "max": 590.89,
+    "median": 588.34,
+    "min": 584.8
+   },
+   "latency_p95_ms": {
+    "max": 2113.32,
+    "median": 2106.97,
+    "min": 2102.08
+   },
+   "load_seconds": {
+    "max": 5.169,
+    "median": 5.104,
+    "min": 4.982
+   },
+   "other_batch": [],
+   "peak_rss_mb": {
+    "max": 10358.9,
+    "median": 10205.0,
+    "min": 10103.6
+   },
+   "peak_rss_mb_getrusage": {
+    "max": 10358.9,
+    "median": 10205.0,
+    "min": 10103.6
+   },
+   "peak_vram_mb": null,
+   "repeats": 3,
+   "torch_peak_vram_mb": null
+  }
+ },
+ "environment": {
+  "cpus_usable": 64,
+  "git_commit": null,
+  "git_dirty": null,
+  "machine": "x86_64",
+  "onnxruntime_providers": [
+   "AzureExecutionProvider",
+   "CPUExecutionProvider"
+  ],
+  "packages": {
+   "SqueakyCleanText": "0.8.2",
+   "emoji": "2.16.0",
+   "ftfy": "6.3.1",
+   "huggingface-hub": "2.4.0",
+   "lingua-language-detector": "2.2.0",
+   "numpy": "2.5.4",
+   "onnxruntime": "1.31.1",
+   "presidio_anonymizer": "2.2.366",
+   "pyarrow": "26.0.1",
+   "regex": "2026.9.29",
+   "tokenizers": "0.23.3"
+  },
+  "platform": "Linux-6.11.0-26-generic-x86_64-with-glibc2.39",
+  "python": "3.12.3"
+ },
+ "gpu": null,
+ "repeats": 3,
+ "seed": 13,
+ "threads": 16
+}

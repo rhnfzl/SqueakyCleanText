@@ -58,6 +58,17 @@ def check(doc: dict, result: dict) -> dict:
     return out
 
 
+def cap_gpu(config: dict) -> None:
+    """PROTOCOL section 16: cap a torch entry's share of the card at ``gpu_mem_gb`` (runner key) on cuda."""
+    if config.get("device") != "cuda" or not config.get("gpu_mem_gb"):
+        return
+    import torch
+
+    if torch.cuda.is_available():
+        total = torch.cuda.get_device_properties(0).total_memory
+        torch.cuda.set_per_process_memory_fraction(min(1.0, float(config["gpu_mem_gb"]) * 2**30 / total))
+
+
 def _sync() -> None:
     """Wait for queued GPU work so timings are real (only when the tool already imported torch)."""
     torch = sys.modules.get("torch")
@@ -110,7 +121,8 @@ def _peak_rss_mb() -> float:
 def run_speed(predict, docs: list[dict], out, batch_size: int, load_seconds: float) -> None:
     """Timing lines: ``first`` (after one prediction; the runner times the cold start from spawn),
     ``latency`` (batch 1 after warmup), ``throughput`` (common batch 8, and ``--batch-size`` if
-    different), then ``done`` with this process's peak RSS and torch's peak VRAM when torch is used."""
+    different; a batch size that raises, e.g. CUDA OOM under the cap, gets an ``error`` instead of its rates), then
+    ``done`` with this process's peak RSS and torch's peak VRAM when torch is used."""
     def emit(line):
         out.write(json.dumps(line) + "\n")
         out.flush()
@@ -125,9 +137,16 @@ def run_speed(predict, docs: list[dict], out, batch_size: int, load_seconds: flo
           "p95_ms": round(1000 * q[18], 2)})
     chars = sum(len(d["text"]) for d in docs)
     for size in sorted({COMMON_BATCH, batch_size}):
-        seconds = sum(_timed(predict, docs[i:i + size])[1] for i in range(0, len(docs), size))
-        emit({"event": "throughput", "batch_size": size, "common": size == COMMON_BATCH,
-              "docs_per_second": round(len(docs) / seconds, 3), "chars_per_second": round(chars / seconds, 1)})
+        line = {"event": "throughput", "batch_size": size, "common": size == COMMON_BATCH}
+        try:
+            seconds = sum(_timed(predict, docs[i:i + size])[1] for i in range(0, len(docs), size))
+            line.update(docs_per_second=round(len(docs) / seconds, 3), chars_per_second=round(chars / seconds, 1))
+        except Exception as error:  # noqa: BLE001  # e.g. CUDA OOM at this batch under the gpu_mem_gb cap: recorded
+            line["error"] = _error(error)
+            torch = sys.modules.get("torch")
+            if torch is not None and torch.cuda.is_available():
+                torch.cuda.empty_cache()
+        emit(line)
     done = {"event": "done", "peak_rss_mb": _peak_rss_mb()}
     torch = sys.modules.get("torch")
     if torch is not None and torch.cuda.is_available():

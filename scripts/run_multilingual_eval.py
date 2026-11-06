@@ -55,7 +55,7 @@ def predict_sct(examples) -> tuple[dict, dict]:
     for example in examples:
         result = cleaner.process(example.text)
         originals = {e.placeholder: e.original for e in result.metadata["anon_map"].entries}
-        predictions[example.id] = keep_labels(predicted_spans(example.text, result.lm_text, originals))
+        predictions[example.id] = keep_labels(predicted_spans(example.text, result.lm_text, originals, cfg=cleaner.cfg))
     cfg = cleaner.cfg
     info = {"ner_models": dict(cfg.ner_models or {}), "config": f"TextCleanerConfig(**{CORRECTNESS_OVERRIDES!r})"}
     return predictions, info

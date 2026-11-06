@@ -18,6 +18,7 @@ import sys
 from pathlib import Path
 
 from benchmarks.compare import runner, scorer
+from benchmarks.compare.entries import PHONE_REGIONS, PRESIDIO_MODELS, SPACY_LG, SPACY_XX  # noqa: F401
 
 BUDGET = 12
 N_DEV = 100
@@ -25,18 +26,7 @@ PRIVACY = (*scorer.GROUPS["privacy-synthetic"], *scorer.GROUPS["privacy-real"])
 GLINER_T = (0.1, 0.2, 0.3, 0.4, 0.5, 0.6)
 FLOOR = 0.05  # scored runs decode at the curve floor; the grid is filtered from them
 
-# Presidio language packs (PROTOCOL.md section 3.2): spaCy's lg pipeline where one exists,
-# else the multilingual xx_ent_wiki_sm; keyed by the gold code prefix the adapter routes on.
-SPACY_LG = ("da", "de", "el", "en", "es", "fi", "fr", "hr", "it", "ja", "ko", "lt", "nl", "pl", "pt", "ro", "ru",
-            "sl", "sv")
-SPACY_XX = ("ar", "bg", "bn", "cs", "et", "he", "hi", "hu", "id", "lv", "ms", "sk", "sr", "ta", "th", "tl", "tr", "vi")
-PRESIDIO_MODELS = {**{c: f"{c}_core_news_lg" for c in SPACY_LG}, "en": "en_core_web_lg", "zh": "zh_core_web_lg",
-                   "no": "nb_core_news_lg",
-                   **dict.fromkeys(SPACY_XX, "xx_ent_wiki_sm")}
-# Vendor default regions plus one region per scored language (fixed for every dataset).
-PHONE_REGIONS = ("US", "GB", "DE", "FR", "IL", "IN", "CA", "BR", "AE", "BD", "BG", "CN", "CZ", "DK", "EE", "EG",
-                 "ES", "FI", "GR", "HR", "HU", "ID", "IT", "JP", "KR", "LK", "LT", "LV", "MY", "NL", "NO", "PH", "PL",
-                 "PT", "RO", "RS", "RU", "SA", "SE", "SI", "SK", "TH", "TR", "TW", "VN")
+# Presidio language packs and phone regions live in entries.py (presidio-full uses them too).
 # OPF's README describes the trade-off (less background stay + easier span entry/continuation =
 # more recall), but ships only the all-zero default; b scales that one documented direction.
 OPF_B = (-1.0, -0.5, 0.0, 0.5, 1.0, 2.0)

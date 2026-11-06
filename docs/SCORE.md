@@ -114,6 +114,6 @@ sct-report data.jsonl --text-column text --preset training \
 ## Not measured yet
 
 The quality head's CPU speed and how much placeholders would shift its score
-are unmeasured. Run the export on the Mac and gpuserver, time fp32 and dynamic
+are unmeasured. Run the export on macOS and on a Linux GPU machine, time fp32 and dynamic
 int8 at 512 tokens, batch 32, and record the numbers here. They tune Score B;
 they do not change its defaults (off).

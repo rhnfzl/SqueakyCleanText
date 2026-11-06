@@ -4,7 +4,7 @@ By default it marks e-mail addresses (``EMAIL``, score 0.9) and digit runs (``NU
 score 0.6). Config for tests, all keyed by doc id: ``spans`` (fixed predictions),
 ``sleep`` (seconds), ``raise`` (ids that raise), ``crash`` (ids that kill the process),
 ``crash_once`` with ``state_dir`` (crash the first time only), ``bad`` (ids that return an
-out-of-range span).
+out-of-range span); ``raise_batch`` (n: a call with n or more docs raises, like a CUDA OOM).
 """
 
 import os
@@ -40,7 +40,12 @@ def load(config: dict):
                   if not any(s["start"] <= m.start() < s["end"] for s in spans)]
         return {"spans": spans}
 
-    return lambda docs: [one(doc) for doc in docs]
+    def predict(docs: list[dict]) -> list[dict]:
+        if len(docs) >= config.get("raise_batch", len(docs) + 1):
+            raise RuntimeError("dummy batch too large")
+        return [one(doc) for doc in docs]
+
+    return predict
 
 
 if __name__ == "__main__":
