@@ -6,7 +6,7 @@ edit_url: https://github.com/rhnfzl/SqueakyCleanText/edit/main/README.md
 
 --8<-- "README.md:limits"
 
-## Known limits of 0.8.2
+## Known limits of 0.8.3
 
 Details in [CHANGELOG.md](https://github.com/rhnfzl/SqueakyCleanText/blob/main/CHANGELOG.md).
 

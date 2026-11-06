@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.8.3 - 2026-11-06
 
 **Leak fixes, cleaner internals, faster import, clearer errors.**
 
