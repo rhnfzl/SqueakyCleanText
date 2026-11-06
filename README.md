@@ -205,6 +205,15 @@ NER is the slow stage. Turn it off (`check_ner_process=False`) for regex-only cl
 
 Measured on open datasets with [benchmarks/](https://github.com/rhnfzl/SqueakyCleanText/tree/main/benchmarks).
 
+The [SCT v0.8.2 comparison with other PII tools](https://github.com/rhnfzl/SqueakyCleanText/blob/main/benchmarks/results/compare-2026-11-04-visuals/README.md)
+shows paired recall, precision and exposure results, with uncertainty intervals.
+It measures PII configurations rather than the whole processing pipeline. The tested version is v0.8.2, not v0.8.3.
+
+The [released v0.7.1 versus v0.8.3 comparison](https://github.com/rhnfzl/SqueakyCleanText/blob/main/benchmarks/results/compare-0.7.1-0.8.3/README.md)
+includes all 12 PII/long-document datasets, repeated CPU speed runs, and charts.
+Strict span F1 improves on every dataset. Unsupported-language false answers and TAB direct-identifier coverage worsen.
+Runtime versions differ, so the speed results do not isolate SCT code changes.
+
 - **Cleaning** (FineWeb-2 with injected noise, default config): 100% of HTML, 99.6% of mojibake and 100% of URLs removed.
 - **Language detection** (WiLI): 95.1% accuracy over 7,200 documents.
 - **PII** (12 open PII datasets, about 40 languages): the 0.8.1 release branch leaked fewer values than 0.8.0 on every dataset, for example 18.1% to 8.2% on REDACT ([comparison](https://github.com/rhnfzl/SqueakyCleanText/blob/main/benchmarks/results/comparison-0.8.0-unreleased.md), pre-release commit `2078e8c4`).

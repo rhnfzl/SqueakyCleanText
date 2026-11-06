@@ -1,0 +1,66 @@
+{
+ "command": "python -m benchmarks.run --sct-version 0.7.1 --suite pii long lid --datasets openpii gretel nemotron redact iahlt bayanat thainer thai_pii naamapadam multiconer stockmark tab wili --configs default training --threads 16 --workers 2 --out quality/0.7.1",
+ "configs": [
+  "default",
+  "training"
+ ],
+ "device": "cpu",
+ "environment": {
+  "cpus_usable": 64,
+  "git_commit": null,
+  "git_dirty": null,
+  "machine": "x86_64",
+  "onnxruntime_providers": [
+   "AzureExecutionProvider",
+   "CPUExecutionProvider"
+  ],
+  "packages": {
+   "SqueakyCleanText": "0.7.1",
+   "emoji": "2.16.0",
+   "ftfy": "6.3.1",
+   "huggingface-hub": "2.4.0",
+   "lingua-language-detector": "2.2.0",
+   "numpy": "2.5.4",
+   "onnxruntime": "1.23.2",
+   "presidio_anonymizer": "2.2.366",
+   "pyarrow": "26.0.0",
+   "regex": "2026.9.29",
+   "tokenizers": "0.23.3"
+  },
+  "platform": "Linux-6.11.0-26-generic-x86_64-with-glibc2.39",
+  "python": "3.12.3"
+ },
+ "gpu_mem_gb": null,
+ "models": {
+  "ner_backend": "onnx",
+  "ner_model_revisions": {
+   "DUTCH": "381e34ba4c222bc221e9fd02832f52a179ed840d",
+   "ENGLISH": "2c10955af9538d6ff8a68316c5dbfcd0b968761e",
+   "GERMAN": "fe4aecfa6dc376244ef37da37e6df3b1b0911d71",
+   "MULTILINGUAL": "74191432b21c956b5b04b4778c0e92e569b1f80d",
+   "SPANISH": "ef52a7f08172203c763d51fe36660d36985bb388"
+  },
+  "ner_models": {
+   "DUTCH": "rhnfzl/xlm-roberta-large-conll02-dutch-onnx",
+   "ENGLISH": "rhnfzl/xlm-roberta-large-conll03-english-onnx",
+   "GERMAN": "rhnfzl/xlm-roberta-large-conll03-german-onnx",
+   "MULTILINGUAL": "rhnfzl/wikineural-multilingual-ner-onnx",
+   "SPANISH": "rhnfzl/xlm-roberta-large-conll02-spanish-onnx"
+  }
+ },
+ "n": null,
+ "scoring_overrides": {
+  "check_to_ascii_unicode": false,
+  "replacement_mode": "reversible"
+ },
+ "sct_version": "0.7.1",
+ "seed": 13,
+ "suites": [
+  "pii",
+  "long",
+  "lid"
+ ],
+ "threads": 16,
+ "wall_seconds": 5064.8,
+ "workers": 2
+}
