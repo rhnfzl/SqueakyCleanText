@@ -336,6 +336,8 @@ def _presidio(monkeypatch, tmp_path, config):
                     SimpleNamespace(start=0, end=3, entity_type="A", score=None)]
 
     class Registry:
+        recognizers = ()
+
         def __init__(self, supported_languages):
             calls["registry_languages"] = supported_languages
 
@@ -364,7 +366,7 @@ def _presidio(monkeypatch, tmp_path, config):
         return kwargs
 
     analyzer_module = SimpleNamespace(
-        AnalyzerEngine=Analyzer, RecognizerRegistry=Registry,
+        AnalyzerEngine=Analyzer, RecognizerRegistry=Registry, PatternRecognizer=type("PatternRecognizer", (), {}),
         predefined_recognizers=SimpleNamespace(PhoneRecognizer=recognizer, UkNinoRecognizer=recognizer))
     anonymizer = SimpleNamespace(anonymize=lambda text, analyzer_results: SimpleNamespace(text=f"masked:{text}"))
     fake_modules(monkeypatch, presidio_analyzer=analyzer_module,
@@ -485,6 +487,25 @@ def test_sct_language_falls_back_to_the_base_code_or_to_detection():
     sct = _adapter_module("sct_adapter.py")
     assert sct.sct_language("ar-mixed_en") == sct.sct_language("ar")
     assert sct.sct_language(None) is None and sct.sct_language("zz-nope") is None
+
+
+def test_sct_adapter_accepts_the_pinned_release_worker_argument(monkeypatch):
+    from sct.sct import TextCleaner
+
+    process_batch = TextCleaner.process_batch
+    calls = []
+
+    def release_process_batch(self, texts, batch_size=None):
+        calls.append(batch_size)
+        return process_batch(self, texts, max_workers=batch_size)
+
+    monkeypatch.setattr(TextCleaner, "process_batch", release_process_batch)
+    predict = _adapter_module("sct_adapter.py").load({
+        "workers": 2, "overrides": {"check_ner_process": False},
+    })
+    result = predict([doc(text="Mail ana@example.com now.")])[0]
+    assert calls == [2]
+    assert result["unplaced"] == 0 and "ana@example.com" not in result["masked_text"]
 
 
 def test_sct_predict_places_masked_values_in_the_source(capsys):

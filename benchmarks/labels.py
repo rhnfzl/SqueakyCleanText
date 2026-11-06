@@ -8,6 +8,8 @@ Mapping follows sct-integration-research REPORT.md section (c), with SCT 0.8 nam
 
 PERSON, LOCATION, ORGANISATION = "PERSON", "LOCATION", "ORGANISATION"
 EMAIL, PHONE, IP, URL, DATE, NUMBER = "EMAIL", "PHONE", "IP", "URL", "DATE", "NUMBER"
+# Gold with no entity type (RedactionBench): in every view, scored by the type-agnostic measures only.
+UNTYPED = "UNTYPED"
 
 # SCT placeholder type -> scored type. YEAR is a date; the rest are pre-0.8 names.
 PRED_ALIASES = {"YEAR": DATE, "PHONE_NUMBER": PHONE, "IP_ADDRESS": IP, "IBAN": NUMBER, "CARD": NUMBER, "ID": NUMBER}
@@ -15,7 +17,8 @@ PRED_ALIASES = {"YEAR": DATE, "PHONE_NUMBER": PHONE, "IP_ADDRESS": IP, "IBAN": N
 # Gold labels that mark one part of a name (given name, surname). Only these merge
 # into a full name; two plain PERSON entities next to each other stay two entities.
 NAME_PARTS = frozenset({"GIVENNAME", "SURNAME", "first_name", "last_name", "First_Given_Name", "Last_Family_Name",
-                        "FIRSTNAME", "MIDDLENAME", "LASTNAME"})
+                        "FIRSTNAME", "MIDDLENAME", "LASTNAME", "FIRST_NAME", "MIDDLE_NAME", "LAST_NAME",
+                        "NAME_GIVEN", "NAME_FAMILY"})
 
 _PER_LOC_ORG = {"PER": PERSON, "LOC": LOCATION, "ORG": ORGANISATION}
 
@@ -90,7 +93,101 @@ DATASET_LABELS: dict[str, dict[str, str]] = {
         "人名": PERSON, "地名": LOCATION, "施設名": LOCATION,
         "法人名": ORGANISATION, "政治的組織名": ORGANISATION, "その他の組織名": ORGANISATION,
     },
+    # Round 2 (PROTOCOL.md section 1). Postcodes are NUMBER, as in round 1 (openpii ZIPCODE, nemotron postcode).
+    "newmean": {
+        "PERSON": PERSON, "ADDRESS": LOCATION, "ORG": ORGANISATION, "EMAIL": EMAIL, "PHONE": PHONE, "URL": URL,
+        "IP_ADDRESS": IP, "DATE_OF_BIRTH": DATE, "ID_NUMBER": NUMBER, "FINANCIAL": NUMBER,
+    },
+    "dialogpii": {
+        "PERSON": PERSON, "ORG": ORGANISATION, "PERSON_EMAIL": EMAIL, "CODE_PHONE": PHONE, "CODE_URL": URL,
+        "DATETIME": DATE, "CODE": NUMBER, "LOC_ZIP": NUMBER,
+        **dict.fromkeys(("LOC_CITY", "LOC_COUNTRY", "LOC_STREET", "LOC_HOUSENUMBER", "LOC_OTHER"), LOCATION),
+    },
+    "kdpii": {
+        "PS_NAME": PERSON, "PS_NICKNAME": PERSON,
+        **dict.fromkeys(("OG_WORKPLACE", "OGG_EDUCATION", "OG_DEPARTMENT", "OGG_CLUB"), ORGANISATION),
+        "LC_ADDRESS": LOCATION, "LC_PLACE": LOCATION, "LCP_COUNTRY": LOCATION, "TMI_EMAIL": EMAIL, "TMI_SITE": URL,
+        "QT_IP": IP, "QT_MOBILE": PHONE, "QT_PHONE": PHONE, "DT_BIRTH": DATE,
+        **dict.fromkeys(("QT_RESIDENT_NUMBER", "QT_ALIEN_NUMBER", "QT_PASSPORT_NUMBER", "QT_DRIVER_NUMBER",
+                         "QT_ACCOUNT_NUMBER", "QT_PLATE_NUMBER", "QT_CARD_NUMBER"), NUMBER),
+        # PS_ID (user names) out of scope, like USERNAME in newmean and tonic
+    },
+    "nus_lt": {
+        "PER": PERSON, "LOC": LOCATION, "ORG": ORGANISATION, "DATE": DATE, "NUM_PHONE": PHONE,
+        "ID_PER": NUMBER, "ID_MISC": NUMBER, "NUM_CAR": NUMBER, "MISC:email": EMAIL, "MISC:url": URL,
+    },
+    "redmadrobot": {
+        "FIRST_NAME": PERSON, "MIDDLE_NAME": PERSON, "LAST_NAME": PERSON,
+        **dict.fromkeys(("COUNTRY", "REGION", "DISTRICT", "CITY", "STREET", "HOUSE"), LOCATION),
+        "EMAIL": EMAIL, "PHONE": PHONE, "URL": URL, "IP_ADDRESS": IP,
+        **dict.fromkeys(("CREDIT_CARD", "PASSPORT", "INN", "SNILS", "OMS", "DRIVER_LICENSE", "MILITARY_ID",
+                         "BIRTH_CERTIFICATE"), NUMBER),
+    },
+    "redactionbench": {"mandatory": UNTYPED},
+    "tonic": {
+        "NAME_GIVEN": PERSON, "NAME_FAMILY": PERSON, "ORGANIZATION": ORGANISATION, "EMAIL_ADDRESS": EMAIL,
+        "PHONE_NUMBER": PHONE, "URL": URL, "LOCATION_ADDRESS": LOCATION, "EMPLOYEE_ID": NUMBER, "ACCOUNT_NUMBER": NUMBER,
+    },
+    "meddeid": {
+        "Name": PERSON, "Organization": ORGANISATION, "Address_Location": LOCATION, "Date": DATE,
+        "Age_Birthdate:date": DATE, "Contactdetails:email": EMAIL, "Contactdetails:phone": PHONE, "ID": NUMBER,
+    },
+    "greek_deid": {
+        "greek_patient_name": PERSON, "greek_clinician": PERSON, "hospital": ORGANISATION, "url": URL,
+        "email": EMAIL, "address": LOCATION, "greek_phone": PHONE, "date": DATE, "dob": DATE,
+        "amka": NUMBER, "gr_id": NUMBER,
+    },
+    "neonredact": {
+        "KISI": PERSON, "ADRES": LOCATION, "KURUM": ORGANISATION, "TELEFON": PHONE, "EPOSTA": EMAIL,
+        "DOGUM_TARIHI": DATE, "OLAY_TARIHI": DATE,
+        **dict.fromkeys(("TC_KIMLIK", "VKN", "IBAN", "KART", "PLAKA"), NUMBER),
+    },
+    "pl_pii": {
+        "PERSON": PERSON, "ORG": ORGANISATION, "LOC": LOCATION, "POSTAL": NUMBER, "DOB": DATE, "PHONE": PHONE,
+        "EMAIL": EMAIL,
+        **dict.fromkeys(("PESEL", "NIP", "REGON", "DOWOD", "IBAN", "PASSPORT", "DRIVING_LICENSE", "PAYMENT_CARD",
+                         "VIN", "VEHICLE_PLATE"), NUMBER),
+    },
+    "europii": {
+        "PERSON": PERSON, "EMAIL": EMAIL, "PHONE": PHONE, "IP_ADDRESS": IP,
+        **dict.fromkeys(("IBAN", "PAYMENT_CARD", "VAT_ID", "NATIONAL_ID"), NUMBER),
+    },
 }
+
+# Round-2 gold labels with no SCT type, named from each card / verify.md (labels only, never values). A round-2
+# gold label in neither the map nor this list stops the run (``unknown_gold_labels``): it would otherwise drop out
+# of scope silently and move precision and the recall base. A new one is added here or to the map, by hand.
+DATASET_OUT_OF_SCOPE: dict[str, frozenset] = {
+    "newmean": frozenset({"SECRET", "USERNAME"}),
+    "dialogpii": frozenset({"PERSON_SOCIAL_RELATION", "PROFESSION", "QUANTITY", "PRODUCT", "DATETIME_AGE", "MISC"}),
+    "kdpii": frozenset({"PS_ID", "OGG_RELIGION", "CV_POSITION", "CV_SEX", "CV_MILITARY_CAMP", "QT_AGE", "QT_LENGTH",
+                        "QT_WEIGHT", "QT_GRADE", "FD_MAJOR", "TM_BLOOD_TYPE"}),
+    # the card's 8 sensitive categories (named by the first real load) have no SCT type either
+    "nus_lt": frozenset({"MISC", "TIME", "DURATION", "VALUE", "AGE", "OCC", "EDU", "NAT",
+                         "GENDER", "SEX", "ETH", "FAM", "MAR", "HEALTH", "REL", "POL"}),
+    "redmadrobot": frozenset(),
+    "redactionbench": frozenset({"contextual"}),
+    "tonic": frozenset({"USERNAME"}),
+    "meddeid": frozenset({"Profession", "Age_Birthdate:age"}),
+    "greek_deid": frozenset(),
+    "neonredact": frozenset({"MESLEK", "AKRABALIK", "SAGLIK", "TARAF_SIFATI", "GIZLI", "SICIL_NO", "SASI_NO",
+                             "MOTOR_NO", "EHLIYET_NO", "BELGE_NO", "KULLANICI_ADI", "RUHSAT_NO"}),
+    "pl_pii": frozenset(f"{label}:keep" for label in DATASET_LABELS["pl_pii"]),
+    "europii": frozenset(),
+}
+
+
+def unknown_gold_labels(dataset: str, records: list[dict]) -> dict[str, int]:
+    """Gold label -> count for labels neither mapped nor declared out of scope (datasets with a declared list)."""
+    if dataset not in DATASET_OUT_OF_SCOPE:
+        return {}
+    known = DATASET_LABELS[dataset].keys() | DATASET_OUT_OF_SCOPE[dataset]
+    counts: dict[str, int] = {}
+    for r in records:
+        for s in r["spans"]:
+            if s["label"] not in known:
+                counts[s["label"]] = counts.get(s["label"], 0) + 1
+    return counts
 
 
 def normalise_gold(text: str, spans: list[dict], mapping: dict[str, str]) -> tuple[list[dict], list[dict]]:

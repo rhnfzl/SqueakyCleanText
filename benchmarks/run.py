@@ -89,7 +89,7 @@ def predict(cleaner, records: list[dict], workers: int) -> tuple[dict, dict, flo
         outputs[record["id"]] = result.lm_text
         predictions[record["id"]] = [
             {"start": s.start, "end": s.end, "label": s.label}
-            for s in predicted_spans(record["text"], result.lm_text, originals)]
+            for s in predicted_spans(record["text"], result.lm_text, originals, cfg=cleaner.cfg)]
     return predictions, outputs, seconds
 
 
@@ -219,8 +219,8 @@ def summary(out: Path) -> str:
     run = json.loads((out / "run.json").read_text(encoding="utf-8")) if (out / "run.json").exists() else {}
     env = run.get("environment", {})
     lines = [f"# SCT {run.get('sct_version', '?')} benchmark", "",
-             f"Commit `{env.get('git_commit')}` (dirty: {env.get('git_dirty')}). {env.get('cpu_model')}, "
-             f"{env.get('cpus_usable') or env.get('logical_cpus')} CPUs, GPUs: {', '.join(env.get('gpus', [])) or 'none'}.",
+             f"Commit `{env.get('git_commit')}` (dirty: {env.get('git_dirty')}). "
+             f"{env.get('cpus_usable')} CPUs.",
              f"Device `{run.get('device')}`, ONNX threads {run.get('threads')}, workers {run.get('workers')}, "
              f"seed {run.get('seed')}. Command: `{run.get('command')}`", "",
              "Percentages. Strict = exact span + type. Partial = overlap + type. Masked R = overlap, any type. "

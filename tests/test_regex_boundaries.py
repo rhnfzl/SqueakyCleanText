@@ -376,10 +376,10 @@ def test_iban_followed_by_code_word_keeps_checksum_prefix():
 
 
 def test_identifier_rule_off_by_default_on_with_flag():
-    text = "Licence RBCON68T08 and GPU RTX4090, ID XK4729QP31; word Model5 A1B2"
+    text = "Licence RBCON68T08, ID XK4729QP31; word Model5 A1B2"
     assert _cleaner().process(text).lm_text.count("RBCON68T08") == 1
     out = _cleaner(check_replace_identifiers=True).process(text).lm_text
-    assert out == "Licence <ID> and GPU <ID>, ID <ID>; word Model5 A1B2"
+    assert out == "Licence <ID>, ID <ID>; word Model5 A1B2"
 
 
 def test_new_types_reversible_and_counted():

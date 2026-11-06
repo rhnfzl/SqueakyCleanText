@@ -5,6 +5,8 @@ is the record's template or source record (``record["group"]`` when the loader s
 else its id). So the split never depends on record order or on other records, and two
 records of one template or one source record (REDACT language variants, Nemotron locale
 pairs) always land on the same side. ``dev`` is for tuning only; ``test`` is scored once.
+A dataset's own split wins: a record with ``part`` (set by the loader: KDPII, NeonRedact, EuroPII, and
+MedDeID, which is all ``test`` because its cards forbid tuning) stays in that part.
 
     python -m benchmarks.compare.split --datasets gretel_en argilla_pii   # print sizes, no ids
 """
@@ -31,7 +33,7 @@ def part_of(dataset: str, group: str, seed: int = SEED) -> str:
 def split(dataset: str, records: list[dict], part: str, seed: int = SEED) -> list[dict]:
     if part not in PARTS:
         raise ValueError(f"part must be one of {PARTS}, not {part!r}")
-    return [r for r in records if part_of(dataset, str(r.get("group", r["id"])), seed) == part]
+    return [r for r in records if (r.get("part") or part_of(dataset, str(r.get("group", r["id"])), seed)) == part]
 
 
 def load(dataset: str, part: str, n: int | None = None, seed: int = SEED) -> list[dict]:

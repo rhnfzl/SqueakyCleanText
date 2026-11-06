@@ -38,7 +38,7 @@ span. The speed line (7.2 docs/s) is a single loaded-machine run, not a code slo
 
 ## Correctness (Mac)
 
-macOS 27.2 arm64 (Apple M4 Max, 16 cores), Python 3.13.12, onnxruntime 1.31.1,
+macOS 27.2 arm64, Python 3.13.12, onnxruntime 1.31.1,
 lingua-language-detector 2.2.0. `python -m scripts.benchmark_release` with the committed
 correctness settings (`replacement_mode="reversible"`, `check_to_ascii_unicode=False`),
 dataset `release_benchmark.jsonl` (same records as the 0.7.1 run, 30 documents, 84 entities; the
@@ -90,7 +90,7 @@ equal once adjacent repeated placeholders are merged.
 
 ## Speed (Linux)
 
-Machine: shared box, AMD Ryzen Threadripper PRO 7985WX (64 cores, 128 threads), 754 GB RAM,
+Machine: shared Linux workstation,
 Ubuntu 24.04.4, kernel 6.11, CPU only (GPUs not used). Python 3.13, `uv sync --frozen
 --no-dev` of each version's own `uv.lock` (both resolve lingua 2.2.0, huggingface-hub 1.32.0),
 then onnxruntime 1.31.1 in both venvs (see "Linux model load" below). Same default models and

@@ -1,5 +1,6 @@
 # gliner2-fastino: fastino/gliner2-privacy-filter-PII-multi @ 1cb4166094dc58fa8d836429f060d6c95f62b495.
 # gliner2 2.1.0 base install is torch-free (API client only); the [local] extra brings the ML stack.
 gliner2[local]==2.1.0
-torch==2.15.0
+# CUDA 12 (round 2): torch 2.14.1+cu126, the newest cu126 build; round 1 used torch==2.15.0 (CUDA 13, ran on CPU).
+torch @ https://download-r2.pytorch.org/whl/cu126/torch-2.14.1%2Bcu126-cp312-cp312-manylinux_2_28_x86_64.whl
 transformers==5.22.1

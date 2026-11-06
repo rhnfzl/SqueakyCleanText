@@ -4,7 +4,6 @@ import os
 import platform
 import shutil
 import subprocess
-import sys
 import time
 from importlib import metadata
 from pathlib import Path
@@ -58,19 +57,8 @@ def _run(cmd: list[str]) -> str | None:
         return None
 
 
-def _cpu_model() -> str | None:
-    if sys.platform == "darwin":
-        return _run(["sysctl", "-n", "machdep.cpu.brand_string"])
-    cpuinfo = Path("/proc/cpuinfo")
-    if cpuinfo.exists():
-        for line in cpuinfo.read_text().splitlines():
-            if line.startswith("model name"):
-                return line.split(":", 1)[1].strip()
-    return platform.processor() or None
-
-
 def environment() -> dict[str, Any]:
-    """Hardware, software and git state for the result files."""
+    """Software and git state for the result files. No hardware names: results are public."""
     versions = {}
     for name in PACKAGES:
         try:
@@ -84,7 +72,6 @@ def environment() -> dict[str, Any]:
     except ImportError:
         providers = []
     affinity = len(os.sched_getaffinity(0)) if hasattr(os, "sched_getaffinity") else None
-    gpus = _run(["nvidia-smi", "--query-gpu=name,memory.total,memory.used,driver_version", "--format=csv,noheader"])
     status = _run(["git", "-C", str(ROOT), "status", "--porcelain"])
     return {
         "git_commit": _run(["git", "-C", str(ROOT), "rev-parse", "HEAD"]),
@@ -92,10 +79,7 @@ def environment() -> dict[str, Any]:
         "python": platform.python_version(),
         "platform": platform.platform(),
         "machine": platform.machine(),
-        "cpu_model": _cpu_model(),
-        "logical_cpus": os.cpu_count(),
         "cpus_usable": affinity,
-        "gpus": gpus.splitlines() if gpus else [],
         "onnxruntime_providers": providers,
         "packages": versions,
     }

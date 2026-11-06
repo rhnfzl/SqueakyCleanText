@@ -177,7 +177,7 @@ def test_noise_injection_and_removal_scoring():
 
 
 def test_label_maps_target_sct_types():
-    sct_types = {"PERSON", "LOCATION", "ORGANISATION", "EMAIL", "PHONE", "IP", "URL", "DATE", "NUMBER"}
+    sct_types = {"PERSON", "LOCATION", "ORGANISATION", "EMAIL", "PHONE", "IP", "URL", "DATE", "NUMBER", "UNTYPED"}
     for name, mapping in DATASET_LABELS.items():
         assert set(mapping.values()) <= sct_types, name
 

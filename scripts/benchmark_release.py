@@ -41,8 +41,6 @@ RESULTS = ROOT / "evaluation" / "results"
 NON_PII_LABELS = frozenset({"YEAR", "NUMBER"})
 SPEED_REPEATS = 3
 CORRECTNESS_OVERRIDES = {"replacement_mode": "reversible", "check_to_ascii_unicode": False}
-
-
 def find_leaks(example, output: str) -> tuple[list[dict], list[dict]]:
     """Return PII values still fully present, and values with a piece left.
 
@@ -126,7 +124,7 @@ def run(dataset: Path) -> dict[str, Any]:
             for entry in result.metadata["anon_map"].entries
         }
         outputs[example.id] = output
-        predictions[example.id] = tuple(predicted_spans(example.text, output, originals))
+        predictions[example.id] = tuple(predicted_spans(example.text, output, originals, cfg=cleaner.cfg))
         doc_leaks, doc_partial = find_leaks(example, output)
         leaks += doc_leaks
         partial += doc_partial

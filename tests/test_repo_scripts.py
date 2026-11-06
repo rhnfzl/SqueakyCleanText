@@ -69,7 +69,8 @@ def test_run_returns_none_when_a_command_is_missing_or_fails():
 def test_environment_records_the_run(monkeypatch):
     monkeypatch.setattr(speed, "_run", lambda cmd: " M " if cmd[-1] == "--porcelain" else None)
     env = speed.environment()
-    assert env["git_dirty"] is True and env["gpus"] == [] and env["git_commit"] is None
+    assert env["git_dirty"] is True and env["git_commit"] is None
+    assert {"cpu_model", "gpus"}.isdisjoint(env)
     assert env["python"] and env["packages"]["numpy"]
     monkeypatch.setattr(speed, "_run", lambda cmd: None)
     assert speed.environment()["git_dirty"] is None

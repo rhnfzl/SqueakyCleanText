@@ -16,6 +16,7 @@ import argparse
 import hashlib
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -27,15 +28,15 @@ from typing import Any, NamedTuple
 from benchmarks.compare import entries as registry
 from benchmarks.compare import scorer, split
 from benchmarks.compare.views import rule_views
-from benchmarks.datasets import get
-from benchmarks.labels import DATASET_LABELS
+from benchmarks.datasets import ROUND2, get
+from benchmarks.labels import DATASET_LABELS, unknown_gold_labels
 from benchmarks.speed import environment
 from sct.utils.atomic_file import write_text_atomic
 
 HERE = Path(__file__).resolve().parent
 ADAPTERS = HERE / "adapters"
 CACHE = HERE.parent / ".cache" / "compare"
-DOC_TIMEOUT = {"tab": 600.0}  # PROTOCOL.md section 15; others use --doc-timeout
+DOC_TIMEOUT = {"tab": 600.0, "redactionbench": 600.0}  # PROTOCOL.md section 15; others use --doc-timeout
 THREAD_VARS = ("OMP_NUM_THREADS", "MKL_NUM_THREADS", "OPENBLAS_NUM_THREADS", "NUMEXPR_NUM_THREADS")
 POLL_SECONDS = 0.05
 MAX_FAILED_STREAK = 3  # docs in a row failing with no output at all: the adapter cannot start
@@ -54,8 +55,25 @@ OFFSET_FIXTURES = {
 }
 
 
+# A GPU build that ships the same import package as a CPU twin some dependency pulls in (SCT depends on
+# onnxruntime). Both would write the same module, and the last one installed wins, so after the install the
+# builder removes the CPU twin and reinstalls the pinned GPU build (no deps) when the spec pins it.
+GPU_TWINS = {"onnxruntime-gpu": "onnxruntime"}
+
+
+def gpu_twin_fixes(requirements_text: str) -> list[tuple[str, str]]:
+    """(CPU package to uninstall, pinned GPU requirement to reinstall) for each GPU_TWINS build the spec pins."""
+    lines = [line.strip() for line in requirements_text.splitlines() if line.strip() and not line.startswith("#")]
+    return [(cpu, line) for gpu, cpu in GPU_TWINS.items() for line in lines
+            if re.split(r"[\[=@ ]", line, maxsplit=1)[0].lower() == gpu]  # name==ver, name[extra]==ver, name @ url
+
+
 def ensure_env(name: str, requirements: Path | None, envs_root: Path, python: str = registry.PYTHON) -> Path:
-    """Python of the entry's venv, built with uv when missing or when its spec changed."""
+    """Python of the entry's venv, built with uv when missing or when its spec changed.
+
+    CUDA builds come from the spec itself as direct CUDA 12 wheel URLs (``envs/*.txt``): torch from the PyTorch
+    cu126 index, onnxruntime-gpu from ORT's CUDA 12 feed, with ``GPU_TWINS`` resolved after the install.
+    """
     if requirements is None:
         return Path(sys.executable)
     venv = envs_root / name
@@ -69,11 +87,25 @@ def ensure_env(name: str, requirements: Path | None, envs_root: Path, python: st
         raise RuntimeError("uv is needed to build entry venvs")
     subprocess.run([uv, "venv", "--clear", "--python", python, str(venv)], check=True)  # noqa: S603
     subprocess.run([uv, "pip", "install", "--python", str(py), "-r", str(requirements)], check=True)  # noqa: S603
+    for cpu, gpu in gpu_twin_fixes(requirements.read_text()):
+        subprocess.run([uv, "pip", "uninstall", "--python", str(py), cpu], check=True)  # noqa: S603
+        subprocess.run([uv, "pip", "install", "--python", str(py), "--reinstall", "--no-deps", gpu],  # noqa: S603
+                       check=True)
     freeze = subprocess.run([uv, "pip", "freeze", "--python", str(py)], check=True,  # noqa: S603
                             capture_output=True, text=True, timeout=30).stdout
     write_text_atomic(venv / "freeze.txt", freeze)
     write_text_atomic(stamp, digest)
     return py
+
+
+def shared_view(datasets, tools: dict) -> tuple:
+    """Types every comparison entry of the round supports (a run of test entries only: those entries)."""
+    if set(datasets) & set(ROUND2) and set(datasets) - set(ROUND2):
+        raise ValueError("a run mixes round-1 and round-2 datasets; run each round on its own (shared view per round)")
+    pool = registry.ENTRIES if set(datasets) & set(ROUND2) else {
+        k: v for k, v in registry.ENTRIES.items() if k not in registry.ROUND2_ENTRIES}
+    compared = list(pool.values()) if set(tools) - set(registry.TEST_ENTRIES) else list(tools.values())
+    return scorer.shared_types(compared, registry.SCT_TYPES)
 
 
 def freeze(py: Path) -> str:
@@ -103,6 +135,11 @@ def child_env(threads: int | None = None, device: str = "cpu", gpu: str | None =
     if hf_hub_cache:
         env["HF_HUB_CACHE"] = hf_hub_cache  # only the hub cache: HF_HOME (and its token) stays the user's
     return env
+
+
+def entry_device(claimed: str, run_device: str) -> str:
+    """Device an entry runs on: a CPU-only entry (``device`` "cpu" in entries.py) stays on cpu in a cuda run."""
+    return run_device if run_device in claimed.split("|") else "cpu"
 
 
 def command(py: Path, adapter: str, config: dict, cpus: str | None = None) -> list[str]:
@@ -234,8 +271,10 @@ def check_offsets(results: dict[str, dict], labels: dict[str, str]) -> tuple[dic
     """(offset problems, detection errors): fixture name -> reason, for fixtures not returned exactly.
 
     An error line or an EMAIL span that cuts into the e-mail is an offset problem (the entry is
-    skipped). No overlapping EMAIL span, or one that covers the whole e-mail plus extra text, is
-    the model's detection error: recorded, not a skip.
+    skipped). No overlapping EMAIL span, one that covers the whole e-mail plus extra text, or one
+    that starts on the e-mail and stops at its own ``.`` / ``@`` (a model tagging only the first
+    subwords; a shifted or inclusive-end span cannot land there) is the model's detection error:
+    recorded, not a skip.
     """
     problems, misses = {}, {}
     for name, (_, text) in OFFSET_FIXTURES.items():
@@ -251,7 +290,7 @@ def check_offsets(results: dict[str, dict], labels: dict[str, str]) -> tuple[dic
             got = [(s["start"], s["end"], s["label"]) for s in line.get("spans", ())]
             reason = f"want EMAIL {(start, end)}, got {got}"
             overlapping = [(a, b) for a, b in emails if a < end and b > start]
-            if all(a <= start and b >= end for a, b in overlapping):
+            if all((a <= start and b >= end) or (a == start and b < end and text[b] in ".@") for a, b in overlapping):
                 misses[name] = reason
             else:
                 problems[name] = reason
@@ -301,8 +340,8 @@ def entry_python(name: str, tool: dict[str, Any], args: argparse.Namespace) -> P
 
 
 def entry_config(tool: dict[str, Any], args: argparse.Namespace, overrides: dict | None = None) -> dict[str, Any]:
-    return {**tool["adapter_config"], "threads": args.threads, "device": args.device, "gpu_mem_gb": args.gpu_mem_gb,
-            **(overrides or {})}
+    return {**tool["adapter_config"], "threads": args.threads, "device": entry_device(tool["device"], args.device),
+            "gpu_mem_gb": args.gpu_mem_gb, **(overrides or {})}
 
 
 def _parse_args(argv: list[str] | None) -> argparse.Namespace:
@@ -390,6 +429,11 @@ def _score_dataset(run: _EntryRun, dataset: str, records: list[dict], args: argp
                                     curve_floor=curve_floor(run.config, tool),
                                     curve_by_filter=tool.get("curve_by_filter", True),
                                     recover=tool.get("recover_dropped", False) and not args.no_recover)
+    if getattr(module, "DELETE_PREDICTIONS", False):
+        raw.unlink(missing_ok=True)
+        stamp.unlink(missing_ok=True)
+        shutil.rmtree(args.cache / name / f"{dataset}-{args.part}", ignore_errors=True)
+        process_info = {**process_info, "predictions_deleted": True}
     ids = sorted(r["id"] for r in records)
     result.update(run.meta, dataset={"name": dataset, "source": module.HF_ID, "revision": module.REVISION,
                                      "licence": module.LICENCE, "publish": module.PUBLISH},
@@ -442,11 +486,8 @@ def main(argv=None) -> None:
     for name, t in tools.items():
         if t["adapter"] is None:
             raise SystemExit(f"entry {name!r} has no adapter yet")
-    gpu, env = device_env(args)
-    # The shared view is the types every comparison entry supports, whichever entries this run scores, so a
-    # partial run (SCT alone with --no-recover) has the same shared view as the full one.
-    compared = list(registry.ENTRIES.values()) if set(tools) - set(registry.TEST_ENTRIES) else list(tools.values())
-    shared = scorer.shared_types(compared, registry.SCT_TYPES)
+    gpu, _ = device_env(args)
+    shared = shared_view(args.datasets, tools)
     run_info = {"command": " ".join(["python -m benchmarks.compare.runner", *(argv or sys.argv[1:])]),
                 "part": args.part, "track": args.track,
                 "tuned": str(args.tuned) if args.tuned else None, "n_per_language": args.n, "seed": args.seed,
@@ -461,6 +502,7 @@ def main(argv=None) -> None:
         py = entry_python(name, t, args)
         config = entry_config(t, args, overrides.get(name))
         cmd = command(py, t["adapter"], config, args.cpus)
+        env = child_env(args.threads, config["device"], gpu, args.hf_hub_cache)
         (args.out / "envs").mkdir(parents=True, exist_ok=True)
         frozen = freeze(py)
         write_text_atomic(args.out / "envs" / f"{name}.freeze.txt", frozen)
@@ -472,6 +514,10 @@ def main(argv=None) -> None:
         for dataset in args.datasets:
             if dataset not in records_by_dataset:
                 records_by_dataset[dataset] = split.load(dataset, args.part, args.n, args.seed)
+                unknown = unknown_gold_labels(dataset, records_by_dataset[dataset])
+                if unknown:
+                    raise SystemExit(f"{dataset}: gold labels neither mapped nor out of scope: {unknown}; add each to "
+                                     "labels.DATASET_LABELS or labels.DATASET_OUT_OF_SCOPE")
             per_doc[name][dataset] = _score_dataset(run, dataset, records_by_dataset[dataset], args)
     _write(args.out / "summary.json", _summary(per_doc, args.baseline))
     print(args.out / "summary.json")

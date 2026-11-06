@@ -383,7 +383,7 @@ class TextCleanerConfig:
     replace_with_iban: str = "<IBAN>"
     replace_with_cards: str = "<CARD>"
     # Identifier tokens: 6+ uppercase letters and digits with 2+ digits and a letter (RBCON68T08).
-    # Off by default: the shape also takes product and reference codes (RTX4090, COVID19)
+    # Off by default: the shape also takes product and reference codes (COVID19)
     check_replace_identifiers: bool = False
     replace_with_identifiers: str = "<ID>"
     # Bracket/brace removal only takes innermost spans of at most this many characters and

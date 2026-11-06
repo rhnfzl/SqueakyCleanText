@@ -1,6 +1,6 @@
 # SCT 0.8.0 benchmark
 
-Commit `None` (dirty: None). AMD Ryzen Threadripper PRO 7985WX 64-Cores, 32 CPUs, GPUs: NVIDIA GeForce RTX 4090, 24564 MiB, 17869 MiB, 560.35.05, NVIDIA GeForce RTX 4090, 24564 MiB, 19167 MiB, 560.35.05, NVIDIA GeForce RTX 4090, 24564 MiB, 18981 MiB, 560.35.05, NVIDIA GeForce RTX 4090, 24564 MiB, 16502 MiB, 560.35.05.
+Commit `None` (dirty: None). 32 CPUs.
 Device `cpu`, ONNX threads 16, workers 2, seed 13. Command: `python -m benchmarks.run --suite pii --datasets openpii gretel redact --threads 16 --workers 2 --seed 13 --configs default --out benchmarks/results/unreleased/thr0.7`
 
 Percentages. Strict = exact span + type. Partial = overlap + type. Masked R = overlap, any type. Leak = gold PII value (or a 4+ char word of it) still in the output; lower is better.

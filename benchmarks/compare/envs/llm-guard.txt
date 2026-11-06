@@ -1,0 +1,8 @@
+# llm-guard: the last release (archived repo; Python <3.13). It pins presidio 2.2.358 and transformers 4.51.3 itself
+# and downloads en_core_web_sm / zh_core_web_sm at first use unless installed, so both are pinned here.
+# CUDA 12 (Linux x86_64, Python 3.12): torch 2.14.1+cu126 as a direct wheel from the PyTorch cu126 index (2.14.1 is
+# the newest release built for cu126; 2.15.0 has no cu126 build). Its nvidia-* CUDA 12 runtime wheels come from PyPI.
+llm-guard==0.3.16
+en_core_web_sm @ https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0-py3-none-any.whl
+zh_core_web_sm @ https://github.com/explosion/spacy-models/releases/download/zh_core_web_sm-3.8.0/zh_core_web_sm-3.8.0-py3-none-any.whl
+torch @ https://download-r2.pytorch.org/whl/cu126/torch-2.14.1%2Bcu126-cp312-cp312-manylinux_2_28_x86_64.whl

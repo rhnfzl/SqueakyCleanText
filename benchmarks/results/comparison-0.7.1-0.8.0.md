@@ -8,7 +8,7 @@ versions and hardware. REDACT files hold aggregate scores only.
 
 ## Setup
 
-- Hardware: AMD Threadripper PRO 7985WX (64 cores), 754 GB RAM, Linux 6.11, Python 3.12.3.
+- Machine: Linux workstation, Linux 6.11, Python 3.12.3.
 - Installs from PyPI: `squeakycleantext[fuzzy]==0.8.0` and `==0.7.1`, plus `pyarrow`.
 - Quality suites (pii, long, lid, clean): both versions at the same time, 0.8.0 on cores 0-31 and
   0.7.1 on cores 32-63, ONNX threads 16, workers 2.
@@ -32,7 +32,7 @@ versions and hardware. REDACT files hold aggregate scores only.
   defaults `ProcessResult.metadata` to `{}`; and wraps 0.7.1's `_detect_language` (it returns a name, not
   a tuple) for the LID suite. The `command` field in the 0.7.1 files says `python -m benchmarks.run`;
   it ran the same arguments through that wrapper.
-- **GPU**: skipped. The shared vLLM server holds 16.5-19 GB on each RTX 4090, leaving at most 8 GB
+- **GPU**: skipped. Other work on the shared machine holds most of each GPU's memory, leaving at most 8 GB
   (GPU 3). A capped 0.8.0 run (6 GB arena cap, 1 worker) ran out of memory loading the English model,
   and peak use reached 24.1 of 24.6 GB, so it was stopped. The installed onnxruntime-gpu 1.31.1 wheel
   also needs CUDA 13; the host driver (560) supports CUDA 12.6. 0.7.1 was never tried on GPU: it

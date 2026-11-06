@@ -43,7 +43,7 @@ from typing import Any
 
 import numpy as np
 
-from benchmarks.labels import DATE, normalise_gold
+from benchmarks.labels import DATE, UNTYPED, normalise_gold
 from benchmarks.score import LEAK_WORD, PLACEHOLDER, leak, masking_recall, overlaps, prepare, score_pii
 
 THRESHOLDS = tuple(round(0.05 * i, 2) for i in range(1, 20))
@@ -59,7 +59,13 @@ GROUPS = {
     "privacy-synthetic": ("openpii", "gretel", "gretel_en", "nemotron", "argilla_pii", "thai_pii", "bayanat"),
     "privacy-real": ("tab", "redact"),
     "ner": ("iahlt", "thainer", "naamapadam", "multiconer", "stockmark"),
+    # Round 2: its own groups, so round-1 group numbers stay as published. Untyped gold is never pooled with typed.
+    "r2-privacy-synthetic": ("newmean", "dialogpii", "tonic", "meddeid", "greek_deid", "neonredact", "pl_pii",
+                             "europii"),
+    "r2-privacy-real": ("kdpii", "nus_lt", "redmadrobot", "carmen"),
+    "r2-untyped": ("redactionbench",),
 }
+TYPED_ONLY = ("strict_precision", "strict_recall", "strict_f1", "partial_precision", "partial_recall", "partial_f1")
 
 
 def map_spans(spans: list[dict], labels: dict[str, str], threshold: float | None = None) -> tuple[list[dict], int]:
@@ -195,7 +201,7 @@ def doc_stats(record: dict, spans: list[dict], mapping: dict[str, str], unplaced
     gold, kept = prepare(record, spans, mapping)
     _, out_of_view = normalise_gold(text, record["spans"], mapping)
     masking = [p for p in spans if any(overlaps(p, g) for g in gold) or not any(overlaps(p, o) for o in out_of_view)]
-    c = Counter(docs=1, gold=len(gold), pred=len(kept) + unplaced)
+    c = Counter(docs=1, gold=len(gold), pred=len(kept) + unplaced, untyped=UNTYPED in mapping.values())
     c["strict_tp"] = sum((Counter((g["label"], g["start"], g["end"]) for g in gold)
                           & Counter((p["label"], p["start"], p["end"]) for p in kept)).values())
     c["partial_tp"] = _one_to_one(gold, kept)
@@ -296,7 +302,29 @@ def metrics(c: Counter) -> dict[str, float | None]:
         p = sum(c[f"chrf{n}_match"] / c[f"chrf{n}_hyp"] for n in orders) / len(orders)
         r = sum(c[f"chrf{n}_match"] / c[f"chrf{n}_ref"] for n in orders) / len(orders)
         out["chrf"] = _f(p, r, CHRF_BETA)
+    if c["untyped"] and c["untyped"] == c["docs"]:  # gold without types: a typed match is not defined
+        out.update(dict.fromkeys(TYPED_ONLY))
     return {k: round(v, 4) if isinstance(v, float) else v for k, v in out.items()}
+
+
+def in_view(mapping: dict[str, str], types) -> dict[str, str]:
+    """The dataset map restricted to a view's types; untyped gold is in every view."""
+    return {k: v for k, v in mapping.items() if v in types or v == UNTYPED}
+
+
+def survival(records: list[dict], spans: dict[str, list[dict]]) -> dict | None:
+    """Must-survive probes (``record["survive"]``, Greek set): share still verbatim in the common masked output.
+
+    A probe is kept only when every occurrence in the source is still there (counted), so a short probe (a dose,
+    a unit) cannot survive by matching elsewhere in the note. No NFKC: the common output is the source with
+    spans replaced, never refolded."""
+    probes = kept = 0
+    for r in records:
+        if r.get("survive"):
+            visible = mask_text(r["text"], spans[r["id"]])
+            probes += len(r["survive"])
+            kept += sum(0 < r["text"].count(v) <= visible.count(v) for v in r["survive"])
+    return {"probes": probes, "kept": kept, "survive_rate": _round(_r(kept, probes))} if probes else None
 
 
 def total(counters) -> Counter:
@@ -418,7 +446,7 @@ def _score_view(records: list[dict], completed: list[dict], failed: set[str], ou
                 mapped: dict[str, list[dict]], mapping: dict[str, str],
                 types: tuple) -> tuple[dict[str, Any], list[tuple]]:
     """One view: its result cell and its ``per_doc`` list."""
-    with_date = {k: v for k, v in mapping.items() if v in types}
+    with_date = in_view(mapping, types)
     view_map = {k: v for k, v in with_date.items() if v != DATE}
     docs = [(r, doc_stats(r, mapped[r["id"]], view_map, outputs[r["id"]].get("unplaced", 0)))
             for r in records]
@@ -471,15 +499,16 @@ def score_run(records: list[dict], outputs: dict[str, dict], labels: dict[str, s
     for view, types in views.items():
         result["views"][view], per_doc[view] = _score_view(records, completed, failed, outputs, mapped, mapping, types)
     if curve_view in views:
-        view_map = {k: v for k, v in mapping.items() if v in views[curve_view] and v != DATE}
+        view_map = {k: v for k, v in in_view(mapping, views[curve_view]).items() if v != DATE}
         result["curve"] = curve(completed, outputs, labels, view_map, curve_floor) if curve_by_filter else None
     if "full" in views:  # tuning objective: full taxonomy minus DATE, so a tool is tuned on everything it must mask
-        view_map = {k: v for k, v in mapping.items() if v in views["full"] and v != DATE}
+        view_map = {k: v for k, v in in_view(mapping, views["full"]).items() if v != DATE}
         result["tuning"] = tuning_rows(records, outputs, labels, view_map,
                                        _tuning_grid(completed, outputs, curve_floor, curve_by_filter))
     if any(r.get("annotators") for r in records):  # TAB: DIRECT/QUASI full-coverage rule, every annotator
         result["tab_masking"] = masking_recall(records, mapped)  # failed docs have no spans: unmasked
     result["native"] = native_leak(records, outputs, mapping)
+    result["survive"] = survival(records, mapped)  # failed docs have no spans: every probe kept
     return result, per_doc
 
 

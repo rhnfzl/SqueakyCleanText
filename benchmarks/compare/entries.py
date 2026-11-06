@@ -6,6 +6,7 @@ positive). ``supports`` is the claimed SCT-type coverage used for the "tool-supp
 view. Revisions are HF commit shas; package versions are exact pins for that entry's venv.
 """
 
+from benchmarks.datasets import ROUND2
 from pathlib import Path
 from typing import Any
 
@@ -14,6 +15,8 @@ from benchmarks.labels import DATE, EMAIL, IP, LOCATION, NUMBER, ORGANISATION, P
 SCT_TYPES = (PERSON, LOCATION, ORGANISATION, EMAIL, PHONE, IP, URL, DATE, NUMBER)
 # SCT's own placeholder names (YEAR, IBAN, ...) are aliases of the canonical types: map them
 # here, before map_spans drops unknown labels.
+# GPU entries use CUDA 12 venvs (envs/*.txt): torch cu126 runs on a CUDA 12.6 driver.
+TORCH_CU126 = "torch==2.14.1+cu126"
 SCT_LABELS = {**{t: t for t in SCT_TYPES}, **PRED_ALIASES}
 
 # One fixed prompt list for every GLiNER-family entry (free-text labels), mapped to SCT types.
@@ -45,15 +48,28 @@ FASTINO_CARD = {  # credentials and usernames are out of scope (absent)
                      "account_id", "sensitive_account_id"), NUMBER),
 }
 
+# Presidio language packs (PROTOCOL.md section 3.2): spaCy's lg pipeline where one exists,
+# else the multilingual xx_ent_wiki_sm; keyed by the gold code prefix the adapter routes on.
+SPACY_LG = ("da", "de", "el", "en", "es", "fi", "fr", "hr", "it", "ja", "ko", "lt", "nl", "pl", "pt", "ro", "ru",
+            "sl", "sv")
+SPACY_XX = ("ar", "bg", "bn", "cs", "et", "he", "hi", "hu", "id", "lv", "ms", "sk", "sr", "ta", "th", "tl", "tr", "vi")
+PRESIDIO_MODELS = {**{c: f"{c}_core_news_lg" for c in SPACY_LG}, "en": "en_core_web_lg", "zh": "zh_core_web_lg",
+                   "no": "nb_core_news_lg",
+                   **dict.fromkeys(SPACY_XX, "xx_ent_wiki_sm")}
+# Vendor default regions plus one region per scored language (fixed for every dataset).
+PHONE_REGIONS = ("US", "GB", "DE", "FR", "IL", "IN", "CA", "BR", "AE", "BD", "BG", "CN", "CZ", "DK", "EE", "EG",
+                 "ES", "FI", "GR", "HR", "HU", "ID", "IT", "JP", "KR", "LK", "LT", "LV", "MY", "NL", "NO", "PH", "PL",
+                 "PT", "RO", "RS", "RU", "SA", "SE", "SI", "SK", "TH", "TR", "TW", "VN")
+
 ENTRIES = {
     "sct-default": {
-        "package": "SqueakyCleanText==0.8.1", "checkpoint": "sct DEFAULT_NER_MODELS (xlm-r conll ONNX, wikineural ONNX)",
+        "package": "SqueakyCleanText==0.8.2", "checkpoint": "sct DEFAULT_NER_MODELS (xlm-r conll ONNX, wikineural ONNX)",
         "revision": "sct/config.py DEFAULT_NER_REVISIONS", "config": "TextCleanerConfig() + reversible scoring mode",
         "threshold": "SCT default", "mask": "SCT placeholder", "device": "cpu", "gpu_gb": 0,
         "labels": SCT_LABELS, "supports": SCT_TYPES, "recover_dropped": True,
     },
     "sct-gliner": {
-        "package": "SqueakyCleanText[gliner]==0.8.1",
+        "package": "SqueakyCleanText[gliner]==0.8.2",
         "checkpoint": "knowledgator/gliner-pii-base-v1.0 (PyTorch: no root model.onnx in the repo, SCT falls back)",
         "revision": "61726e0ad791dcab3e29339bbec3ad42ded65641", "config": "TextCleanerConfig(ner_mode='pii')",
         "threshold": "SCT default", "mask": "SCT placeholder", "device": "cpu|cuda", "gpu_gb": 1,
@@ -70,7 +86,7 @@ ENTRIES = {
         "supports": (PERSON, LOCATION, EMAIL, PHONE, IP, URL, DATE, NUMBER),  # ORG only with a non-spaCy engine
     },
     "gliner-nvidia": {
-        "package": "gliner==0.2.30 torch==2.15.0 transformers==5.22.1",
+        "package": f"gliner==0.2.30 {TORCH_CU126} transformers==5.22.1",
         "checkpoint": "nvidia/gliner-PII",
         "revision": "bd23e8ef4425fd04e34c5204ab49ffaa706eae79",
         "config": "GLINER_PROMPTS, fp16 on cuda (fp32 cpu), batch<=4, vendor truncation at 384 words",
@@ -78,14 +94,14 @@ ENTRIES = {
         "labels": {**GLINER_PROMPTS, **NVIDIA_CARD}, "supports": SCT_TYPES,
     },
     "gliner2-fastino": {
-        "package": "gliner2[local]==2.1.0 torch==2.15.0 transformers==5.22.1",
+        "package": f"gliner2[local]==2.1.0 {TORCH_CU126} transformers==5.22.1",
         "checkpoint": "fastino/gliner2-privacy-filter-PII-multi",
         "revision": "1cb4166094dc58fa8d836429f060d6c95f62b495", "config": "GLINER_PROMPTS, batch<=4",
         "threshold": 0.5, "mask": "common", "device": "cuda|cpu", "gpu_gb": 2,
         "labels": {**GLINER_PROMPTS, **FASTINO_CARD}, "supports": SCT_TYPES,
     },
     "opf": {
-        "package": "transformers==5.22.1 torch==2.15.0", "checkpoint": "openai/privacy-filter",
+        "package": f"transformers==5.22.1 {TORCH_CU126}", "checkpoint": "openai/privacy-filter",
         "revision": "7ffa9a043d54d1be65afb281eddf0ffbe629385b",
         "config": "vendor BIOES constrained Viterbi (checkpoint viterbi_calibration biases), bf16, 4096-token windows",
         "threshold": "default operating point", "mask": "common", "device": "cuda|cpu", "gpu_gb": 5,
@@ -97,7 +113,7 @@ ENTRIES = {
         "curve_by_filter": False,
     },
     "bardsai-v3": {
-        "package": "transformers==5.22.1 onnxruntime==1.31.1 torch==2.15.0",
+        "package": f"transformers==5.22.1 onnxruntime==1.31.1 {TORCH_CU126}",
         "checkpoint": "bardsai/eu-pii-anonimization-multilang-v3",
         "revision": "091984b5fbce4c161abc4776ed0f4e3206e1b374",
         "config": "bundled pii_detector.py (read first), onnx/model_quantized.onnx, 512-token windows, 128 overlap",
@@ -124,8 +140,117 @@ ENTRIES = {
     },
 }
 
-RESERVE = ("scrubadub==2.0.1", "datatrove==0.10.1 PIIFormatter", "urchade/gliner_multi_pii-v1",
-           "OpenMed/privacy-filter-multilingual-v2", "iiiorg/piiranha-v1-detect-personal-information")
+# Round 2 entries (sct-integration-research compare/ROUND2-TODO.md; label maps frozen from each checkpoint's
+# config at the pinned revision, the adapter's LABELS). GPU entries use CUDA 12 venvs (envs/*.txt, torch cu126).
+PIIRANHA = {**dict.fromkeys(("GIVENNAME", "SURNAME"), PERSON),
+            **dict.fromkeys(("CITY", "STREET", "BUILDINGNUM"), LOCATION),
+            "EMAIL": EMAIL, "TELEPHONENUM": PHONE, "DATEOFBIRTH": DATE,
+            **dict.fromkeys(("ACCOUNTNUM", "CREDITCARDNUMBER", "DRIVERLICENSENUM", "IDCARDNUM", "SOCIALNUM", "TAXNUM",
+                             "ZIPCODE"), NUMBER)}
+AI4PRIVACY = {**dict.fromkeys(("GIVENNAME", "SURNAME"), PERSON),
+              **dict.fromkeys(("CITY", "STREET", "BUILDINGNUM"), LOCATION),
+              "EMAIL": EMAIL, "TELEPHONENUM": PHONE, "DATE": DATE,
+              **dict.fromkeys(("CREDITCARDNUMBER", "DRIVERLICENSENUM", "IDCARDNUM", "PASSPORTNUM", "SOCIALNUM", "TAXNUM",
+                               "ZIPCODE"), NUMBER)}
+OPENMED = {**dict.fromkeys(("FIRSTNAME", "MIDDLENAME", "LASTNAME"), PERSON),
+           **dict.fromkeys(("STREET", "BUILDINGNUMBER", "SECONDARYADDRESS", "CITY", "COUNTY", "STATE", "GPSCOORDINATES"),
+                           LOCATION),
+           "ORGANIZATION": ORGANISATION, "EMAIL": EMAIL, "PHONE": PHONE, "URL": URL, "IPADDRESS": IP,
+           "DATE": DATE, "DATEOFBIRTH": DATE,
+           **dict.fromkeys(("BANKACCOUNT", "IBAN", "BIC", "CREDITCARD", "CVV", "PIN", "MASKEDNUMBER", "SSN", "ZIPCODE",
+                            "VIN", "VRM", "IMEI", "MACADDRESS"), NUMBER)}
+ROUND2_ENTRIES = {
+    "gliner-knowledgator": {
+        "package": f"gliner==0.2.30 transformers==5.22.1 {TORCH_CU126}",
+        "checkpoint": "knowledgator/gliner-pii-base-v1.0 (standalone; the sct-gliner model)",
+        "revision": "61726e0ad791dcab3e29339bbec3ad42ded65641",
+        "config": "GLINER_PROMPTS, card threshold 0.3, fp16 on cuda (fp32 cpu), vendor truncation at 2048 words",
+        "threshold": 0.3, "mask": "common", "device": "cuda|cpu", "gpu_gb": 1,
+        "labels": dict(GLINER_PROMPTS), "supports": SCT_TYPES,
+    },
+    "piiranha": {
+        "package": f"transformers==5.22.1 {TORCH_CU126}", "checkpoint": "iiiorg/piiranha-v1-detect-personal-information",
+        "revision": "255acde67a2f34cf452eb42e365b24d2957352fc",
+        # weights CC-BY-NC-ND-4.0: benchmark only, never shipped
+        "config": "token-classification pipeline, aggregation simple, 256-token windows, 64 overlap",
+        "threshold": "0 (vendor)", "mask": "common", "device": "cuda|cpu", "gpu_gb": 1,
+        "labels": PIIRANHA, "supports": (PERSON, LOCATION, EMAIL, PHONE, DATE, NUMBER),
+    },
+    "llm-guard": {
+        "package": f"llm-guard==0.3.16 (presidio 2.2.358, transformers 4.51.3) {TORCH_CU126}",
+        "checkpoint": "Isotonic/deberta-v3-base_finetuned_ai4privacy_v2 + Presidio regex (llm-guard defaults)",
+        "revision": "9ea992753ab2686be4a8f64605ccc7be197ad794 (pinned by llm-guard)",
+        "config": "Anonymize(Vault()) defaults: DEFAULT_ENTITY_TYPES, language en, PyTorch",
+        "threshold": 0.5, "mask": "llm-guard [REDACTED_TYPE_n]", "device": "cuda|cpu", "gpu_gb": 1,
+        "labels": {"PERSON": PERSON, "EMAIL_ADDRESS": EMAIL, "EMAIL_ADDRESS_RE": EMAIL, "PHONE_NUMBER": PHONE,
+                   "IP_ADDRESS": IP, **dict.fromkeys(("CREDIT_CARD", "CREDIT_CARD_RE", "IBAN_CODE", "US_SSN", "US_SSN_RE",
+                                                      "US_BANK_NUMBER"), NUMBER)},
+        "supports": (PERSON, EMAIL, PHONE, IP, NUMBER),  # no LOCATION/ORG/DATE/URL in the default entity types
+    },
+    "scrubadub": {
+        "package": f"scrubadub==2.0.1 scrubadub_spacy==2.0.0 spacy==3.8.18 en_core_web_trf==3.8.0 {TORCH_CU126}",
+        "checkpoint": "en_core_web_trf (SpacyEntityDetector default for en)", "revision": "spaCy model wheel 3.8.0",
+        "config": "Scrubber() default detectors + SpacyEntityDetector() (PERSON, PER, ORG), locale en_US",
+        "threshold": "-", "mask": "scrubadub {{TYPE}}", "device": "cpu", "gpu_gb": 0,  # spaCy stays on CPU (no cupy)
+        "labels": {"name": PERSON, "organization": ORGANISATION, "location": LOCATION, "address": LOCATION,
+                   "email": EMAIL, "phone": PHONE, "url": URL, "date_of_birth": DATE,
+                   **dict.fromkeys(("credit_card", "drivers_licence", "national_insurance_number", "postalcode",
+                                    "social_security_number", "tax_reference_number", "vehicle_licence_plate"), NUMBER)},
+        "supports": (PERSON, ORGANISATION, EMAIL, PHONE, URL, NUMBER),  # location / dob detectors are off by default
+    },
+    "ai4privacy": {
+        "package": f"transformers==5.22.1 {TORCH_CU126}",
+        "checkpoint": "ai4privacy/llama-ai4privacy-multilingual-categorical-anonymiser-openpii",
+        "revision": "83ef30d5e7c9d113ad80ce745b564cdd2320c5d5",
+        "config": "token-classification pipeline, aggregation simple, 512-token windows, 128 overlap",
+        "threshold": "0 (vendor)", "mask": "common", "device": "cuda|cpu", "gpu_gb": 1,
+        "labels": AI4PRIVACY, "supports": (PERSON, LOCATION, EMAIL, PHONE, DATE, NUMBER),
+    },
+    "openmed": {
+        "package": f"transformers==5.22.1 {TORCH_CU126}", "checkpoint": "OpenMed/privacy-filter-multilingual-v2",
+        "revision": "0d0c0430fa386435ace1d9f842f0f966903a9ac8",
+        "config": "opf decoder: BIOES constrained Viterbi, all biases 0 (no calibration file), bf16, 4096-token windows",
+        "threshold": "default operating point", "mask": "common", "device": "cuda|cpu", "gpu_gb": 5,
+        "labels": OPENMED, "supports": SCT_TYPES, "curve_by_filter": False,  # same score as opf: no operating point
+    },
+    "pii-tracer": {
+        "package": f"transformers==5.22.1 {TORCH_CU126}", "checkpoint": "perplexity-ai/PII-Tracer (remote code)",
+        "revision": "d25c16f2e57e321f6d2527715c01df9112f956f5",
+        "config": "AutoModel(trust_remote_code).predict(text): bundled BIOES Viterbi, vendor truncation at 4096 tokens",
+        "threshold": "default operating point", "mask": "pii-tracer [LABEL]", "device": "cuda|cpu", "gpu_gb": 3,
+        "labels": {"private_person": PERSON, "private_address": LOCATION, "private_email": EMAIL, "private_phone": PHONE,
+                   "private_url": URL, "private_date": DATE, "account_number": NUMBER},
+        "supports": (PERSON, LOCATION, EMAIL, PHONE, URL, DATE, NUMBER),  # no ORG, no IP class (as opf)
+        "curve_by_filter": False,  # sigmoid of the mean decoded logit: not the decoder's operating point
+    },
+    "presidio-full": {
+        "package": "presidio-analyzer==2.2.366 spacy==3.8.18 + every presidio language pack",
+        "checkpoint": "PRESIDIO_MODELS (spaCy lg per language, else xx_ent_wiki_sm)", "revision": "spaCy model wheels 3.8.0",
+        "config": "gold-language engines, PHONE_REGIONS, every predefined pattern recognizer, ORGANIZATION kept",
+        "threshold": "0 (score_threshold default)", "mask": "common", "device": "cpu", "gpu_gb": 0,
+        "labels": {**ENTRIES["presidio"]["labels"]}, "supports": SCT_TYPES,
+    },
+    "sct-training": {
+        "package": "SqueakyCleanText==0.8.2 onnxruntime-gpu==1.31.1",
+        "checkpoint": "sct DEFAULT_NER_MODELS (xlm-r conll ONNX, wikineural ONNX)",
+        "revision": "sct/config.py DEFAULT_NER_REVISIONS", "config": "preset 'training' + reversible scoring mode",
+        "threshold": "SCT default", "mask": "SCT placeholder", "device": "cuda|cpu", "gpu_gb": 2,
+        # the preset turns dates, years and free numbers off; IBAN/card stay on, so NUMBER is partly covered
+        "labels": SCT_LABELS, "supports": tuple(t for t in SCT_TYPES if t != DATE), "recover_dropped": True,
+    },
+    "sct-gliner-nvidia": {
+        "package": f"SqueakyCleanText[gliner]==0.8.2 {TORCH_CU126}",
+        "checkpoint": "nvidia/gliner-PII through SCT's GLiNER backend (gliner_model)",
+        "revision": "bd23e8ef4425fd04e34c5204ab49ffaa706eae79",
+        "config": "TextCleanerConfig(ner_mode='pii', ner_backend='gliner', gliner_model='nvidia/gliner-PII') + reversible "
+                  "scoring mode; SCT's PII prompts and threshold (tuned on knowledgator) as shipped",
+        "threshold": "SCT default", "mask": "SCT placeholder", "device": "cuda|cpu", "gpu_gb": 3,
+        "labels": SCT_LABELS, "supports": SCT_TYPES, "recover_dropped": True,
+    },
+}
+ENTRIES.update(ROUND2_ENTRIES)
+
+RESERVE = ("datatrove==0.10.1 PIIFormatter", "urchade/gliner_multi_pii-v1")  # scrubadub, OpenMed, piiranha: round 2
 
 # Runner registry: adapter script (in ``adapters/``) and its config. The pinned install spec
 # is ``envs/<entry>.txt``; every venv uses PYTHON. Config {} = the vendor default track.
@@ -134,7 +259,18 @@ RUNS = {
     "sct-default": {"adapter": "sct_adapter.py", "config": {"mode": "default", "language": "auto"}},
     "sct-gliner": {"adapter": "sct_adapter.py", "config": {"mode": "gliner", "language": "auto"}},
     **{name: {"adapter": f"{name.replace('-', '_')}_adapter.py", "config": {}} for name in
-       ("presidio", "gliner-nvidia", "gliner2-fastino", "opf", "bardsai-v3", "datafog")},
+       ("presidio", "gliner-nvidia", "gliner2-fastino", "opf", "bardsai-v3", "datafog", "gliner-knowledgator",
+        "piiranha", "llm-guard", "scrubadub", "ai4privacy", "openmed", "pii-tracer")},
+    # presidio-full is defined by per-language engines, so it takes the gold language in both tracks
+    "presidio-full": {"adapter": "presidio_full_adapter.py",
+                      "config": {"language": "gold", "models": PRESIDIO_MODELS, "phone_regions": list(PHONE_REGIONS),
+                                 "enable": "all", "organizations": True}},
+    "sct-training": {"adapter": "sct_adapter.py", "config": {"mode": "default", "language": "auto", "preset": "training"}},
+    "sct-gliner-nvidia": {"adapter": "sct_adapter.py", "config": {
+        "mode": "gliner", "language": "auto",
+        "overrides": {"gliner_model": "nvidia/gliner-PII", "gliner_revision": "bd23e8ef4425fd04e34c5204ab49ffaa706eae79",
+                      # explicit backend: pii mode on the onnx default forces gliner_onnx=True (nvidia ships no ONNX)
+                      "ner_backend": "gliner"}}},
 }
 # Language tracks (PROTOCOL.md section 12), applied to every entry the same way. ``native``:
 # each tool routes as shipped (SCT's own LID, Presidio en, DataFog no locale). ``gold``: every
@@ -143,6 +279,7 @@ TRACKS = ("gold", "native")
 GOLD_TRACK = {
     "sct-default": {"language": "gold"}, "sct-gliner": {"language": "gold"},
     "presidio": {"language": "gold"}, "datafog": {"locales": "gold"},
+    "sct-training": {"language": "gold"}, "sct-gliner-nvidia": {"language": "gold"},
 }
 
 # Not a comparison entry: a stdlib-only adapter for tests and smoke runs (runs in any Python).
@@ -173,21 +310,48 @@ def tool(name: str, track: str = "native") -> dict[str, Any]:
 # PROTOCOL.md section 17, per entry: dataset -> direct flag ("*" = every other dataset).
 # T trained on it, E vendor evaluates on it, D SCT developed against it, U training data undisclosed, - none known.
 # Family flags are not listed here: ``contamination`` derives them from FAMILIES for every entry alike.
+# Round 2 (sct-integration-research round2-datasets/SHORTLIST.md section 2, after its U-cell pass): SCT was not
+# developed against any round-2 set, and no entry trained on or was vendor-evaluated on one. Third-party published
+# scores (E3) and clean-by-inference (c*) count as clean, so every round-2 cell is "-" except the one residual U,
+# openai/privacy-filter x KDPII, which also stays U for openmed (OPF is the model inside it: decision 21).
 CONTAMINATION = {
-    "sct-default": {"*": "D", "gretel_en": "-", "argilla_pii": "-"},
-    "sct-gliner": {"*": "U, D", "gretel_en": "U", "argilla_pii": "U"},
+    "sct-default": {"*": "D", "gretel_en": "-", "argilla_pii": "-", **dict.fromkeys(ROUND2, "-")},
+    "sct-gliner": {"*": "U, D", "gretel_en": "U", "argilla_pii": "U", **dict.fromkeys(ROUND2, "-")},
     "presidio": {"*": "-"},
     "gliner-nvidia": {"*": "-", "openpii": "E", "gretel_en": "E", "nemotron": "T", "argilla_pii": "E"},
     "gliner2-fastino": {"*": "-"},
-    "opf": {"*": "U"},
+    "opf": {"*": "U", **dict.fromkeys(ROUND2, "-"), "kdpii": "U"},
     "bardsai-v3": {"*": "-", "openpii": "T", "gretel_en": "T", "nemotron": "T"},
     "datafog": {"*": "-"},
+    # Round 2 entries. Round-2 cells: the shortlist has no T or vendor E for any of these tools (E3 / c* = "-").
+    # Training sets outside the harness are named by their family member (FAMILIES), so the family rule flags
+    # openpii / argilla_pii without a hand-set family flag.
+    "gliner-knowledgator": {"*": "U", **dict.fromkeys(ROUND2, "-")},  # the sct-gliner model without SCT's D
+    "piiranha": {"*": "-", "ai4privacy-400k": "T"},  # card: datasets ai4privacy/pii-masking-400k
+    "llm-guard": {"*": "-", "argilla_pii": "T"},  # Isotonic deberta: ai4privacy/pii-masking-200k (Argilla's source split)
+    "scrubadub": {"*": "-"},  # rules + en_core_web_trf (OntoNotes 5), as presidio
+    "ai4privacy": {"*": "-", "ai4privacy-500k": "T, E"},  # trained and evaluated on open-pii-masking-500k
+    # base openai/privacy-filter is undisclosed (opf: U); the fine-tune names ai4privacy 200k/400k/500k/openpii-1m,
+    # Nemotron-PII, gretel-pii-masking-en-v1, privy
+    "openmed": {"*": "U", "openpii": "T", "gretel_en": "T", "nemotron": "T", "argilla_pii": "T",
+                **dict.fromkeys(ROUND2, "-"), "kdpii": "U"},
+    # PII-TRACE paper 3.7: in-house conversations + ai4privacy samples (set unnamed); 4.7 evaluates on ai4privacy,
+    # Nemotron-PII, SPY, Gretel (gretel-pii-masking-en-v1), TAB
+    "pii-tracer": {"*": "-", "ai4privacy-unnamed": "T, E", "nemotron": "E", "gretel_en": "E", "tab": "E"},
+    "presidio-full": {"*": "-"},  # spaCy packs (OntoNotes / WikiNER / national corpora), none of ours
+    "sct-training": {"*": "D", "gretel_en": "-", "argilla_pii": "-", **dict.fromkeys(ROUND2, "-")},
+    "sct-gliner-nvidia": {"*": "D", "openpii": "E, D", "gretel_en": "E", "nemotron": "T, D", "argilla_pii": "E",
+                          **dict.fromkeys(ROUND2, "-")},
 }
 # Generator families (decision 21: a dataset AND its family). A T, E or D flag on one member puts
 # "<flag>-family" on the others. Gretel: gretel finance and gretel_en (Gretel Navigator) and nemotron
 # (NeMo Data Designer, Navigator's successor after NVIDIA took over Gretel; the gretel_en and Nemotron-PII
 # cards both carry the datadesigner tag). ai4privacy: openpii and argilla_pii (a slice of ai4privacy-200k).
-FAMILIES = (("gretel", "gretel_en", "nemotron"), ("openpii", "argilla_pii"))
+# The ai4privacy family also lists the generator's training sets that are not loaded here (names only), so a model
+# trained on one of them gets the family flag on openpii and argilla_pii.
+FAMILIES = (("gretel", "gretel_en", "nemotron"),
+            ("openpii", "argilla_pii", "ai4privacy-200k", "ai4privacy-400k", "ai4privacy-500k", "ai4privacy-openpii-1m",
+             "ai4privacy-unnamed"))
 
 
 def _flags(entry: str, dataset: str) -> list[str]:
@@ -225,6 +389,13 @@ CLAIMED_LANGUAGES = {
     "gliner-nvidia": ("en",), "gliner2-fastino": ("en", "fr", "es", "de", "it", "pt", "nl"),
     "opf": ("en",),  # "primarily English"
     "bardsai-v3": EU24, "datafog": None,
+    "gliner-knowledgator": ("en",), "piiranha": ("en", "it", "fr", "de", "nl", "es"),
+    "llm-guard": ("en",), "scrubadub": ("en",),  # English locale / spaCy model only
+    "ai4privacy": ("fr", "en", "de", "te", "hi", "it", "es", "nl"),
+    "openmed": ("ar", "bn", "de", "en", "es", "fr", "hi", "it", "ja", "ko", "nl", "pt", "te", "tr", "vi", "zh"),
+    "pii-tracer": None,  # card language field: [en, multilingual] (multilingual is in the language field itself)
+    "presidio-full": None,  # every gold language gets an engine (xx_ent_wiki_sm where no lg pack exists)
+    "sct-training": None, "sct-gliner-nvidia": ("en",),  # nvidia/gliner-PII is English-only
 }
 
 

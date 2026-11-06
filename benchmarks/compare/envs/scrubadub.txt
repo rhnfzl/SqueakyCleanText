@@ -1,0 +1,10 @@
+# scrubadub: scrubadub 2.0.1 + scrubadub_spacy 2.0.0 (spacy[transformers]) and the detector's default English
+# model en_core_web_trf (a transformer pipeline on torch). It runs on CPU: the adapter calls no spacy.prefer_gpu()
+# and there is no cupy, so the entry's device is cpu.
+# CUDA 12 (Linux x86_64, Python 3.12): torch 2.14.1+cu126 as a direct wheel from the PyTorch cu126 index (2.14.1 is
+# the newest release built for cu126; 2.15.0 has no cu126 build). Its nvidia-* CUDA 12 runtime wheels come from PyPI.
+scrubadub==2.0.1
+scrubadub_spacy==2.0.0
+spacy==3.8.18
+en_core_web_trf @ https://github.com/explosion/spacy-models/releases/download/en_core_web_trf-3.8.0/en_core_web_trf-3.8.0-py3-none-any.whl
+torch @ https://download-r2.pytorch.org/whl/cu126/torch-2.14.1%2Bcu126-cp312-cp312-manylinux_2_28_x86_64.whl
