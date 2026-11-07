@@ -5,9 +5,11 @@
 [![Python Versions](https://img.shields.io/badge/Python-3.12%20|%203.13%20|%203.14-blue)](https://pypi.org/project/squeakycleantext/)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/rhnfzl/SqueakyCleanText/blob/main/LICENSE)
 
-**Clean, privacy-safe text datasets for LLM training, fine-tuning and RAG, in 75 languages.**
+**Stop hunting for personal details by hand. Mask detected names and contact details before sharing your text dataset.**
 
-SqueakyCleanText (SCT) is a text processing pipeline for datasets. A JSONL file, a Hugging Face dataset or a DataTrove job goes in. Cleaned text comes out, plus `sct_*` columns and a data card that describe each record without storing personal data. It runs on CPU or GPU.
+SqueakyCleanText helps people prepare text datasets for sharing, LLM training, fine-tuning or RAG, with language detection in 75 languages.
+It masks the personal details it finds and repairs broken text.
+Works with JSONL files, Hugging Face datasets and DataTrove jobs, on CPU or GPU.
 
 ```text
 in:   Iâ€™m Anna Berg &amp; my mail is anna@example.se. Order 4711 ships on 2024-05-01.
@@ -18,6 +20,8 @@ in:   Bel +31 20 123 4567 voor Jan de Vries.
 out:  Bel <PHONE> voor <PERSON>.
       sct_language=DUTCH  sct_pii_count=2  sct_pii_types=['PERSON', 'PHONE']
 ```
+
+Review cleaned text before sharing sensitive data; some personal details can be missed.
 
 Documentation: <https://rhnfzl.github.io/SqueakyCleanText/>
 
