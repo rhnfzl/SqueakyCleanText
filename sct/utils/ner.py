@@ -9,18 +9,15 @@ import logging
 from typing import TYPE_CHECKING, Any, cast
 from collections.abc import Collection, Iterable, Mapping, Sequence
 
-from sct.utils import constants, resources
+from sct.utils import constants
 from sct.utils.anonymization_map import AnonymizationMap
 from sct.utils.markers import PLACEHOLDER_TOKEN
 from sct.utils.ner_chunking import Window, plan_windows
 from sct.utils.ner_spans import (
     ENTITY_TYPE_MAP,
-    drop_allowed,
-    fit_to_markers,
-    merge_location_gaps,
+    finalize_spans,
+    presidio_results,
     merge_overlaps,
-    propagate,
-    snap_word_edges,
 )
 from sct.config import (
     DEFAULT_NER_MODELS,
@@ -35,6 +32,7 @@ from sct.config import (
     TORCH_BACKENDS,
     TextCleanerConfig,
 )
+from sct.findings import Detection, DetectionContext
 from sct.privacy import (
     DetectedEntity,
     EntityFinding,
@@ -545,6 +543,21 @@ class GeneralNER:
         cut = ner_confidence_threshold
         return tags, self.cfg.effective_ner_confidence_threshold if cut is None else cut
 
+    def analyze(self, text: str, *, language: str | None, context: DetectionContext) -> tuple[Detection, ...]:
+        """Return value-free findings in canonical input coordinates, without replacement."""
+        if self.cfg.ner_backend == 'presidio_gliner':
+            results = presidio_results(self, text, language, protect_markers=False)
+            return tuple(Detection(r.entity_type, r.start, r.end, 'builtin_ner',
+                                   None if r.score is None else float(r.score), 'canonical')
+                         for r in results)
+        tags, cutoff = self._tags_and_cut(None, None)
+        self._load_models([language])
+        windows = self._plan_windows(text, self._window_keys(language))
+        results = self._detect([w.text for w in windows], [language] * len(windows), tags) if windows else []
+        spans = finalize_spans(self, text, windows, results, cutoff, protect_markers=False)
+        return tuple(Detection(ENTITY_TYPE_MAP.get(s['entity_group'], s['entity_group']),
+                               s['start'], s['end'], 'builtin_ner', float(s['score']), 'canonical') for s in spans)
+
     def ner_process_detailed(
         self,
         text: str,
@@ -587,29 +600,7 @@ class GeneralNER:
         (*source_markers*) gets no protection, and neither do fakes, so real text equal to a
         fake is still masked.
         """
-        analyzer_language = resources.language_to_iso(language) if language else 'en'
-        # Detection covers 75 languages; Presidio only analyzes those its NLP engine has.
-        supported = getattr(self._analyzer, 'supported_languages', None)
-        if supported is not None and analyzer_language not in supported:
-            analyzer_language = 'en'
-        analyzer_results = self._analyzer.analyze(
-            text=text,
-            language=analyzer_language,
-        )
-        markers = self._marker_spans(text, source_markers)
-        kept = []
-        for result in analyzer_results:
-            span = fit_to_markers(result.start, result.end, markers)
-            if span is not None:
-                result.start, result.end = span
-                kept.append(result)
-        analyzer_results = kept
-        # Analyzer names (PHONE_NUMBER, a label's upper case) -> the configured type names,
-        # then aliases (PER/LOC/ORG) to canonical names, as the other backends do.
-        analyzer_results = drop_allowed(self._allow_regex, text, analyzer_results, lambda r: (r.start, r.end))
-        for result in analyzer_results:
-            entity_type = self._presidio_types.get(result.entity_type, result.entity_type)
-            result.entity_type = ENTITY_TYPE_MAP.get(entity_type, entity_type)
+        analyzer_results = presidio_results(self, text, language, source_markers)
         entities = tuple(
             DetectedEntity(
                 entity_type=result.entity_type,
@@ -837,61 +828,8 @@ class GeneralNER:
         source_markers: Collection[Any] | None = None,
     ) -> NERProcessingResult:
         """Merge window spans in document coordinates, vote, and replace once."""
-        spans: list[dict[str, Any]] = []
-        foreign: list[dict[str, Any]] = []
-        for (_, win_start, offsets, own_start, own_end), ner_results in zip(windows, window_results):
-            for item in ner_results:
-                start = win_start + offsets[item['start']]
-                end = win_start + offsets[item['end']]
-                if self.cfg.ner_snap_word_edges:
-                    start, end = snap_word_edges(
-                        text, start, end, self.cfg.ner_subword_widen, self.cfg.ner_subword_widen_same_script)
-                span = {**item, 'start': start, 'end': end,
-                        'word': text[start:end], 'key': f"{start}:{end}"}
-                (spans if own_start <= start < own_end else foreign).append(span)
-        # Windows repeat context and WordPiece widening can give one model two labels for a
-        # span; neither is another model: one vote per model and span, its best score.
-        best: dict[tuple, dict[str, Any]] = {}
-        for span in spans + foreign:
-            vote = (span.get('model'), span['key'])
-            if vote not in best or span['score'] > best[vote]['score']:
-                best[vote] = span
-        owned = {(s.get('model'), s['key']) for s in spans}
-        foreign = [span for vote, span in best.items() if vote not in owned]
-        spans = [span for vote, span in best.items() if vote in owned]
-        if foreign:
-            spans = self.vote_entities(spans, ner_confidence_threshold)
-            # A neighbour's copy counts only where an eligible owned span covering it is concealed.
-            covers = [
-                o for o in spans
-                if self._privacy_policy is None
-                or self._privacy_policy.evaluate((self._entity(o),))[0].action in ('placeholder', 'redact')
-            ]
-            spans += [
-                span for span in foreign
-                if not any(o['start'] <= span['start'] and span['end'] <= o['end'] for o in covers)
-            ]
-
-        ensemble_results = self.vote_entities(spans, ner_confidence_threshold)
-        markers = self._marker_spans(text, source_markers)
-        if self._synthetic_replacer:  # None outside synthetic mode
-            # Fakes the regex steps inserted (emails, phones...) are protected like placeholders.
-            for fake in set(self._synthetic_replacer._get_cache().values()):
-                markers += [m.span() for m in re.finditer(re.escape(fake), text)]
-        fitted = []
-        for item in ensemble_results:
-            fit = fit_to_markers(item['start'], item['end'], markers)
-            if fit == (item['start'], item['end']):
-                fitted.append(item)
-            elif fit is not None:
-                fitted.append({**item, 'start': fit[0], 'end': fit[1], 'word': text[fit[0]:fit[1]]})
-        ensemble_results = fitted
-        if self.cfg.ner_propagate_masked:
-            ensemble_results = propagate(text, ensemble_results, markers, self.cfg.ner_propagate_min_score)
-        if self.cfg.ner_merge_location_gap:
-            ensemble_results = merge_location_gaps(
-                text, ensemble_results, markers, self.cfg.ner_merge_location_gap)
-        ensemble_results = drop_allowed(self._allow_regex, text, ensemble_results, lambda item: (item['start'], item['end']))
+        ensemble_results = finalize_spans(
+            self, text, windows, window_results, ner_confidence_threshold, source_markers)
         if not ensemble_results:
             return NERProcessingResult(text=text, findings=())
         entities = tuple(self._entity(item) for item in ensemble_results)
