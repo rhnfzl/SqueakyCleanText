@@ -1,0 +1,44 @@
+{
+  "python": "3.14.4 (main, Apr  7 2026, 20:47:53) [Clang 22.1.1 ]",
+  "root": "/home/rehan/sct-improvements-schema-20261107",
+  "providers": {
+    "fastmcp": {
+      "version": "4.0.5",
+      "module_path": "/home/rehan/sct-improvements-schema-20261107/.venv/lib/python3.14/site-packages/fastmcp/__init__.py"
+    },
+    "pydantic": {
+      "version": "2.13.5",
+      "module_path": "/home/rehan/sct-improvements-schema-20261107/.venv/lib/python3.14/site-packages/pydantic/__init__.py"
+    },
+    "haystack-ai": {
+      "version": "3.4.1",
+      "module_path": "/home/rehan/sct-improvements-schema-20261107/.venv/lib/python3.14/site-packages/haystack/__init__.py"
+    }
+  },
+  "source_sha256": {
+    "sct/detectors.py": "3892d4886bcdb4be869c763d0db82b240e09521320155d7c98b49c8c3f629456",
+    "sct/config.py": "4fc86326b5526da62425f3e4cd6d517a0a291ef21862ea0d776e6c395c91beb4",
+    "sct/integrations/_runtime.py": "db9009e7c17af51ecd064fa3bf2c49e2ee57115c854f879e9a5e5981a0ea8f36",
+    "sct/detectors_builtin.py": "175a772eca01ad1efd665f6cbc5509c7fb626d9ec0be69a527014c511308e260"
+  },
+  "status": "verified C3 review-fix1 source snapshot",
+  "scope": "Actual MCP server/client and Haystack serializers; not final C4/C5 acceptance",
+  "test_command": "PYTHONPYCACHEPREFIX=task-owned-fresh-prefix HF_HUB_OFFLINE=1 .venv/bin/python -m pytest tests/test_mcp_server.py tests/test_integrations_frameworks.py tests/test_detector_registry.py -q",
+  "result": "62 passed, 11 skipped in 4.11s",
+  "test_log_sha256": "9a48bf257a7743d7e58868579471f39b3284f68595566779b5e1ea333dcf5d6d",
+  "prior_snapshot": {
+    "result": "56 passed, 11 skipped in 3.49s",
+    "source_sha256": {
+      "sct/detectors.py": "eb0a1fba92d4e128b397181892e461f9f02f9fa159bbf60703d857b8c117abf8",
+      "sct/config.py": "4fc86326b5526da62425f3e4cd6d517a0a291ef21862ea0d776e6c395c91beb4",
+      "sct/integrations/_runtime.py": "949d2de3174dcb61b093011e415240b1bb43830ada70754c1c5e82e058263ff7",
+      "sct/detectors_builtin.py": "175a772eca01ad1efd665f6cbc5509c7fb626d9ec0be69a527014c511308e260"
+    },
+    "superseded_reason": "C3 review exposed bound-factory transport and options reinitialization defects; fixed source requalified here."
+  },
+  "limits": [
+    "Other optional framework skips do not establish those integrations.",
+    "Future C4/C5 behavior and final integrated source require repeated acceptance.",
+    "An initial guessed test filename did not exist and ran no tests; corrected before the passing qualification runs."
+  ]
+}

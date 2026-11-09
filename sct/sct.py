@@ -18,6 +18,7 @@ from collections.abc import Callable
 import regex
 
 from sct.config import GLICLASS_DEFAULT_MODEL, TextCleanerConfig
+from sct.detectors import DetectorRegistry
 from sct.privacy import EntityFinding, PrivacyPolicy, ProcessingMetrics, TokenStore
 from sct.utils import constants, contact, datetime, ner, normtext, resources, special, stopwords
 from sct.utils.anonymization_map import AnonymizationMap
@@ -124,6 +125,7 @@ class TextCleaner:
         token_store: TokenStore | None = None,
         include_entities: bool = False,
         metrics_callback: Callable[[ProcessingMetrics], None] | None = None,
+        detector_registry: DetectorRegistry | None = None,
     ):
         """Initialize the text cleaning pipeline.
 
@@ -138,6 +140,12 @@ class TextCleaner:
                 whitespace input runs nothing and does not call it.
         """
         self.cfg = cfg or TextCleanerConfig()
+        if self.cfg.detector_specs:
+            raise ValueError("detector_specs require unified processing, which is not available yet")
+        if detector_registry is not None and not isinstance(detector_registry, DetectorRegistry):
+            raise TypeError("detector_registry must be a DetectorRegistry")
+        self._detector_registry = detector_registry if detector_registry is not None else DetectorRegistry()
+        self._detector_registry.freeze()
         names = constants.LEGACY_TYPE_NAMES if self.cfg.legacy_type_names else {}
         self._phone_type, self._ip_type = names.get('PHONE', 'PHONE'), names.get('IP', 'IP')
         if (

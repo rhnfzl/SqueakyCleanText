@@ -15,6 +15,7 @@ from types import MappingProxyType
 from typing import Any, Literal, get_args
 from collections.abc import Mapping
 
+from sct.detectors import DetectorSpec
 from sct.utils.resources import DEFAULT_LANGUAGES, resolve_language
 from sct.utils.markers import LABEL_PATTERN
 
@@ -416,7 +417,17 @@ class TextCleanerConfig:
     # most one space ("1250 EUR", "EUR 1250", "USD 1,250"), is an amount and stays. False: masked like any ID
     numbers_keep_currency_code_amounts: bool = True
 
+    # Appended to preserve existing positional configuration arguments.
+    detector_specs: tuple[DetectorSpec, ...] = ()
+    allow_network_detectors: bool = False
+
     def __post_init__(self):
+        if type(self.allow_network_detectors) is not bool:
+            raise ValueError("allow_network_detectors must be a boolean")
+        specs = tuple(DetectorSpec(**item) if isinstance(item, Mapping) else item for item in self.detector_specs)
+        if any(not isinstance(item, DetectorSpec) for item in specs):
+            raise ValueError("detector_specs must contain DetectorSpec values")
+        object.__setattr__(self, "detector_specs", specs)
         if self.synthetic_reference_date is not None:
             date.fromisoformat(self.synthetic_reference_date)  # ValueError on a bad date
         _apply_gliclass_defaults(self)
@@ -456,6 +467,8 @@ class TextCleanerConfig:
     def _plain_state(self) -> dict[str, Any]:
         """The fields as plain values: mapping proxies as dicts, a PII-derived gliner_label_map as None."""
         state = {k: dict(v) if isinstance(v, MappingProxyType) else v for k, v in self.__dict__.items()}
+        state["detector_specs"] = tuple({"name": spec.name, "options": dict(spec.options)}
+                                        for spec in self.detector_specs)
         # derived only in PII mode (re-shared on load); a map kept after a replace() to another mode is data
         if self.ner_mode == 'pii' and any(self.gliner_label_map is m for m in _PII_MAPS.values()):
             state['gliner_label_map'] = None
@@ -464,6 +477,7 @@ class TextCleanerConfig:
     def __getstate__(self):
         # Restore the exact normalized state; never re-run __post_init__.
         state = self._plain_state()
+        state["detector_specs"] = self.detector_specs
         frozen = [k for k, v in self.__dict__.items() if isinstance(v, MappingProxyType) and state[k] is not None]
         return state, frozen
 

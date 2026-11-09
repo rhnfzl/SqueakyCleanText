@@ -6,12 +6,16 @@ ONNX sessions. Pickling keeps only the config.
 """
 
 import os
+import importlib
+import sys
+from types import FunctionType
 import threading
 from dataclasses import replace
 from typing import Any
-from collections.abc import Iterable, Mapping, Sequence
+from collections.abc import Callable, Iterable, Mapping, Sequence
 
 from sct.config import ONNX_BACKENDS, TextCleanerConfig, require_adapter_mode
+from sct.detectors import DetectorRegistry
 from sct.presets import preset_config
 from sct.score import SCORE_A_COLUMNS, score_record
 from sct.sct import TextCleaner
@@ -53,7 +57,20 @@ def _pin_loaded_revisions(cleaner: TextCleaner | None, config: TextCleanerConfig
 class CleanerHandle:
     """Picklable owner of one ``TextCleaner`` per process."""
 
-    def __init__(self, config: TextCleanerConfig | str | None = None):
+    def __init__(self, config: TextCleanerConfig | str | None = None, *,
+                 registry_factory: Callable[[TextCleanerConfig], DetectorRegistry] | None = None):
+        self._registry_factory_reference: tuple[str, str] | None = None
+        if registry_factory is not None:
+            if not isinstance(registry_factory, FunctionType):
+                raise ValueError("registry_factory must be a trusted importable module-level function")
+            module_name, name = registry_factory.__module__, registry_factory.__name__
+            module = sys.modules.get(module_name)
+            if (registry_factory.__closure__ or registry_factory.__qualname__ != name
+                or module_name == '__main__' or module is None
+                or vars(module).get(name) is not registry_factory):
+                raise ValueError("registry_factory must be a trusted importable module-level function")
+            self._registry_factory_reference = (module_name, name)
+        self.registry_factory = registry_factory
         self.config = resolve_config(config)
         self._cleaner: TextCleaner | None = None
         self._pid: int | None = None
@@ -65,15 +82,24 @@ class CleanerHandle:
                 if self._cleaner is None or self._pid != pid:
                     # Forked child: reuse the parent's resolved commits (no network after fork).
                     self.config = _pin_loaded_revisions(self._cleaner, self.config)
-                    self._cleaner = TextCleaner(self.config)
+                    if self.registry_factory is None:
+                        self._cleaner = TextCleaner(self.config)
+                    else:
+                        self._cleaner = TextCleaner(self.config, detector_registry=self.registry_factory(self.config))
                     self._pid = pid
         return self._cleaner
 
     def __getstate__(self):
-        return {"config": _pin_loaded_revisions(self._cleaner, self.config)}
+        return {"config": _pin_loaded_revisions(self._cleaner, self.config),
+                "registry_factory_reference": self._registry_factory_reference}
 
     def __setstate__(self, state):
         self.config = state["config"]
+        self._registry_factory_reference = state.get("registry_factory_reference")
+        self.registry_factory = None
+        if self._registry_factory_reference is not None:
+            module, name = self._registry_factory_reference
+            self.registry_factory = getattr(importlib.import_module(module), name)
         self._cleaner = None
         self._pid = None
 
