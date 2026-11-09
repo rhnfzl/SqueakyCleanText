@@ -10,7 +10,7 @@ from types import SimpleNamespace
 import numpy as np
 import pytest
 
-from tests.test_benchmarks_compare import _adapter_module
+from tests.adapter_helpers import adapter_module
 
 
 def fake_modules(monkeypatch, **modules):
@@ -36,7 +36,7 @@ def doc(doc_id="d", text="hello world", lang="en"):
 
 @pytest.fixture
 def protocol():
-    return _adapter_module("_protocol.py")
+    return adapter_module("_protocol.py")
 
 
 def test_check_normalises_a_valid_prediction(protocol):
@@ -122,14 +122,14 @@ def test_serve_writes_ready_then_predictions_and_passes_the_config(protocol, tmp
 # --- dummy ---
 
 def test_dummy_marks_emails_and_digit_runs_outside_them():
-    predict = _adapter_module("dummy_adapter.py").load({})
+    predict = adapter_module("dummy_adapter.py").load({})
     spans = predict([doc(text="ann1@x.io call 42")])[0]["spans"]
     assert [(s["start"], s["end"], s["label"], s["score"]) for s in spans] == [(0, 9, "EMAIL", 0.9), (15, 17, "NUMBER", 0.6)]
 
 
 def test_dummy_config_is_keyed_by_doc_id():
     fixed = [{"start": 0, "end": 1, "label": "X"}]
-    predict = _adapter_module("dummy_adapter.py").load({"raise": ["r"], "bad": ["b"], "spans": {"s": fixed}})
+    predict = adapter_module("dummy_adapter.py").load({"raise": ["r"], "bad": ["b"], "spans": {"s": fixed}})
     assert predict([doc("s")])[0]["spans"] == fixed
     assert predict([doc("b", "abc")])[0]["spans"][0]["end"] == 8
     with pytest.raises(RuntimeError):
@@ -145,7 +145,7 @@ BIASES = dict.fromkeys(("transition_bias_background_stay", "transition_bias_back
 
 
 def test_opf_tag_and_span_helpers():
-    opf = _adapter_module("opf_adapter.py")
+    opf = adapter_module("opf_adapter.py")
     assert opf.tag_of("O") == ("O", None) and opf.tag_of("B-private_person") == ("B", "private_person")
     assert opf.token_spans([0, 1, 2, 3, 0, 4], LABELS) == [("x", 1, 4), ("x", 5, 6)]
     assert opf.token_spans([0, 3], LABELS) == []  # an end with no begin is not a span
@@ -155,7 +155,7 @@ def test_opf_tag_and_span_helpers():
 
 def test_opf_transitions_allow_only_valid_bioes():
     torch = pytest.importorskip("torch")
-    opf = _adapter_module("opf_adapter.py")
+    opf = adapter_module("opf_adapter.py")
     start, end, trans = opf.transition_scores(LABELS, {**BIASES, "transition_bias_background_stay": 0.5})
     index = LABELS.index
     assert [LABELS[i] for i in torch.nonzero(start > opf.NEG_INF).flatten().tolist()] == ["O", "B-x", "S-x", "B-y"]
@@ -169,7 +169,7 @@ def test_opf_transitions_allow_only_valid_bioes():
 
 def test_opf_viterbi_finds_the_best_valid_path_not_the_best_token():
     torch = pytest.importorskip("torch")
-    opf = _adapter_module("opf_adapter.py")
+    opf = adapter_module("opf_adapter.py")
     start, end, trans = opf.transition_scores(LABELS, BIASES)
     logp = torch.full((3, len(LABELS)), -5.0)
     logp[0, LABELS.index("I-x")] = 0.0  # token-wise best is I, E, O: not a valid start
@@ -181,7 +181,7 @@ def test_opf_viterbi_finds_the_best_valid_path_not_the_best_token():
 
 def test_opf_viterbi_falls_back_to_argmax_when_no_path_is_finite():
     torch = pytest.importorskip("torch")
-    opf = _adapter_module("opf_adapter.py")
+    opf = adapter_module("opf_adapter.py")
     start, end, trans = opf.transition_scores(LABELS, BIASES)
     logp = torch.full((2, len(LABELS)), -math.inf)
     logp[0, LABELS.index("I-x")] = 0.0
@@ -220,7 +220,7 @@ def _opf_predict(monkeypatch, tmp_path, config):
             AutoTokenizer=SimpleNamespace(from_pretrained=lambda *a, **k: Tokenizer()),
             AutoModelForTokenClassification=SimpleNamespace(from_pretrained=lambda *a, **k: Model())),
     )
-    return _adapter_module("opf_adapter.py").load(config)
+    return adapter_module("opf_adapter.py").load(config)
 
 
 @pytest.mark.parametrize("n_ctx", [None, 1])  # one window, or a window per token
@@ -256,7 +256,7 @@ def _nvidia(monkeypatch, config):
 
     fake_modules(monkeypatch, torch=fake_torch(),
                  gliner=SimpleNamespace(GLiNER=SimpleNamespace(from_pretrained=from_pretrained)))
-    adapter = _adapter_module("gliner_nvidia_adapter.py")
+    adapter = adapter_module("gliner_nvidia_adapter.py")
     return adapter, adapter.load(config), calls
 
 
@@ -283,7 +283,7 @@ def test_nvidia_rejects_an_unknown_label_set(monkeypatch):
 # --- gliner2-fastino ---
 
 def test_fastino_prompts_and_unknown_choice():
-    fastino = _adapter_module("gliner2_fastino_adapter.py")
+    fastino = adapter_module("gliner2_fastino_adapter.py")
     assert fastino.prompts("card") == list(fastino.CARD_LABELS)
     assert "person" in fastino.prompts("gliner")
     with pytest.raises(ValueError):
@@ -291,7 +291,7 @@ def test_fastino_prompts_and_unknown_choice():
 
 
 def test_fastino_spans_are_sorted_and_missing_offsets_count_as_unplaced():
-    fastino = _adapter_module("gliner2_fastino_adapter.py")
+    fastino = adapter_module("gliner2_fastino_adapter.py")
     result = fastino.to_spans({"entities": {"email": [{"start": 9, "end": 12, "confidence": 0.8}, {"text": "lost"}],
                                             "person": [{"start": 0, "end": 3, "confidence": 0.9}]}})
     assert result == {"spans": [{"start": 0, "end": 3, "label": "person", "score": 0.9},
@@ -312,7 +312,7 @@ def test_fastino_passes_the_chunking_and_threshold_settings(monkeypatch):
 
     fake_modules(monkeypatch, torch=fake_torch(),
                  gliner2=SimpleNamespace(GLiNER2=SimpleNamespace(from_pretrained=lambda *a, **k: Model())))
-    predict = _adapter_module("gliner2_fastino_adapter.py").load({"threshold": 0.2, "encoder_batch": 2, "chunk_size": 10})
+    predict = adapter_module("gliner2_fastino_adapter.py").load({"threshold": 0.2, "encoder_batch": 2, "chunk_size": 10})
     assert predict([doc()]) == [{"spans": [], "unplaced": 0}]
     assert (calls["threshold"], calls["batch_size"], calls["chunk_size"], calls["chunk_overlap"]) == (0.2, 2, 10, 64)
     assert calls["include_spans"] and calls["include_confidence"] and calls["device"] == "cpu"
@@ -372,7 +372,7 @@ def _presidio(monkeypatch, tmp_path, config):
     fake_modules(monkeypatch, presidio_analyzer=analyzer_module,
                  presidio_analyzer__nlp_engine=SimpleNamespace(NlpEngineProvider=Provider),
                  presidio_anonymizer=SimpleNamespace(AnonymizerEngine=lambda: anonymizer))
-    return _adapter_module("presidio_adapter.py").load(config), calls
+    return adapter_module("presidio_adapter.py").load(config), calls
 
 
 def test_presidio_default_is_the_untouched_quick_start_on_english(monkeypatch, tmp_path):
@@ -432,7 +432,7 @@ class PIIDetector:
 
 
 def _bardsai(monkeypatch, tmp_path, config, drop=()):
-    adapter = _adapter_module("bardsai_v3_adapter.py")
+    adapter = adapter_module("bardsai_v3_adapter.py")
     types = [t for t in [*adapter.LABELS, *adapter.OUT_OF_SCOPE] if t not in drop]
     (tmp_path / "pii_detector.py").write_text(DETECTOR)
     (tmp_path / "types.json").write_text(json.dumps(types))
@@ -460,7 +460,7 @@ def test_bardsai_stops_when_the_model_labels_change(monkeypatch, tmp_path):
 # --- datafog ---
 
 def test_datafog_locale_gold_means_german_only():
-    datafog = _adapter_module("datafog_adapter.py")
+    datafog = adapter_module("datafog_adapter.py")
     assert datafog.doc_locales("gold", "de_AT") == ["de"]
     assert datafog.doc_locales("gold", "fr") is None and datafog.doc_locales("gold", None) is None
     assert datafog.doc_locales(["nl"], "de") == ["nl"] and datafog.doc_locales(None, "de") is None
@@ -475,7 +475,7 @@ def test_datafog_counts_values_it_could_not_place(monkeypatch):
         return SimpleNamespace(entities=entities, redacted_text="[x]")
 
     fake_modules(monkeypatch, datafog=SimpleNamespace(), datafog__engine=SimpleNamespace(scan_and_redact=scan_and_redact))
-    predict = _adapter_module("datafog_adapter.py").load({"locales": "gold", "threads": 4})
+    predict = adapter_module("datafog_adapter.py").load({"locales": "gold", "threads": 4})
     assert predict([doc(lang="de")]) == [{"spans": [{"start": 0, "end": 3, "label": "EMAIL", "score": None}],
                                           "masked_text": "[x]", "unplaced": 1}]
     assert calls[0] == {"engine": "regex", "entity_types": None, "strategy": "token", "locales": ["de"], "backend": "python"}
@@ -484,7 +484,7 @@ def test_datafog_counts_values_it_could_not_place(monkeypatch):
 # --- sct ---
 
 def test_sct_language_falls_back_to_the_base_code_or_to_detection():
-    sct = _adapter_module("sct_adapter.py")
+    sct = adapter_module("sct_adapter.py")
     assert sct.sct_language("ar-mixed_en") == sct.sct_language("ar")
     assert sct.sct_language(None) is None and sct.sct_language("zz-nope") is None
 
@@ -500,7 +500,7 @@ def test_sct_adapter_accepts_the_pinned_release_worker_argument(monkeypatch):
         return process_batch(self, texts, max_workers=batch_size)
 
     monkeypatch.setattr(TextCleaner, "process_batch", release_process_batch)
-    predict = _adapter_module("sct_adapter.py").load({
+    predict = adapter_module("sct_adapter.py").load({
         "workers": 2, "overrides": {"check_ner_process": False},
     })
     result = predict([doc(text="Mail ana@example.com now.")])[0]
@@ -509,7 +509,7 @@ def test_sct_adapter_accepts_the_pinned_release_worker_argument(monkeypatch):
 
 
 def test_sct_predict_places_masked_values_in_the_source(capsys):
-    predict = _adapter_module("sct_adapter.py").load({"overrides": {"check_ner_process": False}})
+    predict = adapter_module("sct_adapter.py").load({"overrides": {"check_ner_process": False}})
     text = "Mail ana@example.com now."
     english, unknown = predict([doc("a", text, "en"), doc("b", text, "zz-nope")])
     assert [(s["start"], s["end"], s["score"]) for s in english["spans"]] == [(5, 20, None)]

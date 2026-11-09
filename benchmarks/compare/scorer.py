@@ -334,7 +334,7 @@ def total(counters) -> Counter:
     return out
 
 
-def _mean(values) -> float | None:
+def mean(values) -> float | None:
     values = [v for v in values if v is not None]
     return round(sum(values) / len(values), 4) if values else None
 
@@ -342,7 +342,7 @@ def _mean(values) -> float | None:
 def macro(scores: list[dict]) -> dict[str, float | None]:
     """Mean of each metric over *scores* (None skipped)."""
     keys = {k for s in scores for k, v in s.items() if isinstance(v, float) or v is None}
-    return {k: _mean(s.get(k) for s in scores) for k in sorted(keys)}
+    return {k: mean(s.get(k) for s in scores) for k in sorted(keys)}
 
 
 def summarise(docs: list[tuple[str, Counter]]) -> dict[str, Any]:

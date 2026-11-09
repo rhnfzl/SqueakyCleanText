@@ -17,6 +17,8 @@ from collections.abc import Iterable, Sequence
 
 import regex
 
+from sct.utils.markers import LABEL_PATTERN, PLACEHOLDER_PATTERN
+
 if TYPE_CHECKING:
     from sct.utils.process_result import ProcessResult
 
@@ -29,9 +31,9 @@ SCORE_A_COLUMNS = tuple(SCORE_A_TYPES)
 SCORE_B_COLUMNS = ("sct_quality", "sct_minhash")
 
 # Placeholders count as one token; reversible ``<PERSON_3>`` normalises to ``<PERSON>``.
-_PLACEHOLDER = regex.compile(r"<([A-Z][A-Z0-9_]*?)(?:_\d+)?>")
-_WORD_TOKEN = regex.compile(r"<[A-Z][A-Z0-9_]*>|\w+")
-_CHAR_TOKEN = regex.compile(r"<[A-Z][A-Z0-9_]*>|\S")
+_PLACEHOLDER = regex.compile(rf"<({LABEL_PATTERN}?)(?:_\d+)?>")
+_WORD_TOKEN = regex.compile(rf"{PLACEHOLDER_PATTERN}|\w+")
+_CHAR_TOKEN = regex.compile(rf"{PLACEHOLDER_PATTERN}|\S")
 # Scripts written without spaces between words get character shingles.
 _NO_SPACE_SCRIPT = regex.compile(
     r"[\p{Han}\p{Hiragana}\p{Katakana}\p{Thai}\p{Lao}\p{Khmer}\p{Myanmar}]"

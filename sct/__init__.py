@@ -51,7 +51,7 @@ from sct.streaming import (
 from sct.utils.anonymization_map import AnonymizationMap, MapEntry
 from sct.utils.process_result import ProcessResult
 
-__version__ = "0.8.4"
+__version__ = "0.9.0"
 __all__ = [
     "TextCleaner", "TextCleanerConfig", "CustomPatternTimeout", "ModelLoadError", "PRESETS", "preset_config",
     "PII_LABELS", "PII_LABEL_MAP",

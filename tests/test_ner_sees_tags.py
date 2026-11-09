@@ -4,7 +4,6 @@ import re
 
 import pytest
 
-from sct import config as config_module
 from sct.config import TextCleanerConfig
 from sct.sct import TextCleaner
 from tests.conftest import TEST_NER_MODELS, TEST_NER_REVISIONS
@@ -94,16 +93,6 @@ def test_old_order_is_an_option():
     new = _cleaner("synthetic").process(text)
     assert _spans(old) != _spans(new)  # NER read the fake email in 0.7 and found Philips
     assert _spans(new) == _spans(_cleaner("placeholder").process(text))
-
-
-def test_legacy_global_flows():
-    old = config_module.NER_SEES_TAGS
-    try:
-        config_module.NER_SEES_TAGS = False
-        assert config_module._config_from_module_globals().ner_sees_tags is False
-    finally:
-        config_module.NER_SEES_TAGS = old
-    assert TextCleanerConfig().ner_sees_tags is True
 
 
 @pytest.mark.parametrize("mode, lm_text, entries", [

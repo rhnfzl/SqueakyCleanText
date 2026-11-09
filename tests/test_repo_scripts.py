@@ -141,6 +141,37 @@ def test_benchmark_models_rejects_an_unknown_candidate(monkeypatch):
     assert stop.value.code == 2
 
 
+def test_release_benchmark_cli_keeps_worker_limit_separate_from_model_batch_size(tmp_path, monkeypatch):
+    script = load_script("scripts/benchmark_release.py")
+    dataset = tmp_path / "records.jsonl"
+    dataset.write_text(json.dumps({
+        "id": "one", "text": "Mail a@b.com", "language": "en", "domain": "test", "entities": [],
+    }) + "\n", encoding="utf-8")
+    calls = []
+
+    class Cleaner:
+        def __init__(self, cfg):
+            assert cfg.ner_batch_size == 3
+
+        def process_batch(self, texts, max_workers=None):
+            calls.append((list(texts), max_workers))
+            return [SimpleNamespace(lm_text=text) for text in texts]
+
+    monkeypatch.setattr(script, "TextCleaner", Cleaner)
+    output = tmp_path / "reports"
+    monkeypatch.setattr(sys, "argv", [
+        "benchmark_release", "--dataset", str(dataset), "--output-dir", str(output),
+        "--batch", "4", "--max-workers", "2", "--ner-batch-size", "3", "--repeats", "1",
+    ])
+    script.main()
+
+    report, = output.glob("*-N4-W2-K3-TNone.json")
+    settings = json.loads(report.read_text())["settings"]
+    assert settings["max_workers"] == 2 and settings["ner_batch_size"] == 3
+    assert "batch_size" not in settings
+    assert calls == [(["Mail a@b.com"] * 4, 2)] * 2
+
+
 # --- scripts/export_onnx_models.py ---
 
 @pytest.fixture

@@ -7,7 +7,6 @@ import pickle
 
 import pytest
 
-import sct.config as config_module
 from sct import TextCleaner
 from sct.adapters import process_json
 from sct.config import TextCleanerConfig
@@ -30,18 +29,6 @@ def test_defaults_are_empty_and_change_nothing():
     assert cfg.custom_terms_case_sensitive is False
     text = "Blue Sky ships to bob@x.com"
     assert _cleaner().process(text).lm_text == "Blue Sky ships to <EMAIL>"
-
-
-def test_legacy_globals(monkeypatch):
-    monkeypatch.setattr(config_module, 'CUSTOM_DENY_TERMS', {'PROJECT': ('Blue Sky',)})
-    monkeypatch.setattr(config_module, 'CUSTOM_ALLOW_TERMS', ('Acme',))
-    monkeypatch.setattr(config_module, 'CUSTOM_PATTERNS', {'TICKET': r'TCK-\d+'})
-    monkeypatch.setattr(config_module, 'CUSTOM_TERMS_CASE_SENSITIVE', True)
-    cfg = config_module._config_from_module_globals()
-    assert dict(cfg.custom_deny_terms) == {'PROJECT': ('Blue Sky',)}
-    assert cfg.custom_allow_terms == ('Acme',)
-    assert dict(cfg.custom_patterns) == {'TICKET': r'TCK-\d+'}
-    assert cfg.custom_terms_case_sensitive is True
 
 
 @pytest.mark.parametrize("fields, message", [
@@ -267,7 +254,7 @@ def _timed(call, limit):
         assert time.perf_counter() - started < limit + 1
 
 
-def test_timeout_defaults_validation_and_legacy_globals(monkeypatch):
+def test_timeout_defaults_validation():
     from sct import CustomPatternTimeout
     cfg = TextCleanerConfig()
     assert (cfg.custom_patterns_timeout, cfg.custom_patterns_on_timeout) == (2.0, 'raise')
@@ -277,10 +264,6 @@ def test_timeout_defaults_validation_and_legacy_globals(monkeypatch):
             TextCleanerConfig(custom_patterns_timeout=bad)
     with pytest.raises(ValueError, match='custom_patterns_on_timeout'):
         TextCleanerConfig(custom_patterns_on_timeout='skip')
-    monkeypatch.setattr(config_module, 'CUSTOM_PATTERNS_TIMEOUT', 0.5)
-    monkeypatch.setattr(config_module, 'CUSTOM_PATTERNS_ON_TIMEOUT', 'warn')
-    cfg = config_module._config_from_module_globals()
-    assert (cfg.custom_patterns_timeout, cfg.custom_patterns_on_timeout) == (0.5, 'warn')
     error = pickle.loads(pickle.dumps(CustomPatternTimeout('SLOW', 0.5)))  # noqa: S301 - trusted round trip
     assert isinstance(error, TimeoutError) and error.label == 'SLOW' and "'SLOW'" in str(error)
 

@@ -4,7 +4,7 @@ import re
 
 import pytest
 
-from sct import TextCleaner, TextCleanerConfig, config
+from sct import TextCleaner, TextCleanerConfig
 from sct.signals import public_view
 
 TEXT = "Call +1-202-555-0147 from 8.8.8.8 or mail ann@example.com"
@@ -40,15 +40,6 @@ def test_legacy_type_names_restore_old_names_and_round_trip():
     assert result.metadata["anon_map"].deanonymize(result.lm_text) == TEXT
     # Tag text is set by replace_with_* and does not change.
     assert "<PHONE>" in _cleaner(legacy_type_names=True).process(TEXT).lm_text
-
-
-def test_legacy_type_names_module_global():
-    old = config.LEGACY_TYPE_NAMES
-    try:
-        config.LEGACY_TYPE_NAMES = True
-        assert config._config_from_module_globals().legacy_type_names is True
-    finally:
-        config.LEGACY_TYPE_NAMES = old
 
 
 def test_pii_mode_ner_tags_use_canonical_names():

@@ -1,7 +1,9 @@
 """NER windows: size per model tokenizer, overlap voting across neighbours, and model routes."""
 
 import sys
+import threading
 import types
+from concurrent.futures import ThreadPoolExecutor
 from types import SimpleNamespace
 
 import pytest
@@ -11,10 +13,36 @@ from sct.presets import preset_config
 from sct.privacy import EntityRule, PrivacyPolicy
 from sct.utils.ner import GeneralNER
 from sct.utils.ner_chunking import token_count
+from sct.utils.synthetic import SyntheticReplacer
 
 from tests.helpers import (
     both_paths, FakeRunDetector, gliner_ner, numbered_words, route_models, set_cfg, windows_for, word_ner, WordCountTokenizer,
 )
+
+
+def test_batch_synthetic_caches_stay_with_their_documents_across_threads():
+    barrier = threading.Barrier(2)
+
+    class ConcurrentReplacer(SyntheticReplacer):
+        def swap_cache(self, cache=None):
+            previous = super().swap_cache(cache)
+            barrier.wait(timeout=10)
+            return previous
+
+    ner = gliner_ner("synthetic", FakeRunDetector())
+    ner._synthetic_replacer = ConcurrentReplacer(locale="en_US")
+
+    def run(names):
+        caches = [{("PER", "Alice"): name} for name in names]
+        return [r.text for r in ner.ner_process_batch_detailed(
+            ["Alice called Alice."] * len(names), [None] * len(names),
+            positional_tags=("PER",), synthetic_caches=caches,
+        )]
+
+    batches = [("Beatrice", "Catherine"), ("Diana", "Eleanor")]
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        outputs = list(executor.map(run, batches))
+    assert outputs == [[f"{name} called {name}." for name in names] for names in batches]
 
 
 # --- models_for grew a list ensemble route with GLINER on every call ---

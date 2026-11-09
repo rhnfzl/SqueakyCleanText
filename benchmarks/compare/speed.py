@@ -32,10 +32,10 @@ from pathlib import Path
 from typing import Any
 
 from benchmarks.compare import entries as registry
-from benchmarks.compare.runner import (
+from benchmarks.compare.runtime import (
     POLL_SECONDS,
-    _read_lines,
-    _write,
+    read_lines,
+    write_json,
     add_entry_args,
     child_env,
     command,
@@ -118,13 +118,13 @@ def measure(cmd: list[str], docs: list[dict], work: Path, env: dict, batch_size:
     offset = 0
     try:
         while True:
-            lines, offset = _read_lines(out, offset)
+            lines, offset = read_lines(out, offset)
             _take_timings(lines, result, started)
             hwm = vm_hwm_mb(proc.pid)  # the last read before exit is the process peak
             if hwm is not None:
                 result["peak_rss_mb_proc"] = max(result["peak_rss_mb_proc"] or 0.0, hwm)
             if proc.poll() is not None:
-                _take_timings(_read_lines(out, offset)[0], result, started)
+                _take_timings(read_lines(out, offset)[0], result, started)
                 break
             if time.perf_counter() - started > timeout:
                 proc.kill()
@@ -201,7 +201,7 @@ def main(argv=None) -> None:
               "environment": environment(),
               "entries": {name: {**summarise(runs[name]), "install_mb": sizes[name],
                                  "device": entry_device(t["device"], args.device)} for name, t in tools.items()}}
-    _write(args.out / "speed.json", result)
+    write_json(args.out / "speed.json", result)
     print(args.out / "speed.json")
 
 

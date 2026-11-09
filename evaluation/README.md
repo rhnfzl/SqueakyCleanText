@@ -121,10 +121,12 @@ A speed gain counts only if recall per label and language does not drop.
 Batch throughput (`process_batch`) is a separate mode:
 
 ```sh
-python -m scripts.benchmark_release --batch 256 --batch-size 8 --ner-batch-size 8 --intra-op-threads 2 [--long]
+python -m scripts.benchmark_release --batch 256 --max-workers 8 --ner-batch-size 8 --intra-op-threads 2 [--long]
 ```
 
 It times `--repeats` (default 3) `process_batch` calls after one warmup over N documents (the
 dataset cycled; `--long` joins every 8 documents into one) and writes
-`benchmark-<version>-batch[-long]-N<n>-B<b>-K<k>-T<t>.json` with docs/s, peak RSS and a hash of
+`benchmark-<version>-batch[-long]-N<n>-W<w>-K<k>-T<t>.json` with docs/s, peak RSS and a hash of
 the outputs, so a speed row can be tied to its outputs.
+`--max-workers` controls document concurrency; `--ner-batch-size` controls model input batches.
+New report settings use `max_workers`. Archived reports retain their recorded schema and filenames.

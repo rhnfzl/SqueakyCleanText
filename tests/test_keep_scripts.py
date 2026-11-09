@@ -5,7 +5,6 @@ from io import StringIO
 import pytest
 
 from sct import TextCleaner, TextCleanerConfig
-from sct import config as legacy
 from sct.cli import main
 
 TEXT = "München 日本語 Москва mail maria@example.com"
@@ -19,12 +18,6 @@ def _cfg(**overrides):
 def test_library_default_keeps_scripts_and_ascii_is_an_option():
     assert TextCleaner(cfg=_cfg()).process(TEXT).lm_text == "München 日本語 Москва mail <EMAIL>"
     assert TextCleaner(cfg=_cfg(check_to_ascii_unicode=True)).process(TEXT).lm_text == FOLDED
-
-
-def test_legacy_global_restores_ascii_folding(monkeypatch):
-    assert legacy.CHECK_TO_ASCII_UNICODE is False
-    monkeypatch.setattr(legacy, "CHECK_TO_ASCII_UNICODE", True)
-    assert legacy._config_from_module_globals().check_to_ascii_unicode is True
 
 
 def test_cli_keeps_scripts_by_default_and_to_ascii_folds():

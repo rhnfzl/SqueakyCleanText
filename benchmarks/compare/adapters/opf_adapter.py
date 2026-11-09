@@ -31,10 +31,9 @@ vendor's ``<LABEL>`` placeholders.
 import json
 import math
 
+from _metadata import OPF_MODEL as MODEL, OPF_REVISION as REVISION
 from _protocol import cap_gpu, serve
 
-MODEL = "openai/privacy-filter"
-REVISION = "7ffa9a043d54d1be65afb281eddf0ffbe629385b"
 BIAS_KEYS = ("transition_bias_background_stay", "transition_bias_background_to_start",
              "transition_bias_inside_to_continue", "transition_bias_inside_to_end",
              "transition_bias_end_to_background", "transition_bias_end_to_start")

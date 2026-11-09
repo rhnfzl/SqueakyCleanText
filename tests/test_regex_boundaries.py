@@ -149,26 +149,6 @@ def test_ip_synthetic_mode_replaces_address():
     assert "8.8.8.8" not in cleaner.process("Host 8.8.8.8 seen")[0]
 
 
-def test_ip_legacy_module_globals():
-    from sct import config
-    saved = (config.CHECK_NER_PROCESS, config.CHECK_REPLACE_IPS,
-             config.REPLACE_IPS_PUBLIC_ONLY, config.REPLACE_WITH_IPS)
-    try:
-        config.CHECK_NER_PROCESS = False
-        config.CHECK_REPLACE_IPS = False
-        config.REPLACE_IPS_PUBLIC_ONLY = True
-        config.REPLACE_WITH_IPS = "[IP]"
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore")
-            cfg = TextCleaner().cfg
-        assert cfg.check_replace_ips is False
-        assert cfg.replace_ips_public_only is True
-        assert cfg.replace_with_ips == "[IP]"
-    finally:
-        (config.CHECK_NER_PROCESS, config.CHECK_REPLACE_IPS,
-         config.REPLACE_IPS_PUBLIC_ONLY, config.REPLACE_WITH_IPS) = saved
-
-
 def test_browser_rule_order_matches_python_pipeline():
     manifest = build_browser_manifest(TextCleanerConfig())
     order = manifest["rule_order"]
@@ -329,12 +309,6 @@ def test_numbers_in_words_default_still_replaces_spaceless_scripts():
     assert contact.numbers_regex().sub("<NUMBER>", "Llama-3.1-70B") == "Llama-<NUMBER>-70B"  # same as 0.7.0
     assert contact.numbers_regex().sub("<NUMBER>", "total EUR4500, INR5000") == "total EUR<NUMBER>, INR<NUMBER>"
     assert contact.numbers_regex().sub("<NUMBER>", "XEUR4500") == "XEUR4500"
-
-
-def test_numbers_in_words_legacy_global(monkeypatch):
-    from sct import config
-    monkeypatch.setattr(config, "REPLACE_NUMBERS_IN_WORDS", True)
-    assert config._config_from_module_globals().replace_numbers_in_words is True
 
 
 def test_browser_number_rule_follows_flag():

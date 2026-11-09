@@ -15,21 +15,12 @@ whose types differ. ``score`` and ``masked_text`` as in ``opf_adapter``.
 Config: ``device``, ``threads``, ``n_ctx``, ``attn``, ``revision``, ``gpu_mem_gb``; ``biases`` (OPF's bias names).
 """
 
+from _metadata import OPENMED as LABELS
+from _metadata import OPENMED_MODEL as MODEL, OPENMED_REVISION as REVISION
 from _protocol import serve
 from opf_adapter import BIAS_KEYS, make_predict, merge_biases
 
-MODEL = "OpenMed/privacy-filter-multilingual-v2"
-REVISION = "0d0c0430fa386435ace1d9f842f0f966903a9ac8"
 
-LABELS = {
-    **dict.fromkeys(("FIRSTNAME", "MIDDLENAME", "LASTNAME"), "PERSON"),
-    **dict.fromkeys(("STREET", "BUILDINGNUMBER", "SECONDARYADDRESS", "CITY", "COUNTY", "STATE", "GPSCOORDINATES"),
-                    "LOCATION"),
-    "ORGANIZATION": "ORGANISATION", "EMAIL": "EMAIL", "PHONE": "PHONE", "URL": "URL", "IPADDRESS": "IP",
-    "DATE": "DATE", "DATEOFBIRTH": "DATE",
-    **dict.fromkeys(("BANKACCOUNT", "IBAN", "BIC", "CREDITCARD", "CVV", "PIN", "MASKEDNUMBER", "SSN", "ZIPCODE",
-                     "VIN", "VRM", "IMEI", "MACADDRESS"), "NUMBER"),
-}
 OUT_OF_SCOPE = ("ACCOUNTNAME", "AGE", "AMOUNT", "BITCOINADDRESS", "CREDITCARDISSUER", "CURRENCY", "CURRENCYCODE",
                 "CURRENCYNAME", "CURRENCYSYMBOL", "ETHEREUMADDRESS", "EYECOLOR", "GENDER", "HEIGHT", "JOBDEPARTMENT",
                 "JOBTITLE", "LITECOINADDRESS", "OCCUPATION", "ORDINALDIRECTION", "PASSWORD", "PREFIX", "SEX", "TIME",

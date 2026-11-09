@@ -38,13 +38,3 @@ def test_fullwidth_phone_and_email_replaced_either_way(legacy):
     assert "<PHONE>" in out and "<EMAIL>" in out
     assert not any(ch in out for ch in "０６１２３４５６７８ｊｏｈｅｘ@")
     assert ("，" in out) is not legacy
-
-
-def test_legacy_module_global():
-    from sct import config
-    old = config.FIX_CHARACTER_WIDTH
-    try:
-        config.FIX_CHARACTER_WIDTH = True
-        assert config._config_from_module_globals().fix_character_width is True
-    finally:
-        config.FIX_CHARACTER_WIDTH = old

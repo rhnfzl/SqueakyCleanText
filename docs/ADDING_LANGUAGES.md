@@ -218,21 +218,20 @@ Add the language to `DEFAULT_LANGUAGES`:
 DEFAULT_LANGUAGES = frozenset({'ENGLISH', 'DUTCH', 'FRENCH', 'GERMAN', 'SPANISH'})
 ```
 
-### Step 3: `sct/config.py` — Update defaults
+### Step 3: `sct/config.py`, update model routes
 
-**For NER model fallback** — add to `DEFAULT_NER_MODELS` and `DEFAULT_TORCH_NER_MODELS`.
-Start with the MULTILINGUAL fallback while a dedicated model is being prepared:
+Add the language to the matching checkpoint record in `_ONNX_CHECKPOINTS` and `_TORCH_CHECKPOINTS`.
+Each record keeps its language keys, model ID, and pinned revision together.
+The exported `DEFAULT_*` maps are derived from those records.
+
+A language without a dedicated model belongs to the multilingual checkpoint record:
+
 ```python
-DEFAULT_NER_MODELS: dict[str, str] = {
-    # ... existing language-specific ONNX models ...
-    'FRENCH': 'rhnfzl/wikineural-multilingual-ner-onnx',     # MULTILINGUAL fallback (update after Step 3.5)
-    'PORTUGUESE': 'rhnfzl/wikineural-multilingual-ner-onnx', # MULTILINGUAL fallback (update after Step 3.5)
-    'ITALIAN': 'rhnfzl/wikineural-multilingual-ner-onnx',    # MULTILINGUAL fallback (update after Step 3.5)
-    'MULTILINGUAL': 'rhnfzl/wikineural-multilingual-ner-onnx',
-}
+(('FRENCH', 'PORTUGUESE', 'ITALIAN', 'MULTILINGUAL'),
+ 'rhnfzl/wikineural-multilingual-ner-onnx', '74191432b21c956b5b04b4778c0e92e569b1f80d'),
 ```
 
-> **Note on LANG_KEYS**: Do NOT update `LANG_KEYS` for opt-in languages. `LANG_KEYS` is tied to the deprecated `ner_models_list` tuple API and its length must stay fixed for backward compatibility. New languages are accessed via the `ner_models` dict API only.
+`LANG_KEYS` defines the default model routes. Add opt-in routes to the checkpoint records without changing that default set.
 
 ### Step 3.5: `scripts/export_onnx_models.py` — Create dedicated ONNX model (optional)
 
@@ -287,10 +286,8 @@ The script handles: ONNX export via Optimum CLI, verification of required files,
 
 **4. Update `config.py` with the new ONNX repo ID:**
 
-After a successful upload, replace the MULTILINGUAL fallback in `DEFAULT_NER_MODELS`:
-```python
-'FRENCH': 'rhnfzl/xlm-roberta-large-ner-french-onnx',  # dedicated model
-```
+After upload, move the language from the multilingual record to a dedicated record in `_ONNX_CHECKPOINTS`.
+Record the uploaded model ID and its resolved revision together.
 
 ### Step 4: `sct/utils/stopwords.py` — No changes needed
 
@@ -411,15 +408,9 @@ The script exports via `optimum.exporters.onnx` (token-classification task), ver
 
 **Step 4: Update `config.py`**
 
-After a successful upload, replace the MULTILINGUAL fallback:
-
-```python
-# sct/config.py
-DEFAULT_NER_MODELS: dict[str, str] = {
-    # ...
-    'FRENCH': 'rhnfzl/xlm-roberta-large-ner-french-onnx',  # was: wikineural-multilingual fallback
-}
-```
+After upload, move the language from the multilingual checkpoint record to its own `_ONNX_CHECKPOINTS` record.
+Use the uploaded model ID and its pinned revision.
+The `DEFAULT_NER_MODELS` and `DEFAULT_NER_REVISIONS` maps then update together.
 
 The ONNX pipeline (`sct/utils/onnx_pipeline.py`) handles download, caching, and inference automatically. INT8 dynamic quantization is also available at load time via the `quantize=True` parameter (install `SqueakyCleanText[quantize]` first), reducing model size ~4× with a small accuracy trade-off.
 
@@ -460,13 +451,13 @@ Arabic, Bulgarian, Catalan, Chinese, Czech, Danish, Dutch, English, Finnish, Fre
 ### Opt-in tier (auto-detected by default; `extra_languages` only for `detect_all_languages=False`)
 - [ ] Add month names to `MONTH_NAMES_MULTILINGUAL` in `constants.py` (check for shared names!)
 - [ ] Add ISO code to `_LANG_TO_VOCAB` in `constants.py`
-- [ ] Add to `DEFAULT_NER_MODELS` (dedicated ONNX model or MULTILINGUAL fallback) in `config.py`
-- [ ] Add to `DEFAULT_TORCH_NER_MODELS` (dedicated Torch model or MULTILINGUAL fallback) in `config.py`
+- [ ] Add a language key to `_ONNX_CHECKPOINTS` (dedicated model or multilingual fallback) in `config.py`
+- [ ] Add a language key to `_TORCH_CHECKPOINTS` (dedicated model or multilingual fallback) in `config.py`
 - [ ] **Create dedicated ONNX model** (optional — see Step 3.5; skip if MULTILINGUAL fallback is acceptable):
   - [ ] Find a suitable source model on HuggingFace (XLM-RoBERTa-based, CoNLL/WikiNER-style labels)
   - [ ] Add `"source-model": "rhnfzl/xlm-roberta-large-ner-{lang}-onnx"` to `MODEL_MAP` in `scripts/export_onnx_models.py`
   - [ ] Run `python scripts/export_onnx_models.py --models <source-model>` to export and upload to rhnfzl Hub
-  - [ ] Update `DEFAULT_NER_MODELS` in `config.py` from MULTILINGUAL fallback to the new ONNX repo ID
+  - [ ] Move the language to its dedicated `_ONNX_CHECKPOINTS` record with the new ONNX repo ID and revision
 - [ ] Add date regex tests in `test_sct.py`
 - [ ] (Optional) Add NER tests if dedicated model added
 - [ ] Verify: `ruff check sct/ tests/` clean
@@ -477,5 +468,6 @@ Arabic, Bulgarian, Catalan, Chinese, Czech, Danish, Dutch, English, Finnish, Fre
 All of the above, plus:
 - [ ] Add to `DEFAULT_LANGUAGES` in `resources.py`
 
-### Do NOT change (backward-compat constraint)
-- `LANG_KEYS` in `config.py` — tied to the deprecated `ner_models_list` tuple; changing its length breaks existing users
+### Default routing
+
+Keep `LANG_KEYS` unchanged when adding an opt-in route. Changing it expands the default model and language set.

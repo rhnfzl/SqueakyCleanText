@@ -45,13 +45,3 @@ def test_prose_keeps_its_characters():
     norm = NormaliseText()
     for text in ("① 項目を確認。② 次へ", "面積 25 m²、H₂O、nº 5", "価格：（税込）！", "重さ５㎏"):
         assert norm.fix_bad_unicode(text) == text.replace("５", "5")
-
-
-def test_legacy_module_global():
-    from sct import config
-    old = config.FOLD_STYLED_CHARACTERS
-    try:
-        config.FOLD_STYLED_CHARACTERS = False
-        assert config._config_from_module_globals().fold_styled_characters is False
-    finally:
-        config.FOLD_STYLED_CHARACTERS = old

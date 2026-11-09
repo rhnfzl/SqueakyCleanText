@@ -68,13 +68,6 @@ def test_core_labels_unchanged_for_bare_config():
     assert [cleaner.process(t).language for t in CORE_SENTENCES] == _four_language_labels()
 
 
-def test_core_labels_unchanged_for_module_globals(monkeypatch):
-    monkeypatch.setattr(config_module, "CHECK_NER_PROCESS", False)
-    cleaner = TextCleaner()
-    assert cleaner.cfg.detect_all_languages is True
-    assert [cleaner.process(t).language for t in CORE_SENTENCES] == _four_language_labels()
-
-
 @pytest.mark.parametrize("expected,text", sorted(OTHER_SCRIPTS.items()))
 def test_other_scripts_detected(expected, text):
     result = TextCleaner(cfg=_cfg()).process(text)
@@ -87,15 +80,6 @@ def test_detect_all_languages_false_keeps_old_labels():
     cleaner = TextCleaner(cfg=_cfg(detect_all_languages=False))
     assert [cleaner.process(t).language for t in CORE_SENTENCES] == _four_language_labels()
     assert cleaner.process(OTHER_SCRIPTS["HINDI"]).language != "HINDI"
-
-
-def test_module_global_turns_all_languages_off(monkeypatch):
-    monkeypatch.setattr(config_module, "CHECK_NER_PROCESS", False)
-    monkeypatch.setattr(config_module, "DETECT_ALL_LANGUAGES", False)
-    monkeypatch.setattr(config_module, "LANGUAGE_CONFIDENCE_WARNING", 0.9)
-    cfg = config_module._config_from_module_globals()
-    assert cfg.detect_all_languages is False
-    assert cfg.language_confidence_warning == 0.9
 
 
 def test_any_lingua_language_can_be_pinned():
@@ -146,11 +130,6 @@ def test_low_confidence_warns_on_ambiguous_not_low_absolute_confidence():
     old = TextCleaner(cfg=_cfg(language_confidence_warning=0.5, language_margin_warning=0.0))
     assert old.process(english).metadata["warnings"] == ["language_low_confidence"]
     assert "language_low_confidence" not in old.process(hindi).metadata["warnings"]
-
-
-def test_margin_warning_module_global(monkeypatch):
-    monkeypatch.setattr(config_module, "LANGUAGE_MARGIN_WARNING", 0.3)
-    assert config_module._config_from_module_globals().language_margin_warning == 0.3
 
 
 def test_unknown_language_warning():

@@ -165,6 +165,9 @@ The framework adapters use the `training` preset unless you pass a config, so th
 
 Every step is a `TextCleanerConfig` field ([docs/CONFIG.md](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/CONFIG.md)). The diagrams are built by [scripts/diagrams/](https://github.com/rhnfzl/SqueakyCleanText/tree/main/scripts/diagrams); open the `.excalidraw` files in [resources/](https://github.com/rhnfzl/SqueakyCleanText/tree/main/resources) to view them in Excalidraw.
 
+From 0.9.0, configure cleaners with `TextCleanerConfig` and set document concurrency with `max_workers`.
+Deprecated config globals, `ner_models_list`, the worker `batch_size` alias and cleaner helper properties are removed.
+
 <!-- --8<-- [start:results] -->
 ## What you get back
 
@@ -240,7 +243,7 @@ Language detection covers 75 languages. Full NER models cover English, Dutch, Ge
 - **Offsets are post-regex.** Finding offsets point into the text after the regex step, not into the raw input.
 <!-- --8<-- [end:limits] -->
 
-Detailed known limits of 0.8.4: [docs/limits.md](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/limits.md).
+Detailed known limits of 0.9.0: [docs/limits.md](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/limits.md).
 
 ## Documentation
 
@@ -272,7 +275,7 @@ Issues and pull requests are welcome. Read [AGENTS.md](https://github.com/rhnfzl
   author = {Fazal, Rehan},
   title = {SqueakyCleanText},
   url = {https://github.com/rhnfzl/SqueakyCleanText},
-  version = {0.8.4},
+  version = {0.9.0},
   year = {2026}
 }
 ```

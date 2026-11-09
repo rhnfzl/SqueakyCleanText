@@ -20,24 +20,12 @@ Config: ``threshold`` (tuned-track knob: drop spans scoring below it; default 0 
 import importlib.util
 from pathlib import Path
 
+from _metadata import BARDSAI as LABELS
+from _metadata import BARDSAI_V3_MODEL as REPO, BARDSAI_V3_REVISION as REVISION
 from _protocol import serve
 
-REPO = "bardsai/eu-pii-anonimization-multilang-v3"
-REVISION = "091984b5fbce4c161abc4776ed0f4e3206e1b374"
 CONTEXT = {"max_len": 512, "stride": 128}  # the detector's defaults, recorded for PROTOCOL section 11
 
-# Tool label -> SCT type (PROTOCOL section 5 rules); every one of the 37 labels is in LABELS or OUT_OF_SCOPE.
-LABELS = {
-    "PERSON_NAME": "PERSON", "PERSON_ALIAS": "PERSON",
-    "LOCATION": "LOCATION", "POSTAL_ADDRESS": "LOCATION", "GEO_LOCATION": "LOCATION",
-    "ORGANIZATION_NAME": "ORGANISATION",
-    "EMAIL_ADDRESS": "EMAIL", "PHONE_NUMBER": "PHONE", "IP_ADDRESS": "IP",
-    "URL": "URL", "IDENTIFYING_LINK": "URL",
-    "DATE_TIME": "DATE", "DATE_OF_BIRTH": "DATE",
-    **{t: "NUMBER" for t in ("PERSON_IDENTIFIER", "ORGANIZATION_IDENTIFIER", "BANK_ACCOUNT_IDENTIFIER",
-                             "ACCOUNT_IDENTIFIER", "PAYMENT_CARD", "PAYMENT_CARD_SECURITY",
-                             "DOCUMENT_IDENTIFIER", "VEHICLE_IDENTIFIER", "DEVICE_IDENTIFIER")},
-}
 OUT_OF_SCOPE = ("AUTH_SECRET", "CONTACT_HANDLE", "DOCUMENT_REFERENCE", "FINANCIAL_AMOUNT", "PERSON_ATTRIBUTE",
                 "PERSON_ROLE_OR_TITLE", "PROPER_NAME",
                 # GDPR art. 9

@@ -92,12 +92,14 @@ def test_run_batch_reports_throughput_keys(tmp_path):
     dataset.write_text("\n".join(lines[:2]) + "\n", encoding="utf-8")
 
     result = run_batch(
-        dataset, documents=4, batch_size=2, ner_batch_size=8, intra_op_threads=1,
+        dataset, documents=4, max_workers=2, ner_batch_size=8, intra_op_threads=1,
         repeats=1, long=False, ner_models=TEST_NER_MODELS, ner_model_revisions=TEST_NER_REVISIONS,
     )
 
     assert {"settings", "seconds", "docs_per_second", "peak_rss_mb", "output_sha256"} <= set(result)
     assert result["settings"]["documents"] == 4 and len(result["seconds"]) == 1
+    assert result["settings"]["max_workers"] == 2
+    assert "batch_size" not in result["settings"]
 
 
 def test_predicted_spans_map_unicode_folded_value_to_source_offsets():

@@ -1,10 +1,83 @@
 """Split text into NER windows: plain functions over text and a tokenizer, no model state."""
 
 import re
+from bisect import bisect_left, bisect_right
 from collections.abc import Callable
-from typing import Any
+from typing import Any, NamedTuple
 
 from sct.utils import constants
+
+
+class Window(NamedTuple):
+    text: str
+    start: int
+    offsets: list[int] | range
+    own_start: int
+    own_end: int
+
+
+def plan_windows(
+    text: str,
+    budget: int,
+    tokenizer: Callable[..., Any] | None,
+    overlap: int,
+) -> list[Window]:
+    """Fit windows to a token budget while keeping offsets in the source text.
+
+    Core chunks reserve ``2 * overlap`` tokens for neighbouring context.
+    Without a tokenizer, each token reserves two characters, as in ``simple_chunk``.
+    A span belongs to the window whose core owns its start; context copies are
+    kept only when no owned span covers them. A fitting document stays whole.
+    """
+    if overlap and (
+        token_count(text, tokenizer) <= budget if tokenizer is not None
+        else len(text) <= budget * 2
+    ):
+        overlap = 0
+    budget -= 2 * overlap
+    chunks = split_text(text, budget, tokenizer) if tokenizer is not None else simple_chunk(text, max_tokens=budget)
+
+    cores = []
+    search_start = 0
+    for chunk in chunks:
+        source_chunk, start, offsets = align_chunk(text, chunk, search_start)
+        search_start = start + len(source_chunk)
+        cores.append((chunk, start, start + len(source_chunk), offsets))
+    if not overlap:
+        return [Window(chunk, start, offsets, 0, len(text) + 1) for chunk, start, _, offsets in cores]
+
+    if tokenizer is not None:
+        tokens = [
+            (start, end)
+            for start, end in tokenizer(text, return_offsets_mapping=True).offset_mapping
+            if end > start
+        ]
+        starts = [start for start, _ in tokens]
+        ends = [end for _, end in tokens]
+
+    windows = []
+    for k, (_, core_start, core_end, _) in enumerate(cores):
+        if tokenizer is not None:
+            before = bisect_right(ends, core_start)
+            after = bisect_left(starts, core_end)
+            win_start = min(core_start, starts[max(0, before - overlap)]) if before else core_start
+            win_end = (
+                max(core_end, ends[min(len(ends), after + overlap) - 1])
+                if after < len(ends) else core_end
+            )
+            if token_count(text[win_start:win_end], tokenizer) > budget + 2 * overlap:
+                win_start, win_end = core_start, core_end  # overlap would truncate another model
+        else:
+            win_start = max(0, core_start - overlap * 2)
+            win_end = min(len(text), core_end + overlap * 2)
+        windows.append(Window(
+            text[win_start:win_end],
+            win_start,
+            range(win_end - win_start + 1),
+            core_start if k else 0,
+            cores[k + 1][1] if k + 1 < len(cores) else len(text) + 1,
+        ))
+    return windows
 
 
 def token_count(text: str, tokenizer: Callable[..., Any]) -> int:

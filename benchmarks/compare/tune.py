@@ -19,7 +19,8 @@ from pathlib import Path
 from typing import Any
 
 from benchmarks.compare import runner, scorer
-from benchmarks.compare.entries import PHONE_REGIONS, PRESIDIO_MODELS, SPACY_LG, SPACY_XX  # noqa: F401
+from benchmarks.compare.runtime import write_json
+from benchmarks.compare.entries import PHONE_REGIONS, PRESIDIO_MODELS
 
 BUDGET = 12
 N_DEV = 100
@@ -96,7 +97,7 @@ def select(entry: str, root: Path, datasets=PRIVACY) -> tuple[dict[str, Any], di
     table = []
     for run, t in candidates(entry):
         per = {d: row_at(results[run][d]["tuning"], t) for d in covered}
-        mean = {k: scorer._mean(per[d][k] for d in covered) for k in scorer.TUNING}
+        mean = {k: scorer.mean(per[d][k] for d in covered) for k in scorer.TUNING}
         table.append({"run": run, "threshold": t, "objective": mean["masked_f2"], "mean": mean,
                       "datasets": {d: {k: v for k, v in r.items() if k != "threshold"} for d, r in per.items()}})
     best = max(enumerate(table), key=lambda x: (x[1]["objective"] or -1, x[1]["mean"]["masked_precision"] or -1,
@@ -136,10 +137,10 @@ def main(argv=None) -> None:
     for entry in args.entries:
         frozen[entry], curves[entry] = select(entry, args.root, args.datasets)
     out = args.out or args.root / "tuned.json"
-    runner._write(out, {"objective": "max mean over privacy datasets of language-macro masked F2 (full taxonomy, "
+    write_json(out, {"objective": "max mean over privacy datasets of language-macro masked F2 (full taxonomy, "
                                      "DATE out, failed docs unmasked), dev part", "budget": BUDGET, "n_dev": N_DEV,
                         "entries": frozen})
-    runner._write(args.root / "curves.json", curves)
+    write_json(args.root / "curves.json", curves)
     print(out)
 
 

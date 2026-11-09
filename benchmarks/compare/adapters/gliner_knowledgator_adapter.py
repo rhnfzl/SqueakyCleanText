@@ -9,11 +9,10 @@ Long docs, the vendor's way: gliner truncates at ``max_len`` = 2048 words (``gli
 Config: as ``gliner_nvidia_adapter`` (``threshold``, ``device``, ``threads``, ``dtype``, ``revision``).
 """
 
+from _metadata import GLINER_KNOWLEDGATOR_MODEL as MODEL, GLINER_KNOWLEDGATOR_REVISION as REVISION
 from _protocol import serve
 from gliner_nvidia_adapter import load as gliner_load
 
-MODEL = "knowledgator/gliner-pii-base-v1.0"
-REVISION = "61726e0ad791dcab3e29339bbec3ad42ded65641"
 THRESHOLD = 0.3
 
 

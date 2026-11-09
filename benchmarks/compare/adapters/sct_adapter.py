@@ -150,8 +150,8 @@ def load(config: dict[str, Any]) -> Callable[[list[dict]], list[dict]]:
         reasons: Counter = Counter()
         for key, indices in groups.items():
             object.__setattr__(model.cfg, "language", key)
-            # Adapter environments pin SCT releases that still call this argument batch_size.
-            results = model.process_batch([docs[i]["text"] for i in indices], batch_size=workers)
+            # The worker limit is positional in both the pinned release and current SCT.
+            results = model.process_batch([docs[i]["text"] for i in indices], workers)
             for i, result in zip(indices, results, strict=True):
                 anon_map = result.metadata.get("anon_map")
                 originals = {e.placeholder: e.original for e in anon_map.entries} if anon_map else {}

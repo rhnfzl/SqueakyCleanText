@@ -151,22 +151,12 @@ def test_embedded_phone_predicate():
     assert contact.embedded_phone("١٩٩٠٠١٠١٢٣٤٥", 0, 12)  # yyyymmdd in Arabic-Indic digits
 
 
-def test_config_validation_and_legacy_globals(monkeypatch):
-    from sct import config
+def test_config_validation():
     with pytest.raises(ValueError):
         TextCleanerConfig(replace_numbers_mode="some")
     for bad in (0, -1, True, 2.5):
         with pytest.raises(ValueError):
             TextCleanerConfig(replace_numbers_min_digits=bad)
-    cfg = config._config_from_module_globals()
-    assert (cfg.replace_numbers_mode, cfg.replace_numbers_min_digits, cfg.phone_reject_embedded) == \
-        ("identifiers", 4, True)
-    monkeypatch.setattr(config, "REPLACE_NUMBERS_MODE", "all")
-    monkeypatch.setattr(config, "REPLACE_NUMBERS_MIN_DIGITS", 6)
-    monkeypatch.setattr(config, "PHONE_REJECT_EMBEDDED", False)
-    cfg = config._config_from_module_globals()
-    assert (cfg.replace_numbers_mode, cfg.replace_numbers_min_digits, cfg.phone_reject_embedded) == \
-        ("all", 6, False)
 
 
 def test_browser_number_rule_follows_mode():
@@ -235,16 +225,6 @@ def test_id_shape_rules_only_in_identifiers_mode():
         _clean(text, replace_numbers_mode="all", numbers_letter_prefix_ids=False, numbers_two_part_ids=False,
                numbers_spaced_pair_ids=False, **_NO_STEPS) == \
         "Passport AB1234567, case <NUMBER>/<NUMBER>, zip <NUMBER> <NUMBER>"
-
-
-def test_id_shape_legacy_globals(monkeypatch):
-    from sct import config
-    cfg = config._config_from_module_globals()
-    assert (cfg.numbers_letter_prefix_ids, cfg.numbers_two_part_ids, cfg.numbers_spaced_pair_ids) == (True,) * 3
-    for name in ("NUMBERS_LETTER_PREFIX_IDS", "NUMBERS_TWO_PART_IDS", "NUMBERS_SPACED_PAIR_IDS"):
-        monkeypatch.setattr(config, name, False)
-    cfg = config._config_from_module_globals()
-    assert (cfg.numbers_letter_prefix_ids, cfg.numbers_two_part_ids, cfg.numbers_spaced_pair_ids) == (False,) * 3
 
 
 _MIXED_RUNS = ["123 45-6789", "123 45\u20116789", "123-45 6789", "1234 56-78-90", "12345 678-90", "123-45-6789 12"]
@@ -465,12 +445,8 @@ def test_currency_code_does_not_hide_iban_or_card():
     assert out == "EUR <IBAN> and USD <CARD> and EUR <CARD> x"
 
 
-def test_currency_code_legacy_global_and_streaming(monkeypatch):
-    from sct import config
+def test_currency_code_amounts_survive_streaming():
     from sct.streaming import WindowedStreamingRedactor
-    assert config._config_from_module_globals().numbers_keep_currency_code_amounts is True
-    monkeypatch.setattr(config, "NUMBERS_KEEP_CURRENCY_CODE_AMOUNTS", False)
-    assert config._config_from_module_globals().numbers_keep_currency_code_amounts is False
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         cleaner = TextCleaner(cfg=TextCleanerConfig(

@@ -13,13 +13,11 @@ never seen (PROTOCOL section 11). No batch API: docs run one by one. ``lang`` is
 Config: ``device`` (cpu|cuda), ``threads``, ``revision``, ``gpu_mem_gb``.
 """
 
+from _metadata import PII_TRACER as LABELS
+from _metadata import PII_TRACER_MODEL as MODEL, PII_TRACER_REVISION as REVISION
 from _protocol import cap_gpu, serve
 
-MODEL = "perplexity-ai/PII-Tracer"
-REVISION = "d25c16f2e57e321f6d2527715c01df9112f956f5"
 
-LABELS = {"private_person": "PERSON", "private_address": "LOCATION", "private_email": "EMAIL",
-          "private_phone": "PHONE", "private_url": "URL", "private_date": "DATE", "account_number": "NUMBER"}
 OUT_OF_SCOPE = ("secret", "other_pii")
 
 
