@@ -18,7 +18,7 @@ Details in [CHANGELOG.md](https://github.com/rhnfzl/SqueakyCleanText/blob/main/C
 - `06-12345678` becomes `06-<PHONE>`. Adversarial strings such as `+000000000(000)0` can leave `(000)0` after phone replacement.
 - ORGANISATION is the weakest NER label (0.75 recall in the multilingual eval); Bengali and Tamil name spans can be a few characters off.
 - A URL path that switches from Latin letters straight into a script written without spaces is replaced only up to the switch (`https://x.org/a東京secret` becomes `<URL>東京secret`).
-- Score B's quality head was tested with a small ONNX graph only; GLiNER PII mode was not run end to end for this release.
+- Score B's quality head was tested with a small ONNX graph only.
 - An unpinned NER model makes one Hub request per worker when the parent never loaded it before forking; pin `ner_model_revisions` or set `HF_HUB_OFFLINE=1`.
 - `WindowedStreamingRedactor` raises `BufferError` when the buffer passes `max_buffer_chars` (default 4096) with no safe whitespace split; raise the limit or use `BufferedStreamingRedactor`. A date or IBAN longer than `overlap_chars` (default 256) that is still unfinished at the buffer end can be split and leak; it refuses `custom_allow_terms`.
 - Retrying a failed streaming call can repeat external actions performed by custom steps or callbacks. SCT retains text for retry, but cannot undo those actions. Make such actions idempotent if you retry them.
