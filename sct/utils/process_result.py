@@ -26,6 +26,9 @@ class ProcessMetadata(TypedDict, total=False):
     entity_counts: dict[str, dict[str, int]]
     language_confidence: float | None
     language_source: str
+    language_margin: float | None
+    language_reason: str
+    ner_skipped: bool
     warnings: list[str]
     provenance: dict[str, Any]
     anon_map: "AnonymizationMap"

@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING
 
 from sct.coordinates import Projection, SourceMap
 from sct.detectors import DetectorSpec, DetectorUnavailable
-from sct.detectors_builtin import BuiltinRegexDetector
+from sct.detectors_builtin import BuiltinNERDetector, BuiltinRegexDetector
 from sct.findings import Detection, DetectionContext
 from sct.policy_v2 import FindingDecision, UnifiedPrivacyPolicy
 from sct.privacy import ProcessingMetrics
@@ -132,17 +132,23 @@ class UnifiedProcessor:
             else (DetectorSpec('builtin_regex'),))
         self.policy = cleaner._unified_policy or UnifiedPrivacyPolicy('default', '1', {})
 
-    def _detectors(self):
+    def _detectors(self, *, skip_ner=False):
         if getattr(self._local, 'pid', None) != os.getpid():
+            self._local.detectors = {}
+            self._local.pid = os.getpid()
+        selected = []
+        for index, spec in enumerate(self.specs):
+            if skip_ner and spec.name == 'builtin_ner':
+                continue
             try:
-                detectors = tuple(self.cleaner._detector_registry.create(spec, self.cleaner.cfg) for spec in self.specs)
+                if index not in self._local.detectors:
+                    self._local.detectors[index] = self.cleaner._detector_registry.create(spec, self.cleaner.cfg)
             except DetectorUnavailable:
                 raise DetectorUnavailable("Selected detector unavailable; check dependencies and network permission") from None
             except Exception:
                 raise ValueError("Selected detector could not initialize; check its configuration") from None
-            self._local.detectors = detectors
-            self._local.pid = os.getpid()
-        return self._local.detectors
+            selected.append(self._local.detectors[index])
+        return tuple(selected)
 
     def process(self, text: str, context: DetectionContext, *, protect_value: tuple[str, ...] = ()) -> UnifiedDocument:
         cleaner, cfg = self.cleaner, self.cleaner.cfg
@@ -164,7 +170,9 @@ class UnifiedProcessor:
                 classes = cleaner._gliclass.classify(text)
             except Exception:
                 raise ValueError("Document classification failed") from None
-        language, confidence, source, margin = cleaner._detect_language(text)
+        language_decision = cleaner._language_decision(text)
+        language, confidence, source, margin = (
+            language_decision.language, language_decision.confidence, language_decision.source, language_decision.margin)
         cleaner._document_context.language = language
         cleaner._document_context.warnings = set()
         amap = AnonymizationMap() if cfg.replacement_mode == 'reversible' else None
@@ -181,7 +189,15 @@ class UnifiedProcessor:
         hits = []
         regex_origins: dict[int, Detection] = {}
         provenance = []
-        detectors = self._detectors()
+        skip_ner = cleaner._skip_ner(language)
+        detectors = self._detectors(skip_ner=skip_ner)
+        ner_skipped = skip_ner and (any(spec.name == 'builtin_ner' for spec in self.specs)
+                                   or any(isinstance(d, BuiltinNERDetector) for d in detectors))
+        if ner_skipped:
+            detectors = tuple(d for d in detectors if not isinstance(d, BuiltinNERDetector))
+        if cfg.language_policy != 'legacy' or cfg.unknown_language_action != 'multilingual':
+            cleaner._document_context.warnings.update(cleaner._language_warnings(
+                source, confidence, margin, ner_skipped=ner_skipped))
         if context.declared_entity_types and not protect_value:
             capable_types = {kind for detector in detectors if detector.capabilities.supports_context
                              for kind in detector.capabilities.entity_types}
@@ -290,6 +306,7 @@ class UnifiedProcessor:
             'provenance_v2': {'version': 2, 'detectors': provenance,
                               'policy': {'name': self.policy.name, 'version': self.policy.version}},
         }
+        metadata.update(cleaner._language_metadata(language_decision, ner_skipped=ner_skipped))
         if cleaner._include_entities:
             metadata['findings_v2_values'] = [
                 {'finding_index': index, 'coordinate_space': 'canonical', 'value': canonical[hit.start:hit.end]}

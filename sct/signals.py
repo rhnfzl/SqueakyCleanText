@@ -55,10 +55,14 @@ class Signals(TypedDict):
     counts_v2: NotRequired[dict[str, int]]
     provenance_v2: NotRequired[dict[str, Any]]
     coverage_v2: NotRequired[CoverageV2]
+    language_margin: NotRequired[float | None]
+    language_reason: NotRequired[str]
+    ner_skipped: NotRequired[bool]
 
 
 PUBLIC_VIEW_KEYS: tuple[str, ...] = tuple(key for key in Signals.__annotations__
-                                         if key not in ('version', 'counts_v2', 'provenance_v2', 'coverage_v2'))
+                                         if key not in ('version', 'counts_v2', 'provenance_v2', 'coverage_v2',
+                                                        'language_margin', 'language_reason', 'ner_skipped'))
 # Regex counts that are not PII; every other key (the built-in PII types and the user labels of
 # custom_deny_terms / custom_patterns) counts as PII.
 NON_PII_REGEX_TYPES = frozenset({"HTML", "DATE", "YEAR", "NUMBER", "CURRENCY"})
@@ -67,6 +71,7 @@ WARNING_CODES = frozenset({
     "ner_fallback_models", "ner_off", "cuda_fallback", "mps_fallback", "empty_input",
     "custom_pattern_timeout", "findings_not_collected",
     "source_coverage_covering", "source_coverage_unavailable",
+    "language_abstained", "ner_skipped_unknown_language",
 })
 
 
@@ -112,6 +117,12 @@ def public_view(result: ProcessResult) -> Signals:
             for model in provenance.get("models", ())
         ],
     }
+    if 'language_margin' in metadata:
+        view['language_margin'] = metadata['language_margin']
+    if 'language_reason' in metadata:
+        view['language_reason'] = metadata['language_reason']
+    if 'ner_skipped' in metadata:
+        view['ner_skipped'] = metadata['ner_skipped']
 
     if 'counts_v2' in metadata:
         counts = dict(metadata['counts_v2'])
@@ -163,9 +174,16 @@ def merge_views(views: Iterable[Signals]) -> Signals:
         lang_chars[view["language"]] = lang_chars.get(view["language"], 0) + view["chars"]
     language = max(lang_chars, key=lang_chars.__getitem__)
     # Source follows the longest leaf of the chosen language, not of the whole value.
-    merged["language_source"] = max(
+    language_view = max(
         (v for v in leaves if v["language"] == language), key=lambda v: v["chars"]
-    )["language_source"]
+    )
+    merged["language_source"] = language_view["language_source"]
+    for key in ('language_margin', 'language_reason'):
+        merged.pop(key, None)
+        if key in language_view:
+            merged[key] = language_view[key]
+    if any(v.get('ner_skipped') for v in leaves):
+        merged['ner_skipped'] = True
     same = [v for v in leaves if v["language"] == language and v["language_confidence"] is not None]
     weight = sum(v["chars"] for v in same)
     merged["language"] = language
