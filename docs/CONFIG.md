@@ -249,3 +249,108 @@ The five deprecated processor attributes on `TextCleaner` are removed. Configure
 
 These removals require changes in callers that use the old interfaces.
 The `legacy_type_names` output option and `ProcessResult` tuple behavior remain supported.
+
+## Experimental detector routing
+
+Callers can run a fast detector group first and skip a full group on calibrated inputs.
+Skipping can leave unrequested entities exposed, so `always_run` remains the default.
+This option requires unified processing and a trusted calibration artifact from a separate evaluation.
+
+| Field | Default | Meaning |
+|---|---|---|
+| `routing_policy` | `'always_run'` | `'calibrated_cascade'` enables experimental stage selection |
+| `routing_fast_specs` | `()` | Ordered explicit `DetectorSpec` values for the fast stage |
+| `routing_full_specs` | `()` | Ordered explicit `DetectorSpec` values for the full stage |
+| `routing_entity_types` | `()` | Document-wide requested entity types; an empty tuple always requires the full stage |
+| `routing_calibration` | `None` | Versioned data-only calibration mapping; missing calibration requires both stages |
+
+Configure each field through `TextCleanerConfig`.
+Both groups must be nonempty when routing is configured; `detector_specs` must then be empty.
+Duplicate spec configurations are rejected.
+With explicit groups, `always_run` executes their ordered concatenation and adds no routing metadata.
+Default configurations retain their original results and metadata.
+
+The fast stage must declare every requested entity type through its actual `DetectorCapabilities`.
+Field hints add to the requested types and still require an executing context-capable detector.
+An email match never establishes that names are absent.
+No findings, confidence comparisons between detectors, or built-in word lists authorize skipping.
+
+Unknown or uncalibrated languages, missing capabilities, unsupported context, and absent calibration require the full stage.
+Classification or quality decisions are outside calibration version 1 and also require the full stage.
+Detector initialization or analysis errors raise an explicit error without returning a partial result.
+The explicit `unknown_language_action='skip_ner'` still omits built-in NER, including before its reserved factory is constructed.
+External detectors remain application-owned and receive `language=None` when the language is unknown.
+
+### Routing API and calibration version 1
+
+Import these interfaces from `sct.routing`:
+
+```python
+RoutingContext(language, requested_entity_types, text_size,
+               requires_context=False, quality_score=None, has_classification=False)
+DetectorRun(stage_id, capabilities, status='succeeded', calls=0)
+RoutingDecision(selected_ids=(), skipped_ids=(), reasons=(), policy_identity=None)
+RoutingPolicy(cfg, *, unified_policy=None).plan(*, context, completed)
+routing_config_digest(cfg, *, unified_policy=None)
+capabilities_digest(capabilities)
+```
+
+The DTOs are frozen. `language` is a `LanguageDecision`; sizes use canonical Unicode code points.
+Capabilities contain the actual ordered `DetectorCapabilities` declarations from executed detectors.
+`completed` is an immutable ordered tuple of runs, with fixed stage IDs `fast` and `full`.
+`status` is `succeeded`, `failed`, or `skipped`; `calls` counts detector `detect` invocations.
+The planner accepts each stage at most once and never retries failed stages.
+Detector warnings mark that stage incomplete and require full routing after a fast stage.
+Configured full-stage warning behavior can still return incomplete protection with warnings and `stages_incomplete` status.
+These counts are not neural-model inference counts: providers can batch, window, or call several models internally.
+
+A version 1 artifact contains exactly these fields:
+
+```json
+{
+  "schema_version": 1,
+  "config_digest": "<64 lowercase SHA256 hex characters>",
+  "fast_capabilities_digest": "<64 lowercase SHA256 hex characters>",
+  "language_min_confidence": 0.95,
+  "language_min_margin": 0.2,
+  "max_chars": 256,
+  "languages": ["ENGLISH"],
+  "entity_types": ["EMAIL"]
+}
+```
+
+This example describes the format, not a qualified calibration artifact.
+Measure candidates on the fixed development grid and evaluate the selected candidate on untouched test data before use.
+Inconclusive or failed promotion evidence keeps the cascade experimental.
+Threshold equality passes; pinned languages bypass confidence and margin checks but must still appear in `languages`.
+
+`routing_config_digest` hashes normalized config data, excluding only `routing_policy` and `routing_calibration`.
+It includes fast/full specs, their options, model IDs, configured revisions, and all other cleaner settings.
+It also binds the actual `UnifiedPrivacyPolicy` name, version, and complete handling rules.
+Pass the same `unified_policy` to the digest helper and `TextCleaner`; `None` means the existing default policy.
+A changed policy name, version, action, or score rule requires recalibration before any detector construction.
+Matching custom declarative policies remain supported.
+Policy or rule subclasses can override behavior that their fields do not describe, so cascades reject them explicitly.
+`always_run` preserves existing subclass support.
+Callable pipeline steps cannot be fingerprinted by this format and are rejected for a cascade.
+Changing configuration without recalibration raises an identity error.
+The digest is checked before returning each policy identity, including after ordinary nested mapping mutation.
+`capabilities_digest` hashes the ordered declarations, including model identities; a changed actual fast declaration also raises.
+The full group stays unconstructed until selected, so its runtime declarations cannot be checked when skipped.
+Application factories must version their model, revision, and behavior in explicit `DetectorSpec.options`.
+A declaration hash does not prove installed SDK, binary, or model-file identity; evaluation must record those separately.
+Artifacts are trusted evaluation inputs, not signed attestations or privacy guarantees.
+
+Cascade results add `metadata['routing_v1']` with version, experimental policy identity, executed stages,
+detector calls, skipped stage IDs, constant reason codes, and execution status `stages_finished`.
+The identity is `experimental:calibrated_cascade:v1:<digest>`.
+The digest hashes `{"config_digest": semantic_digest, "calibration": artifact}` using sorted compact JSON and SHA256.
+Here `semantic_digest` is `routing_config_digest(cfg, unified_policy=actual_policy)`.
+Trace metadata contains no text, entity values, paths, classification labels, or raw provider errors.
+Stage completion does not establish complete privacy.
+
+Structured JSON values retain normal context handling.
+Derived JSON key cleaners use `always_run` because their modified cleanup config invalidates the original calibration.
+`pii` keys retain regex-only protection; `pii_ner` keys run the configured fast/full union, adding built-in regex when needed.
+Existing reversible-mode and other adapter restrictions remain in force.
+Blank inputs record no stages, zero calls, reason `empty_input`, and status `no_stages`.

@@ -9,11 +9,12 @@ import time
 from typing import TYPE_CHECKING
 
 from sct.coordinates import Projection, SourceMap
-from sct.detectors import DetectorSpec, DetectorUnavailable
+from sct.detectors import DetectorCapabilities, DetectorSpec, DetectorUnavailable
 from sct.detectors_builtin import BuiltinNERDetector, BuiltinRegexDetector
 from sct.findings import Detection, DetectionContext
 from sct.policy_v2 import FindingDecision, UnifiedPrivacyPolicy
 from sct.privacy import ProcessingMetrics
+from sct.routing import DetectorRun, RoutingContext, RoutingPolicy
 from sct.utils import constants, normtext
 from sct.utils.anonymization_map import AnonymizationMap
 from sct.utils.markers import PLACEHOLDER_TOKEN
@@ -127,17 +128,19 @@ class UnifiedProcessor:
     def __init__(self, cleaner: TextCleaner):
         self.cleaner = cleaner
         self._local = threading.local()
-        self.specs = cleaner.cfg.detector_specs or (
+        self.policy = cleaner._unified_policy or UnifiedPrivacyPolicy('default', '1', {})
+        self.routing = RoutingPolicy(cleaner.cfg, unified_policy=self.policy)
+        self.specs = (cleaner.cfg.routing_fast_specs + cleaner.cfg.routing_full_specs) or cleaner.cfg.detector_specs or (
             (DetectorSpec('builtin_regex'), DetectorSpec('builtin_ner')) if cleaner.cfg.check_ner_process
             else (DetectorSpec('builtin_regex'),))
-        self.policy = cleaner._unified_policy or UnifiedPrivacyPolicy('default', '1', {})
 
-    def _detectors(self, *, skip_ner=False):
+    def _detectors(self, *, skip_ner=False, indices=None):
         if getattr(self._local, 'pid', None) != os.getpid():
             self._local.detectors = {}
             self._local.pid = os.getpid()
         selected = []
-        for index, spec in enumerate(self.specs):
+        for index in range(len(self.specs)) if indices is None else indices:
+            spec = self.specs[index]
             if skip_ner and spec.name == 'builtin_ner':
                 continue
             try:
@@ -155,6 +158,10 @@ class UnifiedProcessor:
         started = time.perf_counter()
         if not text or text.isspace():
             empty_metadata = cleaner._empty_metadata(text)
+            if cfg.routing_policy != 'always_run':
+                empty_metadata['routing_v1'] = {'version': 1, 'policy_identity': self.routing.identity,
+                    'executed_stages': [], 'detector_calls': 0, 'skipped_ids': [],
+                    'reasons': ['empty_input'], 'status': 'no_stages'}
             empty_metadata['findings_v2'] = []
             empty_metadata['counts_v2'] = {'version': 2, 'detector_hits': 0, 'resolved_replacements': 0}
             if cleaner._include_entities:
@@ -190,51 +197,88 @@ class UnifiedProcessor:
         regex_origins: dict[int, Detection] = {}
         provenance = []
         skip_ner = cleaner._skip_ner(language)
-        detectors = self._detectors(skip_ner=skip_ner)
-        ner_skipped = skip_ner and (any(spec.name == 'builtin_ner' for spec in self.specs)
-                                   or any(isinstance(d, BuiltinNERDetector) for d in detectors))
-        if ner_skipped:
-            detectors = tuple(d for d in detectors if not isinstance(d, BuiltinNERDetector))
-        if cfg.language_policy != 'legacy' or cfg.unknown_language_action != 'multilingual':
-            cleaner._document_context.warnings.update(cleaner._language_warnings(
-                source, confidence, margin, ner_skipped=ner_skipped))
+        ner_skipped = False
+        completed: tuple[DetectorRun, ...] = ()
+        route_context = RoutingContext(language_decision,
+            tuple(dict.fromkeys((*cfg.routing_entity_types, *context.declared_entity_types))), len(canonical),
+            requires_context=context != DetectionContext(), has_classification=classes is not None)
+        route_reasons: list[str] = []
+        skipped_ids: list[str] = []
+        all_capabilities: list[DetectorCapabilities] = []
+        seen_detector_ids: set[str] = set()
+        while True:
+            route = self.routing.plan(context=route_context, completed=completed)
+            route_reasons.extend(route.reasons)
+            skipped_ids.extend(route.skipped_ids)
+            if not route.selected_ids:
+                break
+            stage = route.selected_ids[0]
+            boundary = len(cfg.routing_fast_specs)
+            indices = (range(boundary) if stage == 'fast' else range(boundary, len(self.specs)))
+            if cfg.routing_policy == 'always_run':
+                indices = range(len(self.specs))
+            detectors = self._detectors(skip_ner=skip_ner, indices=indices)
+            stage_skipped = skip_ner and (any(self.specs[i].name == 'builtin_ner' for i in indices)
+                                         or any(isinstance(d, BuiltinNERDetector) for d in detectors))
+            ner_skipped = ner_skipped or stage_skipped
+            if stage_skipped:
+                detectors = tuple(d for d in detectors if not isinstance(d, BuiltinNERDetector))
+            if cfg.language_policy != 'legacy' or cfg.unknown_language_action != 'multilingual':
+                cleaner._document_context.warnings.update(cleaner._language_warnings(
+                    source, confidence, margin, ner_skipped=ner_skipped))
+            if cfg.routing_policy == 'always_run' and context.declared_entity_types and not protect_value:
+                capable_types = {kind for detector in detectors if detector.capabilities.supports_context
+                                 for kind in detector.capabilities.entity_types}
+                if not set(context.declared_entity_types) <= capable_types:
+                    raise ValueError('Required field hints have no context-capable detector')
+            if cfg.routing_policy != 'always_run':
+                for detector in detectors:
+                    if detector.capabilities.id in seen_detector_ids:
+                        raise ValueError('Routing detector aliases have duplicate capability identities')
+                    seen_detector_ids.add(detector.capabilities.id)
+            stage_warnings: set[str] = set()
+            for detector in detectors:
+                capabilities = detector.capabilities
+                detector_context = context if capabilities.supports_context else DetectionContext()
+                helper = detector._helper if isinstance(detector, BuiltinRegexDetector) else None
+                if helper is not None:
+                    helper._document_context.warnings = stage_warnings
+                try:
+                    found = detector.detect(canonical, language=language, context=detector_context)
+                    if not isinstance(found, tuple):
+                        raise ValueError('Detector results must be a tuple')
+                    for hit in found:
+                        if not isinstance(hit, Detection):
+                            raise ValueError('Detector result must contain Detection values')
+                        hit.__post_init__()
+                        hit.validate(canonical, coordinate_space='canonical')
+                        if hit.detector_id != capabilities.id or hit.entity_type not in capabilities.entity_types:
+                            raise ValueError('Detector finding does not match its declared capabilities')
+                        if any(r.end > len(text) for r in hit.source_ranges):
+                            raise ValueError('Detector source range exceeds the input')
+                        projection = mapping.project(hit.start, hit.end)
+                        projected_hit = replace(hit, source_ranges=projection.ranges,
+                                                mapping_quality=projection.mapping_quality)
+                        hits.append(projected_hit)
+                        if isinstance(detector, BuiltinRegexDetector):
+                            regex_origins[id(projected_hit)] = projected_hit
+                except DetectorUnavailable:
+                    raise DetectorUnavailable('Selected detector is unavailable during analysis') from None
+                except Exception:
+                    raise ValueError('Detector failed or returned invalid findings') from None
+                finally:
+                    if helper is not None:
+                        cleaner._document_context.warnings.update(stage_warnings)
+                        helper._document_context.clear()
+                provenance.append(asdict(capabilities))
+            caps = tuple(detector.capabilities for detector in detectors)
+            all_capabilities.extend(caps)
+            status = 'failed' if stage_warnings else ('skipped' if stage_skipped else 'succeeded')
+            completed += (DetectorRun(stage, caps, status, len(detectors)),)
         if context.declared_entity_types and not protect_value:
-            capable_types = {kind for detector in detectors if detector.capabilities.supports_context
-                             for kind in detector.capabilities.entity_types}
+            capable_types = {kind for cap in all_capabilities if cap.supports_context for kind in cap.entity_types}
             if not set(context.declared_entity_types) <= capable_types:
                 raise ValueError('Required field hints have no context-capable detector')
-        for detector in detectors:
-            capabilities = detector.capabilities
-            detector_context = context if capabilities.supports_context else DetectionContext()
-            helper = detector._helper if isinstance(detector, BuiltinRegexDetector) else None
-            if helper is not None:
-                helper._document_context.warnings = cleaner._document_context.warnings
-            try:
-                found = detector.detect(canonical, language=language, context=detector_context)
-                if not isinstance(found, tuple):
-                    raise ValueError('Detector results must be a tuple')
-                for hit in found:
-                    if not isinstance(hit, Detection):
-                        raise ValueError('Detector result must contain Detection values')
-                    hit.__post_init__()
-                    hit.validate(canonical, coordinate_space='canonical')
-                    if hit.detector_id != capabilities.id or hit.entity_type not in capabilities.entity_types:
-                        raise ValueError('Detector finding does not match its declared capabilities')
-                    if any(r.end > len(text) for r in hit.source_ranges):
-                        raise ValueError('Detector source range exceeds the input')
-                    projection = mapping.project(hit.start, hit.end)
-                    projected_hit = replace(hit, source_ranges=projection.ranges, mapping_quality=projection.mapping_quality)
-                    hits.append(projected_hit)
-                    if isinstance(detector, BuiltinRegexDetector):
-                        regex_origins[id(projected_hit)] = projected_hit
-            except DetectorUnavailable:
-                raise DetectorUnavailable('Selected detector is unavailable during analysis') from None
-            except Exception:
-                raise ValueError('Detector failed or returned invalid findings') from None
-            finally:
-                if helper is not None:
-                    helper._document_context.clear()
-            provenance.append(asdict(capabilities))
         hits = drop_allowed(cleaner._allow_regex, canonical, hits, lambda hit: (hit.start, hit.end))
         schema_hits = []
         if protect_value and canonical:
@@ -307,6 +351,12 @@ class UnifiedProcessor:
                               'policy': {'name': self.policy.name, 'version': self.policy.version}},
         }
         metadata.update(cleaner._language_metadata(language_decision, ner_skipped=ner_skipped))
+        if cfg.routing_policy != 'always_run':
+            metadata['routing_v1'] = {'version': 1, 'policy_identity': self.routing.identity,
+                'executed_stages': [run.stage_id for run in completed],
+                'detector_calls': sum(run.calls for run in completed), 'skipped_ids': skipped_ids,
+                'reasons': route_reasons,
+                'status': 'stages_incomplete' if any(run.status != 'succeeded' for run in completed) else 'stages_finished'}
         if cleaner._include_entities:
             metadata['findings_v2_values'] = [
                 {'finding_index': index, 'coordinate_space': 'canonical', 'value': canonical[hit.start:hit.end]}

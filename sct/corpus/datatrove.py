@@ -158,8 +158,9 @@ def _cluster_keepers(path: Path, eligible_count: int) -> dict[int, int]:
 def _model_identities(config: TextCleanerConfig) -> tuple[tuple[str, str], ...]:
     models: list[tuple[str, str | None, str | None]] = []
     ner_active = config.check_ner_process
-    if config.pii_processing == 'unified' and config.detector_specs:
-        ner_active = any(spec.name == 'builtin_ner' for spec in config.detector_specs)
+    selected = (config.routing_fast_specs + config.routing_full_specs) or config.detector_specs
+    if config.pii_processing == 'unified' and selected:
+        ner_active = any(spec.name == 'builtin_ner' for spec in selected)
     if ner_active:
         if config.ner_backend == 'presidio_gliner':
             raise ValueError('presidio_gliner does not enforce immutable full NLP provenance in this recipe')

@@ -1,0 +1,283 @@
+{
+  "schema_version": 1,
+  "scope": "Frozen experimental detector routing and runtime-bound config/handling-policy identity; final calibration/promotion and integrated acceptance pending",
+  "commit": "b23250791ea9c6a4286a8ec9b648b6126ed75d87",
+  "changed_source_sha256": {
+    "sct/routing.py": "19ced2813aa8220ab7f08bddd032b384d5ccadf6d9e49f86546b7cd3642f28fc",
+    "tests/test_detector_routing.py": "9fcde4096088895280cc1d1c1449dd368cd24efb34908d79eacd1b799ea0f467",
+    "sct/unified.py": "dc375e3956846ca7c1d5c2b651c9b9242171d2b8e66bb724e57441f34de140d2",
+    "sct/config.py": "a86d0e15831dc358f0973a2dbf1528b33aa11372ec2113ef29c8bad94cf22a53",
+    "sct/utils/process_result.py": "b36f7cbdbe79292cefaa4991cedb8408bf4f0c4ac627a450226ab4ffec595562",
+    "sct/adapters.py": "6c14afecf1b1d995e68c866d4a6333349d5c430edaebc1d0201d37daec08ca34",
+    "sct/corpus/datatrove.py": "8d724832f5abf339a3eb50511143bdc76807cce692d7b0937ebcdd18266fcb29",
+    "docs/CONFIG.md": "a3514ba2cf0725e7d45936915c5aba9af7200229962dbccf3dc730177467fd77"
+  },
+  "committed_byte_verification": "All eight committed blobs match final independently reviewed source, before/after full gate and three runtime manifests.",
+  "runs": [
+    {
+      "python": "3.12.3 (main, Aug 31 2026, 10:18:26) [GCC 13.3.0]",
+      "executable": "/home/rehan/sct-improvements-l1-20261107/py312/.venv/bin/python",
+      "source_root": "/home/rehan/sct-improvements-l2-20261107/sct/__init__.py",
+      "providers": {
+        "lingua": {
+          "version": "2.2.0",
+          "path": "/home/rehan/sct-improvements-l1-20261107/py312/.venv/lib/python3.12/site-packages/lingua/__init__.py"
+        },
+        "onnxruntime": {
+          "version": "1.30.0",
+          "path": "/home/rehan/sct-improvements-l1-20261107/py312/.venv/lib/python3.12/site-packages/onnxruntime/__init__.py"
+        },
+        "tokenizers": {
+          "version": "0.23.2",
+          "path": "/home/rehan/sct-improvements-l1-20261107/py312/.venv/lib/python3.12/site-packages/tokenizers/__init__.py"
+        },
+        "numpy": {
+          "version": "2.5.3",
+          "path": "/home/rehan/sct-improvements-l1-20261107/py312/.venv/lib/python3.12/site-packages/numpy/__init__.py"
+        },
+        "presidio_anonymizer": {
+          "version": "2.2.364",
+          "path": "/home/rehan/sct-improvements-l1-20261107/py312/.venv/lib/python3.12/site-packages/presidio_anonymizer/__init__.py"
+        }
+      },
+      "passed": 202,
+      "skipped": 2,
+      "seconds": 13.09,
+      "runtime_file": "L2-evidence/round2-runtime-312.json",
+      "test_log": "L2-evidence/round2-tests-312.log",
+      "source_sha256": {
+        "sct/routing.py": "19ced2813aa8220ab7f08bddd032b384d5ccadf6d9e49f86546b7cd3642f28fc",
+        "tests/test_detector_routing.py": "9fcde4096088895280cc1d1c1449dd368cd24efb34908d79eacd1b799ea0f467",
+        "sct/unified.py": "dc375e3956846ca7c1d5c2b651c9b9242171d2b8e66bb724e57441f34de140d2",
+        "sct/config.py": "a86d0e15831dc358f0973a2dbf1528b33aa11372ec2113ef29c8bad94cf22a53",
+        "sct/utils/process_result.py": "b36f7cbdbe79292cefaa4991cedb8408bf4f0c4ac627a450226ab4ffec595562",
+        "sct/adapters.py": "6c14afecf1b1d995e68c866d4a6333349d5c430edaebc1d0201d37daec08ca34",
+        "sct/corpus/datatrove.py": "8d724832f5abf339a3eb50511143bdc76807cce692d7b0937ebcdd18266fcb29",
+        "docs/CONFIG.md": "a3514ba2cf0725e7d45936915c5aba9af7200229962dbccf3dc730177467fd77"
+      },
+      "runtime_sha256": "21e860a12a3611d807608e039b382a355e0c02960d29b0c851f0340356708f0b",
+      "test_log_sha256": "5bec7648f285e47998f6d6ee9e388a4bd3ef8c7a9cd5ead3f461e00392ca35b3"
+    },
+    {
+      "python": "3.13.3 (main, May 30 2025, 05:38:56) [Clang 20.1.4 ]",
+      "executable": "/home/rehan/sct-improvements-l1-20261107/py313/.venv/bin/python",
+      "source_root": "/home/rehan/sct-improvements-l2-20261107/sct/__init__.py",
+      "providers": {
+        "lingua": {
+          "version": "2.2.0",
+          "path": "/home/rehan/sct-improvements-l1-20261107/py313/.venv/lib/python3.13/site-packages/lingua/__init__.py"
+        },
+        "onnxruntime": {
+          "version": "1.30.0",
+          "path": "/home/rehan/sct-improvements-l1-20261107/py313/.venv/lib/python3.13/site-packages/onnxruntime/__init__.py"
+        },
+        "tokenizers": {
+          "version": "0.23.2",
+          "path": "/home/rehan/sct-improvements-l1-20261107/py313/.venv/lib/python3.13/site-packages/tokenizers/__init__.py"
+        },
+        "numpy": {
+          "version": "2.5.3",
+          "path": "/home/rehan/sct-improvements-l1-20261107/py313/.venv/lib/python3.13/site-packages/numpy/__init__.py"
+        },
+        "presidio_anonymizer": {
+          "version": "2.2.364",
+          "path": "/home/rehan/sct-improvements-l1-20261107/py313/.venv/lib/python3.13/site-packages/presidio_anonymizer/__init__.py"
+        }
+      },
+      "passed": 202,
+      "skipped": 2,
+      "seconds": 12.92,
+      "runtime_file": "L2-evidence/round2-runtime-313.json",
+      "test_log": "L2-evidence/round2-tests-313.log",
+      "source_sha256": {
+        "sct/routing.py": "19ced2813aa8220ab7f08bddd032b384d5ccadf6d9e49f86546b7cd3642f28fc",
+        "tests/test_detector_routing.py": "9fcde4096088895280cc1d1c1449dd368cd24efb34908d79eacd1b799ea0f467",
+        "sct/unified.py": "dc375e3956846ca7c1d5c2b651c9b9242171d2b8e66bb724e57441f34de140d2",
+        "sct/config.py": "a86d0e15831dc358f0973a2dbf1528b33aa11372ec2113ef29c8bad94cf22a53",
+        "sct/utils/process_result.py": "b36f7cbdbe79292cefaa4991cedb8408bf4f0c4ac627a450226ab4ffec595562",
+        "sct/adapters.py": "6c14afecf1b1d995e68c866d4a6333349d5c430edaebc1d0201d37daec08ca34",
+        "sct/corpus/datatrove.py": "8d724832f5abf339a3eb50511143bdc76807cce692d7b0937ebcdd18266fcb29",
+        "docs/CONFIG.md": "a3514ba2cf0725e7d45936915c5aba9af7200229962dbccf3dc730177467fd77"
+      },
+      "runtime_sha256": "5cf63689f6165454cef307acbfaeb2574c5d89c62940220795c1d4e088ac55c2",
+      "test_log_sha256": "9b83a38424a769ea39b6de34a7aa804d5d4ff172168b7d2b9b0f84546ff03127"
+    },
+    {
+      "python": "3.14.4 (main, Apr  7 2026, 20:47:53) [Clang 22.1.1 ]",
+      "executable": "/home/rehan/sct-improvements-l1-20261107/.venv/bin/python",
+      "source_root": "/home/rehan/sct-improvements-l2-20261107/sct/__init__.py",
+      "providers": {
+        "lingua": {
+          "version": "2.2.0",
+          "path": "/home/rehan/sct-improvements-l1-20261107/.venv/lib/python3.14/site-packages/lingua/__init__.py"
+        },
+        "onnxruntime": {
+          "version": "1.30.0",
+          "path": "/home/rehan/sct-improvements-l1-20261107/.venv/lib/python3.14/site-packages/onnxruntime/__init__.py"
+        },
+        "tokenizers": {
+          "version": "0.23.2",
+          "path": "/home/rehan/sct-improvements-l1-20261107/.venv/lib/python3.14/site-packages/tokenizers/__init__.py"
+        },
+        "numpy": {
+          "version": "2.5.3",
+          "path": "/home/rehan/sct-improvements-l1-20261107/.venv/lib/python3.14/site-packages/numpy/__init__.py"
+        },
+        "presidio_anonymizer": {
+          "version": "2.2.364",
+          "path": "/home/rehan/sct-improvements-l1-20261107/.venv/lib/python3.14/site-packages/presidio_anonymizer/__init__.py"
+        }
+      },
+      "passed": 202,
+      "skipped": 2,
+      "seconds": 13.21,
+      "runtime_file": "L2-evidence/round2-runtime-314.json",
+      "test_log": "L2-evidence/round2-tests-314.log",
+      "source_sha256": {
+        "sct/routing.py": "19ced2813aa8220ab7f08bddd032b384d5ccadf6d9e49f86546b7cd3642f28fc",
+        "tests/test_detector_routing.py": "9fcde4096088895280cc1d1c1449dd368cd24efb34908d79eacd1b799ea0f467",
+        "sct/unified.py": "dc375e3956846ca7c1d5c2b651c9b9242171d2b8e66bb724e57441f34de140d2",
+        "sct/config.py": "a86d0e15831dc358f0973a2dbf1528b33aa11372ec2113ef29c8bad94cf22a53",
+        "sct/utils/process_result.py": "b36f7cbdbe79292cefaa4991cedb8408bf4f0c4ac627a450226ab4ffec595562",
+        "sct/adapters.py": "6c14afecf1b1d995e68c866d4a6333349d5c430edaebc1d0201d37daec08ca34",
+        "sct/corpus/datatrove.py": "8d724832f5abf339a3eb50511143bdc76807cce692d7b0937ebcdd18266fcb29",
+        "docs/CONFIG.md": "a3514ba2cf0725e7d45936915c5aba9af7200229962dbccf3dc730177467fd77"
+      },
+      "runtime_sha256": "c11cf6a378eefbe7af5a58abfdfecb8ad0f36b335d906d8ba784f27941e3a7cb",
+      "test_log_sha256": "e6dcb5255ad52defc5d10adf0f2b98bdaba65ec28a33ed80f90c21ab8a2c11fb"
+    }
+  ],
+  "runtime_profile_reuse": "Qualified L1 project profiles reused read-only with unchanged locked dependencies; current source resolves exclusively from the new L2 task source directory.",
+  "full_local": {
+    "exit_code": 1,
+    "passed": 3200,
+    "skipped": 29,
+    "warnings": 96,
+    "seconds": 277.18,
+    "failed_tests": [
+      "tests/test_atomic_file.py::test_dev_stdout_redirected_to_a_file_is_written_through",
+      "tests/test_atomic_file.py::test_dev_stdout_piped_is_written_through"
+    ],
+    "qualification": "Only known stdout sandbox failures; final-source outside-sandbox split passes both",
+    "stdout_split": {
+      "passed": 2,
+      "seconds": 0.67,
+      "exit_code": 0
+    },
+    "command": "HF_HUB_OFFLINE=1 OMP_NUM_THREADS=2 OPENBLAS_NUM_THREADS=2 VECLIB_MAXIMUM_THREADS=2 .venv/bin/python -m pytest tests/ --cov=sct --cov-report=xml --cov-fail-under=85 -v -rs"
+  },
+  "coverage": {
+    "baseline": {
+      "covered": 6887,
+      "valid": 7290,
+      "percent": 94.4718792866941
+    },
+    "final": {
+      "covered": 7105,
+      "valid": 7515,
+      "percent": 94.54424484364604,
+      "delta_pp": 0.07236555695193658
+    },
+    "minimum_percent": 85
+  },
+  "warnings": {
+    "multiprocess_multithreaded_fork": 95,
+    "deprecated_ner_models_list": 1,
+    "delta": 0,
+    "separate_provenance_diagnostic": "ONNX telemetry device ID persistence failed in sandbox; in-memory identifier used"
+  },
+  "focused_warning_scope": "29 fork warnings: three schema-context and 26 corpus-manifest cases. Final full profile stays 95 existing fork notices plus one legacy configuration deprecation; exact full warning delta zero.",
+  "review": {
+    "whole_task": "approved after two scoped fix rounds",
+    "round1": "approved",
+    "round2": "approved",
+    "closed_findings": [
+      "Incomplete fast regex warnings now force full routing; repeated warning codes cannot hide events.",
+      "Ordinary nested configuration mutation invalidates calibration at use, including blank input.",
+      "Actual injected policy name/version/rules are bound; mismatching score rules reject before provider construction."
+    ]
+  },
+  "checks": {
+    "ruff": "sct/ tests/ scripts/ passed",
+    "mypy": "2.4.1 against project .venv; 63 source files passed",
+    "docs": "strict MkDocs passed in 1.73s",
+    "focused": "300 passed, 3 skipped, 29 existing warnings in 4.96s",
+    "routing_final": "59 passed, 1 native-profile skip in 0.40s"
+  },
+  "baseline_comparison": {
+    "cases": 24,
+    "baseline_commit": "dab6d4cd07aab473ed6a4f510f7e9be8d1227b09",
+    "result": "all outputs and metadata match excluding only fresh anon_map.session_id",
+    "record_sha256": "eb595655ed7d334dfef7c697e387ad8e5b76b5fdab7d442a0b10007413c58873"
+  },
+  "api": {
+    "digest": "routing_config_digest(cfg, *, unified_policy=None)",
+    "planner": "RoutingPolicy(cfg, *, unified_policy=None).plan(*, context, completed)",
+    "default": "always_run",
+    "experimental": "calibrated_cascade",
+    "stage_ids": [
+      "fast",
+      "full"
+    ],
+    "identity_binding": "TextCleanerConfig, declared model/revisions/spec options, actual declarative handling policy and actual fast capability declarations; not a binary/SDK attestation."
+  },
+  "evidence_manifest_sha256": "4622c783d6a15c3574430ac96080b0a69c630f3bdd13c1a9bb36dc89e6f955b5",
+  "evidence_file_sha256": {
+    "L2-evidence/coverage.xml": "693dadfd6a384ed7011bc6016a77e022c0692d8df328b89dfeace8fb5ba2e4e5",
+    "L2-evidence/final-runtime-312.json": "e2438d504d8e503a44a1c8c7af1183d907d2a0641405b7aada0237e946f3d7e5",
+    "L2-evidence/final-runtime-313.json": "c12edf7b9af733e86b199e0f7556280d94227671bd2721d1724fb09a4a8d2c06",
+    "L2-evidence/final-runtime-314.json": "3410a3af9cfb82c9528fa3bfe9294d0b3106c3e83c0dc85ddc26eaf53e6f31de",
+    "L2-evidence/final-tests-312.log": "b5dd23feb790e1af8dbdb0531cdad60d6c994b54316d3523f1ed1f696c7562fb",
+    "L2-evidence/final-tests-313.log": "1b7d3e50e875da3b944b7f716f828aa394e9e37a1870fc9bcc033e1f62a70db5",
+    "L2-evidence/final-tests-314.log": "6c5a70b999700baa35d4c281b9dc9c77b28c496626925dbe25e855dbb9e3c112",
+    "L2-evidence/round2-runtime-312.json": "21e860a12a3611d807608e039b382a355e0c02960d29b0c851f0340356708f0b",
+    "L2-evidence/round2-runtime-313.json": "5cf63689f6165454cef307acbfaeb2574c5d89c62940220795c1d4e088ac55c2",
+    "L2-evidence/round2-runtime-314.json": "c11cf6a378eefbe7af5a58abfdfecb8ad0f36b335d906d8ba784f27941e3a7cb",
+    "L2-evidence/round2-tests-312.log": "5bec7648f285e47998f6d6ee9e388a4bd3ef8c7a9cd5ead3f461e00392ca35b3",
+    "L2-evidence/round2-tests-313.log": "9b83a38424a769ea39b6de34a7aa804d5d4ff172168b7d2b9b0f84546ff03127",
+    "L2-evidence/round2-tests-314.log": "e6dcb5255ad52defc5d10adf0f2b98bdaba65ec28a33ed80f90c21ab8a2c11fb",
+    "L2-evidence/sct-l2-adapter-red-valid.log": "34e1228c951d5ae543e235d2130fe7eb93b883a4080c8068dd127c6aa0f030d1",
+    "L2-evidence/sct-l2-baseline-comparison.json": "eb595655ed7d334dfef7c697e387ad8e5b76b5fdab7d442a0b10007413c58873",
+    "L2-evidence/sct-l2-baseline-unified.py": "a2e3da1c05cfb556eaf1960060907f7cc0914c3986fb75995a477668b6465ed7",
+    "L2-evidence/sct-l2-compare-baseline.py": "36b7d2f6004f8b35075cc751aa573f2c6ae38c692fb92240b87ee21785a70d92",
+    "L2-evidence/sct-l2-edge-red.log": "76792f64f9e2756fd24a037db82a9879cf4f724d7ada2a1fc74cafa35925d81e",
+    "L2-evidence/sct-l2-final-after-source.json": "fcadca9cad7aec6a495cdb99b99cee2c18c31731901d7ff9978571dbbbecef1a",
+    "L2-evidence/sct-l2-final-full.log": "147478f914aa4fa3a7655a3c6a989c54c2db6e4978eb30b93f9542c324e0ac67",
+    "L2-evidence/sct-l2-final-ruff.log": "82b3e6a6c090a57601d22943bd23fca9218d1031dbe5a7b754092f9a156b4f18",
+    "L2-evidence/sct-l2-final-stdout.log": "a65a2e135668904da5355e90568a4d7e06f5ac7b4e108ec7fe1b6ab82d6a1587",
+    "L2-evidence/sct-l2-frozen-source.json": "c0f0378f9699796583c79f4b49a78cd6633222515b4fe59ed853836f64b284bc",
+    "L2-evidence/sct-l2-initial-frozen-source.json": "7f9549a83273221a4bd733bce363abbf724f036044bb2eab0a0dab691b69e916",
+    "L2-evidence/sct-l2-initial-full.log": "1a1fdd35e39223c440df5738edc6f650b1abb261e47c13002a69c876618e9f71",
+    "L2-evidence/sct-l2-local-runtime.json": "04d93db03ed932753151caf176d9c52dfbbc48103b6581445fb877c0bd5a3354",
+    "L2-evidence/sct-l2-policy-repro.json": "75694a7ebc7ddc7edde83fd71ed4d94faa5e1150c934e727d24d1ca82d8df8da",
+    "L2-evidence/sct-l2-policy-repro.py": "0230a26c3db355a2cb5f3b6c07d74592669ba4f8d59fc35443f60e761d971e2a",
+    "L2-evidence/sct-l2-red.log": "58160c7dd76d04ffefb3cf348c0cca646cd7d186a6346b697268353271c1f80d",
+    "L2-evidence/sct-l2-review-fix1.diff": "866c3992cb0a8b0f37feb9a0bc6046f2390c6862673dd23addfb998899190990",
+    "L2-evidence/sct-l2-review-fix2.diff": "beebd7856ea0f171ac8ac7867d731f9897e9edbd0cdac92e74d050e951e5f7eb",
+    "L2-evidence/sct-l2-review-round1-docs.log": "d9814379ceb16ffda9932cf99114f513cae51cf94909a220b0c0bdfb97eb3893",
+    "L2-evidence/sct-l2-review-round1-green.log": "c0b0376aac78a21470f22165741b67158ae4ce247d72f9e7b96ec6bf282cca55",
+    "L2-evidence/sct-l2-review-round1-mypy.log": "0f5e2c0f274fe3238699ff97fc09737970ee01e440d6d8f78a8522bdc43ee59b",
+    "L2-evidence/sct-l2-review-round1-red.log": "99d39e9f1bb8d9c56e8d64d8e4adc949728cbf50551ea1e8428c141700a233c6",
+    "L2-evidence/sct-l2-review-round2-docs.log": "b10c26ff8a2927954e70839bb8e0e741a46cdeb90d73092d23990d26df8f8a77",
+    "L2-evidence/sct-l2-review-round2-final-targeted.log": "2a342b44c29af359ef008ad8649fea3ad021798baeb94ef55299406ffbf38961",
+    "L2-evidence/sct-l2-review-round2-green.log": "950186076a17079f4a8e7a778ace1119d6ecd40e98c01ee42e15dfd86455fea2",
+    "L2-evidence/sct-l2-review-round2-mypy.log": "0f5e2c0f274fe3238699ff97fc09737970ee01e440d6d8f78a8522bdc43ee59b",
+    "L2-evidence/sct-l2-review-round2-red.log": "2e3930b39d62fd3e3369ef89401bd371fcd9ad337c843b6402440e605e414bae",
+    "L2-evidence/sct-l2-round1-frozen-source.json": "dd027f32270fa7d3dd1fdc228848b7bc7319521308f2804b3b6f5e1acc7cfd4c",
+    "L2-evidence/sct-l2-round1-full.log": "b4a30d48de1a63dd7fb9deceecd6fd5e97c5e8917c2a6edc07721681a54ee13c",
+    "L2-evidence/sct-l2-timeout-red.log": "2ff95d112bf9f76802e77b841f0123579b23260257e7a4301aec4ae920b54434"
+  },
+  "matrix_skips": [
+    "datatrove missing in reused Linux profiles; touched helper tested with local datatrove 0.10.1",
+    "haystack missing in reused Linux profiles"
+  ],
+  "limits": [
+    "Cascade remains experimental; no promotion or privacy guarantee",
+    "Detector calls do not count internal neural-model inference",
+    "Actual targeted matrix, not full project suites on three Python versions or hosted CI",
+    "No dependency, lockfile, packaging, CI, release changes, push or PR",
+    "Explicit full-stage warn configuration can return incomplete protection; trace says stages_incomplete.",
+    "Cascade rejects opaque policy/rule subclasses; always_run preserves their prior behavior.",
+    "Calibration artifacts and empirical routing benefits have not yet been qualified by L3."
+  ]
+}

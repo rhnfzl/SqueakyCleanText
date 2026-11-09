@@ -428,6 +428,12 @@ class TextCleanerConfig:
     language_min_margin: float | None = None
     unknown_language_action: Literal['multilingual', 'error', 'skip_ner'] = 'multilingual'
 
+    routing_policy: Literal['always_run', 'calibrated_cascade'] = 'always_run'
+    routing_fast_specs: tuple[DetectorSpec, ...] = ()
+    routing_full_specs: tuple[DetectorSpec, ...] = ()
+    routing_entity_types: tuple[str, ...] = ()
+    routing_calibration: Mapping[str, Any] | None = None
+
     def __post_init__(self):
         if self.language_policy not in ('legacy', 'abstain'):
             raise ValueError('language_policy must be legacy or abstain')
@@ -460,6 +466,8 @@ class TextCleanerConfig:
         _resolve_languages(self)
         _validate_user_terms(self)
         _compute_supported_languages(self)
+        from sct.routing import validate_routing_config
+        validate_routing_config(self)
 
     @property
     def effective_gliner_threshold(self) -> float:
@@ -486,8 +494,8 @@ class TextCleanerConfig:
     def _plain_state(self) -> dict[str, Any]:
         """The fields as plain values: mapping proxies as dicts, a PII-derived gliner_label_map as None."""
         state = {k: dict(v) if isinstance(v, MappingProxyType) else v for k, v in self.__dict__.items()}
-        state["detector_specs"] = tuple({"name": spec.name, "options": dict(spec.options)}
-                                        for spec in self.detector_specs)
+        for name in ("detector_specs", "routing_fast_specs", "routing_full_specs"):
+            state[name] = tuple({"name": spec.name, "options": dict(spec.options)} for spec in getattr(self, name))
         # derived only in PII mode (re-shared on load); a map kept after a replace() to another mode is data
         if self.ner_mode == 'pii' and any(self.gliner_label_map is m for m in _PII_MAPS.values()):
             state['gliner_label_map'] = None
@@ -496,7 +504,8 @@ class TextCleanerConfig:
     def __getstate__(self):
         # Restore the exact normalized state; never re-run __post_init__.
         state = self._plain_state()
-        state["detector_specs"] = self.detector_specs
+        for name in ("detector_specs", "routing_fast_specs", "routing_full_specs"):
+            state[name] = getattr(self, name)
         frozen = [k for k, v in self.__dict__.items() if isinstance(v, MappingProxyType) and state[k] is not None]
         return state, frozen
 
