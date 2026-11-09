@@ -1,0 +1,1516 @@
+{
+  "schema_version": 1,
+  "scope": "Reconstructed frozen v090-v2 empirical results; not production privacy, general speed, independent memory savings or default migration",
+  "server_root": "/home/rehan/sct-improvements-l3-v090-v2-20261109",
+  "manifest_sha256": "e2b7c928f9db317073b34e0bb5a5fcd9d98b6929c78f6d0e41940c6e15b1de73",
+  "development_sha256": "e0c4f33163b735771590889182e57bb9bd4713453cd2a3c8aa473b4496216b21",
+  "candidate": {
+    "confidence": 0.95,
+    "id": "c95-m20-s512",
+    "margin": 0.2,
+    "max_chars": 512
+  },
+  "development_candidates": 12,
+  "development_selected": "c95-m20-s512",
+  "development_selected_skipped_stages": 0,
+  "heldout_evaluations": 1,
+  "samples": {
+    "development": 220,
+    "heldout": 110,
+    "mixed": 6,
+    "timing_repeats": 3,
+    "bootstrap_template_groups": 11
+  },
+  "model_calls": {
+    "baseline": {
+      "fast": 750,
+      "full": 750
+    },
+    "candidate": {
+      "fast": 750,
+      "full": 690
+    },
+    "expensive_reduction_percent": 8.0,
+    "all_reduction_percent": 4.0
+  },
+  "latency": {
+    "baseline_median_ms": 395.40915000179666,
+    "candidate_median_ms": 381.34775499929674,
+    "median_reduction_percent": 3.5561632811066786,
+    "baseline_p95_ms": 481.8477349981549,
+    "candidate_p95_ms": 468.0151259963168
+  },
+  "exposure_and_accuracy": {
+    "full": {
+      "baseline": {
+        "docs": 110,
+        "docs_with_gold": 110,
+        "document_exposure": 0.7090909090909091,
+        "exposed_docs": 78,
+        "gold": 660,
+        "precision": 0.9120521172638436,
+        "predicted": 614,
+        "recall": 0.8484848484848485,
+        "true_positive": 560
+      },
+      "candidate": {
+        "docs": 110,
+        "docs_with_gold": 110,
+        "document_exposure": 0.7090909090909091,
+        "exposed_docs": 78,
+        "gold": 660,
+        "precision": 0.9120521172638436,
+        "predicted": 614,
+        "recall": 0.8484848484848485,
+        "true_positive": 560
+      }
+    },
+    "shared": {
+      "baseline": {
+        "docs": 110,
+        "docs_with_gold": 110,
+        "document_exposure": 0.7090909090909091,
+        "exposed_docs": 78,
+        "gold": 330,
+        "precision": 0.8098591549295775,
+        "predicted": 284,
+        "recall": 0.696969696969697,
+        "true_positive": 230
+      },
+      "candidate": {
+        "docs": 110,
+        "docs_with_gold": 110,
+        "document_exposure": 0.7090909090909091,
+        "exposed_docs": 78,
+        "gold": 330,
+        "precision": 0.8098591549295775,
+        "predicted": 284,
+        "recall": 0.696969696969697,
+        "true_positive": 230
+      }
+    }
+  },
+  "mixed": {
+    "baseline": {
+      "actual_model_calls": {
+        "fast": 42,
+        "full": 42
+      },
+      "full": {
+        "domain": {
+          "billing": {
+            "docs": 1,
+            "docs_with_gold": 1,
+            "document_exposure": 1.0,
+            "exposed_docs": 1,
+            "gold": 6,
+            "precision": 1.0,
+            "predicted": 5,
+            "recall": 0.8333333333333334,
+            "true_positive": 5
+          },
+          "hr": {
+            "docs": 1,
+            "docs_with_gold": 1,
+            "document_exposure": 0.0,
+            "exposed_docs": 0,
+            "gold": 6,
+            "precision": 0.8571428571428571,
+            "predicted": 7,
+            "recall": 1.0,
+            "true_positive": 6
+          },
+          "office": {
+            "docs": 1,
+            "docs_with_gold": 1,
+            "document_exposure": 1.0,
+            "exposed_docs": 1,
+            "gold": 6,
+            "precision": 0.08333333333333333,
+            "predicted": 60,
+            "recall": 0.8333333333333334,
+            "true_positive": 5
+          },
+          "security": {
+            "docs": 1,
+            "docs_with_gold": 1,
+            "document_exposure": 0.0,
+            "exposed_docs": 0,
+            "gold": 6,
+            "precision": 1.0,
+            "predicted": 6,
+            "recall": 1.0,
+            "true_positive": 6
+          },
+          "support": {
+            "docs": 2,
+            "docs_with_gold": 2,
+            "document_exposure": 0.5,
+            "exposed_docs": 1,
+            "gold": 12,
+            "precision": 1.0,
+            "predicted": 11,
+            "recall": 0.9166666666666666,
+            "true_positive": 11
+          }
+        },
+        "entity": {
+          "EMAIL": {
+            "docs": 6,
+            "docs_with_gold": 6,
+            "document_exposure": 0.0,
+            "exposed_docs": 0,
+            "gold": 6,
+            "precision": 1.0,
+            "predicted": 6,
+            "recall": 1.0,
+            "true_positive": 6
+          },
+          "IP": {
+            "docs": 6,
+            "docs_with_gold": 6,
+            "document_exposure": 0.0,
+            "exposed_docs": 0,
+            "gold": 6,
+            "precision": 1.0,
+            "predicted": 6,
+            "recall": 1.0,
+            "true_positive": 6
+          },
+          "LOCATION": {
+            "docs": 6,
+            "docs_with_gold": 6,
+            "document_exposure": 0.0,
+            "exposed_docs": 0,
+            "gold": 6,
+            "precision": 1.0,
+            "predicted": 6,
+            "recall": 1.0,
+            "true_positive": 6
+          },
+          "ORGANISATION": {
+            "docs": 6,
+            "docs_with_gold": 6,
+            "document_exposure": 0.5,
+            "exposed_docs": 3,
+            "gold": 6,
+            "precision": 0.05172413793103448,
+            "predicted": 58,
+            "recall": 0.5,
+            "true_positive": 3
+          },
+          "PERSON": {
+            "docs": 6,
+            "docs_with_gold": 6,
+            "document_exposure": 0.0,
+            "exposed_docs": 0,
+            "gold": 6,
+            "precision": 1.0,
+            "predicted": 6,
+            "recall": 1.0,
+            "true_positive": 6
+          },
+          "PHONE": {
+            "docs": 6,
+            "docs_with_gold": 6,
+            "document_exposure": 0.0,
+            "exposed_docs": 0,
+            "gold": 6,
+            "precision": 1.0,
+            "predicted": 6,
+            "recall": 1.0,
+            "true_positive": 6
+          }
+        },
+        "language": {
+          "ar": {
+            "docs": 1,
+            "docs_with_gold": 1,
+            "document_exposure": 1.0,
+            "exposed_docs": 1,
+            "gold": 6,
+            "precision": 1.0,
+            "predicted": 5,
+            "recall": 0.8333333333333334,
+            "true_positive": 5
+          },
+          "bn": {
+            "docs": 0,
+            "docs_with_gold": 0,
+            "document_exposure": null,
+            "exposed_docs": 0,
+            "gold": 0,
+            "precision": null,
+            "predicted": 0,
+            "recall": null,
+            "true_positive": 0
+          },
+          "de": {
+            "docs": 1,
+            "docs_with_gold": 1,
+            "document_exposure": 0.0,
+            "exposed_docs": 0,
+            "gold": 6,
+            "precision": 1.0,
+            "predicted": 6,
+            "recall": 1.0,
+            "true_positive": 6
+          },
+          "en": {
+            "docs": 2,
+            "docs_with_gold": 2,
+            "document_exposure": 0.5,
+            "exposed_docs": 1,
+            "gold": 12,
+            "precision": 0.16666666666666666,
+            "predicted": 66,
+            "recall": 0.9166666666666666,
+            "true_positive": 11
+          },
+          "es": {
+            "docs": 0,
+            "docs_with_gold": 0,
+            "document_exposure": null,
+            "exposed_docs": 0,
+            "gold": 0,
+            "precision": null,
+            "predicted": 0,
+            "recall": null,
+            "true_positive": 0
+          },
+          "hi": {
+            "docs": 0,
+            "docs_with_gold": 0,
+            "document_exposure": null,
+            "exposed_docs": 0,
+            "gold": 0,
+            "precision": null,
+            "predicted": 0,
+            "recall": null,
+            "true_positive": 0
+          },
+          "ja": {
+            "docs": 1,
+            "docs_with_gold": 1,
+            "document_exposure": 1.0,
+            "exposed_docs": 1,
+            "gold": 6,
+            "precision": 1.0,
+            "predicted": 5,
+            "recall": 0.8333333333333334,
+            "true_positive": 5
+          },
+          "nl": {
+            "docs": 1,
+            "docs_with_gold": 1,
+            "document_exposure": 0.0,
+            "exposed_docs": 0,
+            "gold": 6,
+            "precision": 0.8571428571428571,
+            "predicted": 7,
+            "recall": 1.0,
+            "true_positive": 6
+          },
+          "ta": {
+            "docs": 0,
+            "docs_with_gold": 0,
+            "document_exposure": null,
+            "exposed_docs": 0,
+            "gold": 0,
+            "precision": null,
+            "predicted": 0,
+            "recall": null,
+            "true_positive": 0
+          },
+          "th": {
+            "docs": 0,
+            "docs_with_gold": 0,
+            "document_exposure": null,
+            "exposed_docs": 0,
+            "gold": 0,
+            "precision": null,
+            "predicted": 0,
+            "recall": null,
+            "true_positive": 0
+          },
+          "zh": {
+            "docs": 0,
+            "docs_with_gold": 0,
+            "document_exposure": null,
+            "exposed_docs": 0,
+            "gold": 0,
+            "precision": null,
+            "predicted": 0,
+            "recall": null,
+            "true_positive": 0
+          }
+        },
+        "overall": {
+          "docs": 6,
+          "docs_with_gold": 6,
+          "document_exposure": 0.5,
+          "exposed_docs": 3,
+          "gold": 36,
+          "precision": 0.3707865168539326,
+          "predicted": 89,
+          "recall": 0.9166666666666666,
+          "true_positive": 33
+        },
+        "types": [
+          "PERSON",
+          "LOCATION",
+          "ORGANISATION",
+          "EMAIL",
+          "PHONE",
+          "IP"
+        ]
+      },
+      "id": "always_run",
+      "language_coverage": 1.0,
+      "language_model_support": {
+        "ar": {
+          "documents": 1,
+          "fast": false,
+          "full": false,
+          "interpretation": "model extrapolation; no declared neural language support"
+        },
+        "bn": {
+          "documents": 0,
+          "fast": false,
+          "full": false,
+          "interpretation": "model extrapolation; no declared neural language support"
+        },
+        "de": {
+          "documents": 1,
+          "fast": false,
+          "full": true,
+          "interpretation": "within declared training languages"
+        },
+        "en": {
+          "documents": 2,
+          "fast": true,
+          "full": true,
+          "interpretation": "within declared training languages"
+        },
+        "es": {
+          "documents": 0,
+          "fast": false,
+          "full": true,
+          "interpretation": "within declared training languages"
+        },
+        "hi": {
+          "documents": 0,
+          "fast": false,
+          "full": false,
+          "interpretation": "model extrapolation; no declared neural language support"
+        },
+        "ja": {
+          "documents": 1,
+          "fast": false,
+          "full": false,
+          "interpretation": "model extrapolation; no declared neural language support"
+        },
+        "nl": {
+          "documents": 1,
+          "fast": false,
+          "full": true,
+          "interpretation": "within declared training languages"
+        },
+        "ta": {
+          "documents": 0,
+          "fast": false,
+          "full": false,
+          "interpretation": "model extrapolation; no declared neural language support"
+        },
+        "th": {
+          "documents": 0,
+          "fast": false,
+          "full": false,
+          "interpretation": "model extrapolation; no declared neural language support"
+        },
+        "zh": {
+          "documents": 0,
+          "fast": false,
+          "full": false,
+          "interpretation": "model extrapolation; no declared neural language support"
+        }
+      },
+      "language_sources": {
+        "detected": 6
+      },
+      "latency_samples": 18,
+      "median_ms": 212.85689450087375,
+      "p95_ms": 873.1969820000813,
+      "process_peak_rss_kib": 1660124,
+      "routing_reasons": {},
+      "shared": {
+        "domain": {
+          "billing": {
+            "docs": 1,
+            "docs_with_gold": 1,
+            "document_exposure": 1.0,
+            "exposed_docs": 1,
+            "gold": 3,
+            "precision": 1.0,
+            "predicted": 2,
+            "recall": 0.6666666666666666,
+            "true_positive": 2
+          },
+          "hr": {
+            "docs": 1,
+            "docs_with_gold": 1,
+            "document_exposure": 0.0,
+            "exposed_docs": 0,
+            "gold": 3,
+            "precision": 0.75,
+            "predicted": 4,
+            "recall": 1.0,
+            "true_positive": 3
+          },
+          "office": {
+            "docs": 1,
+            "docs_with_gold": 1,
+            "document_exposure": 1.0,
+            "exposed_docs": 1,
+            "gold": 3,
+            "precision": 0.03508771929824561,
+            "predicted": 57,
+            "recall": 0.6666666666666666,
+            "true_positive": 2
+          },
+          "security": {
+            "docs": 1,
+            "docs_with_gold": 1,
+            "document_exposure": 0.0,
+            "exposed_docs": 0,
+            "gold": 3,
+            "precision": 1.0,
+            "predicted": 3,
+            "recall": 1.0,
+            "true_positive": 3
+          },
+          "support": {
+            "docs": 2,
+            "docs_with_gold": 2,
+            "document_exposure": 0.5,
+            "exposed_docs": 1,
+            "gold": 6,
+            "precision": 1.0,
+            "predicted": 5,
+            "recall": 0.8333333333333334,
+            "true_positive": 5
+          }
+        },
+        "entity": {
+          "EMAIL": {
+            "docs": 6,
+            "docs_with_gold": 0,
+            "document_exposure": null,
+            "exposed_docs": 0,
+            "gold": 0,
+            "precision": null,
+            "predicted": 0,
+            "recall": null,
+            "true_positive": 0
+          },
+          "IP": {
+            "docs": 6,
+            "docs_with_gold": 0,
+            "document_exposure": null,
+            "exposed_docs": 0,
+            "gold": 0,
+            "precision": null,
+            "predicted": 0,
+            "recall": null,
+            "true_positive": 0
+          },
+          "LOCATION": {
+            "docs": 6,
+            "docs_with_gold": 6,
+            "document_exposure": 0.0,
+            "exposed_docs": 0,
+            "gold": 6,
+            "precision": 1.0,
+            "predicted": 6,
+            "recall": 1.0,
+            "true_positive": 6
+          },
+          "ORGANISATION": {
+            "docs": 6,
+            "docs_with_gold": 6,
+            "document_exposure": 0.5,
+            "exposed_docs": 3,
+            "gold": 6,
+            "precision": 0.05172413793103448,
+            "predicted": 58,
+            "recall": 0.5,
+            "true_positive": 3
+          },
+          "PERSON": {
+            "docs": 6,
+            "docs_with_gold": 6,
+            "document_exposure": 0.0,
+            "exposed_docs": 0,
+            "gold": 6,
+            "precision": 1.0,
+            "predicted": 6,
+            "recall": 1.0,
+            "true_positive": 6
+          },
+          "PHONE": {
+            "docs": 6,
+            "docs_with_gold": 0,
+            "document_exposure": null,
+            "exposed_docs": 0,
+            "gold": 0,
+            "precision": null,
+            "predicted": 0,
+            "recall": null,
+            "true_positive": 0
+          }
+        },
+        "language": {
+          "ar": {
+            "docs": 1,
+            "docs_with_gold": 1,
+            "document_exposure": 1.0,
+            "exposed_docs": 1,
+            "gold": 3,
+            "precision": 1.0,
+            "predicted": 2,
+            "recall": 0.6666666666666666,
+            "true_positive": 2
+          },
+          "bn": {
+            "docs": 0,
+            "docs_with_gold": 0,
+            "document_exposure": null,
+            "exposed_docs": 0,
+            "gold": 0,
+            "precision": null,
+            "predicted": 0,
+            "recall": null,
+            "true_positive": 0
+          },
+          "de": {
+            "docs": 1,
+            "docs_with_gold": 1,
+            "document_exposure": 0.0,
+            "exposed_docs": 0,
+            "gold": 3,
+            "precision": 1.0,
+            "predicted": 3,
+            "recall": 1.0,
+            "true_positive": 3
+          },
+          "en": {
+            "docs": 2,
+            "docs_with_gold": 2,
+            "document_exposure": 0.5,
+            "exposed_docs": 1,
+            "gold": 6,
+            "precision": 0.08333333333333333,
+            "predicted": 60,
+            "recall": 0.8333333333333334,
+            "true_positive": 5
+          },
+          "es": {
+            "docs": 0,
+            "docs_with_gold": 0,
+            "document_exposure": null,
+            "exposed_docs": 0,
+            "gold": 0,
+            "precision": null,
+            "predicted": 0,
+            "recall": null,
+            "true_positive": 0
+          },
+          "hi": {
+            "docs": 0,
+            "docs_with_gold": 0,
+            "document_exposure": null,
+            "exposed_docs": 0,
+            "gold": 0,
+            "precision": null,
+            "predicted": 0,
+            "recall": null,
+            "true_positive": 0
+          },
+          "ja": {
+            "docs": 1,
+            "docs_with_gold": 1,
+            "document_exposure": 1.0,
+            "exposed_docs": 1,
+            "gold": 3,
+            "precision": 1.0,
+            "predicted": 2,
+            "recall": 0.6666666666666666,
+            "true_positive": 2
+          },
+          "nl": {
+            "docs": 1,
+            "docs_with_gold": 1,
+            "document_exposure": 0.0,
+            "exposed_docs": 0,
+            "gold": 3,
+            "precision": 0.75,
+            "predicted": 4,
+            "recall": 1.0,
+            "true_positive": 3
+          },
+          "ta": {
+            "docs": 0,
+            "docs_with_gold": 0,
+            "document_exposure": null,
+            "exposed_docs": 0,
+            "gold": 0,
+            "precision": null,
+            "predicted": 0,
+            "recall": null,
+            "true_positive": 0
+          },
+          "th": {
+            "docs": 0,
+            "docs_with_gold": 0,
+            "document_exposure": null,
+            "exposed_docs": 0,
+            "gold": 0,
+            "precision": null,
+            "predicted": 0,
+            "recall": null,
+            "true_positive": 0
+          },
+          "zh": {
+            "docs": 0,
+            "docs_with_gold": 0,
+            "document_exposure": null,
+            "exposed_docs": 0,
+            "gold": 0,
+            "precision": null,
+            "predicted": 0,
+            "recall": null,
+            "true_positive": 0
+          }
+        },
+        "overall": {
+          "docs": 6,
+          "docs_with_gold": 6,
+          "document_exposure": 0.5,
+          "exposed_docs": 3,
+          "gold": 18,
+          "precision": 0.2112676056338028,
+          "predicted": 71,
+          "recall": 0.8333333333333334,
+          "true_positive": 15
+        },
+        "types": [
+          "PERSON",
+          "LOCATION",
+          "ORGANISATION"
+        ]
+      },
+      "skipped_stages": 0
+    },
+    "candidate": {
+      "actual_model_calls": {
+        "fast": 42,
+        "full": 42
+      },
+      "full": {
+        "domain": {
+          "billing": {
+            "docs": 1,
+            "docs_with_gold": 1,
+            "document_exposure": 1.0,
+            "exposed_docs": 1,
+            "gold": 6,
+            "precision": 1.0,
+            "predicted": 5,
+            "recall": 0.8333333333333334,
+            "true_positive": 5
+          },
+          "hr": {
+            "docs": 1,
+            "docs_with_gold": 1,
+            "document_exposure": 0.0,
+            "exposed_docs": 0,
+            "gold": 6,
+            "precision": 0.8571428571428571,
+            "predicted": 7,
+            "recall": 1.0,
+            "true_positive": 6
+          },
+          "office": {
+            "docs": 1,
+            "docs_with_gold": 1,
+            "document_exposure": 1.0,
+            "exposed_docs": 1,
+            "gold": 6,
+            "precision": 0.08333333333333333,
+            "predicted": 60,
+            "recall": 0.8333333333333334,
+            "true_positive": 5
+          },
+          "security": {
+            "docs": 1,
+            "docs_with_gold": 1,
+            "document_exposure": 0.0,
+            "exposed_docs": 0,
+            "gold": 6,
+            "precision": 1.0,
+            "predicted": 6,
+            "recall": 1.0,
+            "true_positive": 6
+          },
+          "support": {
+            "docs": 2,
+            "docs_with_gold": 2,
+            "document_exposure": 0.5,
+            "exposed_docs": 1,
+            "gold": 12,
+            "precision": 1.0,
+            "predicted": 11,
+            "recall": 0.9166666666666666,
+            "true_positive": 11
+          }
+        },
+        "entity": {
+          "EMAIL": {
+            "docs": 6,
+            "docs_with_gold": 6,
+            "document_exposure": 0.0,
+            "exposed_docs": 0,
+            "gold": 6,
+            "precision": 1.0,
+            "predicted": 6,
+            "recall": 1.0,
+            "true_positive": 6
+          },
+          "IP": {
+            "docs": 6,
+            "docs_with_gold": 6,
+            "document_exposure": 0.0,
+            "exposed_docs": 0,
+            "gold": 6,
+            "precision": 1.0,
+            "predicted": 6,
+            "recall": 1.0,
+            "true_positive": 6
+          },
+          "LOCATION": {
+            "docs": 6,
+            "docs_with_gold": 6,
+            "document_exposure": 0.0,
+            "exposed_docs": 0,
+            "gold": 6,
+            "precision": 1.0,
+            "predicted": 6,
+            "recall": 1.0,
+            "true_positive": 6
+          },
+          "ORGANISATION": {
+            "docs": 6,
+            "docs_with_gold": 6,
+            "document_exposure": 0.5,
+            "exposed_docs": 3,
+            "gold": 6,
+            "precision": 0.05172413793103448,
+            "predicted": 58,
+            "recall": 0.5,
+            "true_positive": 3
+          },
+          "PERSON": {
+            "docs": 6,
+            "docs_with_gold": 6,
+            "document_exposure": 0.0,
+            "exposed_docs": 0,
+            "gold": 6,
+            "precision": 1.0,
+            "predicted": 6,
+            "recall": 1.0,
+            "true_positive": 6
+          },
+          "PHONE": {
+            "docs": 6,
+            "docs_with_gold": 6,
+            "document_exposure": 0.0,
+            "exposed_docs": 0,
+            "gold": 6,
+            "precision": 1.0,
+            "predicted": 6,
+            "recall": 1.0,
+            "true_positive": 6
+          }
+        },
+        "language": {
+          "ar": {
+            "docs": 1,
+            "docs_with_gold": 1,
+            "document_exposure": 1.0,
+            "exposed_docs": 1,
+            "gold": 6,
+            "precision": 1.0,
+            "predicted": 5,
+            "recall": 0.8333333333333334,
+            "true_positive": 5
+          },
+          "bn": {
+            "docs": 0,
+            "docs_with_gold": 0,
+            "document_exposure": null,
+            "exposed_docs": 0,
+            "gold": 0,
+            "precision": null,
+            "predicted": 0,
+            "recall": null,
+            "true_positive": 0
+          },
+          "de": {
+            "docs": 1,
+            "docs_with_gold": 1,
+            "document_exposure": 0.0,
+            "exposed_docs": 0,
+            "gold": 6,
+            "precision": 1.0,
+            "predicted": 6,
+            "recall": 1.0,
+            "true_positive": 6
+          },
+          "en": {
+            "docs": 2,
+            "docs_with_gold": 2,
+            "document_exposure": 0.5,
+            "exposed_docs": 1,
+            "gold": 12,
+            "precision": 0.16666666666666666,
+            "predicted": 66,
+            "recall": 0.9166666666666666,
+            "true_positive": 11
+          },
+          "es": {
+            "docs": 0,
+            "docs_with_gold": 0,
+            "document_exposure": null,
+            "exposed_docs": 0,
+            "gold": 0,
+            "precision": null,
+            "predicted": 0,
+            "recall": null,
+            "true_positive": 0
+          },
+          "hi": {
+            "docs": 0,
+            "docs_with_gold": 0,
+            "document_exposure": null,
+            "exposed_docs": 0,
+            "gold": 0,
+            "precision": null,
+            "predicted": 0,
+            "recall": null,
+            "true_positive": 0
+          },
+          "ja": {
+            "docs": 1,
+            "docs_with_gold": 1,
+            "document_exposure": 1.0,
+            "exposed_docs": 1,
+            "gold": 6,
+            "precision": 1.0,
+            "predicted": 5,
+            "recall": 0.8333333333333334,
+            "true_positive": 5
+          },
+          "nl": {
+            "docs": 1,
+            "docs_with_gold": 1,
+            "document_exposure": 0.0,
+            "exposed_docs": 0,
+            "gold": 6,
+            "precision": 0.8571428571428571,
+            "predicted": 7,
+            "recall": 1.0,
+            "true_positive": 6
+          },
+          "ta": {
+            "docs": 0,
+            "docs_with_gold": 0,
+            "document_exposure": null,
+            "exposed_docs": 0,
+            "gold": 0,
+            "precision": null,
+            "predicted": 0,
+            "recall": null,
+            "true_positive": 0
+          },
+          "th": {
+            "docs": 0,
+            "docs_with_gold": 0,
+            "document_exposure": null,
+            "exposed_docs": 0,
+            "gold": 0,
+            "precision": null,
+            "predicted": 0,
+            "recall": null,
+            "true_positive": 0
+          },
+          "zh": {
+            "docs": 0,
+            "docs_with_gold": 0,
+            "document_exposure": null,
+            "exposed_docs": 0,
+            "gold": 0,
+            "precision": null,
+            "predicted": 0,
+            "recall": null,
+            "true_positive": 0
+          }
+        },
+        "overall": {
+          "docs": 6,
+          "docs_with_gold": 6,
+          "document_exposure": 0.5,
+          "exposed_docs": 3,
+          "gold": 36,
+          "precision": 0.3707865168539326,
+          "predicted": 89,
+          "recall": 0.9166666666666666,
+          "true_positive": 33
+        },
+        "types": [
+          "PERSON",
+          "LOCATION",
+          "ORGANISATION",
+          "EMAIL",
+          "PHONE",
+          "IP"
+        ]
+      },
+      "id": "c95-m20-s512",
+      "language_coverage": 1.0,
+      "language_model_support": {
+        "ar": {
+          "documents": 1,
+          "fast": false,
+          "full": false,
+          "interpretation": "model extrapolation; no declared neural language support"
+        },
+        "bn": {
+          "documents": 0,
+          "fast": false,
+          "full": false,
+          "interpretation": "model extrapolation; no declared neural language support"
+        },
+        "de": {
+          "documents": 1,
+          "fast": false,
+          "full": true,
+          "interpretation": "within declared training languages"
+        },
+        "en": {
+          "documents": 2,
+          "fast": true,
+          "full": true,
+          "interpretation": "within declared training languages"
+        },
+        "es": {
+          "documents": 0,
+          "fast": false,
+          "full": true,
+          "interpretation": "within declared training languages"
+        },
+        "hi": {
+          "documents": 0,
+          "fast": false,
+          "full": false,
+          "interpretation": "model extrapolation; no declared neural language support"
+        },
+        "ja": {
+          "documents": 1,
+          "fast": false,
+          "full": false,
+          "interpretation": "model extrapolation; no declared neural language support"
+        },
+        "nl": {
+          "documents": 1,
+          "fast": false,
+          "full": true,
+          "interpretation": "within declared training languages"
+        },
+        "ta": {
+          "documents": 0,
+          "fast": false,
+          "full": false,
+          "interpretation": "model extrapolation; no declared neural language support"
+        },
+        "th": {
+          "documents": 0,
+          "fast": false,
+          "full": false,
+          "interpretation": "model extrapolation; no declared neural language support"
+        },
+        "zh": {
+          "documents": 0,
+          "fast": false,
+          "full": false,
+          "interpretation": "model extrapolation; no declared neural language support"
+        }
+      },
+      "language_sources": {
+        "detected": 6
+      },
+      "latency_samples": 18,
+      "median_ms": 212.25115100241965,
+      "p95_ms": 874.1810430001351,
+      "process_peak_rss_kib": 1660124,
+      "routing_reasons": {
+        "language_evidence": 6,
+        "text_size": 3,
+        "uncalibrated_language": 9
+      },
+      "shared": {
+        "domain": {
+          "billing": {
+            "docs": 1,
+            "docs_with_gold": 1,
+            "document_exposure": 1.0,
+            "exposed_docs": 1,
+            "gold": 3,
+            "precision": 1.0,
+            "predicted": 2,
+            "recall": 0.6666666666666666,
+            "true_positive": 2
+          },
+          "hr": {
+            "docs": 1,
+            "docs_with_gold": 1,
+            "document_exposure": 0.0,
+            "exposed_docs": 0,
+            "gold": 3,
+            "precision": 0.75,
+            "predicted": 4,
+            "recall": 1.0,
+            "true_positive": 3
+          },
+          "office": {
+            "docs": 1,
+            "docs_with_gold": 1,
+            "document_exposure": 1.0,
+            "exposed_docs": 1,
+            "gold": 3,
+            "precision": 0.03508771929824561,
+            "predicted": 57,
+            "recall": 0.6666666666666666,
+            "true_positive": 2
+          },
+          "security": {
+            "docs": 1,
+            "docs_with_gold": 1,
+            "document_exposure": 0.0,
+            "exposed_docs": 0,
+            "gold": 3,
+            "precision": 1.0,
+            "predicted": 3,
+            "recall": 1.0,
+            "true_positive": 3
+          },
+          "support": {
+            "docs": 2,
+            "docs_with_gold": 2,
+            "document_exposure": 0.5,
+            "exposed_docs": 1,
+            "gold": 6,
+            "precision": 1.0,
+            "predicted": 5,
+            "recall": 0.8333333333333334,
+            "true_positive": 5
+          }
+        },
+        "entity": {
+          "EMAIL": {
+            "docs": 6,
+            "docs_with_gold": 0,
+            "document_exposure": null,
+            "exposed_docs": 0,
+            "gold": 0,
+            "precision": null,
+            "predicted": 0,
+            "recall": null,
+            "true_positive": 0
+          },
+          "IP": {
+            "docs": 6,
+            "docs_with_gold": 0,
+            "document_exposure": null,
+            "exposed_docs": 0,
+            "gold": 0,
+            "precision": null,
+            "predicted": 0,
+            "recall": null,
+            "true_positive": 0
+          },
+          "LOCATION": {
+            "docs": 6,
+            "docs_with_gold": 6,
+            "document_exposure": 0.0,
+            "exposed_docs": 0,
+            "gold": 6,
+            "precision": 1.0,
+            "predicted": 6,
+            "recall": 1.0,
+            "true_positive": 6
+          },
+          "ORGANISATION": {
+            "docs": 6,
+            "docs_with_gold": 6,
+            "document_exposure": 0.5,
+            "exposed_docs": 3,
+            "gold": 6,
+            "precision": 0.05172413793103448,
+            "predicted": 58,
+            "recall": 0.5,
+            "true_positive": 3
+          },
+          "PERSON": {
+            "docs": 6,
+            "docs_with_gold": 6,
+            "document_exposure": 0.0,
+            "exposed_docs": 0,
+            "gold": 6,
+            "precision": 1.0,
+            "predicted": 6,
+            "recall": 1.0,
+            "true_positive": 6
+          },
+          "PHONE": {
+            "docs": 6,
+            "docs_with_gold": 0,
+            "document_exposure": null,
+            "exposed_docs": 0,
+            "gold": 0,
+            "precision": null,
+            "predicted": 0,
+            "recall": null,
+            "true_positive": 0
+          }
+        },
+        "language": {
+          "ar": {
+            "docs": 1,
+            "docs_with_gold": 1,
+            "document_exposure": 1.0,
+            "exposed_docs": 1,
+            "gold": 3,
+            "precision": 1.0,
+            "predicted": 2,
+            "recall": 0.6666666666666666,
+            "true_positive": 2
+          },
+          "bn": {
+            "docs": 0,
+            "docs_with_gold": 0,
+            "document_exposure": null,
+            "exposed_docs": 0,
+            "gold": 0,
+            "precision": null,
+            "predicted": 0,
+            "recall": null,
+            "true_positive": 0
+          },
+          "de": {
+            "docs": 1,
+            "docs_with_gold": 1,
+            "document_exposure": 0.0,
+            "exposed_docs": 0,
+            "gold": 3,
+            "precision": 1.0,
+            "predicted": 3,
+            "recall": 1.0,
+            "true_positive": 3
+          },
+          "en": {
+            "docs": 2,
+            "docs_with_gold": 2,
+            "document_exposure": 0.5,
+            "exposed_docs": 1,
+            "gold": 6,
+            "precision": 0.08333333333333333,
+            "predicted": 60,
+            "recall": 0.8333333333333334,
+            "true_positive": 5
+          },
+          "es": {
+            "docs": 0,
+            "docs_with_gold": 0,
+            "document_exposure": null,
+            "exposed_docs": 0,
+            "gold": 0,
+            "precision": null,
+            "predicted": 0,
+            "recall": null,
+            "true_positive": 0
+          },
+          "hi": {
+            "docs": 0,
+            "docs_with_gold": 0,
+            "document_exposure": null,
+            "exposed_docs": 0,
+            "gold": 0,
+            "precision": null,
+            "predicted": 0,
+            "recall": null,
+            "true_positive": 0
+          },
+          "ja": {
+            "docs": 1,
+            "docs_with_gold": 1,
+            "document_exposure": 1.0,
+            "exposed_docs": 1,
+            "gold": 3,
+            "precision": 1.0,
+            "predicted": 2,
+            "recall": 0.6666666666666666,
+            "true_positive": 2
+          },
+          "nl": {
+            "docs": 1,
+            "docs_with_gold": 1,
+            "document_exposure": 0.0,
+            "exposed_docs": 0,
+            "gold": 3,
+            "precision": 0.75,
+            "predicted": 4,
+            "recall": 1.0,
+            "true_positive": 3
+          },
+          "ta": {
+            "docs": 0,
+            "docs_with_gold": 0,
+            "document_exposure": null,
+            "exposed_docs": 0,
+            "gold": 0,
+            "precision": null,
+            "predicted": 0,
+            "recall": null,
+            "true_positive": 0
+          },
+          "th": {
+            "docs": 0,
+            "docs_with_gold": 0,
+            "document_exposure": null,
+            "exposed_docs": 0,
+            "gold": 0,
+            "precision": null,
+            "predicted": 0,
+            "recall": null,
+            "true_positive": 0
+          },
+          "zh": {
+            "docs": 0,
+            "docs_with_gold": 0,
+            "document_exposure": null,
+            "exposed_docs": 0,
+            "gold": 0,
+            "precision": null,
+            "predicted": 0,
+            "recall": null,
+            "true_positive": 0
+          }
+        },
+        "overall": {
+          "docs": 6,
+          "docs_with_gold": 6,
+          "document_exposure": 0.5,
+          "exposed_docs": 3,
+          "gold": 18,
+          "precision": 0.2112676056338028,
+          "predicted": 71,
+          "recall": 0.8333333333333334,
+          "true_positive": 15
+        },
+        "types": [
+          "PERSON",
+          "LOCATION",
+          "ORGANISATION"
+        ]
+      },
+      "skipped_stages": 0
+    }
+  },
+  "added_exposure_documents_by_view": {
+    "full": {
+      "domain:billing": 0,
+      "domain:hr": 0,
+      "domain:office": 0,
+      "domain:security": 0,
+      "domain:support": 0,
+      "entity:EMAIL": 0,
+      "entity:IP": 0,
+      "entity:LOCATION": 0,
+      "entity:ORGANISATION": 0,
+      "entity:PERSON": 0,
+      "entity:PHONE": 0,
+      "language:ar": 0,
+      "language:bn": 0,
+      "language:de": 0,
+      "language:en": 0,
+      "language:es": 0,
+      "language:hi": 0,
+      "language:ja": 0,
+      "language:nl": 0,
+      "language:ta": 0,
+      "language:th": 0,
+      "language:zh": 0
+    },
+    "shared": {
+      "domain:billing": 0,
+      "domain:hr": 0,
+      "domain:office": 0,
+      "domain:security": 0,
+      "domain:support": 0,
+      "entity:EMAIL": 0,
+      "entity:IP": 0,
+      "entity:LOCATION": 0,
+      "entity:ORGANISATION": 0,
+      "entity:PERSON": 0,
+      "entity:PHONE": 0,
+      "language:ar": 0,
+      "language:bn": 0,
+      "language:de": 0,
+      "language:en": 0,
+      "language:es": 0,
+      "language:hi": 0,
+      "language:ja": 0,
+      "language:nl": 0,
+      "language:ta": 0,
+      "language:th": 0,
+      "language:zh": 0
+    }
+  },
+  "promotion": {
+    "default_policy": "always_run",
+    "gates": {
+      "exposure_upper_nonpositive": true,
+      "fewer_expensive_model_calls": true,
+      "lower_median_latency": true,
+      "mixed_no_regression": true,
+      "no_added_slice_exposure": true,
+      "shared_exposure_upper_nonpositive": true
+    },
+    "paired_95_percent_interval": [
+      0.0,
+      0.0
+    ],
+    "paired_intervals_by_view": {
+      "full": [
+        0.0,
+        0.0
+      ],
+      "shared": [
+        0.0,
+        0.0
+      ]
+    },
+    "status": "pass"
+  },
+  "bootstrap": {
+    "groups": 11,
+    "method": "paired template-group percentile, language macro, candidate minus baseline",
+    "samples": 1000,
+    "seed": 20261109
+  },
+  "audit": {
+    "remote_audit_dev": "passed without inference replay",
+    "remote_audit_test": "passed without inference replay",
+    "independent_local_source_bound_reconstruction": "passed; model construction and socket connections rejected by audit wrapper",
+    "portable_frozen_archive_reconstruction": "passed without model cache",
+    "portable_archive_sha256": "75f292b5c847626e68a401a4e66052b298c3c900d8b13658b242145b913776b2",
+    "portable_archive_files": 82,
+    "remote_and_local_file_hashes_equal": 64,
+    "log_sha256": {
+      "local-pure-audit.log": "305a47da90899e89e95d03ab2d24b14d9a8331fa58bcabe1b5c0b6343b455828",
+      "portable-audit.log": "e5d68ed9c3eb9cfaa29d2e48832f5e52d271be597ee658d5b2672bb924c8c79e",
+      "portable-audit-complete.log": "0a229be818f6f81b5dfda9bb860d1b943a997a4487fffc6f960a1c2df8ad6846"
+    },
+    "first_portable_attempt": "Missing historical v1 input validation data; corrected archive includes all provenance-bound partitions. No source change or inference replay."
+  },
+  "source_binding": {
+    "executed_archive_sha256": "7adfed00fa54e9341ab8fa3495bee74f8aec72826095839c0bf72b39c6d1c9a5",
+    "frozen_sources": 74,
+    "frozen_inputs": 3,
+    "claim": "These results bind original frozen sources. Later HF/MCP/warmup and coverage-tooling changes are separate and are not rebound to this experiment."
+  },
+  "evidence_sha256": {
+    "frozen-audit-source-v2.tar.gz": "75f292b5c847626e68a401a4e66052b298c3c900d8b13658b242145b913776b2",
+    "routing-calibrations-v2.json": "7bcc84ab9b95c8caa0355cd5201f743721170374928da5b991339f2cf60eb79e",
+    "routing-dev-complete-v2.json": "defc875d17afc6fa3fddad95fbcdb44bc8f358ad7cdcd11c80d4484343796a36",
+    "routing-dev-consumed-v2.json": "164f9b075841c97fe106b4332a90a53f85cd256e767b9fd633158ba9f2b30816",
+    "routing-development-v2.json": "e0c4f33163b735771590889182e57bb9bd4713453cd2a3c8aa473b4496216b21",
+    "routing-freeze-consumed-v2.json": "e2a769e1c77f91aa10b533767eb745647966f1f66373b5d230439619f2e019e1",
+    "routing-heldout-v2.json": "87b67e1cd8607b31d3c564c77c7a1ea28014e2272171937b92c58628b0db111b",
+    "routing-input-provenance-v2.json": "d0cf31e4222f6aacde28c7d55bcbf3ced44b1246bbca70c42166aa6f2ccac46b",
+    "routing-manifest-v2.json": "e2b7c928f9db317073b34e0bb5a5fcd9d98b6929c78f6d0e41940c6e15b1de73",
+    "routing-mixed-v2.jsonl": "a8e5b634a0337a8fe6cc85767ebf5ac1c7f5d32260f411bc95439028ffce431a",
+    "routing-observations-dev-always_run-r0-v2.json": "78e4606ca2a505bc10be218125aac8147fc8437be981648d775323bb8574ee2c",
+    "routing-observations-dev-always_run-r1-v2.json": "4ea8902114f5f3f1dec0a09cd6823c2730a7887b8183ed8641a86634e5820b9a",
+    "routing-observations-dev-always_run-r2-v2.json": "b30609c65de0af8f4dcd59e7f339bea417039fd97184e0118fa61d6d649c7691",
+    "routing-observations-dev-c90-m10-s256-r0-v2.json": "aa6b783bcbac5c65475cd52f729cf15d69e074502d853cc57efb85995a9ef053",
+    "routing-observations-dev-c90-m10-s256-r1-v2.json": "9754a974a421185763b812240a83db4c6109d75b8f1140bc7ef7f5015eca5a89",
+    "routing-observations-dev-c90-m10-s256-r2-v2.json": "cbce55d1f6b1d3fb501a498416378beba267e33f58e0b4c6c2c8153d12148f80",
+    "routing-observations-dev-c90-m10-s512-r0-v2.json": "1df6ff7b2d26e9c35916178f44cd47d1294011a5b426e32bd47afaf223e657c6",
+    "routing-observations-dev-c90-m10-s512-r1-v2.json": "47df8f21f3c0474b907fc60525f6a57c9763af03d41b25c4ee08f34ebeaf16cd",
+    "routing-observations-dev-c90-m10-s512-r2-v2.json": "6e7f3d0db9a4028825ecfa6a8710ff970cbd40d3819219b49886e322fad79712",
+    "routing-observations-dev-c90-m20-s256-r0-v2.json": "f312b1c6e4e59360dc58398f1a3f24122c9e436df985101df6780e7995ff23c3",
+    "routing-observations-dev-c90-m20-s256-r1-v2.json": "5c8165bb2e4663bbd80db8396559613f6f926a7fe9fafafb323365ba5f9e563d",
+    "routing-observations-dev-c90-m20-s256-r2-v2.json": "c0f8a05ecd7f9eaded3587c5570a0cfaedca9cc846c33345cbe3b459f575e817",
+    "routing-observations-dev-c90-m20-s512-r0-v2.json": "5a5c5b6491eafc2226b0aea1d4c94f50d05758c927582490a25f4b16af8bacfd",
+    "routing-observations-dev-c90-m20-s512-r1-v2.json": "d7e0ac6588882672b64cf46c25c67edb9168b221950296f5b01a8ad02a0f0e3d",
+    "routing-observations-dev-c90-m20-s512-r2-v2.json": "10245f71044fe1e727ab94dab46169e9f99b9c33560b1161799aa30f6decd241",
+    "routing-observations-dev-c95-m10-s256-r0-v2.json": "267ebb08c423ba1465f9a09d2c9fa377f245d93a3bda803c199232d66b08bcca",
+    "routing-observations-dev-c95-m10-s256-r1-v2.json": "275092ea59b7c3a339786eb9a9b91066ee2032ac7140ba6cc7a02110ac21b089",
+    "routing-observations-dev-c95-m10-s256-r2-v2.json": "11cdc5afc762f1535a70b877c3bf4830514546bd67abca572db782c88deec219",
+    "routing-observations-dev-c95-m10-s512-r0-v2.json": "5a2e3857d53423d7a74ccc5e1d11406a575236441b86af7e720882ccc3bf87dc",
+    "routing-observations-dev-c95-m10-s512-r1-v2.json": "1c10c538a2bf88538a72ca57bbeabf54e43fbb7e9149bdc049b6dc662c3f8bbe",
+    "routing-observations-dev-c95-m10-s512-r2-v2.json": "ec5687ee31a11ca0ce6e4bd942902e3101970ac43f2f56c24b14131f9435b64b",
+    "routing-observations-dev-c95-m20-s256-r0-v2.json": "3d5fc0238a1cd80e8e365c0a8a69cc94730e8ab04e0a3ab048071d2e9efd3df0",
+    "routing-observations-dev-c95-m20-s256-r1-v2.json": "b869e25efc7d00fe43bc98643c016c5b3389fee7ac09da2046ff9538b5277169",
+    "routing-observations-dev-c95-m20-s256-r2-v2.json": "c41c8510eab67592b362b92953c90280ad6163f7088243d3ffc0b72f75c3ecda",
+    "routing-observations-dev-c95-m20-s512-r0-v2.json": "2c6be19167eca8133be436f57fcb604a0a30ed35831de2f4bf515fe35865a814",
+    "routing-observations-dev-c95-m20-s512-r1-v2.json": "ee126b46e9ae9ddacc057f3dca56e46ada768841225199c135d98a7559561995",
+    "routing-observations-dev-c95-m20-s512-r2-v2.json": "2c1dbecf59738c5da8e0d5dc89d4edffedebc8766fdac443876f9b1607809f72",
+    "routing-observations-dev-c99-m10-s256-r0-v2.json": "1487600d765767dc10252a34d1021247a5b4d582420ca1f32fa43af463e0483c",
+    "routing-observations-dev-c99-m10-s256-r1-v2.json": "5b295aa3973a2d87dcb55361175770b52ff770bac53dd710afa33ab2404a8e78",
+    "routing-observations-dev-c99-m10-s256-r2-v2.json": "7cf90a9912af5542cb7131283350ea3b29cb00759c22cde61dc9bd94befb8dcf",
+    "routing-observations-dev-c99-m10-s512-r0-v2.json": "7552f3ff7ef6ff34aa6c490eff83da32169d04729e8e35333a612508685deead",
+    "routing-observations-dev-c99-m10-s512-r1-v2.json": "05b9986e414b7347587c55cb82da2cb4a28d258e3d6825e951035b446a500835",
+    "routing-observations-dev-c99-m10-s512-r2-v2.json": "f5fe8824a8cc751134bad8ed1aca91bbc706c2a86419ec604ed7232c0e65fcf8",
+    "routing-observations-dev-c99-m20-s256-r0-v2.json": "e389669d78d1e0783073df9d4e4bbf20e8c1dfcbeb9a19344da04eb20ba44a28",
+    "routing-observations-dev-c99-m20-s256-r1-v2.json": "d215215638f74056fa2d767084ad2bc646a7f142fc0a41551ea4b5c4cb40bec2",
+    "routing-observations-dev-c99-m20-s256-r2-v2.json": "e36d56a3ff5ddef0aeb53062862d66708843958f273e951cc46eb0f3cb91ab58",
+    "routing-observations-dev-c99-m20-s512-r0-v2.json": "67b5d292acd633bc65ca3e014f0ed826a9d4bf91b262669256d1d7643025f3ad",
+    "routing-observations-dev-c99-m20-s512-r1-v2.json": "f58262e7222a0808d19d651ec8af584af9c363f315cee7b193da658575ebdcda",
+    "routing-observations-dev-c99-m20-s512-r2-v2.json": "71604dd45455faaa00fc8049deaf2452cba5fb00cd3649f5011e70e9b45b9f57",
+    "routing-observations-mixed-always_run-r0-v2.json": "3fe2da8c2af8b3b712b4df216f825b32ffb170e2b43e9ca3330998b83b65fa70",
+    "routing-observations-mixed-always_run-r1-v2.json": "4823c2aa241e64072448a1bfd96d3cff410e46498ccd74014e36998f0da79a50",
+    "routing-observations-mixed-always_run-r2-v2.json": "14f54ec711e39abece6f35de6b7bf6bf80ad62b4e457adb57d2fa6b70a063aa7",
+    "routing-observations-mixed-c95-m20-s512-r0-v2.json": "09fa5a98b54bc4ff671ca7dc7a687461432f7487ebfbc2909e52831f7c4adeea",
+    "routing-observations-mixed-c95-m20-s512-r1-v2.json": "ee98b59184b0102409cec6c40437cdaa4016f3a41b474da62f1991b4e9a6347c",
+    "routing-observations-mixed-c95-m20-s512-r2-v2.json": "2044756601b58ddd3c9cd8b426e4c5ff8fa2c005f15ae0c44d1bbf1ed9a8358a",
+    "routing-observations-test-always_run-r0-v2.json": "a3aa75c4602290204f7764b15c30e3eb3021354e4ea2b564bc585a36510f6812",
+    "routing-observations-test-always_run-r1-v2.json": "df466f7affdffaec86a5f3a57bd60fdff7fd4589e5c0ba8ce30dcba440e07d78",
+    "routing-observations-test-always_run-r2-v2.json": "3a0142b114390c2d7b87359e16eb06d98804339edaee1fab73bf3e41a3248664",
+    "routing-observations-test-c95-m20-s512-r0-v2.json": "7edd549c2323fa5312e7a77a603fbb0519df03d337f318af783822707225b474",
+    "routing-observations-test-c95-m20-s512-r1-v2.json": "fd8107e3ef7c51ad816b4d73a6bef12d1c003a07416ad34f6ac3bed78ecb8bf6",
+    "routing-observations-test-c95-m20-s512-r2-v2.json": "dc920829edd3a304cfb05198a4cb5b124e7ee47f3434416adaac7ab465c0258e",
+    "routing-protocol.md": "f31cad3820af77d15c4a5bdb45120d4a707f3e896ce2a7f4133e2fec58796225",
+    "routing-test-complete-v2.json": "e20ff451cc5c71825057afcdf93e235bc65e81dd2b9cd0a614c12cb14b1ca83b",
+    "routing-test-consumed-v2.json": "353c3e3baf8d8619490a84ac1ab7e9ba98e2ab853dac66b748f6352c3e1ee768",
+    "routing-test-v2.jsonl": "90c46bc265889f5ff3ec66dfa58c7eb24878d52ea724b35033c73e2470346478"
+  },
+  "limits": [
+    "Held-out exposure remains78/110; mixed exposure remains3/6 under both policies. Passing relative gates does not mean complete protection.",
+    "Synthetic templates span11 body clusters, not55 independent language/domain samples; no native-language expert review.",
+    "Compared baseline executes fast and full stages. No full-only or general release speed claim.",
+    "Both model sessions remain resident; cumulative RSS cannot prove per-policy memory savings.",
+    "The SSH observation handle disconnected after inference. Complete receipts, saved summaries and successful rescore establish completion; inference was never restarted."
+  ]
+}

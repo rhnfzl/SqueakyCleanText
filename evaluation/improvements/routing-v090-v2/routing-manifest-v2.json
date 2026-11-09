@@ -1,0 +1,294 @@
+{
+  "calibrations_sha256": "7bcc84ab9b95c8caa0355cd5201f743721170374928da5b991339f2cf60eb79e",
+  "config_digest": "3e2ce998070f68f5d8e9e484305fafef37e4316a0ae5cf167ffbb8f7a972e9da",
+  "experiment": "v090-v2",
+  "grid": [
+    {
+      "confidence": 0.9,
+      "id": "c90-m10-s256",
+      "margin": 0.1,
+      "max_chars": 256
+    },
+    {
+      "confidence": 0.9,
+      "id": "c90-m10-s512",
+      "margin": 0.1,
+      "max_chars": 512
+    },
+    {
+      "confidence": 0.9,
+      "id": "c90-m20-s256",
+      "margin": 0.2,
+      "max_chars": 256
+    },
+    {
+      "confidence": 0.9,
+      "id": "c90-m20-s512",
+      "margin": 0.2,
+      "max_chars": 512
+    },
+    {
+      "confidence": 0.95,
+      "id": "c95-m10-s256",
+      "margin": 0.1,
+      "max_chars": 256
+    },
+    {
+      "confidence": 0.95,
+      "id": "c95-m10-s512",
+      "margin": 0.1,
+      "max_chars": 512
+    },
+    {
+      "confidence": 0.95,
+      "id": "c95-m20-s256",
+      "margin": 0.2,
+      "max_chars": 256
+    },
+    {
+      "confidence": 0.95,
+      "id": "c95-m20-s512",
+      "margin": 0.2,
+      "max_chars": 512
+    },
+    {
+      "confidence": 0.99,
+      "id": "c99-m10-s256",
+      "margin": 0.1,
+      "max_chars": 256
+    },
+    {
+      "confidence": 0.99,
+      "id": "c99-m10-s512",
+      "margin": 0.1,
+      "max_chars": 512
+    },
+    {
+      "confidence": 0.99,
+      "id": "c99-m20-s256",
+      "margin": 0.2,
+      "max_chars": 256
+    },
+    {
+      "confidence": 0.99,
+      "id": "c99-m20-s512",
+      "margin": 0.2,
+      "max_chars": 512
+    }
+  ],
+  "input_counts": {
+    "dev": 220,
+    "mixed": 6,
+    "test": 110
+  },
+  "inputs": {
+    "/home/rehan/sct-improvements-l3-v090-v2-20261109/evaluation/improvements/routing-v090-v2/routing-mixed-v2.jsonl": "a8e5b634a0337a8fe6cc85767ebf5ac1c7f5d32260f411bc95439028ffce431a",
+    "/home/rehan/sct-improvements-l3-v090-v2-20261109/evaluation/improvements/routing-v090-v2/routing-test-v2.jsonl": "90c46bc265889f5ff3ec66dfa58c7eb24878d52ea724b35033c73e2470346478",
+    "/home/rehan/sct-improvements-l3-v090-v2-20261109/evaluation/multilingual_pii.jsonl": "d946043dc567a8246657f7cbb443aa773d038c5ca1c7fc6f44e68981bd2540c1"
+  },
+  "measured_repeats": 3,
+  "memory_method": "Linux resource.getrusage(RUSAGE_SELF).ru_maxrss, KiB, cumulative process high-water mark. All policies share resident models; these are not independent per-policy memory measurements.",
+  "model_files": {
+    "/home/rehan/.cache/huggingface/hub/models--protectai--bert-base-NER-onnx/snapshots/84d28ab2bc28401b4353b26033eb043c8c8a0739/config.json": "e3cc09261a1c73bda961e030563585b2be563bef339a78e11c802c3377b98d66",
+    "/home/rehan/.cache/huggingface/hub/models--protectai--bert-base-NER-onnx/snapshots/84d28ab2bc28401b4353b26033eb043c8c8a0739/model.onnx": "e2165e300f6e0016c1f295bcdee36e084371e1f4f3564cd7e47cb833b58a75b7",
+    "/home/rehan/.cache/huggingface/hub/models--protectai--bert-base-NER-onnx/snapshots/84d28ab2bc28401b4353b26033eb043c8c8a0739/tokenizer.json": "cb26b43c98e8266ae3e99c2a583cf8315d73b33a17e6b20b4df7ff1f22392d34",
+    "/home/rehan/.cache/huggingface/hub/models--protectai--bert-base-NER-onnx/snapshots/84d28ab2bc28401b4353b26033eb043c8c8a0739/tokenizer_config.json": "e4225b51da958444892048db70287fa3a0be55c8f95ab24c22d79b01bd58e4e9",
+    "/home/rehan/.cache/huggingface/hub/models--rhnfzl--wikineural-multilingual-ner-onnx/snapshots/74191432b21c956b5b04b4778c0e92e569b1f80d/config.json": "c2fc117a6f2d7e50ca05e7258eefa589c27b6a93dbe827eb5959527187d5679a",
+    "/home/rehan/.cache/huggingface/hub/models--rhnfzl--wikineural-multilingual-ner-onnx/snapshots/74191432b21c956b5b04b4778c0e92e569b1f80d/model.onnx": "bcc15ae15392b6af3f37fe60c798c9052700bc72d87e61d801bc1b1f6b2148c1",
+    "/home/rehan/.cache/huggingface/hub/models--rhnfzl--wikineural-multilingual-ner-onnx/snapshots/74191432b21c956b5b04b4778c0e92e569b1f80d/tokenizer.json": "7d76a4d25ebe8f217654f1039bd991bfc96e7c2cd36e6d28aff941783ed1e9c8",
+    "/home/rehan/.cache/huggingface/hub/models--rhnfzl--wikineural-multilingual-ner-onnx/snapshots/74191432b21c956b5b04b4778c0e92e569b1f80d/tokenizer_config.json": "6d269cf83ce9198f4fb2308befd8d324b942948654cf5c75d92bdcfebfe1a7a7"
+  },
+  "models": {
+    "fast": {
+      "id": "protectai/bert-base-NER-onnx",
+      "languages": [
+        "ENGLISH"
+      ],
+      "license": null,
+      "revision": "84d28ab2bc28401b4353b26033eb043c8c8a0739"
+    },
+    "full": {
+      "id": "rhnfzl/wikineural-multilingual-ner-onnx",
+      "languages": [
+        "ENGLISH",
+        "DUTCH",
+        "GERMAN",
+        "SPANISH",
+        "FRENCH",
+        "ITALIAN",
+        "PORTUGUESE",
+        "POLISH",
+        "RUSSIAN"
+      ],
+      "license": null,
+      "revision": "74191432b21c956b5b04b4778c0e92e569b1f80d"
+    }
+  },
+  "no_eligible_comparison": "c99-m20-s256",
+  "runtime": {
+    "cpu_affinity": [
+      2,
+      3
+    ],
+    "environment": {
+      "CUDA_VISIBLE_DEVICES": "",
+      "HF_HUB_OFFLINE": "1",
+      "OMP_NUM_THREADS": "2",
+      "OPENBLAS_NUM_THREADS": "2",
+      "TOKENIZERS_PARALLELISM": "false"
+    },
+    "executable": "/home/rehan/sct-improvements-v090-20261109/.venv-models/bin/python",
+    "executable_sha256": "b8a102363af013e65a4ef27128c1a4f8a560520c3a3b61856e7a92605af2508b",
+    "platform": "Linux-6.11.0-26-generic-x86_64-with-glibc2.39",
+    "prefix": "/home/rehan/sct-improvements-v090-20261109/.venv-models",
+    "providers": {
+      "huggingface-hub": {
+        "binaries": {},
+        "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models/lib/python3.13/site-packages/huggingface_hub/__init__.py",
+        "sha256": "600481203e97002dbeedeee40ce426f2698e5dabfe066a381d5eed8c60e54191",
+        "version": "1.32.0"
+      },
+      "lingua-language-detector": {
+        "binaries": {
+          "/home/rehan/sct-improvements-v090-20261109/.venv-models/lib/python3.13/site-packages/lingua/lingua.cpython-313-x86_64-linux-gnu.so": "d2230e8615fa7166b04a6789daae83e36850262670c00267351fe65094941f2d"
+        },
+        "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models/lib/python3.13/site-packages/lingua/__init__.py",
+        "sha256": "d6341b4300102cc3c0ed8fffb2a768d7921ca2ca5177cefc023654b9493bf4e1",
+        "version": "2.2.0"
+      },
+      "numpy": {
+        "binaries": {
+          "/home/rehan/sct-improvements-v090-20261109/.venv-models/lib/python3.13/site-packages/numpy/_core/_multiarray_tests.cpython-313-x86_64-linux-gnu.so": "1356878f9ef15f62174af09a30be36c8048bfdd49fbff0b9df828d0f9eff2fa0",
+          "/home/rehan/sct-improvements-v090-20261109/.venv-models/lib/python3.13/site-packages/numpy/_core/_multiarray_umath.cpython-313-x86_64-linux-gnu.so": "097e10f2baaf99d5a4655e549a6c76b139e3931681af39068f79c7b3abddadac",
+          "/home/rehan/sct-improvements-v090-20261109/.venv-models/lib/python3.13/site-packages/numpy/_core/_operand_flag_tests.cpython-313-x86_64-linux-gnu.so": "4e2d3b29ee6d7920ebda8f4facf18c4c240c0dafb618d9921a388d37d58df31d",
+          "/home/rehan/sct-improvements-v090-20261109/.venv-models/lib/python3.13/site-packages/numpy/_core/_rational_tests.cpython-313-x86_64-linux-gnu.so": "e47d9ec683d4ef02549244eddb688740c73d191981930ed439ecee63bfd65990",
+          "/home/rehan/sct-improvements-v090-20261109/.venv-models/lib/python3.13/site-packages/numpy/_core/_simd.cpython-313-x86_64-linux-gnu.so": "e64b6191bb182af06f03e3e7102b4165aa3c35c0e9ef3d94b79ba28bd378765b",
+          "/home/rehan/sct-improvements-v090-20261109/.venv-models/lib/python3.13/site-packages/numpy/_core/_struct_ufunc_tests.cpython-313-x86_64-linux-gnu.so": "9db6dd6dd5c3ef59ed0428e8195e05edb792ba9c2dea64b683c6511c9839c775",
+          "/home/rehan/sct-improvements-v090-20261109/.venv-models/lib/python3.13/site-packages/numpy/_core/_umath_tests.cpython-313-x86_64-linux-gnu.so": "fed2c94267e9dea0c7364733314a75c1a8b12b7cd9d6ec68ffeed98de2346c3a",
+          "/home/rehan/sct-improvements-v090-20261109/.venv-models/lib/python3.13/site-packages/numpy/fft/_pocketfft_umath.cpython-313-x86_64-linux-gnu.so": "37eea6cf4de15ba3cc9487e704bbd306de65bf804310b1067f1b11d1e50a9de8",
+          "/home/rehan/sct-improvements-v090-20261109/.venv-models/lib/python3.13/site-packages/numpy/linalg/_umath_linalg.cpython-313-x86_64-linux-gnu.so": "01de11939672ad309b147e678a86bb39faa4cc128b23db8c03a030f0a2904be8",
+          "/home/rehan/sct-improvements-v090-20261109/.venv-models/lib/python3.13/site-packages/numpy/linalg/lapack_lite.cpython-313-x86_64-linux-gnu.so": "32b56703f2639f07073eec950a5dbe0ccd397ece5c1d82f7cc2505166b019699",
+          "/home/rehan/sct-improvements-v090-20261109/.venv-models/lib/python3.13/site-packages/numpy/random/_bounded_integers.cpython-313-x86_64-linux-gnu.so": "45ef8d6c1a65f9bf287190e2c0f5297ec6dfed9411ff942789fb27f82d5dfa05",
+          "/home/rehan/sct-improvements-v090-20261109/.venv-models/lib/python3.13/site-packages/numpy/random/_common.cpython-313-x86_64-linux-gnu.so": "2b01ada16f10eafd2ed578d1fd1cf637d476120f224d3846c882529f00b30892",
+          "/home/rehan/sct-improvements-v090-20261109/.venv-models/lib/python3.13/site-packages/numpy/random/_generator.cpython-313-x86_64-linux-gnu.so": "2a6dcb8d65ff603c7943b642e04a37356774a96dc32de3dc8b59171938408391",
+          "/home/rehan/sct-improvements-v090-20261109/.venv-models/lib/python3.13/site-packages/numpy/random/_mt19937.cpython-313-x86_64-linux-gnu.so": "8a6b3ec2095ac4cc0c52655f41e1e3e76f5c3da891a3dfe2d4729897d012da9a",
+          "/home/rehan/sct-improvements-v090-20261109/.venv-models/lib/python3.13/site-packages/numpy/random/_pcg64.cpython-313-x86_64-linux-gnu.so": "1573dafacd3740c81255c3b22c9bb1cfe3cbe6d904f77801382ec19b2af74fc2",
+          "/home/rehan/sct-improvements-v090-20261109/.venv-models/lib/python3.13/site-packages/numpy/random/_philox.cpython-313-x86_64-linux-gnu.so": "a1c1c7f655cfbd4ed4f6fa1c8fad23da50dcaec0e192e9e9b012c47be23516ed",
+          "/home/rehan/sct-improvements-v090-20261109/.venv-models/lib/python3.13/site-packages/numpy/random/_sfc64.cpython-313-x86_64-linux-gnu.so": "d8f2aa1f3e52abee15858e6bbad2b1acdf92888d3f0e83c1a30552e7d366cb86",
+          "/home/rehan/sct-improvements-v090-20261109/.venv-models/lib/python3.13/site-packages/numpy/random/bit_generator.cpython-313-x86_64-linux-gnu.so": "30b89d04a78a753a0ff494324638e633e8b6111ab258123e4288114acaacefea",
+          "/home/rehan/sct-improvements-v090-20261109/.venv-models/lib/python3.13/site-packages/numpy/random/mtrand.cpython-313-x86_64-linux-gnu.so": "05fa55a19653596f138a172b03f4846ea6f85c96696ebf7a635564dc9e792f28"
+        },
+        "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models/lib/python3.13/site-packages/numpy/__init__.py",
+        "sha256": "09295a80660f17925ae23765ce8cbd7ff7ceae968d5f2f89349f1cb74c0b9e11",
+        "version": "2.5.3"
+      },
+      "onnx": {
+        "binaries": {
+          "/home/rehan/sct-improvements-v090-20261109/.venv-models/lib/python3.13/site-packages/onnx/onnx_cpp2py_export.abi3.so": "9885c622a164db12d518b4c57f2b6fbc7b5042c32c99f4c3ba8a6436985c6b27"
+        },
+        "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models/lib/python3.13/site-packages/onnx/__init__.py",
+        "sha256": "bc629ae3520cb85919ea4dbffca55662b4fe2a042c072ca4bfc4159a96006e84",
+        "version": "1.23.2"
+      },
+      "onnxruntime": {
+        "binaries": {
+          "/home/rehan/sct-improvements-v090-20261109/.venv-models/lib/python3.13/site-packages/onnxruntime/capi/libonnxruntime_providers_shared.so": "086ec1d5388f64153d9c63470d126693db9a182c8ce236d3a1119068471b8a0d",
+          "/home/rehan/sct-improvements-v090-20261109/.venv-models/lib/python3.13/site-packages/onnxruntime/capi/onnxruntime_pybind11_state.cpython-313-x86_64-linux-gnu.so": "990e7ac6e4835fb5e70ebdd4b9b5ef683471d96e53aaf193fc135a524ebcf72c"
+        },
+        "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models/lib/python3.13/site-packages/onnxruntime/__init__.py",
+        "sha256": "c238c7f2c3660ad216cfe3f794f65adf81a08c99be0f7c8d854f1e4cab076d07",
+        "version": "1.30.0"
+      },
+      "tokenizers": {
+        "binaries": {
+          "/home/rehan/sct-improvements-v090-20261109/.venv-models/lib/python3.13/site-packages/tokenizers/tokenizers.abi3.so": "7c4ddf7ad4251a646d324151b4d698da59531fdd892ea3abd24a6f323fcb1d6b"
+        },
+        "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models/lib/python3.13/site-packages/tokenizers/__init__.py",
+        "sha256": "b1cee924695651af5c3dab98e8c34406ab355a2cc1d633228646c470210e649e",
+        "version": "0.23.2"
+      }
+    },
+    "python": "3.13.3 (main, May 30 2025, 05:38:56) [Clang 20.1.4 ]"
+  },
+  "schema_version": 2,
+  "seed": 20261109,
+  "source_files": {
+    "/home/rehan/sct-improvements-l3-v090-v2-20261109/benchmarks/compare/scorer.py": "3c1934772abe4200d0a8ef5972352cb63fdd696ebadf7e81fc7bdeca605ef27d",
+    "/home/rehan/sct-improvements-l3-v090-v2-20261109/benchmarks/labels.py": "c1b7cf406b22d0b493a41633f9b0bb070563aa5942f66850314917730232b042",
+    "/home/rehan/sct-improvements-l3-v090-v2-20261109/benchmarks/score.py": "c386fdd6b3aaaccba5f3bb4c3eaaef59540ff1219539b7d66df82938b2aeab3e",
+    "/home/rehan/sct-improvements-l3-v090-v2-20261109/evaluation/improvements/measure_baseline.py": "242b9db550bc754e76cb9ba2f62bea2d3b4c252154677f7c7cb60d2b73aa8035",
+    "/home/rehan/sct-improvements-l3-v090-v2-20261109/evaluation/improvements/routing-v090-v2/routing-input-provenance-v2.json": "d0cf31e4222f6aacde28c7d55bcbf3ced44b1246bbca70c42166aa6f2ccac46b",
+    "/home/rehan/sct-improvements-l3-v090-v2-20261109/evaluation/improvements/routing-v090-v2/routing-protocol.md": "f31cad3820af77d15c4a5bdb45120d4a707f3e896ce2a7f4133e2fec58796225",
+    "/home/rehan/sct-improvements-l3-v090-v2-20261109/pylock.toml": "7bd1216b3f34861b05fe5ed95c367eca04d2d5d448c178ed8bd655b91fedfb93",
+    "/home/rehan/sct-improvements-l3-v090-v2-20261109/pyproject.toml": "101c93e8315b691df1f11b9df16c38ad6291feb4f0a55e93b72b0a07c9dda9bc",
+    "/home/rehan/sct-improvements-l3-v090-v2-20261109/scripts/benchmark_detector_routing.py": "e8c5a8fec71c08beb0430c94dade95a4eee7783dd3d40044811d532fe5ab2e73",
+    "/home/rehan/sct-improvements-l3-v090-v2-20261109/sct/__init__.py": "d6e5aca8eb5cbdbe0781bde805abe658ae869ec35d60b2a42f3af44b9cb9cd01",
+    "/home/rehan/sct-improvements-l3-v090-v2-20261109/sct/adapters.py": "6c14afecf1b1d995e68c866d4a6333349d5c430edaebc1d0201d37daec08ca34",
+    "/home/rehan/sct-improvements-l3-v090-v2-20261109/sct/browser.py": "552541e368fc5403f02294363816917d05bb2b837b6e3f66c30a3ed126c2a8bb",
+    "/home/rehan/sct-improvements-l3-v090-v2-20261109/sct/cli.py": "b25622f4d030bebcb53e8fa4fd59b0e55805c48c5ad36fe852c90b4ef9f6abaa",
+    "/home/rehan/sct-improvements-l3-v090-v2-20261109/sct/config.py": "15ff66b60385383b73d70d873afd7e39c3ddf8a770329ecaf9e67fb45f518710",
+    "/home/rehan/sct-improvements-l3-v090-v2-20261109/sct/coordinates.py": "33d8b74559945bd8a12bd765b8313b4364a01ceb11460dfc4422e493846b7e72",
+    "/home/rehan/sct-improvements-l3-v090-v2-20261109/sct/corpus/__init__.py": "b3589ddd7ab3c2a9fbf62fb3d0d4e932486e610fe308166ea76ddf5a2671124a",
+    "/home/rehan/sct-improvements-l3-v090-v2-20261109/sct/corpus/datatrove.py": "901f069dd09ea1a9aee082b1fcfc6f4016eff720e68b7879942a9ef6cecf9eda",
+    "/home/rehan/sct-improvements-l3-v090-v2-20261109/sct/corpus/manifest.py": "de9c291a63960d4a1ae4c8a9aa8d318ceb1d643e468295bcc166fac56e6cd577",
+    "/home/rehan/sct-improvements-l3-v090-v2-20261109/sct/corpus/runner.py": "d00e80f9f3bb1d2cceee814ad9cddf986bef6db95fa65cc49e5dd10201d3cbc9",
+    "/home/rehan/sct-improvements-l3-v090-v2-20261109/sct/corpus/selection.py": "9f11d71de2889607c7a403f26725c35a326909e4f72a849bd2649eb08d4809a4",
+    "/home/rehan/sct-improvements-l3-v090-v2-20261109/sct/corpus/types.py": "c78dd1c36e09e2b2a2c160594b2a529d6e8f04001a7577a391c295fedac1bf1f",
+    "/home/rehan/sct-improvements-l3-v090-v2-20261109/sct/detectors.py": "3892d4886bcdb4be869c763d0db82b240e09521320155d7c98b49c8c3f629456",
+    "/home/rehan/sct-improvements-l3-v090-v2-20261109/sct/detectors_builtin.py": "68ed494896dadc4eb7f70b40ce9f5516063c2378cc0bdd04e79018ace18dd241",
+    "/home/rehan/sct-improvements-l3-v090-v2-20261109/sct/detectors_datafog.py": "eb0601c49a3e8ad093d3cdfbced9a50901a37c0b1876514ac86912981d1ed5d7",
+    "/home/rehan/sct-improvements-l3-v090-v2-20261109/sct/documents.py": "1250c8d780deb4e147767e630296d17bb84b1835fa565f9f9bcf37eeaa119c5a",
+    "/home/rehan/sct-improvements-l3-v090-v2-20261109/sct/evaluation.py": "0744ddaccf6a6f9f26c1b05ac14165d0e140d0dd2cc386d5b8cce914a7f02e27",
+    "/home/rehan/sct-improvements-l3-v090-v2-20261109/sct/findings.py": "c5298b9205f66c63d361096f73189646ecb70e47a5245ec9589493f430a209d2",
+    "/home/rehan/sct-improvements-l3-v090-v2-20261109/sct/integrations/__init__.py": "86572a797863d690fc17eacfeb6baab82b5c2146606d20cc9852abb9fd59e851",
+    "/home/rehan/sct-improvements-l3-v090-v2-20261109/sct/integrations/_runtime.py": "dd1c97c8649338177560b8d872ab8298822dfe072d691b36242cec84e48e6fb7",
+    "/home/rehan/sct-improvements-l3-v090-v2-20261109/sct/integrations/datatrove.py": "60ebe86941848bbc3ce6ba37162fcc286ec9fd3af033381818714b9a0a680205",
+    "/home/rehan/sct-improvements-l3-v090-v2-20261109/sct/integrations/docling.py": "6d1d26bf2fe3b2216261c2270ec2d67db6f5143c9d648d28effce3f1b31458d5",
+    "/home/rehan/sct-improvements-l3-v090-v2-20261109/sct/integrations/haystack.py": "496863210cad7e4048c25aaf24bf4bd40ccdc94f876bcd085716778887cecfed",
+    "/home/rehan/sct-improvements-l3-v090-v2-20261109/sct/integrations/hf.py": "8b19a47f52f76a07b9d0f36d4e90f359e345c52f7cc47304d787d20e764d5e73",
+    "/home/rehan/sct-improvements-l3-v090-v2-20261109/sct/integrations/langchain.py": "c3c9ba429153c0acbb38d912851cc89f60a24660b53a307ce8f9e229b300c8b3",
+    "/home/rehan/sct-improvements-l3-v090-v2-20261109/sct/language_policy.py": "e5c60565ad19a50c605ad57f46d5c33f7737affeed8cf972b5396c80070b4a28",
+    "/home/rehan/sct-improvements-l3-v090-v2-20261109/sct/mcp_server.py": "6ef57a2986b5ff1a87397f12def6e910f11705665c76cfcfd0097072a1ff47d3",
+    "/home/rehan/sct-improvements-l3-v090-v2-20261109/sct/model_benchmark.py": "14c667e194880b7a60e95704605e07cfe4244224aa53724f196fbe2a4cffc3d1",
+    "/home/rehan/sct-improvements-l3-v090-v2-20261109/sct/model_candidates.py": "e800be7bed0b7b256bd4d880f1b3d8027b7e8e92215386778971348cc7adee46",
+    "/home/rehan/sct-improvements-l3-v090-v2-20261109/sct/ocr.py": "1ccb8453e01bf6a0946455b7db2503f966a7a0b602c883b1833f5f745071c6cc",
+    "/home/rehan/sct-improvements-l3-v090-v2-20261109/sct/policy_v2.py": "e25e1f44c4ff7be6beb9bbf3c47a9bcc01dd5c731b053fdc15eff93bebde70b3",
+    "/home/rehan/sct-improvements-l3-v090-v2-20261109/sct/presets.py": "be2446dafbfc8705e05fdea1663de99f6187cca1dfb600f56b8491808aa1db1a",
+    "/home/rehan/sct-improvements-l3-v090-v2-20261109/sct/privacy.py": "b0b7c78d52e5746b841a5f87255180094fab2d08634e0f8bb724ba52e6853d5a",
+    "/home/rehan/sct-improvements-l3-v090-v2-20261109/sct/report_cli.py": "c95d9c4ef190d377b5f2cf80f9848d9177c5cf0135fca291890b49cfdd076320",
+    "/home/rehan/sct-improvements-l3-v090-v2-20261109/sct/risk.py": "55ed1510197fe3361b127fef3c16ac8a7f2d8a0a393668ccce7507a326783bb9",
+    "/home/rehan/sct-improvements-l3-v090-v2-20261109/sct/routing.py": "19ced2813aa8220ab7f08bddd032b384d5ccadf6d9e49f86546b7cd3642f28fc",
+    "/home/rehan/sct-improvements-l3-v090-v2-20261109/sct/schema.py": "6821237c10f3b7a438cee08afdb94b0ce6b7ee6a71ccae639efe899338719584",
+    "/home/rehan/sct-improvements-l3-v090-v2-20261109/sct/score.py": "b7a6548572e29147b85116e2efceeae8b9b30fe2ffd5af9b49bedcbb3fd0e4fc",
+    "/home/rehan/sct-improvements-l3-v090-v2-20261109/sct/sct.py": "3e8c4a2812c1213e307c93b5d51d4cafbe7ab3f3a63e5c58a88f048273b2cdc0",
+    "/home/rehan/sct-improvements-l3-v090-v2-20261109/sct/signals.py": "6ef22ea0261a6206748613befa672a4900330bfac2349df8e31ba34fe5471626",
+    "/home/rehan/sct-improvements-l3-v090-v2-20261109/sct/streaming.py": "c442a2fb06eea1aa0a4f98e962ecffbf09f4cbc41bd2369f504d8e3084a08a75",
+    "/home/rehan/sct-improvements-l3-v090-v2-20261109/sct/token_stores/__init__.py": "4f8caf8bd1fc12c5ee812a62b0e1e6d35e2d88df613105436fc3ea8c3e86946c",
+    "/home/rehan/sct-improvements-l3-v090-v2-20261109/sct/token_stores/sqlite.py": "bdaedeecfccbc4ef628a93e00ff5ae0dda6f17207dc84628512e00735be7118b",
+    "/home/rehan/sct-improvements-l3-v090-v2-20261109/sct/unified.py": "f844242f43ae099fdc08ecdbbf7e34932c94e609a67ae2ef2131b68fae55e714",
+    "/home/rehan/sct-improvements-l3-v090-v2-20261109/sct/utils/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "/home/rehan/sct-improvements-l3-v090-v2-20261109/sct/utils/anonymization_map.py": "2925f2580dd2666c0a5a71348a0539a1cf84ae305de28f0223a0ffe275803b04",
+    "/home/rehan/sct-improvements-l3-v090-v2-20261109/sct/utils/atomic_file.py": "99f67a1ffb1db33eb229d0d7ac178dff4b669666ad42433888fa007890085d5a",
+    "/home/rehan/sct-improvements-l3-v090-v2-20261109/sct/utils/constants.py": "20966a48e158141a055ab3127c0b99954580a0bd784428fc6be4145ae773dd6a",
+    "/home/rehan/sct-improvements-l3-v090-v2-20261109/sct/utils/contact.py": "627e5ffd3e2a1212f73094b28d9ddf9ca72432225363eff47889e60b998ef2ba",
+    "/home/rehan/sct-improvements-l3-v090-v2-20261109/sct/utils/datetime.py": "420babdfdbff4259a4774faf3cd6dfe33603882606214ab5a8e80869b34b4f30",
+    "/home/rehan/sct-improvements-l3-v090-v2-20261109/sct/utils/gliclass_adapter.py": "d9f054dc7a1831634cbeb1510f18ccfbc80cb7d2595319d492a820a63b1ba8be",
+    "/home/rehan/sct-improvements-l3-v090-v2-20261109/sct/utils/gliner_adapter.py": "99c366d8859637df255d237f9516f2e666b74b5eecfe2f12cb843d39c436c972",
+    "/home/rehan/sct-improvements-l3-v090-v2-20261109/sct/utils/markers.py": "79b03874a953c587e8c530b52ecebe69e29d39b88a8918c7bb26e70c2b9a1856",
+    "/home/rehan/sct-improvements-l3-v090-v2-20261109/sct/utils/ner.py": "dba9b9cdae78b0a6f619741ff26fdcee80e5574e0a95ad88266595f6772f7f35",
+    "/home/rehan/sct-improvements-l3-v090-v2-20261109/sct/utils/ner_chunking.py": "b60046f3b86bbc9e0e0c3273fb7e8c8d62a22f8a8a2b61c7b1155869cbbd0bb1",
+    "/home/rehan/sct-improvements-l3-v090-v2-20261109/sct/utils/ner_spans.py": "d3934998a8f76ae8de354be9cd4a95da9aed324496e7975d3fd552f043685e57",
+    "/home/rehan/sct-improvements-l3-v090-v2-20261109/sct/utils/normtext.py": "538569ee5a14d411c99a63808c0bc144959711d770372128f95d70c1771e63c2",
+    "/home/rehan/sct-improvements-l3-v090-v2-20261109/sct/utils/onnx_pipeline.py": "8214e7ebd532890541d63346986d4557c38b0176bae60b4708b3645b4db71d60",
+    "/home/rehan/sct-improvements-l3-v090-v2-20261109/sct/utils/process_result.py": "b36f7cbdbe79292cefaa4991cedb8408bf4f0c4ac627a450226ab4ffec595562",
+    "/home/rehan/sct-improvements-l3-v090-v2-20261109/sct/utils/resources.py": "18058b215ffdd9d390966ff7485447f03fe8d54968821b4d7902342ee804ed13",
+    "/home/rehan/sct-improvements-l3-v090-v2-20261109/sct/utils/special.py": "705aa6e13607a229f30dfa69c061656aac7d1b3accbc1611c2b6b0caecf36a97",
+    "/home/rehan/sct-improvements-l3-v090-v2-20261109/sct/utils/stopwords.py": "e36784c680695cf4dd1f00a33a379e525d98bae964c39d525e2837792bf9996c",
+    "/home/rehan/sct-improvements-l3-v090-v2-20261109/sct/utils/synthetic.py": "1f3a659abc9d3e1e79d606904e7b58cacde7fedf8229a5fad1072f3403fb4775",
+    "/home/rehan/sct-improvements-l3-v090-v2-20261109/sct/utils/torch_pipeline.py": "b70053c797d8d694dd9f497491e88fe342abdb687fa2e35668d7091a347f34c7",
+    "/home/rehan/sct-improvements-l3-v090-v2-20261109/uv.lock": "d147303f247458c5e1c38e8e3c5a6e79a6d9c7b9a78bad99a08526bddc03242d"
+  },
+  "source_root": "/home/rehan/sct-improvements-l3-v090-v2-20261109",
+  "timestamp_utc": "2026-11-09T19:32:14Z",
+  "warmup_documents": 2
+}

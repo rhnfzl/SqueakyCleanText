@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "failed_manifest_sha256": "e7f27e977a8e36295801ac5bf79ed0e3b9be61f4663762a9e4850d76cf431156",
+  "failed_source_sha256": "2697170ceca7cc9e40188b3acd11464e55f752f62668a1a2d0c6c4883290e763",
+  "phase": "baseline scoring before first development candidate",
+  "error": "KeyError: 'score' in benchmarks.compare.scorer.merge_same_type",
+  "candidate_evaluations": 0,
+  "test_evaluations": 0,
+  "resolution": "Add score=None when optional score absent; overlapping native prediction regression reproduced before fix; freeze new source identity without changing data, grid or models.",
+  "failed_manifest": "routing-manifest-preflight-v1.json"
+}

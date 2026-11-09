@@ -1,0 +1,114 @@
+{
+  "schema_version": 1,
+  "status": "local checks complete; remote held-out artifacts await retrieval",
+  "full": {
+    "command": "HF_HUB_OFFLINE=1 OMP_NUM_THREADS=2 OPENBLAS_NUM_THREADS=2 VECLIB_MAXIMUM_THREADS=2 PYTEST_XDIST_AUTO_NUM_WORKERS=4 .venv/bin/python -m pytest tests/ --cov=sct --cov-report=xml --cov-fail-under=85 -v -rs",
+    "session": 27659,
+    "exit_code": 1,
+    "passed": 3229,
+    "skipped": 30,
+    "failed": 2,
+    "warnings": 96,
+    "duration_seconds": 310.91,
+    "known_failures": [
+      "tests/test_atomic_file.py::test_dev_stdout_redirected_to_a_file_is_written_through",
+      "tests/test_atomic_file.py::test_dev_stdout_piped_is_written_through"
+    ]
+  },
+  "stdout_split": {
+    "session": 48211,
+    "exit_code": 0,
+    "passed": 2,
+    "duration_seconds": 0.21
+  },
+  "coverage": {
+    "covered": 7105,
+    "statements": 7515,
+    "exact_percent": 94.54424484364604,
+    "baseline_exact_percent": 94.54424484364604,
+    "delta_percentage_points": 0.0,
+    "minimum": 85
+  },
+  "checks": {
+    "ruff": "whole repository passed",
+    "mypy": "2.4.1; project interpreter; 63 source files passed",
+    "strict_docs": "passed in 2.07 seconds; empirical append still pending"
+  },
+  "native": {
+    "312": {
+      "passed": 125,
+      "skipped": 2,
+      "seconds": 2.06
+    },
+    "313": {
+      "passed": 125,
+      "skipped": 2,
+      "seconds": 2.09
+    },
+    "314": {
+      "passed": 125,
+      "skipped": 2,
+      "seconds": 1.98
+    },
+    "notes": "L3 native model check executes all three; separate L2 native opt-in and absent DataTrove profile skipped"
+  },
+  "local_runtime": {
+    "python": "3.14.3 (main, Mar  3 2026, 15:46:55) [Clang 21.1.4 ]",
+    "executable": "/Users/rehan-8v/projects/personal/SqueakyCleanText-pipeline-research/.venv/bin/python",
+    "prefix": "/Users/rehan-8v/projects/personal/SqueakyCleanText-pipeline-research/.venv"
+  },
+  "logs_sha256": {
+    "/private/tmp/sct-l3-full.log": "d79cc692c2a1b08cec751258bccafbef20753eb4a567607111e91a1da0b714df",
+    "/private/tmp/sct-l3-stdout.log": "686b4ed9a084cc13a88ea4749c9895e659d7faa3540b7c04eedf6fa858d9cc2c",
+    "/private/tmp/sct-l3-docs.log": "7966b9fc104ec6beb50d01b1e52f92e4a82d35a427052f3bc36461f5bdf3862f",
+    "/private/tmp/sct-l3-before-full.json": "2e0d4552367c86c973e1e75e38d840503bbca5222f80d52357102042474339d1",
+    "/private/tmp/sct-l3-after-full.json": "2e0d4552367c86c973e1e75e38d840503bbca5222f80d52357102042474339d1",
+    "/private/tmp/sct-l3-native-evidence/l3-native-312.log": "00db0725a2ba53e6924b6b16fe29a4ae1d040fffbc7e691500602bddb8b2a9d3",
+    "/private/tmp/sct-l3-native-evidence/l3-native-313.log": "958720743c3eae0756d720ed092e96eda1948e7fd9cab6516a0d2d9636ea544f",
+    "/private/tmp/sct-l3-native-evidence/l3-native-314.log": "355ead86d62b00df61d32034ff819c5bf61b1fb394ac3cd69245cf2fd740d359",
+    "/private/tmp/sct-l3-native-evidence/l3-runtime-312.json": "278d987f4780c33afd72faa5b7b84145a2111b72f102254a4c523bf1991d77a8",
+    "/private/tmp/sct-l3-native-evidence/l3-runtime-313.json": "4f1744a541116cd0802ec0ed85df7909b9d78f4467e45019892f2c9b776d6cb7",
+    "/private/tmp/sct-l3-native-evidence/l3-runtime-314.json": "c041c374c3fd6e3c6a7a3ec3ef406cfedba803848b505bebdc2f0c11e72a1b3e"
+  },
+  "heldout": {
+    "session": 46640,
+    "exit_code": 0,
+    "remote_gate_observation": {
+      "status": "pass",
+      "all_five_gates": true,
+      "paired_interval": [
+        0.0,
+        0.0
+      ],
+      "default_policy": "always_run"
+    },
+    "full_report_retrieved": false,
+    "never_rerun": true
+  },
+  "manifest_sha256": "233ca224b10be81a68735572b59e63b9761c756f4cf8b0b4c69ac97a1a916904",
+  "scope": "L3 frozen local source qualification only; exact remote held-out report and consumption marker are not retrieved or independently verified. L3 remains incomplete.",
+  "source_sha256": {
+    "scripts/benchmark_detector_routing.py": "31edc0c3d04e3464a5cad71bc9514d026ef3b85d6f2b7d205521be21fae0a934",
+    "tests/test_routing_calibration.py": "3c9c1f31777154eafedc12fbe3b2354e8a97184d030f3e9a44c44931cc55b619",
+    "docs/PERFORMANCE.md": "7fe77285c479851205f66b357f0e2dc635a4e875ee296593c8de3986d4cc615e",
+    "benchmarks/compare/PROTOCOL.md": "21a42f973dfb3d1a5d3ca25932d1e5337025f5d833bfe6d5ba19b62534bff95b",
+    "evaluation/improvements/routing-calibrations-v1.json": "54f3d4706a8f432ce0340cb2f5859a9de3a6a4e1d954f426e135b09ea5a6d4df",
+    "evaluation/improvements/routing-development-v1.json": "586cb9dfa3fbdd1ce2b7d008882544c94555f060a2b6680e426fc88e7f8565cf",
+    "evaluation/improvements/routing-input-provenance-v1.json": "e457da4419507a9d1ab90a5e7f6849aed07926e2dd04872b6581df595a8e6a4b",
+    "evaluation/improvements/routing-manifest-preflight-v1.json": "e7f27e977a8e36295801ac5bf79ed0e3b9be61f4663762a9e4850d76cf431156",
+    "evaluation/improvements/routing-manifest-review-predecessor-v1.json": "3958ab724ed820340f9cac6754f1f651cefe13e6851a08a07bee2c915c671c67",
+    "evaluation/improvements/routing-manifest-v1.json": "233ca224b10be81a68735572b59e63b9761c756f4cf8b0b4c69ac97a1a916904",
+    "evaluation/improvements/routing-mixed-v1.jsonl": "6cb8882c5dd75335b3fe3203910b0f1c241aada03af8981141ba4b47de0034b9",
+    "evaluation/improvements/routing-preflight-failure-v1.json": "dce669446d7ae4d6bd02fe09c89566ff9ee9a578912b0466124df9005f04fb34",
+    "evaluation/improvements/routing-protocol.md": "433e6e6601c568346a850d227697c002ddc01a0ede5a199133c5ca0b0e0c393a",
+    "evaluation/improvements/routing-review-predecessor-v1.json": "37b0c82801d04ea565a1cc1fcf7f6f680186a4c099628ca08d803d9ea6a61b92",
+    "evaluation/improvements/routing-test-v1.jsonl": "e28a488c2db7f7fd763759d7ebcd9983ccd25db335f49fd4c6b07b8310c48ae3"
+  },
+  "controller_validation": {
+    "logs_match_sha256": true,
+    "before_after_all_16_paths_match": true,
+    "current_publishable_15_paths_match": true,
+    "scratch_report_excluded_from_publishable_source": true,
+    "split_test_evidence_not_single_green_full_run": true
+  }
+}

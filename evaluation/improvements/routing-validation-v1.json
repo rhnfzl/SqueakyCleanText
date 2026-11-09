@@ -1,0 +1,109 @@
+{
+  "schema_version": 1,
+  "validation_status": "passed with audit limits",
+  "heldout_execution_replayed": false,
+  "artifact_sha256": {
+    "routing-manifest-v1.json": "233ca224b10be81a68735572b59e63b9761c756f4cf8b0b4c69ac97a1a916904",
+    "routing-development-v1.json": "586cb9dfa3fbdd1ce2b7d008882544c94555f060a2b6680e426fc88e7f8565cf",
+    "routing-heldout-v1.json": "400368f86b1f1b376a63eb46df69d75cac2bad4afa9c14315172d004d0142294",
+    "routing-test-consumed-v1.json": "e02bbc8ade0365fc5246c693bd230f2a89e5da4cfa344bf732b4f8db9b6ca4fc"
+  },
+  "identity_verification": {
+    "local_frozen_source_files": 70,
+    "local_input_files": 3,
+    "remote_frozen_source_files": 70,
+    "remote_input_files": 3,
+    "remote_model_files": 8,
+    "remote_runtime_matches_manifest": true,
+    "remote_verification_session": 63475,
+    "remote_verification_exit_code": 0
+  },
+  "report_checks": [
+    "complete twelve-candidate grid and development-only selection",
+    "held-out and consumption development/manifest identity",
+    "220 development / 110 held-out / 6 mixed records and partition isolation",
+    "110 held-out records across 11 template groups",
+    "every shared/full overall, language, domain and entity denominator and derived metric",
+    "language/domain support and aggregate count reconciliation",
+    "actual model totals equal three times first-pass per-document calls",
+    "all 22 declared added-exposure slices present and zero",
+    "mixed fixture summaries show no exposed gold",
+    "five promotion gates recomputed from saved measurements"
+  ],
+  "candidate": {
+    "confidence": 0.95,
+    "id": "c95-m20-s256",
+    "margin": 0.2,
+    "max_chars": 256
+  },
+  "promotion": {
+    "default_policy": "always_run",
+    "gates": {
+      "exposure_upper_nonpositive": true,
+      "fewer_expensive_model_calls": true,
+      "lower_median_latency": true,
+      "mixed_no_regression": true,
+      "no_added_slice_exposure": true
+    },
+    "paired_95_percent_interval": [
+      0.0,
+      0.0
+    ],
+    "status": "pass"
+  },
+  "measurements": {
+    "full_model_calls": {
+      "baseline": 750,
+      "candidate": 690,
+      "reduction_percent": 8.0
+    },
+    "median_ms": {
+      "baseline": 314.97820105869323,
+      "candidate": 313.5619700187817,
+      "reduction_percent": 0.4496282711474396
+    },
+    "full_taxonomy": {
+      "docs": 110,
+      "docs_with_gold": 110,
+      "document_exposure": 0.6727272727272727,
+      "exposed_docs": 74,
+      "gold": 660,
+      "precision": 0.9372822299651568,
+      "predicted": 574,
+      "recall": 0.8151515151515152,
+      "true_positive": 538
+    },
+    "shared_taxonomy": {
+      "docs": 110,
+      "docs_with_gold": 110,
+      "document_exposure": 0.6727272727272727,
+      "exposed_docs": 74,
+      "gold": 330,
+      "precision": 0.8524590163934426,
+      "predicted": 244,
+      "recall": 0.6303030303030303,
+      "true_positive": 208
+    },
+    "mixed_fixture_exposed_documents": 0
+  },
+  "limits": [
+    "Raw predictions, per-document exposure counters and individual latency samples were not persisted. Their scores, paired interval and latency quantiles cannot be independently recomputed without replay, which was not performed.",
+    "The saved paired interval [0,0] is internally consistent with unchanged exposure and the frozen scoring implementation; it is not evidence of zero population risk.",
+    "The result covers a small synthetic cohort and configured two-stage always-run baseline; it does not establish production privacy or a general speed improvement.",
+    "Median latency improves by about 0.45 percent in this sequential run; host/order effects remain possible. Mixed fixtures were slower under the candidate.",
+    "Default remains always_run; no release or default migration is authorized."
+  ],
+  "scoped_checks": {
+    "date": "2026-11-09",
+    "routing_tests_passed": 29,
+    "explicit_native_test_skips": 1,
+    "ruff": "passed",
+    "strict_mkdocs": "passed",
+    "independently_reconciled_metric_rows": 184,
+    "production_or_benchmark_source_changed": false
+  },
+  "empirical_documentation_sha256": {
+    "docs/PERFORMANCE.md": "17072f011d3ee1da1527559be2e841f0ca945e91c8984091440e1d4490a0f890",
+    "benchmarks/compare/PROTOCOL.md": "2d9c2bb839c43c436eb5c1ab0415a439583eae39631150266a91665a230090cb"
+  }
+}

@@ -147,3 +147,129 @@ cache, a cached load still took 30-46 s, and XLM-R-large crashed the process.
   the models over 3 GPUs with a test harness, because 7.6 GB of free memory on one GPU was
   not enough.
 - GPU numbers were measured on a shared machine; your numbers on a free GPU can be higher.
+
+## Experimental detector routing
+
+The calibrated cascade can skip a second detector after a fast stage covers every requested entity type.
+It is opt-in. `always_run` remains the default.
+
+The version 1 experiment compares 12 fixed confidence, margin and size combinations against the same two-stage baseline.
+It uses pinned English BERT and multilingual WikiNEURAL ONNX checkpoints on the same CPU runtime.
+Here `always_run` means the configured fast-plus-full model union, not SCT's default model profile.
+Any measured speed difference applies only to this configured comparison.
+The fast stage also runs the existing email, phone and IP format detectors.
+The full protocol is `evaluation/improvements/routing-protocol.md` in the repository.
+
+Development uses the existing 220 multilingual synthetic records, whose language outcomes were already inspected.
+A separate 110-record synthetic cohort is frozen before candidate inference and evaluated after development selection.
+Six mixed-entity fixtures provide an additional deterministic regression check.
+Shared neural types and the full annotated taxonomy have separate reports.
+Unsupported neural languages are reported as extrapolation, with all documents retained in accuracy denominators.
+
+The benchmark measures actual ONNX session calls, median latency and nearest-rank p95 over three timed repeats.
+Two document warmups precede each policy. Model loading is outside timing.
+Memory observations are cumulative Linux process peak RSS, in KiB, with both models resident.
+They do not show independent per-policy memory use or memory savings.
+
+Promotion requires a nonpositive upper paired 95% exposure interval, no mixed-entity regression,
+fewer full-model inference calls and lower median latency.
+Every declared held-out language, entity and domain slice must also show no added exposure.
+Negative and inconclusive results remain in the versioned evaluation artifacts.
+Small synthetic samples cannot establish production privacy.
+
+### Version 1 observed results
+
+The selected cascade skips the full stage for ten English test documents without changing any saved accuracy summary.
+This result covers 110 synthetic documents in eleven template groups, using the configured two-model baseline above.
+Development selected `c95-m20-s256`: confidence 0.95, margin 0.20 and maximum length 256 characters.
+All twelve development candidates had zero skipped stages and zero full-model call savings.
+Their timing-only selection does not establish a useful development speed improvement.
+
+| Held-out measurement | `always_run` | Selected cascade |
+| --- | ---: | ---: |
+| Actual fast-model calls, three repeats | 750 | 750 |
+| Actual full-model calls, three repeats | 750 | 690 |
+| Median document latency, ms | 314.978201 | 313.561970 |
+| p95 document latency, ms | 387.812853 | 385.098284 |
+| Full-taxonomy exact-span precision | 538/574 (93.7282%) | 538/574 (93.7282%) |
+| Full-taxonomy exact-span recall | 538/660 (81.5152%) | 538/660 (81.5152%) |
+| Shared neural-type precision | 208/244 (85.2459%) | 208/244 (85.2459%) |
+| Shared neural-type recall | 208/330 (63.0303%) | 208/330 (63.0303%) |
+| Exposed documents, either taxonomy | 74/110 (67.2727%) | 74/110 (67.2727%) |
+
+Full-model calls fall 8%; total model calls fall 4%.
+The median falls 1.416231 ms (0.449628%) over 330 timed document calls per policy.
+Ten unique early exits produce 30 skipped stages across the three repeats.
+The saved paired 95% exposure interval is `[0.0, 0.0]`, with all five experiment gates passing.
+All 22 declared language, entity and domain added-exposure counts are zero.
+Both policies retain identical shared/full slice summaries, including support counts and undefined values.
+Language detection covers all 110 documents; 70 documents use languages outside the neural models' declared support.
+Accuracy includes these documents and every routing fallback.
+
+The six mixed-entity fixtures expose no annotated entities under either policy.
+They save no calls and have a slower cascade median: 118.674737 ms versus 111.708482 ms.
+All four measurements report the same cumulative process peak RSS of 1,649,020 KiB.
+That value does not measure policy-specific memory savings.
+
+Source-free results and the validation record are under `evaluation/improvements/`:
+`routing-development-v1.json`, `routing-heldout-v1.json`, `routing-test-consumed-v1.json` and `routing-validation-v1.json`.
+They preserve every slice; raw latency samples, predictions and per-document exposure counters were not persisted.
+Validation checks saved counts, ratios, identities and gates; it cannot independently reconstruct raw scores, timing quantiles or the paired interval.
+The surviving remote logs contain summaries only. Held-out inference was not replayed.
+Sequential execution and host drift can affect this small timing difference; no latency uncertainty interval was measured.
+This synthetic result establishes neither zero population exposure risk nor a general production speedup.
+`always_run` remains the default.
+
+### Version 2 observed results on the frozen v0.9.0 feature source
+
+The selected cascade reduces full-model calls, but both policies leave annotated content exposed in 78 of 110 documents (70.9091%).
+Passing the relative experiment gates does not establish adequate absolute privacy protection.
+`always_run` remains the default.
+
+The separate preregistration and retained evidence are under `evaluation/improvements/routing-v090-v2/`.
+This experiment uses a new 110-record synthetic cohort, eleven language-template clusters and six separate regression fixtures.
+The historical v1 cohort and results remain unchanged and were not replayed.
+
+Development selected `c95-m20-s512`: confidence 0.95, margin 0.20 and maximum length 512 code points.
+All twelve development candidates were eligible, but none skipped a stage or saved model calls.
+The selected development median was 161.103002 ms against the baseline's 166.432187 ms, with 660 observations per policy.
+Selection therefore relied on measured timing differences without development call savings; fixed order and host drift remain possible explanations.
+
+| Held-out measurement | Configured `always_run` | Selected cascade |
+| --- | ---: | ---: |
+| Actual fast-model calls, three repeats | 750 | 750 |
+| Actual full-model calls, three repeats | 750 | 690 |
+| Total actual model calls | 1,500 | 1,440 |
+| Median document latency, ms | 395.409150 | 381.347755 |
+| Nearest-rank p95 latency, ms | 481.847735 | 468.015126 |
+| Full-taxonomy exact-span precision | 560/614 (91.2052%) | 560/614 (91.2052%) |
+| Full-taxonomy exact-span recall | 560/660 (84.8485%) | 560/660 (84.8485%) |
+| Shared neural-type precision | 230/284 (80.9859%) | 230/284 (80.9859%) |
+| Shared neural-type recall | 230/330 (69.6970%) | 230/330 (69.6970%) |
+| Exposed documents, either taxonomy | 78/110 (70.9091%) | 78/110 (70.9091%) |
+
+Each policy has 330 retained held-out durations: 110 documents over three fixed repeats, excluding initialization and two warmup documents.
+Full-model calls fall 8%, total calls fall 4%, and median latency falls 14.061395 ms (3.556163%).
+Ten English documents skip the full stage, producing 30 skipped stages across the repeats.
+Every language, entity and domain added-exposure count is zero in both taxonomy views.
+Both paired 95% exposure intervals are `[0.0, 0.0]`, using 1,000 template-group draws and seed 20261109.
+All preregistered gates pass for this configured comparison; the intervals do not establish zero population risk.
+All 110 documents remain in accuracy denominators, including 70 documents outside the models' declared neural language support.
+
+The six mixed fixtures add no exposed gold mentions relative to baseline, but both policies expose three of six documents.
+Their full-taxonomy recall is 33/36 and precision is 33/89; no stages or model calls are saved.
+Across 18 durations per policy, the mixed median falls from 212.856895 to 212.251151 ms.
+Its p95 increases from 873.196982 to 874.181043 ms.
+All held-out and mixed measurements report cumulative Linux peak RSS of 1,660,124 KiB with both models resident.
+This is not an independent memory comparison or evidence of memory savings.
+
+Every repeat retains source-free positional predictions, durations and actual model-call deltas.
+Durable completion receipts bind successful postflight verification to the manifest and every observation file.
+The saved numeric audit reconstructs selection, scores, quantiles, intervals and gates without model-cache access or inference replay.
+The portable frozen source is `frozen-audit-source-v2.tar.gz`; reproduction commands are in `benchmarks/compare/PROTOCOL.md`.
+
+The result binds the experiment's frozen source, not every later repository revision.
+Later fixes changed the HF integration, MCP server and warmup paths; those paths were not exercised by this benchmark.
+The preserved archive retains the original bytes, and the manifest was not rebound to the later source.
+This small synthetic cohort lacks independent native-language expert review.
+Sequential timing and a single configured CPU runtime do not establish a general production speed improvement.
