@@ -17,19 +17,13 @@ Config (tuned-track knobs per PROTOCOL section 3 in caps):
   ``model`` (another GLiNER checkpoint: ``gliner_knowledgator_adapter.py`` runs this loader).
 """
 
+from _metadata import GLINER_NVIDIA_MODEL as MODEL, GLINER_NVIDIA_REVISION as REVISION
+from _metadata import GLINER_PROMPTS, NVIDIA_CARD
 from _protocol import cap_gpu, serve
 
-MODEL = "nvidia/gliner-PII"
-REVISION = "bd23e8ef4425fd04e34c5204ab49ffaa706eae79"
 
-# Same keys as entries.GLINER_PROMPTS (kept literal: this script runs in the tool's own venv).
-COMMON = ["person", "organization", "location", "address", "email", "phone number", "ip address", "url",
-          "date", "date of birth", "credit card number", "iban", "social security number", "passport number",
-          "account number", "tax id", "national id"]
-# The model's own training labels (Nemotron-PII) for the 9 scored types; max_types is 25.
-CARD = ["first_name", "last_name", "company_name", "street_address", "city", "state", "country", "postcode",
-        "email", "phone_number", "fax_number", "ipv4", "ipv6", "url", "date", "date_of_birth", "date_time",
-        "account_number", "credit_debit_card", "ssn", "bank_routing_number", "swift_bic"]
+COMMON = list(GLINER_PROMPTS)
+CARD = list(NVIDIA_CARD)
 
 
 def load(config: dict):

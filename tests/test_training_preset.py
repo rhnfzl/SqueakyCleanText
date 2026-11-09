@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from sct import TextCleaner, TextCleanerConfig, config, preset_config
+from sct import TextCleaner, TextCleanerConfig, preset_config
 from sct.presets import PRESETS
 from tests.conftest import TEST_NER_MODELS, TEST_NER_REVISIONS
 
@@ -69,12 +69,6 @@ def test_decode_unicode_escapes_flag():
     assert "\\u00e9" not in on.process(text).lm_text
 
 
-def test_decode_unicode_escapes_legacy_global(monkeypatch):
-    assert config._config_from_module_globals().check_decode_unicode_escapes
-    monkeypatch.setattr(config, "CHECK_DECODE_UNICODE_ESCAPES", False)
-    assert not config._config_from_module_globals().check_decode_unicode_escapes
-
-
 def test_threshold_sentinels():
     # Old code rewrote an explicit 0.85 / 0.4 because they equalled the defaults.
     assert TextCleanerConfig(
@@ -89,7 +83,6 @@ def test_threshold_sentinels():
     assert (std.effective_ner_confidence_threshold, std.effective_gliner_threshold) == (0.85, 0.4)
     clone = pickle.loads(pickle.dumps(pii))  # noqa: S301 - trusted round trip
     assert clone.ner_confidence_threshold is None and clone.gliner_threshold is None
-    assert config._config_from_module_globals().ner_confidence_threshold is None
     for bad in ({"ner_confidence_threshold": 1.5}, {"gliner_threshold": -0.1}):
         with pytest.raises(ValueError, match="in \\[0, 1\\]"):
             TextCleanerConfig(check_ner_process=False, **bad)

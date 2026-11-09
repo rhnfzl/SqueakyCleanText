@@ -305,7 +305,7 @@ def language_table(track_dir: Path, entries, group: str, view: str = "full", met
     out = [f"| lang | datasets | {' | '.join(entries)} |", "|---|---|" + "---|" * len(entries)]
     for lang in sorted(cells):
         sets = sorted({d for v in cells[lang].values() for _, d in v})
-        vals = [scorer._mean(v for v, _ in cells[lang][e]) if e in cells[lang] else None for e in entries]
+        vals = [scorer.mean(v for v, _ in cells[lang][e]) if e in cells[lang] else None for e in entries]
         out.append(f"| {lang} | {', '.join(sets)} | " + " | ".join(
             "-" if v is None else _fmt(v) + ("" if registry.claims(e, lang) else "°") + flags[lang][e]
             for v, e in zip(vals, entries, strict=True)) + " |")

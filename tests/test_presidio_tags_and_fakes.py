@@ -290,6 +290,16 @@ def test_batch_path_passes_source_markers():
     assert "LONDON" not in source[0].text and "<EMAIL>" in source[0].text
 
 
+def test_batch_synthetic_caches_reach_presidio_replacement():
+    ner = _ner((r"Alice", "PERSON"), replacement_mode="synthetic")
+    ner._synthetic_replacer = SyntheticReplacer(locale="en_US")
+    results = ner.ner_process_batch_detailed(
+        ["Alice called Alice."] * 2, ["ENGLISH"] * 2,
+        synthetic_caches=[{("PERSON", "Alice"): name} for name in ("Beatrice", "Catherine")],
+    )
+    assert [r.text for r in results] == ["Beatrice called Beatrice.", "Catherine called Catherine."]
+
+
 def test_process_batch_keeps_tags(monkeypatch):
     cleaner, _ = _cleaner(monkeypatch, *_TAG_WORDS)
     assert "<<" not in cleaner.process_batch([_TEXT, _TEXT], max_workers=1)[0].lm_text

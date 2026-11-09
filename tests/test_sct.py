@@ -8,7 +8,6 @@ from hypothesis.strategies import text, from_regex
 from faker import Faker
 from tests.helpers import assert_near_linear, bare_ner
 from sct.utils.ner_chunking import simple_chunk, split_text, token_count
-from sct import config
 from sct.config import (
     TextCleanerConfig,
     PII_LABELS, PII_LABEL_MAP, PII_DEFAULT_MODEL, PII_DEFAULT_THRESHOLD,
@@ -49,7 +48,6 @@ class TextCleanerTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         # Initialize processing classes (no NER needed for these)
-        config.CHECK_NER_PROCESS = False
         cls.ProcessContacts = contact.ProcessContacts()
         cls.ProcessDateTime = datetime.ProcessDateTime()
         cls.ProcessSpecialSymbols = special.ProcessSpecialSymbols()
@@ -76,7 +74,6 @@ class TextCleanerTest(unittest.TestCase):
 
     def setUp(self):
         """Set up test fixtures before each test method."""
-        config.CHECK_NER_PROCESS = True
         self.ProcessContacts = self.__class__.ProcessContacts
         self.ProcessDateTime = self.__class__.ProcessDateTime
         self.ProcessSpecialSymbols = self.__class__.ProcessSpecialSymbols
@@ -186,14 +183,6 @@ class TextCleanerTest(unittest.TestCase):
         with self.assertRaises(AttributeError):
             cfg.check_ner_process = False
 
-    def test_config_from_module_globals(self):
-        """Test backward-compatible config creation from module globals."""
-        from sct.config import _config_from_module_globals
-        old_val = config.CHECK_NER_PROCESS
-        config.CHECK_NER_PROCESS = False
-        cfg = _config_from_module_globals()
-        self.assertFalse(cfg.check_ner_process)
-        config.CHECK_NER_PROCESS = old_val
 
     def test_config_list_to_tuple_coercion(self):
         """Test that list args are coerced to tuples in frozen dataclass."""
@@ -203,7 +192,7 @@ class TextCleanerTest(unittest.TestCase):
     # --- NER model config dict tests ---
 
     def test_ner_models_dict_acceptance(self):
-        """Test that ner_models dict is accepted and populates both fields."""
+        """Custom model dictionaries are frozen and fill missing routes."""
         from types import MappingProxyType
         models = {
             'ENGLISH': 'test/english-onnx',
@@ -218,9 +207,6 @@ class TextCleanerTest(unittest.TestCase):
         self.assertIn('DUTCH', cfg.ner_models)
         self.assertIn('GERMAN', cfg.ner_models)
         self.assertIn('SPANISH', cfg.ner_models)
-        # ner_models_list also populated
-        self.assertIsInstance(cfg.ner_models_list, tuple)
-        self.assertEqual(len(cfg.ner_models_list), 5)
 
     def test_ner_models_frozen(self):
         """Test that ner_models dict is immutable (MappingProxyType)."""
@@ -235,29 +221,6 @@ class TextCleanerTest(unittest.TestCase):
         self.assertIn('ENGLISH', str(ctx.exception))
         self.assertIn('MULTILINGUAL', str(ctx.exception))
 
-    def test_ner_models_backward_compat_tuple(self):
-        """Test that old ner_models_list tuple API still works."""
-        from types import MappingProxyType
-        models = ("m1", "m2", "m3", "m4", "m5")
-        cfg = TextCleanerConfig(ner_models_list=models)
-        # Should auto-derive ner_models dict
-        self.assertIsInstance(cfg.ner_models, MappingProxyType)
-        self.assertEqual(cfg.ner_models['ENGLISH'], 'm1')
-        self.assertEqual(cfg.ner_models['MULTILINGUAL'], 'm5')
-        # Original tuple preserved
-        self.assertEqual(cfg.ner_models_list, models)
-
-    def test_ner_models_dict_priority_over_list(self):
-        """Test that ner_models takes priority when both are provided."""
-        cfg = TextCleanerConfig(
-            ner_models={'ENGLISH': 'dict-model', 'MULTILINGUAL': 'dict-multi'},
-            ner_models_list=("list1", "list2", "list3", "list4", "list5"),
-        )
-        # Dict should win
-        self.assertEqual(cfg.ner_models['ENGLISH'], 'dict-model')
-        self.assertEqual(cfg.ner_models['MULTILINGUAL'], 'dict-multi')
-        # ner_models_list re-derived from merged dict
-        self.assertEqual(cfg.ner_models_list[0], 'dict-model')
 
     # --- Special symbols tests ---
 
@@ -581,7 +544,6 @@ class TextCleanerTest(unittest.TestCase):
     @requires_ner
     def test_batch_processing_languages(self):
         """Test batch processing with multiple languages (fixed assertions)."""
-        config.CHECK_NER_PROCESS = True
         cfg = TextCleanerConfig(
             check_ner_process=True,
             ner_models=TEST_NER_MODELS, ner_model_revisions=TEST_NER_REVISIONS,
@@ -1668,11 +1630,6 @@ class GLiNEROnnxConfigTest(unittest.TestCase):
         )
         self.assertFalse(cfg.gliner_onnx)
 
-    def test_gliner_onnx_module_level_variable(self):
-        """Module-level GLINER_ONNX variable should exist and default to False."""
-        self.assertTrue(hasattr(config, 'GLINER_ONNX'))
-        self.assertFalse(config.GLINER_ONNX)
-
 
 class BiEncoderAdapterTest(unittest.TestCase):
     """Test GLiNERAdapter bi-encoder detection and label caching (mock-based)."""
@@ -2104,14 +2061,6 @@ class GLiClassConfigTest(unittest.TestCase):
         self.assertEqual(len(results), 1)  # only email above threshold
         self.assertEqual(results[0]['label'], 'email')
         self.assertGreaterEqual(results[0]['score'], 0.5)
-
-    def test_otter_mmbert_placeholders(self):
-        """OTTER_NER_MODELS and MMBERT_NER_MODELS should exist as empty dicts."""
-        from sct.config import OTTER_NER_MODELS, MMBERT_NER_MODELS
-        self.assertIsInstance(OTTER_NER_MODELS, dict)
-        self.assertIsInstance(MMBERT_NER_MODELS, dict)
-        self.assertEqual(len(OTTER_NER_MODELS), 0)
-        self.assertEqual(len(MMBERT_NER_MODELS), 0)
 
 
 class ProcessResultTest(unittest.TestCase):

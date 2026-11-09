@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.9.0 - 2026-11-09
+
+This cleanup preserves text output while simplifying configuration.
+Streaming and whole-document cleaning share the same masking rules.
+Batched documents keep matching fake values across cleaning stages.
+Existing output formats and result tuples stay the same.
+Benchmark reruns refresh cached predictions when shared adapter code changes.
+Configure cleaners through `TextCleanerConfig` and set worker limits with `max_workers`.
+Breaking changes: deprecated config globals, model tuples, worker arguments and cleaner helper aliases are removed.
+
+### Changed
+- Configure cleaners with `TextCleanerConfig`, including `ner_models` for language-keyed model choices. Changing `sct.config` globals no longer configures a cleaner.
+- Use `max_workers` on `process_batch` and `aprocess_batch`; the deprecated `batch_size` keyword is removed. Model and dataset batch sizes keep their existing meaning.
+- The release benchmark uses `--max-workers`, report setting `max_workers`, and `-W` in throughput filenames. Archived reports keep their recorded formats.
+- Removed deprecated cleaner properties `NormaliseText`, `ProcessStopwords`, `ProcessDateTime`, `ProcessContacts` and `ProcessSpecialSymbols`. Use utility classes from their own modules when needed.
+- Removed the empty `OTTER_NER_MODELS` and `MMBERT_NER_MODELS` placeholders. Default model routing and pinned revisions are unchanged.
+- NER window planning lives with chunk splitting. Benchmark process execution is shared by quality and speed workflows.
+
 ## 0.8.4 - 2026-11-09
 
 Streaming retries keep text after a processing failure.

@@ -24,8 +24,8 @@ Never use the word "compet" + "itor" (split here so a repo grep stays clean) in 
 
 ## Every behaviour is configurable
 
-Every behaviour is a safe default plus a config option (`TextCleanerConfig` field and
-legacy module global). Never force one behaviour.
+Every behaviour is a safe default plus a `TextCleanerConfig` field. Never force one behaviour.
+Pass configuration explicitly; do not mirror fields into mutable module globals.
 
 ## Release notes
 

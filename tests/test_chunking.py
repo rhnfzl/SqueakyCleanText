@@ -250,16 +250,12 @@ def test_whole_document_replacement_merges_names_across_chunk_boundary():
     assert len(result.findings) == 2
 
 
-def test_overlap_config_validation_and_module_global(monkeypatch):
-    from sct import config
-
+def test_overlap_config_validation():
     with pytest.raises(ValueError, match="ner_chunk_overlap"):
         TextCleanerConfig(check_ner_process=False, ner_chunk_overlap=-1)
     assert TextCleanerConfig(check_ner_process=False).ner_chunk_overlap == 0
-    monkeypatch.setattr(config, "NER_CHUNK_OVERLAP", 16)
-    assert config._config_from_module_globals().ner_chunk_overlap == 16
-    monkeypatch.setattr(config, "NER_BATCH_SIZE", 2)
-    assert config._config_from_module_globals().ner_batch_size == 2
+    cfg = TextCleanerConfig(ner_chunk_overlap=16, ner_batch_size=2, check_ner_process=False)
+    assert (cfg.ner_chunk_overlap, cfg.ner_batch_size) == (16, 2)
 
 
 def test_overlap_with_real_tokenizer():

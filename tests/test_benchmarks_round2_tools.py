@@ -4,31 +4,20 @@ No tool package or model is loaded: each adapter's ``load`` runs against hand-wr
 library, on hand-written text, so offsets, label maps and wiring are checked offline.
 """
 
-import importlib.util
 import json
 import sys
 import types
 
 import pytest
 
-from benchmarks.compare import entries, report, runner, speed
+from tests.adapter_helpers import adapter_module as adapter
+from benchmarks.compare import entries, report, runner, runtime, speed
 from benchmarks.datasets import ROUND2
 
 NEW = ("gliner-knowledgator", "piiranha", "llm-guard", "scrubadub", "ai4privacy", "openmed", "pii-tracer",
        "presidio-full", "sct-training", "sct-gliner-nvidia")
 TEXT = "Héllo Ana Lee 👋, mail ana.lee@example.org or call +31 6 1234 5678 today."
 EMAIL = (TEXT.index("ana.lee"), TEXT.index("ana.lee") + len("ana.lee@example.org"))
-
-
-def adapter(name):
-    sys.path.insert(0, str(runner.ADAPTERS))
-    try:
-        spec = importlib.util.spec_from_file_location(name.removesuffix(".py"), runner.ADAPTERS / name)
-        module = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(module)
-        return module
-    finally:
-        sys.path.remove(str(runner.ADAPTERS))
 
 
 def fake_module(monkeypatch, name, **attrs):
@@ -49,7 +38,7 @@ def test_round2_entries_are_registered_with_runs_envs_and_rules():
     assert set(NEW) == set(entries.ROUND2_ENTRIES) and set(NEW) <= set(entries.ENTRIES)
     for name in NEW:
         t = entries.tool(name)
-        assert (runner.ADAPTERS / t["adapter"]).exists() and t["requirements"].exists(), name
+        assert (runtime.ADAPTERS / t["adapter"]).exists() and t["requirements"].exists(), name
         assert name in entries.CONTAMINATION and name in entries.CLAIMED_LANGUAGES and name in report.LICENCES, name
         assert set(t["labels"].values()) <= set(entries.SCT_TYPES) and t["gpu_gb"] <= 5, name
     assert entries.tool("presidio-full", "native")["adapter_config"]["enable"] == "all"
@@ -75,16 +64,16 @@ def test_round2_gpu_envs_are_cuda12():
 def test_env_builder_swaps_the_cpu_twin_for_the_gpu_build(tmp_path, monkeypatch):
     spec = tmp_path / "x.txt"
     spec.write_text("# c\nSqueakyCleanText==0.8.1\nonnxruntime-gpu[cuda,cudnn]==1.31.1\n")
-    assert runner.gpu_twin_fixes(spec.read_text()) == [("onnxruntime", "onnxruntime-gpu[cuda,cudnn]==1.31.1")]
-    assert runner.gpu_twin_fixes("onnxruntime==1.31.1\n") == []
+    assert runtime.gpu_twin_fixes(spec.read_text()) == [("onnxruntime", "onnxruntime-gpu[cuda,cudnn]==1.31.1")]
+    assert runtime.gpu_twin_fixes("onnxruntime==1.31.1\n") == []
     url = "onnxruntime-gpu[cuda,cudnn] @ https://example.org/onnxruntime_gpu-1.29.0-cp312-cp312-manylinux_2_28_x86_64.whl"
-    assert runner.gpu_twin_fixes(url) == [("onnxruntime", url)]
-    assert runner.gpu_twin_fixes(url.replace("[cuda,cudnn]", "")) == [("onnxruntime", url.replace("[cuda,cudnn]", ""))]
+    assert runtime.gpu_twin_fixes(url) == [("onnxruntime", url)]
+    assert runtime.gpu_twin_fixes(url.replace("[cuda,cudnn]", "")) == [("onnxruntime", url.replace("[cuda,cudnn]", ""))]
     calls = []
-    monkeypatch.setattr(runner.shutil, "which", lambda name: "uv")
-    monkeypatch.setattr(runner.subprocess, "run", lambda cmd, **kw: calls.append(cmd) or types.SimpleNamespace(stdout=""))
+    monkeypatch.setattr(runtime.shutil, "which", lambda name: "uv")
+    monkeypatch.setattr(runtime.subprocess, "run", lambda cmd, **kw: calls.append(cmd) or types.SimpleNamespace(stdout=""))
     (tmp_path / "envs" / "x" / "bin").mkdir(parents=True)
-    runner.ensure_env("x", spec, tmp_path / "envs")
+    runtime.ensure_env("x", spec, tmp_path / "envs")
     assert ["uv", "pip", "uninstall", "--python", str(tmp_path / "envs" / "x" / "bin" / "python"), "onnxruntime"] in calls
     assert calls.index(next(c for c in calls if "uninstall" in c)) > calls.index(next(c for c in calls if "-r" in c))
     assert calls[-2][-1] == "onnxruntime-gpu[cuda,cudnn]==1.31.1" and "--no-deps" in calls[-2]

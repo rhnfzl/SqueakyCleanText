@@ -10,20 +10,12 @@ Config: ``threshold`` (default 0 = vendor), ``device``, ``threads``, ``max_len``
 """
 
 import _hf_token
+from _metadata import AI4PRIVACY as LABELS
+from _metadata import AI4PRIVACY_MODEL as MODEL, AI4PRIVACY_REVISION as REVISION
 from _protocol import serve
 
-MODEL = "ai4privacy/llama-ai4privacy-multilingual-categorical-anonymiser-openpii"
-REVISION = "83ef30d5e7c9d113ad80ce745b564cdd2320c5d5"
 MAX_LEN, STRIDE = 512, 128
 
-# Same rules as piiranha (OpenPII names): every one of the 20 types is in LABELS or OUT_OF_SCOPE.
-LABELS = {
-    "GIVENNAME": "PERSON", "SURNAME": "PERSON",
-    "CITY": "LOCATION", "STREET": "LOCATION", "BUILDINGNUM": "LOCATION",
-    "EMAIL": "EMAIL", "TELEPHONENUM": "PHONE", "DATE": "DATE",
-    **dict.fromkeys(("CREDITCARDNUMBER", "DRIVERLICENSENUM", "IDCARDNUM", "PASSPORTNUM", "SOCIALNUM", "TAXNUM",
-                     "ZIPCODE"), "NUMBER"),
-}
 OUT_OF_SCOPE = ("AGE", "GENDER", "SEX", "TIME", "TITLE")
 
 

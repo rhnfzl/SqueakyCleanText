@@ -20,13 +20,10 @@ Config: ``threshold`` (default 0.5); ``device`` / ``gpu_mem_gb`` only cap the to
 (the recognizer picks cuda when it is visible).
 """
 
+from _metadata import LLM_GUARD as LABELS
 from _protocol import cap_gpu, serve
 
 # DEFAULT_ENTITY_TYPES of 0.3.16 (+ CUSTOM, added by the scanner); UUID, CRYPTO and CUSTOM are out of scope.
-LABELS = {"PERSON": "PERSON", "EMAIL_ADDRESS": "EMAIL", "EMAIL_ADDRESS_RE": "EMAIL", "PHONE_NUMBER": "PHONE",
-          "IP_ADDRESS": "IP",
-          **dict.fromkeys(("CREDIT_CARD", "CREDIT_CARD_RE", "IBAN_CODE", "US_SSN", "US_SSN_RE", "US_BANK_NUMBER"),
-                          "NUMBER")}
 OUT_OF_SCOPE = ("CRYPTO", "UUID", "CUSTOM")
 
 

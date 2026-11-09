@@ -11,20 +11,12 @@ Config: ``threshold`` (drop spans below it; default 0 = vendor), ``device``, ``t
 """
 
 import _hf_token
+from _metadata import PIIRANHA as LABELS
+from _metadata import PIIRANHA_MODEL as MODEL, PIIRANHA_REVISION as REVISION
 from _protocol import serve
 
-MODEL = "iiiorg/piiranha-v1-detect-personal-information"
-REVISION = "255acde67a2f34cf452eb42e365b24d2957352fc"
 MAX_LEN, STRIDE = 256, 64
 
-# Tool label -> SCT type (PROTOCOL section 5); every one of the 17 types is in LABELS or OUT_OF_SCOPE.
-LABELS = {
-    "GIVENNAME": "PERSON", "SURNAME": "PERSON",
-    "CITY": "LOCATION", "STREET": "LOCATION", "BUILDINGNUM": "LOCATION",
-    "EMAIL": "EMAIL", "TELEPHONENUM": "PHONE", "DATEOFBIRTH": "DATE",
-    **dict.fromkeys(("ACCOUNTNUM", "CREDITCARDNUMBER", "DRIVERLICENSENUM", "IDCARDNUM", "SOCIALNUM", "TAXNUM",
-                     "ZIPCODE"), "NUMBER"),
-}
 OUT_OF_SCOPE = ("PASSWORD", "USERNAME")
 
 

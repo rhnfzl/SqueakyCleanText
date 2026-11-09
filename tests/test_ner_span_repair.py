@@ -78,14 +78,10 @@ def test_subword_widen_option_reaches_the_old_behaviours():
     assert spans == {None: [(0, len(text))], 0: [(6, 16)], 1.0: [(6, 16)]}
 
 
-def test_subword_widen_config_and_legacy_global(monkeypatch):
-    from sct import config as cfg_module
-
+def test_subword_widen_config():
     assert TextCleanerConfig().ner_subword_widen == 1.0
     with pytest.raises(ValueError):
         TextCleanerConfig(ner_subword_widen=-1)
-    monkeypatch.setattr(cfg_module, "NER_SUBWORD_WIDEN", None)
-    assert cfg_module._config_from_module_globals().ner_subword_widen is None
 
 
 @pytest.mark.parametrize("same_script, expected", [(True, (3, 15)), (False, (2, 17))])
@@ -112,14 +108,6 @@ def test_wordpiece_widening_still_completes_a_same_script_word():
     assert _aggregate(text, tokens, offsets, {3: 1}) == [(6, 11)]
 
 
-def test_widen_same_script_config_and_legacy_global(monkeypatch):
-    from sct import config as cfg_module
-
-    assert TextCleanerConfig().ner_subword_widen_same_script is True
-    monkeypatch.setattr(cfg_module, "NER_SUBWORD_WIDEN_SAME_SCRIPT", False)
-    assert cfg_module._config_from_module_globals().ner_subword_widen_same_script is False
-
-
 def test_ensemble_agreement_never_drops_a_strong_single_model_hit():
     # F1: XLM-R 1.0 + wikineural 0.40 on the same widened span averaged to 0.70 < 0.85
 
@@ -132,14 +120,10 @@ def test_ensemble_agreement_never_drops_a_strong_single_model_hit():
     assert ner.vote_entities([strong, weak], 0.85) == []
 
 
-def test_ensemble_vote_config_and_legacy_global(monkeypatch):
-    from sct import config as cfg_module
-
+def test_ensemble_vote_config():
     assert TextCleanerConfig().ner_ensemble_vote == 'max'
     with pytest.raises(ValueError):
         TextCleanerConfig(ner_ensemble_vote='median')
-    monkeypatch.setattr(cfg_module, "NER_ENSEMBLE_VOTE", 'mean')
-    assert cfg_module._config_from_module_globals().ner_ensemble_vote == 'mean'
 
 
 def test_masked_value_is_masked_at_its_other_whole_word_occurrences():
@@ -176,17 +160,11 @@ def test_propagation_reversible_restores_exactly():
     assert anon_map.deanonymize(out) == text
 
 
-def test_propagate_config_and_legacy_global(monkeypatch):
-    from sct import config as cfg_module
-
+def test_propagate_config():
     assert TextCleanerConfig().ner_propagate_masked is True
     assert TextCleanerConfig().ner_propagate_min_score is None
     with pytest.raises(ValueError):
         TextCleanerConfig(ner_propagate_min_score=1.5)
-    monkeypatch.setattr(cfg_module, "NER_PROPAGATE_MASKED", False)
-    monkeypatch.setattr(cfg_module, "NER_PROPAGATE_MIN_SCORE", 0.9)
-    cfg = cfg_module._config_from_module_globals()
-    assert (cfg.ner_propagate_masked, cfg.ner_propagate_min_score) == (False, 0.9)
 
 
 def _loc_spans(text, *words):
@@ -223,14 +201,10 @@ def test_location_gap_merge_reversible_restores_exactly():
     assert anon_map.deanonymize(out) == "Springfield, IL 62704, USA"
 
 
-def test_location_gap_config_and_legacy_global(monkeypatch):
-    from sct import config as cfg_module
-
+def test_location_gap_config():
     assert TextCleanerConfig().ner_merge_location_gap == 0
     with pytest.raises(ValueError):
         TextCleanerConfig(ner_merge_location_gap=-1)
-    monkeypatch.setattr(cfg_module, "NER_MERGE_LOCATION_GAP", 20)
-    assert cfg_module._config_from_module_globals().ner_merge_location_gap == 20
 
 
 @pytest.mark.parametrize("text, word, expected", [
@@ -250,14 +224,6 @@ def test_span_edges_snap_to_the_whole_word(text, word, expected):
     set_cfg(ner, ner_snap_word_edges=False)  # 0.8.0: the span is replaced as tagged
     assert finalized_text(ner, text, windows, results) == \
         text[:start] + "<PERSON>" + text[start + len(word):]
-
-
-def test_snap_word_edges_config_and_legacy_global(monkeypatch):
-    from sct import config as cfg_module
-
-    assert TextCleanerConfig().ner_snap_word_edges is True
-    monkeypatch.setattr(cfg_module, "NER_SNAP_WORD_EDGES", False)
-    assert cfg_module._config_from_module_globals().ner_snap_word_edges is False
 
 
 # --- NER does not rewrite the synthetic fake a regex step inserted ---

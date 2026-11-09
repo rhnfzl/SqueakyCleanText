@@ -891,17 +891,6 @@ class TestConfigEdgeCases:
         with pytest.raises(dataclasses.FrozenInstanceError):
             cfg.check_ner_process = True  # type: ignore[misc]
 
-    def test_m55_legacy_module_level_config(self):
-        """Legacy module-level config backward compat."""
-        from sct import config
-        original = config.CHECK_NER_PROCESS
-        try:
-            config.CHECK_NER_PROCESS = False
-            # Should build a config from module globals
-            tc = TextCleaner()
-            assert tc.cfg.check_ner_process is False
-        finally:
-            config.CHECK_NER_PROCESS = original
 
     def test_m56_all_toggles_off(self):
         """All pipeline toggles OFF returns text mostly unchanged."""

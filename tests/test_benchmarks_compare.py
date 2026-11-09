@@ -1,11 +1,17 @@
 """Tool-comparison harness: dev/test split, new loaders' span building, entry tables (no dataset data)."""
 
+import json
 import subprocess
+import sys
+from collections import Counter
 
-from benchmarks.compare import entries, split
+import pytest
+
+from benchmarks.compare import entries, runner, runtime, scorer, split
 from benchmarks.datasets import MODULES, get
 from benchmarks.datasets.gretel_en import entity_spans
 from benchmarks.labels import DATASET_LABELS, normalise_gold
+from tests.adapter_helpers import adapter_module
 
 
 def rec(rid, group=None):
@@ -75,14 +81,6 @@ def test_entries_are_complete_and_map_to_sct_types():
 
 
 # --- comparison harness: scorer, supervisor, runner (hand-made text and spans only) ---
-
-import json  # noqa: E402
-import sys  # noqa: E402
-from collections import Counter  # noqa: E402
-
-import pytest  # noqa: E402
-
-from benchmarks.compare import runner, scorer  # noqa: E402
 
 MAP = {"person": "PERSON", "email": "EMAIL", "date": "DATE", "ssn": "NUMBER"}
 TEXT = "Ann Lee and Bo Ek mailed ann@x.io on 2020-01-02; SSN 123-45-6789. Ann Lee again."
@@ -217,7 +215,7 @@ def test_paired_bootstrap_and_mcnemar():
     assert scorer.mcnemar([True, False], [True, False])["p_value"] == 1.0
 
 
-DUMMY = [sys.executable, str(runner.ADAPTERS / "dummy_adapter.py")]
+DUMMY = [sys.executable, str(runtime.ADAPTERS / "dummy_adapter.py")]
 
 
 def dummy_cmd(config):
@@ -230,7 +228,7 @@ def docs(n):
 
 def test_supervisor_keeps_errors_and_bad_spans(tmp_path):
     results, info = runner.supervise(dummy_cmd({"raise": ["d1"], "bad": ["d2"]}), docs(4), tmp_path,
-                                     runner.child_env(), doc_timeout=30, start_timeout=30)
+                                     runtime.child_env(), doc_timeout=30, start_timeout=30)
     assert set(results) == {"d0", "d1", "d2", "d3"} and info["processes"] == 1
     assert results["d1"]["error"].startswith("RuntimeError") and results["d1"]["spans"] == []
     assert results["d2"]["error"].startswith("ValueError: span offsets out of range")
@@ -240,7 +238,7 @@ def test_supervisor_keeps_errors_and_bad_spans(tmp_path):
 
 def test_supervisor_retries_crash_then_records_timeouts(tmp_path):
     config = {"crash_once": ["d1"], "state_dir": str(tmp_path), "crash": ["d3"], "sleep": {"d4": 5}}
-    results, info = runner.supervise(dummy_cmd(config), docs(6), tmp_path / "w", runner.child_env(),
+    results, info = runner.supervise(dummy_cmd(config), docs(6), tmp_path / "w", runtime.child_env(),
                                      doc_timeout=1.0, start_timeout=10, retries=1)
     assert "error" not in results["d1"]  # crashed once, the retry worked
     assert results["d3"]["error"] == "crash: exit 3"
@@ -251,14 +249,14 @@ def test_supervisor_retries_crash_then_records_timeouts(tmp_path):
 
 def test_supervisor_aborts_when_the_adapter_cannot_start(tmp_path):
     cmd = [sys.executable, "-c", "import sys; sys.exit(2)"]
-    results, info = runner.supervise(cmd, docs(10), tmp_path, runner.child_env(), doc_timeout=5, start_timeout=5)
+    results, info = runner.supervise(cmd, docs(10), tmp_path, runtime.child_env(), doc_timeout=5, start_timeout=5)
     assert len(results) == 10 and all("error" in r for r in results.values())
     assert results["d9"]["error"].startswith("aborted") and info["processes"] == 2 * runner.MAX_FAILED_STREAK
 
 
 def test_offset_fixtures_pass_for_a_correct_adapter(tmp_path):
     fixtures = [{"id": k, "lang": lang, "text": text} for k, (lang, text) in runner.OFFSET_FIXTURES.items()]
-    results, _ = runner.supervise(dummy_cmd({}), fixtures, tmp_path, runner.child_env(), 30, 30)
+    results, _ = runner.supervise(dummy_cmd({}), fixtures, tmp_path, runtime.child_env(), 30, 30)
     assert runner.check_offsets(results, {"EMAIL": "EMAIL"}) == ({}, {})
     shifted = {k: {**v, "spans": [{**s, "start": s["start"] + 1} for s in v["spans"]]} for k, v in results.items()}
     problems, misses = runner.check_offsets(shifted, {"EMAIL": "EMAIL"})
@@ -294,6 +292,9 @@ def test_runner_end_to_end_with_dummy(tmp_path, monkeypatch):
     runner.main(["--entries", "dummy", "--datasets", "gretel_en", "--part", "dev", "--out", str(out),
                  "--cache", str(tmp_path / "cache"), "--doc-timeout", "30", "--start-timeout", "30"])
     result = json.loads((out / "dummy" / "gretel_en-dev.json").read_text())
+    assert json.loads((out / "run.json").read_text())["command"].startswith("python -m benchmarks.compare.runner")
+    assert result["entry_config"]["checkpoint"] == "-"
+    assert (out / "envs" / "dummy.freeze.txt").is_file()
     assert result["completion_rate"] == 1.0 and result["contamination"] == "-"
     assert result["views"]["supported"]["compare"]["micro"]["masked_recall"] == 1.0
     assert result["views"]["full"]["compare"]["micro"]["masked_recall"] == round(2 / 3, 4)
@@ -341,7 +342,7 @@ def test_registry_has_pinned_envs_and_contamination():
 def test_speed_mode_reports_cold_start_latency_throughput_and_rss(tmp_path):
     from benchmarks.compare import speed
 
-    run = speed.measure(dummy_cmd({}), docs(30), tmp_path, runner.child_env(), batch_size=4, timeout=60, poll_vram=False)
+    run = speed.measure(dummy_cmd({}), docs(30), tmp_path, runtime.child_env(), batch_size=4, timeout=60, poll_vram=False)
     assert "error" not in run and run["cold_start_seconds"] > 0
     assert run["latency"]["docs"] == 30 and run["latency"]["p95_ms"] >= run["latency"]["median_ms"] >= 0
     assert sorted(t["batch_size"] for t in run["throughput"]) == [4, 8]
@@ -354,7 +355,7 @@ def test_speed_mode_reports_cold_start_latency_throughput_and_rss(tmp_path):
 def test_speed_mode_records_a_batch_size_that_raises(tmp_path):
     from benchmarks.compare import speed
 
-    run = speed.measure(dummy_cmd({"raise_batch": 8}), docs(30), tmp_path, runner.child_env(), batch_size=4, timeout=60,
+    run = speed.measure(dummy_cmd({"raise_batch": 8}), docs(30), tmp_path, runtime.child_env(), batch_size=4, timeout=60,
                         poll_vram=False)
     assert "error" not in run and run["latency"]["docs"] == 30 and "done" in run
     by_size = {t["batch_size"]: t for t in run["throughput"]}
@@ -363,21 +364,49 @@ def test_speed_mode_records_a_batch_size_that_raises(tmp_path):
     assert summary["common_batch_docs_per_second"] is None and summary["latency_median_ms"] is not None
     assert summary["common_batch_errors"] == ["RuntimeError: dummy batch too large"]
     crashed = speed.measure([sys.executable, "-c", "import sys; sys.exit('adapter could not start')"], docs(2), tmp_path,
-                            runner.child_env(), batch_size=1, timeout=60, poll_vram=False)
+                            runtime.child_env(), batch_size=1, timeout=60, poll_vram=False)
     assert crashed["error"] == "crash: exit 1: adapter could not start"
 
 
-def _adapter_module(name):
-    import importlib.util
+def test_cache_key_tracks_transitive_adapter_helpers(tmp_path, monkeypatch):
+    monkeypatch.setattr(runtime, "ADAPTERS", tmp_path)
+    (tmp_path / "adapter.py").write_text("from helper import value\n")
+    (tmp_path / "helper.py").write_text("import metadata\nvalue = metadata.value\n")
+    (tmp_path / "metadata.py").write_text("import helper\nvalue = 1\n")
+    (tmp_path / "unrelated.py").write_text("value = 1\n")
+    before = runner.cache_key({}, "adapter.py", "freeze", [])
 
-    sys.path.insert(0, str(runner.ADAPTERS))
-    try:
-        spec = importlib.util.spec_from_file_location(name.removesuffix(".py"), runner.ADAPTERS / name)
-        module = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(module)  # stdlib-only at import time: tool packages load inside load()
-        return module
-    finally:
-        sys.path.remove(str(runner.ADAPTERS))
+    (tmp_path / "unrelated.py").write_text("value = 2\n")
+    assert runner.cache_key({}, "adapter.py", "freeze", []) == before
+    (tmp_path / "metadata.py").write_text("import helper\nvalue = 2\n")
+    assert runner.cache_key({}, "adapter.py", "freeze", []) != before
+
+
+def test_sct_cache_key_tracks_checkout_scoring_and_excludes_pinned_sct(tmp_path, monkeypatch):
+    source = (runtime.ADAPTERS / "sct_adapter.py").read_text()
+    benchmarks = tmp_path / "benchmarks"
+    adapters = benchmarks / "compare" / "adapters"
+    adapters.mkdir(parents=True)
+    (adapters / "sct_adapter.py").write_text(source)
+    (adapters / "_protocol.py").write_text("")
+    (benchmarks / "__init__.py").write_text("")
+    (benchmarks / "score.py").write_text("from benchmarks import labels\nvalue = labels.value\n")
+    (benchmarks / "labels.py").write_text("value = 1\n")
+    (benchmarks / "unrelated.py").write_text("value = 1\n")
+    sct = tmp_path / "sct"
+    sct.mkdir()
+    (sct / "config.py").write_text("value = 1\n")
+    monkeypatch.setattr(runtime, "ADAPTERS", adapters)
+    before = runner.cache_key({}, "sct_adapter.py", "freeze", [])
+
+    (benchmarks / "unrelated.py").write_text("value = 2\n")
+    (sct / "config.py").write_text("value = 2\n")
+    assert runner.cache_key({}, "sct_adapter.py", "freeze", []) == before
+    (benchmarks / "score.py").write_text("from benchmarks import labels\nvalue = labels.value + 1\n")
+    assert runner.cache_key({}, "sct_adapter.py", "freeze", []) != before
+    current = runner.cache_key({}, "sct_adapter.py", "freeze", [])
+    (benchmarks / "labels.py").write_text("value = 2\n")
+    assert runner.cache_key({}, "sct_adapter.py", "freeze", []) != current
 
 
 def test_every_entry_has_a_runnable_adapter():
@@ -385,20 +414,20 @@ def test_every_entry_has_a_runnable_adapter():
 
     for name in reg.ENTRIES:
         adapter = reg.tool(name)["adapter"]
-        assert adapter and adapter.endswith("_adapter.py") and (runner.ADAPTERS / adapter).exists(), name
-        assert callable(_adapter_module(adapter).load), name
+        assert adapter and adapter.endswith("_adapter.py") and (runtime.ADAPTERS / adapter).exists(), name
+        assert callable(adapter_module(adapter).load), name
 
 
 def test_adapter_label_tables_match_the_frozen_entries():
     from benchmarks.compare import entries as reg
 
-    bardsai = _adapter_module("bardsai_v3_adapter.py")
+    bardsai = adapter_module("bardsai_v3_adapter.py")
     assert reg.ENTRIES["bardsai-v3"]["labels"] == bardsai.LABELS
     assert not set(bardsai.OUT_OF_SCOPE) & set(bardsai.LABELS)
-    nvidia = _adapter_module("gliner_nvidia_adapter.py")
-    assert nvidia.COMMON == list(reg.GLINER_PROMPTS)  # the adapter's literal copy of the shared prompts
+    nvidia = adapter_module("gliner_nvidia_adapter.py")
+    assert nvidia.COMMON == list(reg.GLINER_PROMPTS)
     assert set(nvidia.CARD) <= set(reg.ENTRIES["gliner-nvidia"]["labels"])
-    fastino = _adapter_module("gliner2_fastino_adapter.py")
+    fastino = adapter_module("gliner2_fastino_adapter.py")
     assert {k: v for k, v in fastino.CARD_LABELS.items() if v} == reg.FASTINO_CARD
     for name in ("gliner-nvidia", "gliner2-fastino"):  # card names never re-map a shared prompt
         labels = reg.ENTRIES[name]["labels"]
@@ -427,7 +456,7 @@ def test_c2_masking_metrics_share_one_type_agnostic_prediction_set():
 
 
 def test_c3_datafog_accepts_the_runners_runtime_keys():
-    datafog = _adapter_module("datafog_adapter.py")
+    datafog = adapter_module("datafog_adapter.py")
     assert datafog.settings({"threads": 4, "device": "cpu", "gpu_mem_gb": 5.0}) == datafog.DEFAULTS
     with pytest.raises(ValueError):
         datafog.settings({"bogus": 1})
@@ -470,7 +499,7 @@ def test_c6_sct_offsets_survive_entity_decoding_and_invisible_chars():
 
     from benchmarks.score import predicted_spans
 
-    sct = _adapter_module("sct_adapter.py")
+    sct = adapter_module("sct_adapter.py")
     fix = NormaliseText().fix_bad_unicode
 
     def normalise(token):
@@ -497,7 +526,7 @@ def test_c6_sct_offsets_survive_whitespace_collapse_and_report_why_unplaced():
 
     from benchmarks.score import predicted_spans
 
-    sct = _adapter_module("sct_adapter.py")
+    sct = adapter_module("sct_adapter.py")
     fix = NormaliseText().fix_bad_unicode
 
     def normalise(token):
@@ -559,7 +588,7 @@ def test_c12_stale_ready_marker_does_not_skip_the_load_allowance(tmp_path):
     work = tmp_path / "w"
     work.mkdir()
     (work / "out-1.jsonl.ready").write_text("1")  # left by an earlier run
-    results, info = runner.supervise([sys.executable, str(slow)], docs(1), work, runner.child_env(),
+    results, info = runner.supervise([sys.executable, str(slow)], docs(1), work, runtime.child_env(),
                                      doc_timeout=0.3, start_timeout=30)
     assert "error" not in results["d0"] and info["processes"] == 1
 
@@ -828,7 +857,7 @@ def test_hung_tool_probes_fall_back(tmp_path, monkeypatch):
     monkeypatch.setattr(subprocess, "run", hang)
     monkeypatch.setattr(speed.shutil, "which", lambda name: f"/usr/bin/{name}")
     assert speed.vram_mb(123) is None
-    assert runner.freeze(tmp_path / "bin" / "python") == ""
+    assert runtime.freeze(tmp_path / "bin" / "python") == ""
 
 
 def test_failed_tool_probes_fall_back(tmp_path, monkeypatch):
@@ -837,7 +866,7 @@ def test_failed_tool_probes_fall_back(tmp_path, monkeypatch):
     monkeypatch.setattr(subprocess, "run", lambda cmd, **_: subprocess.CompletedProcess(cmd, 1, "123, 5\n", ""))
     monkeypatch.setattr(speed.shutil, "which", lambda name: f"/usr/bin/{name}")
     assert speed.vram_mb(123) is None
-    assert runner.freeze(tmp_path / "bin" / "python") == ""
+    assert runtime.freeze(tmp_path / "bin" / "python") == ""
 
     monkeypatch.setattr(subprocess, "run", lambda cmd, **_: subprocess.CompletedProcess(cmd, 0, "123, [N/A]\n", ""))
     assert speed.vram_mb(123) is None

@@ -16,12 +16,10 @@ Config: ``locale`` (default ``en_US``), ``spacy`` (default true: add the spaCy n
 (spaCy model; default the detector's own choice). Runner keys are ignored.
 """
 
+from _metadata import SCRUBADUB
 from _protocol import serve
 
-LABELS = {"name": "PERSON", "organization": "ORGANISATION", "location": "LOCATION", "address": "LOCATION",
-          "email": "EMAIL", "phone": "PHONE", "url": "URL", "date_of_birth": "DATE",
-          **dict.fromkeys(("credit_card", "drivers_licence", "national_insurance_number", "postalcode",
-                           "social_security_number", "tax_reference_number", "vehicle_licence_plate"), "NUMBER")}
+LABELS = SCRUBADUB
 OUT_OF_SCOPE = ("credential", "twitter", "skype", "unknown", "tagged")
 
 

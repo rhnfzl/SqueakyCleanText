@@ -149,23 +149,6 @@ def test_only_reversible_mode_keeps_a_symbol_glued_to_a_placeholder():
     assert _cleaner(replacement_mode="reversible").process("foo - bar").lm_text == "foo bar"
 
 
-@pytest.mark.parametrize("old, new", [
-    ("NormaliseText", "_text_normaliser"),
-    ("ProcessStopwords", "_stopword_remover"),
-    ("ProcessDateTime", "_date_masker"),
-    ("ProcessContacts", "_contact_masker"),
-    ("ProcessSpecialSymbols", "_symbol_masker"),
-])
-def test_renamed_collaborators_keep_their_deprecated_public_names(old, new):
-    cleaner = _cleaner()
-    with pytest.warns(DeprecationWarning, match=old):
-        assert getattr(cleaner, old) is getattr(cleaner, new)
-    replacement = object()
-    with pytest.warns(DeprecationWarning, match=old):
-        setattr(cleaner, old, replacement)
-    assert getattr(cleaner, new) is replacement
-
-
 def test_warmup_loads_a_custom_route():
     ner = bare_ner()
     ner._ensemble_models = {"DUTCH": ("CUSTOM",)}

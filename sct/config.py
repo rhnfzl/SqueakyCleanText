@@ -1,28 +1,22 @@
 """
 Configuration for the SqueakyCleanText pipeline.
 
-New API (thread-safe, recommended):
+Pass an immutable config to each cleaner:
     from sct.config import TextCleanerConfig
     cfg = TextCleanerConfig(check_ner_process=False)
     cleaner = TextCleaner(cfg)
-
-Legacy API (backward compatible):
-    from sct import config
-    config.CHECK_NER_PROCESS = False
-    cleaner = TextCleaner()
 """
 
 import re
-import sys
-import warnings
 from collections.abc import Iterable
-from dataclasses import dataclass, fields
+from dataclasses import dataclass
 from datetime import date
 from types import MappingProxyType
 from typing import Any, Literal, get_args
 from collections.abc import Mapping
 
 from sct.utils.resources import DEFAULT_LANGUAGES, resolve_language
+from sct.utils.markers import LABEL_PATTERN
 
 
 LANG_KEYS = ('ENGLISH', 'DUTCH', 'GERMAN', 'SPANISH', 'MULTILINGUAL')
@@ -44,51 +38,27 @@ ONNX_BACKENDS = frozenset({'onnx', 'ensemble_onnx'})
 TORCH_BACKENDS = frozenset({'torch', 'ensemble_torch'})
 TOKEN_MODEL_BACKENDS = ONNX_BACKENDS | TORCH_BACKENDS
 
-DEFAULT_NER_MODELS: dict[str, str] = {
-    'ENGLISH': 'rhnfzl/xlm-roberta-large-conll03-english-onnx',
-    'DUTCH': 'rhnfzl/xlm-roberta-large-conll02-dutch-onnx',
-    'GERMAN': 'rhnfzl/xlm-roberta-large-conll03-german-onnx',
-    'SPANISH': 'rhnfzl/xlm-roberta-large-conll02-spanish-onnx',
-    # FR/PT/IT: no dedicated ONNX model available; map to MULTILINGUAL fallback
-    'FRENCH': 'rhnfzl/wikineural-multilingual-ner-onnx',
-    'PORTUGUESE': 'rhnfzl/wikineural-multilingual-ner-onnx',
-    'ITALIAN': 'rhnfzl/wikineural-multilingual-ner-onnx',
-    'MULTILINGUAL': 'rhnfzl/wikineural-multilingual-ner-onnx',
-}
-
-DEFAULT_NER_REVISIONS: dict[str, str] = {
-    'ENGLISH': '2c10955af9538d6ff8a68316c5dbfcd0b968761e',
-    'DUTCH': '381e34ba4c222bc221e9fd02832f52a179ed840d',
-    'GERMAN': 'fe4aecfa6dc376244ef37da37e6df3b1b0911d71',
-    'SPANISH': 'ef52a7f08172203c763d51fe36660d36985bb388',
-    'FRENCH': '74191432b21c956b5b04b4778c0e92e569b1f80d',
-    'PORTUGUESE': '74191432b21c956b5b04b4778c0e92e569b1f80d',
-    'ITALIAN': '74191432b21c956b5b04b4778c0e92e569b1f80d',
-    'MULTILINGUAL': '74191432b21c956b5b04b4778c0e92e569b1f80d',
-}
-
-DEFAULT_TORCH_NER_MODELS: dict[str, str] = {
-    'ENGLISH': 'FacebookAI/xlm-roberta-large-finetuned-conll03-english',
-    'DUTCH': 'FacebookAI/xlm-roberta-large-finetuned-conll02-dutch',
-    'GERMAN': 'FacebookAI/xlm-roberta-large-finetuned-conll03-german',
-    'SPANISH': 'FacebookAI/xlm-roberta-large-finetuned-conll02-spanish',
-    # FR/PT/IT: no dedicated Torch model available; map to MULTILINGUAL fallback
-    'FRENCH': 'Babelscape/wikineural-multilingual-ner',
-    'PORTUGUESE': 'Babelscape/wikineural-multilingual-ner',
-    'ITALIAN': 'Babelscape/wikineural-multilingual-ner',
-    'MULTILINGUAL': 'Babelscape/wikineural-multilingual-ner',
-}
-
-DEFAULT_TORCH_NER_REVISIONS: dict[str, str] = {
-    'ENGLISH': '18f95e9924f3f452df09cc90945073906ef18f1e',
-    'DUTCH': '630d5d48d08071704d9a2719b045082019b6ac12',
-    'GERMAN': '1fbcc7a00a69ce5ab754623154a8e9cc6ba868e2',
-    'SPANISH': 'a7c5f08c766adcbd6c22f343145fa65d38b3c1d5',
-    'FRENCH': 'bed6ee7a45d2827b6c90a4fd7983f0241ae0a5c1',
-    'PORTUGUESE': 'bed6ee7a45d2827b6c90a4fd7983f0241ae0a5c1',
-    'ITALIAN': 'bed6ee7a45d2827b6c90a4fd7983f0241ae0a5c1',
-    'MULTILINGUAL': 'bed6ee7a45d2827b6c90a4fd7983f0241ae0a5c1',
-}
+_ONNX_CHECKPOINTS = (
+    (('ENGLISH',), 'rhnfzl/xlm-roberta-large-conll03-english-onnx', '2c10955af9538d6ff8a68316c5dbfcd0b968761e'),
+    (('DUTCH',), 'rhnfzl/xlm-roberta-large-conll02-dutch-onnx', '381e34ba4c222bc221e9fd02832f52a179ed840d'),
+    (('GERMAN',), 'rhnfzl/xlm-roberta-large-conll03-german-onnx', 'fe4aecfa6dc376244ef37da37e6df3b1b0911d71'),
+    (('SPANISH',), 'rhnfzl/xlm-roberta-large-conll02-spanish-onnx', 'ef52a7f08172203c763d51fe36660d36985bb388'),
+    (('FRENCH', 'PORTUGUESE', 'ITALIAN', 'MULTILINGUAL'),
+     'rhnfzl/wikineural-multilingual-ner-onnx', '74191432b21c956b5b04b4778c0e92e569b1f80d'),
+)
+_TORCH_CHECKPOINTS = (
+    (('ENGLISH',), 'FacebookAI/xlm-roberta-large-finetuned-conll03-english', '18f95e9924f3f452df09cc90945073906ef18f1e'),
+    (('DUTCH',), 'FacebookAI/xlm-roberta-large-finetuned-conll02-dutch', '630d5d48d08071704d9a2719b045082019b6ac12'),
+    (('GERMAN',), 'FacebookAI/xlm-roberta-large-finetuned-conll03-german', '1fbcc7a00a69ce5ab754623154a8e9cc6ba868e2'),
+    (('SPANISH',), 'FacebookAI/xlm-roberta-large-finetuned-conll02-spanish', 'a7c5f08c766adcbd6c22f343145fa65d38b3c1d5'),
+    (('FRENCH', 'PORTUGUESE', 'ITALIAN', 'MULTILINGUAL'),
+     'Babelscape/wikineural-multilingual-ner', 'bed6ee7a45d2827b6c90a4fd7983f0241ae0a5c1'),
+)
+DEFAULT_NER_MODELS = {key: model for keys, model, _ in _ONNX_CHECKPOINTS for key in keys}
+DEFAULT_NER_REVISIONS = {key: revision for keys, _, revision in _ONNX_CHECKPOINTS for key in keys}
+DEFAULT_TORCH_NER_MODELS = {key: model for keys, model, _ in _TORCH_CHECKPOINTS for key in keys}
+DEFAULT_TORCH_NER_REVISIONS = {key: revision for keys, _, revision in _TORCH_CHECKPOINTS for key in keys}
+_DEFAULT_CONFIG_NER_MODELS = {key: DEFAULT_NER_MODELS[key] for key in LANG_KEYS}
 
 # NER ensemble: ordered model keys to run per input language.
 # Keys must exist in the resolved ner_models dict.
@@ -167,11 +137,6 @@ MODERNBERT_NER_MODELS: dict[str, str] = {
 # GLiClass document-level classification defaults
 GLICLASS_DEFAULT_MODEL = 'knowledgator/gliclass-edge-v3.0'      # 32.7M params, 131MB
 GLICLASS_DEFAULT_REVISION = 'df03993a2ed98e5e4a0d2dd7efbbd105abe874cf'
-
-# Placeholder constants for future multilingual NER models (blocked: models not yet published)
-OTTER_NER_MODELS: dict[str, str] = {}   # arXiv:2601.06347 — checkpoints not on HF Hub
-MMBERT_NER_MODELS: dict[str, str] = {}  # GLiNER bug #332 blocks mmBERT as backbone
-
 
 @dataclass(frozen=True)
 class TextCleanerConfig:
@@ -259,10 +224,6 @@ class TextCleanerConfig:
     # If None, NER_ENSEMBLE_DEFAULT_KEYS is used. Pass an empty tuple to skip
     # ensemble inference for unmapped languages.
     ner_ensemble_default_keys: tuple[str, ...] | None = None
-
-    # Deprecated: positional tuple (English, Dutch, German, Spanish, Multilingual).
-    # Use ner_models dict instead. Kept for backward compatibility.
-    ner_models_list: tuple[str, ...] = tuple(DEFAULT_NER_MODELS[k] for k in LANG_KEYS)
 
     # Torch backend models (only used when ner_backend is 'torch' or 'ensemble_torch')
     torch_ner_models: Mapping[str, str] | None = None
@@ -516,7 +477,7 @@ class TextCleanerConfig:
             object.__setattr__(self, 'gliner_label_map', _PII_MAPS[self.legacy_type_names])
 
 
-_USER_LABEL = re.compile(r'[A-Z][A-Z0-9_]*')
+_USER_LABEL = re.compile(LABEL_PATTERN)
 
 
 def _user_terms(name, terms):
@@ -601,8 +562,6 @@ def _freeze_sequences(cfg):
     # Convert mutable collections to immutable for frozen safety
     if isinstance(cfg.positional_tags, list):
         object.__setattr__(cfg, 'positional_tags', tuple(cfg.positional_tags))
-    if isinstance(cfg.ner_models_list, list):
-        object.__setattr__(cfg, 'ner_models_list', tuple(cfg.ner_models_list))
     if isinstance(cfg.custom_pipeline_steps, list):
         object.__setattr__(cfg, 'custom_pipeline_steps', tuple(cfg.custom_pipeline_steps))
     for step in cfg.custom_pipeline_steps:
@@ -780,42 +739,21 @@ def _reconcile_torch_models(cfg):
 
 
 def _reconcile_ner_models(cfg):
-    # Reconcile ner_models (dict, preferred) and ner_models_list (tuple, deprecated).
-    # After this block, both fields are guaranteed populated.
-    if cfg.ner_models is not None:
-        # Dict API used — validate required keys, fill defaults, freeze
+    if cfg.ner_models is None:
+        merged = dict(_DEFAULT_CONFIG_NER_MODELS)
+    else:
         missing = REQUIRED_NER_KEYS - set(cfg.ner_models)
         if missing:
             raise ValueError(
                 f"ner_models must include {sorted(REQUIRED_NER_KEYS)}, "
                 f"missing: {sorted(missing)}"
             )
-        # A map of exactly LANG_KEYS matching ner_models_list is a normalized
-        # legacy/default config (replace(), copy): keep it exact. Decided by
-        # content only, so a dict and a mapping proxy give the same config.
-        derived = (
-            set(cfg.ner_models) == set(LANG_KEYS)
-            and tuple(cfg.ner_models[k] for k in LANG_KEYS) == cfg.ner_models_list
-        )
+        # A copied default config keeps its four-language routing.
         merged = (
-            dict(cfg.ner_models) if derived
+            dict(cfg.ner_models) if cfg.ner_models == _DEFAULT_CONFIG_NER_MODELS
             else {**DEFAULT_NER_MODELS, **cfg.ner_models}
         )
-        object.__setattr__(cfg, 'ner_models', MappingProxyType(merged))
-        object.__setattr__(
-            cfg, 'ner_models_list',
-            tuple(merged[k] for k in LANG_KEYS),
-        )
-    else:
-        # No dict provided — derive from ner_models_list (may be default or custom)
-        if cfg.ner_models_list != TextCleanerConfig.ner_models_list:
-            warnings.warn(
-                "ner_models_list is deprecated. Use ner_models dict instead.",
-                DeprecationWarning,
-                stacklevel=3,
-            )
-        models_dict = dict(zip(LANG_KEYS, cfg.ner_models_list))
-        object.__setattr__(cfg, 'ner_models', MappingProxyType(models_dict))
+    object.__setattr__(cfg, 'ner_models', MappingProxyType(merged))
 
     pinned_revisions = {
         key: revision
@@ -890,12 +828,6 @@ def _compute_supported_languages(cfg):
     object.__setattr__(cfg, 'supported_languages', frozenset(langs))
 
 
-# Fields without a plain UPPER_CASE global: ner_models_list is fed by the NER_MODELS_LIST global through
-# ner_models, supported_languages is computed, and NER_ENSEMBLE_DEFAULT_KEYS is also the built-in fallback.
-_NO_PLAIN_GLOBAL = frozenset({'ner_models_list', 'supported_languages', 'ner_ensemble_default_keys'})
-_BUILTIN_ENSEMBLE_DEFAULT_KEYS = NER_ENSEMBLE_DEFAULT_KEYS
-
-
 def require_adapter_mode(cfg: TextCleanerConfig) -> None:
     """Refuse reversible mode on a surface that has no way to hand back each text's map."""
     if cfg.replacement_mode == "reversible":
@@ -903,36 +835,3 @@ def require_adapter_mode(cfg: TextCleanerConfig) -> None:
             "Adapters do not support reversible mode. "
             "Process each text directly and retain its token map."
         )
-
-
-def _config_from_module_globals() -> TextCleanerConfig:
-    """Build a TextCleanerConfig from the current module-level variable state.
-
-    Supports backward compatibility with the legacy config pattern.
-    """
-    m = sys.modules[__name__]
-    kwargs: dict[str, Any] = {
-        f.name: getattr(m, f.name.upper(), f.default)
-        for f in fields(TextCleanerConfig)
-        if f.name not in _NO_PLAIN_GLOBAL
-    }
-    kwargs['positional_tags'] = tuple(m.POSITIONAL_TAGS)
-    if kwargs['ner_models'] is None:
-        kwargs['ner_models'] = dict(zip(LANG_KEYS, m.NER_MODELS_LIST))
-    if m.NER_ENSEMBLE_DEFAULT_KEYS != _BUILTIN_ENSEMBLE_DEFAULT_KEYS:
-        kwargs['ner_ensemble_default_keys'] = m.NER_ENSEMBLE_DEFAULT_KEYS
-    return TextCleanerConfig(**kwargs)
-
-
-# ---------------------------------------------------------------------------
-# Backward-compatible module-level variables: one per field, named in upper case, set to the field's
-# default. Users can still do: config.CHECK_NER_PROCESS = False
-# ---------------------------------------------------------------------------
-for _field in fields(TextCleanerConfig):
-    if _field.name not in _NO_PLAIN_GLOBAL:
-        globals()[_field.name.upper()] = _field.default
-
-# Lists, as they always were, so config.POSITIONAL_TAGS.append('X') keeps working.
-POSITIONAL_TAGS = list(TextCleanerConfig.positional_tags)
-# Order: English, Dutch, German, Spanish, Multilingual
-NER_MODELS_LIST = list(TextCleanerConfig.ner_models_list)

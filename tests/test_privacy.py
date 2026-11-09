@@ -218,7 +218,7 @@ def test_detailed_processing_maps_normalized_chunk_offsets_to_source(monkeypatch
 
     ner = gliner_ner(detector=FakeGLiNER())
     ner.tokenizer = None
-    monkeypatch.setattr("sct.utils.ner.simple_chunk", lambda text, max_tokens: ["Intro. Maria"])
+    monkeypatch.setattr("sct.utils.ner_chunking.simple_chunk", lambda text, max_tokens: ["Intro. Maria"])
     policy = PrivacyPolicy(
         name="strict",
         version="1",

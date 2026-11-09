@@ -714,7 +714,7 @@ section 17 rule views (`own`, `same_set`, `pairwise`). Not yet built: the common
   `entries.py`. No rule for round-1 data changed; round-1 scores are untouched.
 - 2026-11-03 (round 2 entries): ten entries added (section 2 "Round 2 entries"), label maps (section 5),
   contamination rows (section 17), CUDA 12 venvs (torch cu126 direct wheels; onnxruntime-gpu, with
-  `runner.GPU_TWINS` removing SCT's CPU onnxruntime after the install), per-entry GPU speed column (section 16),
+  `runtime.GPU_TWINS` removing SCT's CPU onnxruntime after the install), per-entry GPU speed column (section 16),
   per-round shared view (`runner.shared_view`). `PRESIDIO_MODELS` / `PHONE_REGIONS` moved from `tune.py` to
   `entries.py` (unchanged values; `tune` re-exports them). `opf_adapter` split into `load` + `make_predict`
   (same decoding) so openmed reuses it; `gliner_nvidia_adapter` takes a `model` key and caps GPU memory. No
@@ -734,7 +734,7 @@ section 17 rule views (`own`, `same_set`, `pairwise`). Not yet built: the common
 - 2026-11-03 (round 2 envs): every env resolves for Linux x86_64 / Python 3.12 with CUDA 12 nvidia-* wheels only.
   sct-gliner also moves to torch 2.14.1+cu126 (it resolved PyPI's CUDA 13 torch 2.15.0). sct-training takes
   onnxruntime-gpu 1.29.0 from ORT's CUDA 12 feed: PyPI's 1.27+ builds (1.31.1 included) are CUDA 13.
-  `runner.gpu_twin_fixes` also matches `name @ url` pins.
+  `runtime.gpu_twin_fixes` also matches `name @ url` pins.
 - 2026-11-03 (round 2 smoke): every entry through the real runner on GPU 3 (cap 5 GB): offset fixtures plus 20 dev
   docs each of pl_pii, kdpii and redactionbench, then `speed.py --device cuda` (FineWeb-2, 3 docs per language,
   1 repeat). Fixes: partial e-mail detections no longer fail the offset check (ai4privacy); CPU-only entries get

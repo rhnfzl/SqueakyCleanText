@@ -8,20 +8,21 @@ import os
 import re
 import threading
 import time
-import warnings
 from bisect import bisect_right
 from collections import Counter
 from concurrent.futures import ThreadPoolExecutor
+from functools import partial
 from typing import Any, NamedTuple, cast
 from collections.abc import Callable
 
 import regex
 
-from sct.config import GLICLASS_DEFAULT_MODEL, TextCleanerConfig, _config_from_module_globals
+from sct.config import GLICLASS_DEFAULT_MODEL, TextCleanerConfig
 from sct.privacy import EntityFinding, PrivacyPolicy, ProcessingMetrics, TokenStore
 from sct.utils import constants, contact, datetime, ner, normtext, resources, special, stopwords
 from sct.utils.anonymization_map import AnonymizationMap
 from sct.utils.gliclass_adapter import GLiClassAdapter
+from sct.utils.markers import PLACEHOLDER_TOKEN
 from sct.utils.synthetic import FAKER_GENERATORS, SyntheticReplacer
 from sct.utils.process_result import ProcessMetadata, ProcessResult
 
@@ -103,30 +104,6 @@ class _DocumentContext(threading.local):
         self.__dict__.clear()
 
 
-def _renamed_attribute(old: str, new: str) -> property:
-    """A deprecated public name that reads and writes the attribute that replaced it."""
-    message = f"TextCleaner.{old} is deprecated; it is a private attribute now and this alias will be removed"
-
-    def read(self):
-        warnings.warn(message, DeprecationWarning, stacklevel=2)
-        return getattr(self, new)
-
-    def write(self, value):
-        warnings.warn(message, DeprecationWarning, stacklevel=2)
-        setattr(self, new, value)
-    return property(read, write)
-
-
-def _resolve_max_workers(max_workers: int | None, batch_size: int | None) -> int | None:
-    """*max_workers*, or the value of its deprecated alias *batch_size*."""
-    if batch_size is None:
-        return max_workers
-    if max_workers is not None:
-        raise TypeError("pass max_workers or its deprecated alias batch_size, not both")
-    warnings.warn("batch_size is deprecated; use max_workers", DeprecationWarning, stacklevel=3)
-    return batch_size
-
-
 class TextCleaner:
     """Runs one configured cleaning pipeline; ``process`` and ``process_batch`` return ``ProcessResult``s.
 
@@ -138,12 +115,6 @@ class TextCleaner:
     - *privacy_policy*: policy and findings.
     - *include_entities*: findings.
     """
-
-    NormaliseText = _renamed_attribute('NormaliseText', '_text_normaliser')
-    ProcessStopwords = _renamed_attribute('ProcessStopwords', '_stopword_remover')
-    ProcessDateTime = _renamed_attribute('ProcessDateTime', '_date_masker')
-    ProcessContacts = _renamed_attribute('ProcessContacts', '_contact_masker')
-    ProcessSpecialSymbols = _renamed_attribute('ProcessSpecialSymbols', '_symbol_masker')
 
     def __init__(
         self,
@@ -157,8 +128,7 @@ class TextCleaner:
         """Initialize the text cleaning pipeline.
 
         Args:
-            cfg: Immutable configuration. If None, reads from module-level
-                 config variables (backward compatible).
+            cfg: Immutable configuration. If None, uses TextCleanerConfig defaults.
             privacy_policy: Chooses each NER entity's action in place of the replacement; adds the policy and
                 findings metadata keys. Requires ``replacement_mode='placeholder'`` (ValueError otherwise).
             token_store: Reversible mode saves each map here, and metadata has anon_map_reference
@@ -167,7 +137,7 @@ class TextCleaner:
             metrics_callback: Called with value-free ProcessingMetrics after each non-blank document; empty or
                 whitespace input runs nothing and does not call it.
         """
-        self.cfg = cfg or _config_from_module_globals()
+        self.cfg = cfg or TextCleanerConfig()
         names = constants.LEGACY_TYPE_NAMES if self.cfg.legacy_type_names else {}
         self._phone_type, self._ip_type = names.get('PHONE', 'PHONE'), names.get('IP', 'IP')
         if (
@@ -268,8 +238,8 @@ class TextCleaner:
                              if allow_terms else None)
         # Markers that are not <TAG>-shaped ("EMAIL"): NER protects them like <EMAIL> (ner.regex_markers).
         self._custom_markers = tuple(sorted({
-            tag for tag in self._tags.values() if tag and not ner.PLACEHOLDER_TOKEN.fullmatch(tag)}))
-        self._marker_regex = re.compile('|'.join([ner.PLACEHOLDER_TOKEN.pattern, *map(
+            tag for tag in self._tags.values() if tag and not PLACEHOLDER_TOKEN.fullmatch(tag)}))
+        self._marker_regex = re.compile('|'.join([PLACEHOLDER_TOKEN.pattern, *map(
             re.escape, sorted(self._custom_markers, key=len, reverse=True))]))
 
     def _build_detector(self):
@@ -351,30 +321,46 @@ class TextCleaner:
                                       (cfg.check_to_ascii_unicode, self._text_normaliser.to_ascii_unicode),
                                       (cfg.check_remove_emoji, self._text_normaliser.remove_emoji)) if on]
 
-    def _init_pipeline(self):
-        """Build the pipeline steps list based on config."""
+    def _masking_plan(self, normalised_text: str | None = None):
+        """Cleaning steps and their boundary checks share order, toggles and matching rules."""
         cfg = self.cfg
+        language = (self._detect_language(normalised_text)[0]
+                    if normalised_text is not None and cfg.check_fuzzy_replace_dates else None)
+        rows = (
+            # escaped "<b>" stays text: decoded after the view, hidden from tags
+            (cfg.check_fix_bad_unicode, self._unescape_markup, ()),
+            (bool(self._user_rules), self._replace_user_terms,
+             tuple(partial(self._sub_user_rule, pattern, label) for pattern, _, label in self._user_rules)),
+            (cfg.check_replace_html, self._replace_html, (self._html_regex.sub,)),
+            # brackets hide from the tag step only; contacts see "john<at>x.com"
+            (cfg.check_fix_bad_unicode, self._restore_brackets, ()),
+            (cfg.check_replace_urls, self._replace_urls, (self._url_regex.sub,)),
+            (cfg.check_replace_emails, self._replace_emails, (constants.EMAIL_REGEX.sub,)),
+            (cfg.check_replace_ips, self._replace_ips, (contact.IP_VIEW.sub,)),
+            (cfg.check_replace_dates, self._replace_dates, (self._date_view.sub,)),
+            (cfg.check_fuzzy_replace_dates, self._replace_fuzzy_dates, (partial(self._sub_fuzzy_dates, language),)),
+            # Phones before years, so a year step cannot split "+31 6 1234 2019".
+            # Checksum-valid IBANs/cards and identifier tokens before phones, so a phone cannot take their digits.
+            (cfg.check_replace_iban_cards, self._replace_iban_cards, (contact.IBAN_VIEW.sub, contact.CARD_VIEW.sub)),
+            (cfg.check_replace_identifiers, self._replace_identifiers, (constants.IDENTIFIER_REGEX.sub,)),
+            (cfg.check_replace_phone_numbers, self._replace_phone_numbers, (self._phone_view.sub,)),
+        )
+        return [(step, substitutions) for on, step, substitutions in rows if on]
 
+    def _sub_fuzzy_dates(self, language, repl, text):
+        def masked(match):
+            is_date = self._date_masker.fuzzy_replace_dates(
+                match.group(), replace_with="", score_cutoff=self.cfg.fuzzy_date_score_cutoff, language=language) == ""
+            return repl(match) if is_date else match.group()
+        return constants.FUZZY_DATE_CANDIDATE_REGEX.sub(masked, text)
+
+    def _init_pipeline(self):
+        cfg = self.cfg
         self._pipeline.extend(self._normalising_steps())
         # Steps before this index only normalise; markers they surface are source text.
         self._normalise_step_count = len(self._pipeline)
+        self._pipeline.extend(step for step, _ in self._masking_plan())
         rows = (
-            # escaped "<b>" stays text: decoded after the view, hidden from tags
-            (cfg.check_fix_bad_unicode, self._unescape_markup),
-            (bool(self._user_rules), self._replace_user_terms),
-            (cfg.check_replace_html, self._replace_html),
-            # brackets hide from the tag step only; contacts see "john<at>x.com"
-            (cfg.check_fix_bad_unicode, self._restore_brackets),
-            (cfg.check_replace_urls, self._replace_urls),
-            (cfg.check_replace_emails, self._replace_emails),
-            (cfg.check_replace_ips, self._replace_ips),
-            (cfg.check_replace_dates, self._replace_dates),
-            (cfg.check_fuzzy_replace_dates, self._replace_fuzzy_dates),
-            # Phones before years, so a year step cannot split "+31 6 1234 2019".
-            # Checksum-valid IBANs/cards and identifier tokens before phones, so a phone cannot take their digits.
-            (cfg.check_replace_iban_cards, self._replace_iban_cards),
-            (cfg.check_replace_identifiers, self._replace_identifiers),
-            (cfg.check_replace_phone_numbers, self._replace_phone_numbers),
             (cfg.check_replace_years, self._replace_years),
             (cfg.check_replace_numbers, self._replace_numbers),
             (cfg.check_replace_currency_symbols, self._replace_currency_symbols),
@@ -522,8 +508,8 @@ class TextCleaner:
         # Placeholder spellings the source holds, raw or once normalised ("＜LONDON＞",
         # "&lt;LONDON&gt;"): NER gives them no protection and reversible mode never
         # allocates them.
-        source_markers = frozenset(ner.PLACEHOLDER_TOKEN.findall(text)) | frozenset(
-            ner.PLACEHOLDER_TOKEN.findall(normtext.unescape_markup(current_text))) | frozenset(
+        source_markers = frozenset(PLACEHOLDER_TOKEN.findall(text)) | frozenset(
+            PLACEHOLDER_TOKEN.findall(normtext.unescape_markup(current_text))) | frozenset(
             tag for tag in self._custom_markers if tag in text or tag in current_text)
         if anon_map is not None:
             anon_map.reserved.update(source_markers)
@@ -622,19 +608,17 @@ class TextCleaner:
         return ProcessResult(current_text, stat_text, language, metadata=metadata)
 
     def process_batch(
-        self, texts: list[str], max_workers: int | None = None, *, batch_size: int | None = None,
+        self, texts: list[str], max_workers: int | None = None,
     ) -> list[ProcessResult]:
         """Process multiple texts with bounded document concurrency.
 
         Args:
             max_workers: Maximum number of worker threads (default ``os.cpu_count()``). Documents per NER
                 model call is ``cfg.ner_batch_size``.
-            batch_size: Deprecated alias of *max_workers*.
 
         Returns:
-            List of ProcessResult (each unpacks as 3-tuple for backward compat).
+            List of ProcessResult.
         """
-        max_workers = _resolve_max_workers(max_workers, batch_size)
         if max_workers is not None and max_workers <= 0:
             raise ValueError("max_workers must be >= 1")
         if not texts:
@@ -680,15 +664,11 @@ class TextCleaner:
             staged = run(before_ner)
             states = [state for state, _ in staged]
 
-            def restore_synthetic(index):
-                if replacer:
-                    replacer.swap_cache(staged[index][1])
-
             ner_results = self.GeneralNER.ner_process_batch_detailed(
                 [state.text for state in states],
                 [state.language for state in states],
                 anon_maps=[state.anon_map for state in states],
-                before_finalize=restore_synthetic,
+                synthetic_caches=[cache for _, cache in staged],
                 max_workers=workers,
                 source_markers=[state.source_markers for state in states],
             )
@@ -724,15 +704,13 @@ class TextCleaner:
         return metadata
 
     async def aprocess_batch(
-        self, texts: list[str], max_workers: int | None = None, *, batch_size: int | None = None,
+        self, texts: list[str], max_workers: int | None = None,
     ) -> list[ProcessResult]:
         """Async version of process_batch for use with asyncio-based frameworks (FastAPI, aiohttp).
 
         Runs process_batch in a thread-pool executor so it doesn't block the event loop.
-        *max_workers* is the maximum number of worker threads, as in process_batch; *batch_size* is its
-        deprecated alias.
+        *max_workers* is the maximum number of worker threads, as in process_batch.
         """
-        max_workers = _resolve_max_workers(max_workers, batch_size)
         loop = asyncio.get_running_loop()
         return await loop.run_in_executor(None, self.process_batch, texts, max_workers)
 
@@ -1141,7 +1119,7 @@ class TextCleaner:
             hidden[key] = match.group()
             return key
 
-        replaced = ner.PLACEHOLDER_TOKEN.sub(hide, text)
+        replaced = PLACEHOLDER_TOKEN.sub(hide, text)
         for pattern in patterns:
             replaced = self._replace_typed(replaced, pattern, 'NUMBER')
         for key, placeholder in hidden.items():

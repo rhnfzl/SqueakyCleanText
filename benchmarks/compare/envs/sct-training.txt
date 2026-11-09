@@ -2,6 +2,6 @@
 # PyPI's onnxruntime-gpu is the CUDA 13 build since 1.27, so the CUDA 12 build comes from ORT's own CUDA 12 feed
 # (onnxruntime-cuda-12, newest there: 1.29.0). Its [cuda,cudnn] extra brings the CUDA 12 / cuDNN 9 runtime wheels
 # (the adapter calls onnxruntime.preload_dlls()). SCT depends on the CPU onnxruntime too: the env builder
-# (runner.GPU_TWINS) removes it after install so the GPU build owns the onnxruntime module.
+# (runtime.GPU_TWINS) removes it after install so the GPU build owns the onnxruntime module.
 SqueakyCleanText==0.8.2
 onnxruntime-gpu[cuda,cudnn] @ https://aiinfra.pkgs.visualstudio.com/2692857e-05ef-43b4-ba9c-ccf1c22c437c/_packaging/9387c3aa-d9ad-4513-968c-383f6f7f53b8/pypi/download/onnxruntime-gpu/1.29/onnxruntime_gpu-1.29.0-cp312-cp312-manylinux_2_28_x86_64.whl

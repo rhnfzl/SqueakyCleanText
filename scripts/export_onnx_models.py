@@ -35,10 +35,6 @@ from huggingface_hub import HfApi
 # Other languages: search HuggingFace for XLM-RoBERTa NER models fine-tuned on
 # WikiNER, Evalita (Italian), HAREM (Portuguese), QUAERO (French), or similar corpora.
 #
-# Pending — add entries below when suitable source models are identified:
-#   "source-org/xlm-roberta-large-french-ner":     "rhnfzl/xlm-roberta-large-ner-french-onnx",
-#   "source-org/xlm-roberta-large-portuguese-ner": "rhnfzl/xlm-roberta-large-ner-portuguese-onnx",
-#   "source-org/xlm-roberta-large-italian-ner":    "rhnfzl/xlm-roberta-large-ner-italian-onnx",
 MODEL_MAP = {
     "FacebookAI/xlm-roberta-large-finetuned-conll03-english": "rhnfzl/xlm-roberta-large-conll03-english-onnx",
     "FacebookAI/xlm-roberta-large-finetuned-conll02-dutch": "rhnfzl/xlm-roberta-large-conll02-dutch-onnx",

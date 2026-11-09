@@ -4,6 +4,7 @@ import unicodedata
 from collections.abc import Callable
 
 from sct.utils import constants
+from sct.utils.markers import PLACEHOLDER_TOKEN
 
 
 def _drop_if_isolated(match):
@@ -15,8 +16,6 @@ def _drop_if_isolated(match):
 
 
 _JSON = json.JSONDecoder()
-# The library's own "<NUMBER>"-shaped tokens: earlier steps put them into JSON values, so they count as one.
-_TOKEN = re.compile(r'<[A-Z][A-Z0-9_]*>')
 _JSON_WINDOW = 4096
 
 
@@ -24,7 +23,7 @@ def _json_object_spans(text):
     """(start, end) of each outermost {...} that parses as a JSON object (replacement tokens read as values)."""
     last_close = text.rfind('}')  # a '{' with no '}' after it cannot start an object
     # Same length, so offsets map back to text: "<NUMBER>" -> "0       ".
-    view = _TOKEN.sub(lambda m: '0'.ljust(len(m.group())), text)
+    view = PLACEHOLDER_TOKEN.sub(lambda m: '0'.ljust(len(m.group())), text)
     # Parse a slice from a recent base: a failed parse counts lines from the slice start, so this keeps
     # each failure O(window) instead of O(offset).
     spans, base, chunk = [], 0, view

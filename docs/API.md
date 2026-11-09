@@ -4,6 +4,8 @@
 
 `TextCleaner(cfg=None, *, privacy_policy=None, token_store=None, include_entities=False, metrics_callback=None)`
 
+Pass a `TextCleanerConfig` to change behavior. Omitting `cfg` uses its defaults; module-level configuration globals are no longer supported.
+
 ### `process(text: str) -> ProcessResult`
 
 Cleans one text. It runs `process_batch([text])` and returns its one result. A
@@ -16,7 +18,7 @@ Cleans one text. It runs `process_batch([text])` and returns its one result. A
 
 Processes multiple texts using thread-parallel execution. Each result follows the same format as `process()`.
 `max_workers` is the maximum number of worker threads (default `os.cpu_count()`; it must be >= 1).
-The keyword `batch_size` is a deprecated alias: it emits `DeprecationWarning`, and passing both raises `TypeError`.
+Use `max_workers` for document concurrency; the deprecated `batch_size` keyword is removed.
 Empty or whitespace-only input returns `ProcessResult("", "", None)` with the `empty_input` warning,
 and a non-string item or a non-empty plain `str` for `texts` raises `ValueError`. With NER on and `ner_batch_size > 1`, the steps before
 NER run per document in threads, then one NER call batches the chunks of all documents.

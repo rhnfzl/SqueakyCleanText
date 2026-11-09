@@ -1,18 +1,18 @@
 import math
 import os
 import weakref
-from bisect import bisect_left, bisect_right
 import gc
 import re
 import threading
 from collections import defaultdict
 import logging
-from typing import TYPE_CHECKING, Any, NamedTuple, cast
-from collections.abc import Callable, Collection, Iterable, Mapping, Sequence
+from typing import TYPE_CHECKING, Any, cast
+from collections.abc import Collection, Iterable, Mapping, Sequence
 
 from sct.utils import constants, resources
 from sct.utils.anonymization_map import AnonymizationMap
-from sct.utils.ner_chunking import align_chunk, simple_chunk, split_text, token_count
+from sct.utils.markers import PLACEHOLDER_TOKEN
+from sct.utils.ner_chunking import Window, plan_windows
 from sct.utils.ner_spans import (
     ENTITY_TYPE_MAP,
     drop_allowed,
@@ -54,14 +54,6 @@ _ENSEMBLE_LABEL_MAP = {'person': 'PER', 'organization': 'ORG', 'location': 'LOC'
 # An inference lock's key: 'gliner', or a token model's (name, revision).
 ModelKey = tuple[str, str | None]
 
-# A regex step's placeholder (<PHONE>, <EMAIL_0>); NER spans inside one are dropped,
-# so "call <PHONE>" never becomes "call <<MISC>>". Marker-shaped text already in the
-# source (*source_markers*: its text, e.g. "<LONDON>", or the (start, end) spans of its occurrences,
-# so an emitted marker of the same text keeps its protection) gets none, so it cannot hide PII.
-# Custom replace_with_* markers ("EMAIL") are protected the same way through *regex_markers*.
-PLACEHOLDER_TOKEN = re.compile(r"<[A-Z][A-Z0-9_]*>")
-
-
 # Freeing an inherited ONNX session in a forked child crashes or hangs, so children pin every live
 # GeneralNER for their whole life instead of ever destroying one.
 _LIVE_NER: "weakref.WeakSet[GeneralNER]" = weakref.WeakSet()
@@ -74,14 +66,6 @@ def _pin_live_ner_in_child():
 
 if hasattr(os, "register_at_fork"):
     os.register_at_fork(after_in_child=_pin_live_ner_in_child)
-
-
-class _Window(NamedTuple):
-    text: str
-    start: int
-    offsets: Any  # an align_chunk result or a range
-    own_start: int
-    own_end: int
 
 
 class ModelLoadError(Exception):
@@ -670,7 +654,7 @@ class GeneralNER:
         positional_tags: Sequence[str] | None = None,
         ner_confidence_threshold: float | None = None,
         anon_maps: Sequence['AnonymizationMap | None'] | None = None,
-        before_finalize: Callable[[int], object] | None = None,
+        synthetic_caches: Sequence[dict[tuple, str] | None] | None = None,
         max_workers: int = 1,
         source_markers: Sequence[Collection[Any] | None] | None = None,
     ) -> list[NERProcessingResult]:
@@ -678,8 +662,8 @@ class GeneralNER:
 
         Windows of all documents go through each model in calls of up to
         ``ner_batch_size`` windows; replacement then runs per document exactly as
-        in ``ner_process_detailed``. *before_finalize(i)* runs just before
-        document *i* is replaced (TextCleaner restores its synthetic cache there).
+        in ``ner_process_detailed``. *synthetic_caches* carries each document's
+        replacements from earlier cleaning stages into entity replacement.
         *max_workers* ONNX batches run at once.
         """
         positional_tags, ner_confidence_threshold = self._tags_and_cut(positional_tags, ner_confidence_threshold)
@@ -688,8 +672,8 @@ class GeneralNER:
         if self.cfg.ner_backend == 'presidio_gliner':
             results = []
             for i, text in enumerate(texts):
-                if before_finalize is not None:
-                    before_finalize(i)
+                if synthetic_caches is not None and self._synthetic_replacer is not None:
+                    self._synthetic_replacer.swap_cache(synthetic_caches[i])
                 results.append(self.ner_process_detailed(
                     text, positional_tags, ner_confidence_threshold, languages[i], anon_maps[i], source_markers[i],
                 ))
@@ -711,8 +695,8 @@ class GeneralNER:
         for i, (text, windows) in enumerate(zip(texts, doc_windows)):
             window_results = flat_results[offset:offset + len(windows)]
             offset += len(windows)
-            if before_finalize is not None:
-                before_finalize(i)
+            if synthetic_caches is not None and self._synthetic_replacer is not None:
+                self._synthetic_replacer.swap_cache(synthetic_caches[i])
             if not windows:
                 results.append(NERProcessingResult(text=text, findings=()))
                 continue
@@ -764,82 +748,14 @@ class GeneralNER:
         gliner_max = self._gliner_pipe.max_context_length if self._gliner_pipe else 384
         return int(gliner_max * 0.9)
 
-    def _plan_windows(self, text: str, keys=None) -> list[_Window]:
-        """Split *text* into model windows.
-
-        Windows fit the models in *keys* (the document's ensemble; None: every
-        loaded model), so other documents' models never change this one.
-
-        A document that fits one window is one unchanged window. Otherwise core
-        chunks come from the chunker with ``2 * ner_chunk_overlap`` tokens less
-        budget; each window adds up to ``ner_chunk_overlap`` tokens of the
-        neighbouring text on both sides (GLiNER-only: 2 chars per token, as in
-        ``simple_chunk``). ``win_start + offsets[i]`` is the document position of
-        window position *i*. A span belongs to the window whose core owns its
-        start (``own_start <= start < own_end``); a copy seen by another window is
-        kept only when no owned span covers it. With overlap 0 windows are the
-        0.7.1 chunks and own everything.
-        """
+    def _plan_windows(self, text: str, keys=None) -> list[Window]:
+        """Size windows for this document's models, independent of other loaded routes."""
         overlap = self.cfg.ner_chunk_overlap
         budget = self._chunk_budget(keys)
         if overlap:
             self._check_overlap(budget)  # a model loaded after construction can shrink it
-        # lock-free: HF fast tokenizer Rust backend is thread-safe
-        if self.tokenizer is not None:
-            counter = self._window_tokenizer(keys)
-        # A document that fits one window is never split: overlap applies only when chunking.
-        if overlap and (
-            token_count(text, counter) <= budget if self.tokenizer is not None
-            else len(text) <= budget * 2
-        ):
-            overlap = 0
-        budget -= 2 * overlap
-        if self.tokenizer is not None:
-            chunks = split_text(text, budget, counter)
-        else:
-            chunks = simple_chunk(text, max_tokens=budget)
-
-        cores = []
-        search_start = 0
-        for chunk in chunks:
-            source_chunk, start, offsets = align_chunk(text, chunk, search_start)
-            search_start = start + len(source_chunk)
-            cores.append((chunk, start, start + len(source_chunk), offsets))
-        if not overlap:
-            return [_Window(chunk, start, offsets, 0, len(text) + 1) for chunk, start, _, offsets in cores]
-
-        if self.tokenizer is not None:
-            tokens = [
-                (start, end)
-                for start, end in counter(text, return_offsets_mapping=True).offset_mapping  # route's tokens
-                if end > start
-            ]
-            starts = [start for start, _ in tokens]
-            ends = [end for _, end in tokens]
-
-        windows = []
-        for k, (_, core_start, core_end, _) in enumerate(cores):
-            if self.tokenizer is not None:
-                before = bisect_right(ends, core_start)  # tokens ending at or before the core
-                after = bisect_left(starts, core_end)  # first token starting at or after its end
-                win_start = min(core_start, starts[max(0, before - overlap)]) if before else core_start
-                win_end = (
-                    max(core_end, ends[min(len(ends), after + overlap) - 1])
-                    if after < len(ends) else core_end
-                )
-                if token_count(text[win_start:win_end], counter) > budget + 2 * overlap:
-                    win_start, win_end = core_start, core_end  # overlap would truncate another model
-            else:
-                win_start = max(0, core_start - overlap * 2)
-                win_end = min(len(text), core_end + overlap * 2)
-            windows.append(_Window(
-                text[win_start:win_end],
-                win_start,
-                range(win_end - win_start + 1),
-                core_start if k else 0,
-                cores[k + 1][1] if k + 1 < len(cores) else len(text) + 1,
-            ))
-        return windows
+        tokenizer = self._window_tokenizer(keys) if self.tokenizer is not None else None
+        return plan_windows(text, budget, tokenizer, overlap)
 
     def _detect(
         self,
@@ -914,7 +830,7 @@ class GeneralNER:
     def _finalize(
         self,
         text: str,
-        windows: list[_Window],
+        windows: list[Window],
         window_results: list[list],
         ner_confidence_threshold: float,
         anon_map: 'AnonymizationMap | None',
@@ -985,7 +901,11 @@ class GeneralNER:
         )
 
     def _marker_spans(self, text, source_markers) -> list[tuple[int, int]]:
-        """The spans of the tags the pipeline wrote in *text* (not marker-shaped source text)."""
+        """Protect tags the pipeline emitted, including custom markers.
+
+        Marker-shaped source text must remain detectable, even when another
+        occurrence of the same marker was emitted during cleaning.
+        """
         source_markers = source_markers or ()
         source_spans = [s for s in source_markers if isinstance(s, tuple)]
 

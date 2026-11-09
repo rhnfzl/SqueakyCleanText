@@ -198,25 +198,12 @@ def _plain_cleaner():
     ))
 
 
-def test_process_batch_batch_size_is_a_deprecated_alias():
+def test_process_batch_rejects_nonpositive_worker_limit():
     cleaner = _plain_cleaner()
-
-    assert [r.lm_text for r in cleaner.process_batch(["one"], 1)] == ["one"]
-    with pytest.warns(DeprecationWarning, match="max_workers") as caught:
-        assert [r.lm_text for r in cleaner.process_batch(["one"], batch_size=1)] == ["one"]
-    assert caught[0].filename == __file__
-    with pytest.raises(TypeError, match="not both"):
-        cleaner.process_batch(["one"], 1, batch_size=1)
     with pytest.raises(ValueError, match="max_workers"):
         cleaner.process_batch(["one"], max_workers=0)
 
 
-def test_aprocess_batch_batch_size_is_a_deprecated_alias():
+def test_aprocess_batch_accepts_worker_limit():
     cleaner = _plain_cleaner()
-
-    assert [r.lm_text for r in asyncio.run(cleaner.aprocess_batch(["one"], 1))] == ["one"]
     assert [r.lm_text for r in asyncio.run(cleaner.aprocess_batch(["one"], max_workers=1))] == ["one"]
-    with pytest.warns(DeprecationWarning, match="max_workers"):
-        assert [r.lm_text for r in asyncio.run(cleaner.aprocess_batch(["one"], batch_size=1))] == ["one"]
-    with pytest.raises(TypeError, match="not both"):
-        asyncio.run(cleaner.aprocess_batch(["one"], 1, batch_size=1))

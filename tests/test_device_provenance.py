@@ -6,7 +6,7 @@ import re
 import onnxruntime as ort
 import pytest
 
-from sct import TextCleaner, config
+from sct import TextCleaner
 from sct.config import TextCleanerConfig
 from sct.utils import ner as ner_module
 from sct.utils.ner import GeneralNER
@@ -134,19 +134,13 @@ def test_device_config_validation(overrides, match):
         TextCleanerConfig(check_ner_process=False, **overrides)
 
 
-def test_device_config_defaults_globals_and_pickle(monkeypatch):
+def test_device_config_defaults_and_pickle():
     cfg = TextCleanerConfig(check_ner_process=False)
     assert (cfg.ner_device, cfg.cuda_device_id, cfg.onnx_cuda_provider_options) == (None, 0, None)
-    monkeypatch.setattr(config, "NER_DEVICE", "cpu")
-    monkeypatch.setattr(config, "CUDA_DEVICE_ID", 1)
-    monkeypatch.setattr(config, "ONNX_CUDA_PROVIDER_OPTIONS", {"gpu_mem_limit": 8})
-    legacy = config._config_from_module_globals()
-    assert (legacy.ner_device, legacy.cuda_device_id) == ("cpu", 1)
     frozen = TextCleanerConfig(check_ner_process=False, onnx_cuda_provider_options={"x": 1})
     with pytest.raises(TypeError):
         frozen.onnx_cuda_provider_options["x"] = 2
     assert pickle.loads(pickle.dumps(frozen)) == frozen  # noqa: S301 - trusted round trip
-    assert dict(legacy.onnx_cuda_provider_options) == {"gpu_mem_limit": 8}
 
 
 # --- Apple GPU ('mps'): torch and GLiNER only; ONNX stays on CPU ---

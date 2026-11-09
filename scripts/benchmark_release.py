@@ -7,7 +7,7 @@ Run once per release on the same machine and compare the JSON files:
 
 Batch throughput (``process_batch``) runs only with ``--batch N``:
 
-    python -m scripts.benchmark_release --batch 256 --batch-size 8 --ner-batch-size 8
+    python -m scripts.benchmark_release --batch 256 --max-workers 8 --ner-batch-size 8
 
 Correctness runs the default config with ``replacement_mode="reversible"`` (each
 placeholder maps back to the exact value it replaced, which gives the predicted
@@ -190,7 +190,7 @@ def _peak_rss_mb() -> float | None:
 def run_batch(
     dataset: Path,
     documents: int,
-    batch_size: int | None,
+    max_workers: int | None,
     ner_batch_size: int,
     intra_op_threads: int | None,
     repeats: int,
@@ -205,11 +205,11 @@ def run_batch(
     cleaner = TextCleaner(cfg=TextCleanerConfig(
         ner_batch_size=ner_batch_size, onnx_intra_op_threads=intra_op_threads, **cfg_overrides,
     ))
-    cleaner.process_batch(docs, max_workers=batch_size)
+    cleaner.process_batch(docs, max_workers=max_workers)
     seconds = []
     for _ in range(repeats):
         started_at = time.perf_counter()
-        results = cleaner.process_batch(docs, max_workers=batch_size)
+        results = cleaner.process_batch(docs, max_workers=max_workers)
         seconds.append(time.perf_counter() - started_at)
     output_hash = hashlib.sha256("\0".join(r.lm_text for r in results).encode()).hexdigest()
     return {
@@ -217,7 +217,7 @@ def run_batch(
         "long_documents": long,
         "settings": {
             "documents": documents,
-            "batch_size": batch_size,
+            "max_workers": max_workers,
             "ner_batch_size": ner_batch_size,
             "onnx_intra_op_threads": intra_op_threads,
             "repeats": repeats,
@@ -281,7 +281,7 @@ def main() -> None:
     parser.add_argument("--output-dir", type=Path, default=RESULTS)
     batch = parser.add_argument_group("batch throughput (only with --batch)")
     batch.add_argument("--batch", type=int, metavar="N", help="time process_batch over N documents")
-    batch.add_argument("--batch-size", type=int, metavar="B", help="process_batch workers")
+    batch.add_argument("--max-workers", type=int, metavar="W", help="process_batch document workers")
     batch.add_argument("--ner-batch-size", type=int, default=8, metavar="K")
     batch.add_argument("--intra-op-threads", type=int, metavar="T")
     batch.add_argument("--repeats", type=int, default=3, metavar="R")
@@ -290,12 +290,12 @@ def main() -> None:
     args.output_dir.mkdir(parents=True, exist_ok=True)
     if args.batch:
         result = run_batch(
-            args.dataset, args.batch, args.batch_size, args.ner_batch_size,
+            args.dataset, args.batch, args.max_workers, args.ner_batch_size,
             args.intra_op_threads, args.repeats, args.long,
         )
         name = (
             f"benchmark-{result['sct_version']}-batch{'-long' if args.long else ''}"
-            f"-N{args.batch}-B{args.batch_size}-K{args.ner_batch_size}-T{args.intra_op_threads}.json"
+            f"-N{args.batch}-W{args.max_workers}-K{args.ner_batch_size}-T{args.intra_op_threads}.json"
         )
         write_text_atomic(args.output_dir / name, json.dumps(result, indent=2, sort_keys=True) + "\n")
         return

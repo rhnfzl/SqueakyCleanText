@@ -2,8 +2,6 @@
 
 import re
 from bisect import bisect_right
-from collections.abc import Callable
-from functools import partial
 
 from sct.config import require_adapter_mode
 from sct.sct import TextCleaner
@@ -60,33 +58,6 @@ class BufferedStreamingRedactor:
         except BaseException:
             self._finished = False
             raise
-
-
-def _sub_fuzzy_dates(cleaner, score_cutoff, language, repl, text):
-    """The fuzzy date step as a ``sub(repl, text)``: *repl* runs on each candidate the date masker takes."""
-    def masked(match):
-        is_date = cleaner._date_masker.fuzzy_replace_dates(
-            match.group(), replace_with="", score_cutoff=score_cutoff, language=language) == ""
-        return repl(match) if is_date else match.group()
-    return constants.FUZZY_DATE_CANDIDATE_REGEX.sub(masked, text)
-
-
-def _masking_steps(cleaner, cfg, normalised_text):
-    """The cleaner's masking steps up to the phone step, in pipeline order, each a ``sub(repl, text)``: user
-    rules and fuzzy dates too, since a value they mask moves what the phone rule sees ("117 235 991 12345")."""
-    language = cleaner._detect_language(normalised_text)[0] if cfg.check_fuzzy_replace_dates else None
-    fuzzy_dates = partial(_sub_fuzzy_dates, cleaner, cfg.fuzzy_date_score_cutoff, language)
-    # a pattern past custom_patterns_timeout raises, or (on_timeout='warn') masks nothing
-    steps: list[tuple[bool, Callable[..., str]]] = [
-        (True, partial(cleaner._sub_user_rule, pattern, timed_label)) for pattern, _, timed_label in cleaner._user_rules]
-    steps += [(cfg.check_replace_html, cleaner._html_regex.sub), (cfg.check_replace_urls, cleaner._url_regex.sub),
-              (cfg.check_replace_emails, constants.EMAIL_REGEX.sub), (cfg.check_replace_ips, contact.IP_VIEW.sub),
-              (cfg.check_replace_dates, cleaner._date_view.sub), (cfg.check_fuzzy_replace_dates, fuzzy_dates),
-              (cfg.check_replace_iban_cards, contact.IBAN_VIEW.sub),
-              (cfg.check_replace_iban_cards, contact.CARD_VIEW.sub),
-              (cfg.check_replace_identifiers, constants.IDENTIFIER_REGEX.sub),
-              (cfg.check_replace_phone_numbers, cleaner._phone_view.sub)]
-    return [step for on, step in steps if on]
 
 
 def _step_matches(steps, normalised_text):
@@ -280,7 +251,7 @@ class WindowedStreamingRedactor:
         # rule that reads past a space (a phone's next group: "㉚ ⓪⑦" folds to "30 07") sees what the whole
         # document gives it.
         cutoff = len(buffer) - self._overlap_chars
-        steps = _masking_steps(cleaner, cfg, normalised_text)
+        steps = [sub for _, substitutions in cleaner._masking_plan(normalised_text) for sub in substitutions]
         step_spans, blanked = _step_matches(steps, normalised_text)
         protected = _protected_spans(cleaner, cfg, normalised_text, step_spans, blanked, self._overlap_chars)
         split_at, separator = _find_split(normalise, buffer, cutoff, normalised_text, protected, steps, set(step_spans))

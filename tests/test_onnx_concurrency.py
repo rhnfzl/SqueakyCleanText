@@ -8,7 +8,6 @@ from concurrent.futures import ThreadPoolExecutor
 import pytest
 
 from tests.helpers import gliner_ner
-from sct import config
 from sct.config import TextCleanerConfig
 from sct.utils import ner as ner_module
 from sct.utils.ner import GeneralNER
@@ -129,13 +128,6 @@ def test_thread_config_validation(field):
     with pytest.raises(ValueError, match=field):
         TextCleanerConfig(check_ner_process=False, **{field: 0})
     assert getattr(TextCleanerConfig(check_ner_process=False), field) is None
-
-
-def test_thread_config_module_globals(monkeypatch):
-    monkeypatch.setattr(config, "ONNX_INTRA_OP_THREADS", 2)
-    monkeypatch.setattr(config, "ONNX_INTER_OP_THREADS", 1)
-    cfg = config._config_from_module_globals()
-    assert (cfg.onnx_intra_op_threads, cfg.onnx_inter_op_threads) == (2, 1)
 
 
 def test_fork_child_pins_live_ner(monkeypatch):
