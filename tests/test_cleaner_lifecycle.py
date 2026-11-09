@@ -166,3 +166,11 @@ def test_warmup_on_gliner_only_logs_no_skip(caplog):
     with caplog.at_level("WARNING"):
         cleaner.warmup(["ENGLISH"])
     assert "warmup: skipping" not in caplog.text
+
+
+@pytest.mark.parametrize("ner_enabled", [False, True])
+def test_unified_warmup_rejects_unsupported_worker_initialization(ner_enabled):
+    cleaner = TextCleaner(TextCleanerConfig(pii_processing="unified", check_ner_process=ner_enabled,
+                                            allow_network_detectors=True))
+    with pytest.raises(ValueError, match="warmup.*unified"):
+        cleaner.warmup(["ENGLISH"])

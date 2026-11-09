@@ -13,7 +13,10 @@ from collections import Counter
 from concurrent.futures import ThreadPoolExecutor
 from functools import partial
 from typing import Any, NamedTuple, cast
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
+
+from sct.findings import DetectionContext
+from sct.policy_v2 import UnifiedPrivacyPolicy
 
 import regex
 
@@ -126,6 +129,7 @@ class TextCleaner:
         include_entities: bool = False,
         metrics_callback: Callable[[ProcessingMetrics], None] | None = None,
         detector_registry: DetectorRegistry | None = None,
+        unified_policy: UnifiedPrivacyPolicy | None = None,
     ):
         """Initialize the text cleaning pipeline.
 
@@ -135,13 +139,22 @@ class TextCleaner:
                 findings metadata keys. Requires ``replacement_mode='placeholder'`` (ValueError otherwise).
             token_store: Reversible mode saves each map here, and metadata has anon_map_reference
                 in place of anon_map.
-            include_entities: Add findings, which hold entity text, to metadata.
+            include_entities: Add sensitive entity text to legacy findings or unified findings_v2_values.
+                Unified values reference the canonical stage and include values from redacted spans.
+            unified_policy: Apply one policy to every selected detector in unified mode.
             metrics_callback: Called with value-free ProcessingMetrics after each non-blank document; empty or
                 whitespace input runs nothing and does not call it.
         """
         self.cfg = cfg or TextCleanerConfig()
-        if self.cfg.detector_specs:
-            raise ValueError("detector_specs require unified processing, which is not available yet")
+        if self.cfg.pii_processing == "legacy" and (
+            self.cfg.detector_specs or unified_policy is not None or self.cfg.source_mapping != "best_effort"
+        ):
+            raise ValueError("detector_specs, unified_policy and strict source mapping require unified processing")
+        if unified_policy is not None and not isinstance(unified_policy, UnifiedPrivacyPolicy):
+            raise TypeError("unified_policy must be a UnifiedPrivacyPolicy")
+        if self.cfg.pii_processing == "unified" and privacy_policy is not None:
+            raise ValueError("Unified processing requires unified_policy, not legacy privacy_policy")
+        self._unified_policy = unified_policy
         if detector_registry is not None and not isinstance(detector_registry, DetectorRegistry):
             raise TypeError("detector_registry must be a DetectorRegistry")
         self._detector_registry = detector_registry if detector_registry is not None else DetectorRegistry()
@@ -198,12 +211,18 @@ class TextCleaner:
                 reference_date=self.cfg.synthetic_reference_date,
             )
 
-        self.GeneralNER: ner.GeneralNER | None = self._build_ner() if self.cfg.check_ner_process else None
+        self.GeneralNER: ner.GeneralNER | None = (
+            self._build_ner() if self.cfg.check_ner_process and self.cfg.pii_processing == "legacy" else None)
         # GLiClass document-level pre-classification (optional, lazy-loaded)
+        if (self.cfg.pii_processing == "unified" and self.cfg.check_classify_document
+                and not self.cfg.allow_network_detectors):
+            raise ValueError("Unified classification requires network detector permission")
         self._gliclass: Any = self._build_gliclass() if self.cfg.check_classify_document else None
 
         self._pipeline: list[Callable[[str], str]] = []
         self._init_pipeline()
+        from sct.unified import UnifiedProcessor
+        self._unified = UnifiedProcessor(self) if self.cfg.pii_processing == "unified" else None
 
     @property
     def _defer_tags(self) -> bool:
@@ -320,6 +339,9 @@ class TextCleaner:
             view._user_rules = view._build_user_rules(merged)
         view._pipeline = []
         view._init_pipeline()
+        if view.cfg.pii_processing == "unified":
+            from sct.unified import UnifiedProcessor
+            view._unified = UnifiedProcessor(view)
         return view
 
     def _normalising_steps(self):
@@ -616,23 +638,43 @@ class TextCleaner:
         return ProcessResult(current_text, stat_text, language, metadata=metadata)
 
     def process_batch(
-        self, texts: list[str], max_workers: int | None = None,
+        self, texts: list[str], max_workers: int | None = None, *,
+        contexts: Sequence[DetectionContext] | None = None,
     ) -> list[ProcessResult]:
         """Process multiple texts with bounded document concurrency.
 
         Args:
             max_workers: Maximum number of worker threads (default ``os.cpu_count()``). Documents per NER
                 model call is ``cfg.ner_batch_size``.
+            contexts: One immutable caller context per input, in unified mode only.
 
         Returns:
             List of ProcessResult.
         """
         if max_workers is not None and max_workers <= 0:
             raise ValueError("max_workers must be >= 1")
-        if not texts:
+        if not texts and contexts is None:
             return []
         if isinstance(texts, str):
             raise ValueError("texts must be a list of strings; use process() for one text")
+        if contexts is not None:
+            if len(contexts) != len(texts) or any(not isinstance(c, DetectionContext) for c in contexts):
+                raise ValueError("contexts must contain one DetectionContext per input")
+            if self._unified is None:
+                raise ValueError("contexts require unified processing")
+        if not texts:
+            return []
+        if self._unified is not None:
+            if any(not isinstance(text, str) for text in texts):
+                raise ValueError("Input must be string")
+            rows = list(zip(texts, contexts if contexts is not None else [DetectionContext()] * len(texts), strict=True))
+            def run_unified(row):
+                return self._process_unified_document(*row).result
+            workers = min(len(rows), max_workers or (os.cpu_count() or 4))
+            if workers == 1:
+                return [run_unified(row) for row in rows]
+            with ThreadPoolExecutor(max_workers=workers) as executor:
+                return list(executor.map(run_unified, rows))
 
         results: list[ProcessResult | None] = [None] * len(texts)
         to_process = []
@@ -712,7 +754,8 @@ class TextCleaner:
         return metadata
 
     async def aprocess_batch(
-        self, texts: list[str], max_workers: int | None = None,
+        self, texts: list[str], max_workers: int | None = None, *,
+        contexts: Sequence[DetectionContext] | None = None,
     ) -> list[ProcessResult]:
         """Async version of process_batch for use with asyncio-based frameworks (FastAPI, aiohttp).
 
@@ -720,17 +763,23 @@ class TextCleaner:
         *max_workers* is the maximum number of worker threads, as in process_batch.
         """
         loop = asyncio.get_running_loop()
-        return await loop.run_in_executor(None, self.process_batch, texts, max_workers)
+        call = partial(self.process_batch, texts, max_workers)
+        if contexts is not None:
+            call = partial(call, contexts=contexts)
+        return await loop.run_in_executor(None, call)
 
     def warmup(self, languages: list[str] | None = None) -> None:
-        """Pre-load the NER models each language routes to, to avoid first-request latency.
+        """Pre-load legacy NER models each language routes to, to avoid first-request latency.
 
         A language that fails to load is logged as a warning and skipped; it loads (or fails) on first use.
+        Unified processing raises ValueError because its providers belong to separate workers.
 
         Args:
             languages: Language names to pre-load (e.g. ``['ENGLISH', 'DUTCH']``).
                        If ``None``, pre-loads models for all supported languages.
         """
+        if self.cfg.pii_processing == "unified":
+            raise ValueError("warmup() is unsupported for unified processing; detector providers belong to separate workers")
         if self.GeneralNER is None:
             return
         langs = languages or list(self.cfg.supported_languages)
@@ -740,13 +789,26 @@ class TextCleaner:
             except ner.ModelLoadError as e:
                 logger.warning("warmup: skipping %s: %s", lang, e)
 
-    def process(self, text: str) -> ProcessResult:
+    def _process_unified_document(self, text: str, context: DetectionContext | None = None):
+        """Private whole-document result and post-render source map for document adapters."""
+        if self._unified is None:
+            raise ValueError("Source projection requires unified processing")
+        if not isinstance(text, str) or (context is not None and not isinstance(context, DetectionContext)):
+            raise ValueError("Expected text and DetectionContext")
+        try:
+            return self._unified.process(text, context or DetectionContext())
+        finally:
+            self._document_context.clear()
+
+    def process(self, text: str, *, context: DetectionContext | None = None) -> ProcessResult:
         """Process a single text. Maintains backward compatibility.
 
         Returns:
             ProcessResult (unpacks as 3-tuple: lm_text, stat_text, language).
         """
-        return self.process_batch([text])[0]
+        if context is None:
+            return self.process_batch([text])[0]
+        return self.process_batch([text], contexts=[context])[0]
 
     # --- Pipeline step methods (private, used by _init_pipeline) ---
 

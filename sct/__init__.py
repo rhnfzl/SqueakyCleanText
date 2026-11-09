@@ -2,6 +2,8 @@
 
 from sct.config import TextCleanerConfig, PII_LABELS, PII_LABEL_MAP
 from sct.detectors import Detector, DetectorCapabilities, DetectorRegistry, DetectorSpec, DetectorUnavailable
+from sct.policy_v2 import UnifiedPrivacyPolicy, HandlingRule, FindingDecision
+from sct.findings import Detection, DetectionContext, TextRange
 from sct.privacy import (
     DetectedEntity,
     EntityFinding,
@@ -54,6 +56,7 @@ from sct.utils.process_result import ProcessResult
 
 __version__ = "0.9.0"
 __all__ = [
+    "UnifiedPrivacyPolicy", "HandlingRule", "FindingDecision", "Detection", "DetectionContext", "TextRange",
     "Detector", "DetectorCapabilities", "DetectorRegistry", "DetectorSpec", "DetectorUnavailable",
     "TextCleaner", "TextCleanerConfig", "CustomPatternTimeout", "ModelLoadError", "PRESETS", "preset_config",
     "PII_LABELS", "PII_LABEL_MAP",

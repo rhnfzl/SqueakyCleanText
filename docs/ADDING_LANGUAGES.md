@@ -93,7 +93,7 @@ result = cleaner.process("Spotkanie z Janem Kowalskim 15 styczen 2025 w Warszawi
 
 ### What each field does
 
-**`extra_languages`**: Tuple of language identifiers (e.g. `'POLISH'`, `'pl'`, `'pol'`). Accepts Lingua names, ISO 639-1, or ISO 639-3 codes. They join `supported_languages`, which sets the stopword lists loaded up front and the languages `warmup()` loads. With the default `detect_all_languages=True`, Lingua already considers all 75 languages, so the detector does not change. Only with `detect_all_languages=False` does `extra_languages` add these languages to the detector.
+**`extra_languages`**: Tuple of language identifiers (e.g. `'POLISH'`, `'pl'`, `'pol'`). Accepts Lingua names, ISO 639-1, or ISO 639-3 codes. They join `supported_languages`, which sets the stopword lists loaded up front and the languages legacy `warmup()` loads. Unified processing rejects `warmup()` because providers initialize per worker on first use. With the default `detect_all_languages=True`, Lingua already considers all 75 languages, so the detector does not change. Only with `detect_all_languages=False` does `extra_languages` add these languages to the detector.
 
 **`custom_stopwords`**: Dict mapping language name to frozenset of stopwords. If provided for a language, **replaces** (not merges with) any auto-detected stopwords. If not provided, the `stop-words` package is queried using the language's ISO 639-1 code.
 
