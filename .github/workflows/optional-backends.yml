@@ -17,12 +17,15 @@ on:
       - sct/detectors*.py
       - sct/findings.py
       - sct/coordinates.py
+      - sct/documents.py
       - sct/config.py
       - sct/sct.py
       - sct/unified.py
       - sct/routing.py
       - sct/field*.py
       - tests/test_*document*.py
+      - tests/test_docling_integration.py
+      - tests/fixtures/documents/**
       - tests/test_*datafog*.py
       - tests/test_*secret*.py
       - tests/test_baseline_measurement.py
@@ -38,6 +41,8 @@ on:
       - uv.lock
       - pyproject.toml
       - .github/workflows/optional-backends.yml
+      - .coveragerc-documents
+      - .coveragerc-integrations
   schedule:
     - cron: "17 3 * * 1"
 
@@ -115,6 +120,22 @@ jobs:
           SCT_OPTIONAL_PROFILE: ${{ matrix.profile }}
           HF_HUB_OFFLINE: "1"
         run: .venv/bin/python -m pytest tests/test_optional_profiles.py tests/test_processing_compatibility.py tests/test_baseline_measurement.py -v -s
+
+      - name: Prepare explicit pinned PDF artifacts
+        if: matrix.profile == 'documents'
+        run: |
+          .venv/bin/python -c 'from pathlib import Path; from sct.integrations.docling import prepare_docling_artifacts; prepare_docling_artifacts(Path(".docling-artifacts"), allow_download=True)'
+
+      - name: Exercise native offline PDF layout, OCR and tables
+        if: matrix.profile == 'documents'
+        env:
+          SCT_OPTIONAL_PROFILE: documents
+          SCT_DOCLING_ARTIFACTS: .docling-artifacts
+          HF_HUB_OFFLINE: "1"
+          OMP_NUM_THREADS: "2"
+        run: >-
+          .venv/bin/python -m pytest tests/test_docling_integration.py -v -s
+          --cov=sct/integrations --cov-config=.coveragerc-documents --cov-fail-under=85
 
       - name: Exercise encrypted token-store operations
         if: matrix.profile == 'token-store'

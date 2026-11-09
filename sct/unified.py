@@ -8,7 +8,7 @@ import threading
 import time
 from typing import TYPE_CHECKING
 
-from sct.coordinates import SourceMap
+from sct.coordinates import Projection, SourceMap
 from sct.detectors import DetectorSpec, DetectorUnavailable
 from sct.detectors_builtin import BuiltinRegexDetector
 from sct.findings import Detection, DetectionContext
@@ -26,10 +26,21 @@ if TYPE_CHECKING:
 
 
 @dataclass(frozen=True)
+class RenderedEdit:
+    """Private value-free association between one rendered edit and its source cover."""
+    start: int
+    end: int
+    source_projection: Projection
+    action: str
+    source_isolated: bool = False
+
+
+@dataclass(frozen=True)
 class UnifiedDocument:
     """Private document handoff: output map projects to the original input string."""
     result: ProcessResult = field(repr=False)
     source_map: SourceMap = field(repr=False)
+    rendered_edits: tuple[RenderedEdit, ...] = field(default=(), repr=False)
 
 
 def _whole_edit(mapping, transform):
@@ -255,6 +266,15 @@ class UnifiedProcessor:
                 tag = cleaner._tags.get(label, f'<{label}>')
                 value = tag if tag is not None else ''.join(constants.CURRENCIES.get(char, char) for char in original)
             replacements.append((start, end, value))
+        rendered_edits = []
+        output_delta = 0
+        for (start, end, value), (_, _, decision) in zip(replacements, resolved, strict=True):
+            output_start = start + output_delta
+            projection = mapping.project(start, end)
+            isolated = mapping._is_isolated(start, end)
+            rendered_edits.append(RenderedEdit(output_start, output_start + len(value),
+                                               projection, decision.action, isolated))
+            output_delta += len(value) - (end - start)
         for start, end, value in reversed(replacements):
             mapping = mapping.replace(start, end, value)
         metadata: ProcessMetadata = {
@@ -286,4 +306,4 @@ class UnifiedProcessor:
         if cleaner._metrics_callback:
             cleaner._metrics_callback(ProcessingMetrics(
                 (time.perf_counter() - started) * 1000, language, None, self.policy.name, {}))
-        return UnifiedDocument(ProcessResult(output, stat, language, metadata), mapping)
+        return UnifiedDocument(ProcessResult(output, stat, language, metadata), mapping, tuple(rendered_edits))

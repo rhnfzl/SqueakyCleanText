@@ -9,6 +9,9 @@ SCT ships adapters for four frameworks. Each needs its extra:
 | LangChain | `pip install "squeakycleantext[langchain]"` | `sct.integrations.langchain.SCTDocumentTransformer` |
 | Haystack | `pip install "squeakycleantext[haystack]"` | `sct.integrations.haystack.SCTDocumentCleaner` |
 
+For offline PDF extraction, page layout and cleaned table cells, see [DOCUMENTS.md](DOCUMENTS.md).
+This separate API cleans one joined document and returns only cleaned structure.
+
 Ray, Spark, Polars, DuckDB, dlt and Daft: see [RECIPES.md](RECIPES.md).
 
 ## Shared options

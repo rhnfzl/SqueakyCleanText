@@ -3,6 +3,9 @@
 from sct.config import TextCleanerConfig, PII_LABELS, PII_LABEL_MAP
 from sct.detectors import Detector, DetectorCapabilities, DetectorRegistry, DetectorSpec, DetectorUnavailable
 from sct.policy_v2 import UnifiedPrivacyPolicy, HandlingRule, FindingDecision
+from sct.documents import (
+    DocumentElement, DocumentExtractor, ExtractedDocument, ProcessedDocument, clean_document, extract_document,
+)
 from sct.findings import Detection, DetectionContext, TextRange
 from sct.schema import FieldRule, FieldSchema
 from sct.privacy import (
@@ -58,6 +61,7 @@ from sct.utils.process_result import ProcessResult
 
 __version__ = "0.9.0"
 __all__ = [
+    "DocumentElement", "DocumentExtractor", "ExtractedDocument", "ProcessedDocument", "clean_document", "extract_document",
     "UnifiedPrivacyPolicy", "HandlingRule", "FindingDecision", "Detection", "DetectionContext", "TextRange",
     "Detector", "DetectorCapabilities", "DetectorRegistry", "DetectorSpec", "DetectorUnavailable",
     "TextCleaner", "TextCleanerConfig", "CustomPatternTimeout", "ModelLoadError", "PRESETS", "preset_config",
