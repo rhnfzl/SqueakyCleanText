@@ -1,11 +1,13 @@
 """Private, versioned corpus identity and atomic manifest publication."""
 from dataclasses import asdict, dataclass, field
+from contextlib import contextmanager
 from collections.abc import Mapping
 import hashlib
 import json
 from pathlib import Path
 import re
 import os
+import stat
 from types import MappingProxyType
 
 
@@ -55,9 +57,25 @@ def config_digest(value) -> str:
     return hashlib.sha256(encoded).hexdigest()
 
 
+@contextmanager
+def _open_regular(path: Path):
+    if not stat.S_ISREG(path.stat(follow_symlinks=False).st_mode):
+        raise ValueError('Require a regular nonsymlink corpus artifact')
+    descriptor = os.open(path, os.O_RDONLY | getattr(os, 'O_NOFOLLOW', 0) | getattr(os, 'O_NONBLOCK', 0))
+    try:
+        if not stat.S_ISREG(os.fstat(descriptor).st_mode):
+            raise ValueError('Require a regular nonsymlink corpus artifact')
+        stream = os.fdopen(descriptor, 'rb')
+    except BaseException:
+        os.close(descriptor)
+        raise
+    with stream:
+        yield stream
+
+
 def file_digest(path: Path) -> str:
     digest = hashlib.sha256()
-    with path.open('rb') as stream:
+    with _open_regular(path) as stream:
         for chunk in iter(lambda: stream.read(1024 * 1024), b''):
             digest.update(chunk)
     return digest.hexdigest()

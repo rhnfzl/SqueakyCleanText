@@ -118,7 +118,7 @@ jobs:
         if: matrix.profile == 'corpus'
         env:
           HF_HUB_OFFLINE: "1"
-        run: .venv/bin/python -m pytest tests/test_corpus_selection.py tests/test_corpus_manifest.py -v
+        run: .venv/bin/python -m pytest tests/test_corpus_*.py -v
 
   pinned-model-baseline:
     if: github.event_name == 'workflow_dispatch' && inputs.pinned_model_baseline
