@@ -5013,6 +5013,7 @@ corpus = [
     { name = "datasketch" },
     { name = "datatrove" },
     { name = "orjson" },
+    { name = "spacy" },
 ]
 datasets = [
     { name = "datasets" },
@@ -5129,6 +5130,7 @@ requires-dist = [
     { name = "rapidfuzz", marker = "extra == 'fuzzy'", specifier = ">=3.12" },
     { name = "regex", specifier = ">=2024.11.6" },
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.11" },
+    { name = "spacy", marker = "extra == 'corpus'", specifier = "==3.8.16" },
     { name = "squeakycleantext", extras = ["gliner", "gliner2", "torch"], marker = "extra == 'all-ner'" },
     { name = "stop-words", specifier = ">=2025.11.4" },
     { name = "tokenizers", specifier = ">=0.22.2" },

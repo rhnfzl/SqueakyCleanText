@@ -98,3 +98,68 @@ Returns new documents; their ids are recomputed from the cleaned content.
 - An NER model without a pinned revision (`ner_model_revisions`) makes one Hub request per worker to resolve `main` when the parent never loaded it before the workers started. Pin the revision, load the cleaner once in the parent, or set `HF_HUB_OFFLINE=1` once the models are cached. The default ensemble is pinned and makes none.
 - Guard multi-process code with `if __name__ == "__main__":` (macOS and Windows start workers with spawn and re-import your script).
 - Run SCT after language and quality filters: NER is the slow step, so do not spend it on documents you drop anyway.
+
+### Native corpus curation
+
+`pip install 'SqueakyCleanText[corpus]'` enables a separate native DataTrove 0.10.1 recipe.
+`examples/corpus/clean_select_dedup.py input.jsonl new-run` writes a new cleaned corpus and private decisions.
+Input JSONL rows require unique string `id` and string `text` fields. Other input fields are not copied.
+The example disables model-based NER explicitly. Regex protection and configured cleanup still run.
+
+```python
+from pathlib import Path
+from sct.config import TextCleanerConfig
+from sct.corpus import SelectionConfig
+from sct.corpus.datatrove import curate_datatrove
+
+manifest = curate_datatrove(
+    Path('input.jsonl'), Path('new-run'),
+    config=TextCleanerConfig(check_ner_process=False),
+    retention='caller_managed',
+    selection=SelectionConfig(dedup_mode='apply', dedup_basis='pii_normalized'),
+)
+assert manifest.counts['kept'] + manifest.counts['rejected'] == manifest.counts['input']
+```
+
+Report mode retains all records by default. Applying removal requires an explicit `pre_pii` or
+`pii_normalized` basis. Normalized placeholders can collapse different sensitive records.
+Quality rejection requires an explicit scorer, threshold and versioned `component_identities`.
+Schema, detector registry factory and detection context use the existing process-owned cleaner handle.
+Custom runtime components require caller-owned version identities. Unsupported non-JSON configuration fails before processing.
+Named cleaner presets can request models. Callers must provide their required local model artifacts.
+
+The recipe runs native signature, bucket, cluster and duplicate-filter stages through `LocalPipelineExecutor`.
+Native bucket matching is approximate. It does not verify D1's exact Jaccard threshold.
+`native_config=MinhashConfig(...)` controls native shingles, bucket count, hashes, normalization and seed.
+Changing `SelectionConfig.similarity_threshold` from its compatibility default raises an error.
+The recipe default explicitly uses DataTrove's SHA1 hash implementation. Caller hash algorithms are never substituted.
+DataTrove's default xxhash fails its text probe in the qualified Python 3.14 installation.
+SCT/datasketch hashes never become DataTrove signature files.
+
+Eligible rows enter native stages in stable-ID order. Quality failures cannot become duplicate keepers.
+The pinned native cluster file format maps ordinal pairs to stable IDs.
+A validated native removal file selects each cluster's minimum stable ID before the actual native filter runs.
+Data tasks use one deterministic shard. `workers` controls framework processes, including parallel bucket tasks.
+This recipe stages texts on disk; native clustering still holds its union graph in memory.
+
+The new output directory must not exist. Inputs remain unchanged.
+`kept.jsonl` contains cleaned text, while `decisions.jsonl` contains IDs, scores and decisions without text.
+`manifest.json` publishes completion only after atomic shard renames and checksum verification.
+Its schema version is 1. It records baseline/package versions, input digest and stable IDs,
+configuration digest, native signature identity, caller component identities, seed, counts and output checksums.
+The manifest excludes raw configuration values and reversible maps.
+
+The directory is private (0700), and finished files use 0600 permissions.
+Private SQLite staging retains source-basis text. Signatures, IDs and configuration digests can identify records.
+Hashing does not anonymize them. `retention='caller_managed'` explicitly assigns storage protection,
+backup handling and eventual deletion to the caller. No rejected-document text writer is enabled.
+Incomplete runs remain private for inspection. This API does not implement resume or retries.
+
+Model-enabled native recipes require 40-character immutable Hub commit revisions for every active SCT-owned model route.
+The manifest records those exact model repository/revision pairs. Disabled model fields do not load models.
+Pre-cache the pinned artifacts outside the recipe, then start Python with `HF_HUB_OFFLINE=1`.
+The recipe checks the imported Hub runtime flag and never changes global download settings.
+Missing cached artifacts fail privately. Cached model execution needs separate provider qualification.
+Active `presidio_gliner` is unsupported here because its default NLP engine can load separate unpinned models.
+This restriction does not change the legacy adapter. Trusted external registries remain application-owned.
+Their registry and quality identities must describe immutable artifacts and all behavior-changing configuration.

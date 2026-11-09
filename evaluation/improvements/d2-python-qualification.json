@@ -1,0 +1,162 @@
+{
+  "schema_version": 1,
+  "scope": "Frozen D2 native corpus workflow, required optional profile and core-install isolation. Separate cached ONNX smoke is recorded in d2-cached-model-smoke.json; final integrated matrix remains pending.",
+  "commit": "a68949582e01bca86869bdeea89b990e1fa4df8e",
+  "source_snapshot_sha256": {
+    "sct/corpus/datatrove.py": "561111f12e30f6cd4360cdd255b3fbf2e714885b621624459e696f09e2d06f3e",
+    "sct/corpus/manifest.py": "2c8147d2bb30851df5261ea2d982bd6894226003edf65949119322cba501de6b",
+    "tests/test_corpus_manifest.py": "0800319b29c7e7369a71b24f324ac1d449b46584c77aa095a9f86cb4ba2ec4a6",
+    "tests/test_linux_workers.py": "ff633c9ae285e11c671e9751ae14494ca58b6112588a51a836312942a8fb2f4b",
+    "examples/corpus/clean_select_dedup.py": "5c6d762e107a39669b80df2cd806795a28f82917e2e5645be576e1709dbadbd0",
+    "sct/corpus/__init__.py": "0b0da171e138fc1d750b1b734d8e3e3d3bd043fda390b5b60959a607c967ab43",
+    "docs/INTEGRATIONS.md": "b6b6eb9db951be1f00908b06a1b0885c66cd24e22ca1410388ccbfd743450c5a",
+    "pyproject.toml": "101c93e8315b691df1f11b9df16c38ad6291feb4f0a55e93b72b0a07c9dda9bc",
+    "uv.lock": "d147303f247458c5e1c38e8e3c5a6e79a6d9c7b9a78bad99a08526bddc03242d",
+    "tests/test_corpus_selection.py": "cb7d2caff457978d4f8991b3126ece966ba81a4ab680b1486d5476184306ccf6",
+    ".github/workflows/python-package.yml": "bf166473aecb31d92af738b1898d513dd4d8aa3d32ea18a9f535e65615f7852a",
+    ".github/workflows/optional-backends.yml": "8951162dc4a0ba022796ce42e53efa17bd11a02bb7870841aff131082e00faa0",
+    "tests/test_optional_profiles.py": "6f7d22e750c58b5aee533339bd3db04cfb6cb2c84f595b4024889a9c33b3a4a3"
+  },
+  "runs": [
+    {
+      "python": "3.12.15 (main, Sep 30 2026, 22:04:19) [Clang 21.0.0 (clang-2100.3.34.2)]",
+      "executable": "/private/tmp/sct-foundation-local-20261107/py312/.venv/bin/python",
+      "root": "/private/tmp/sct-foundation-local-20261107/py312",
+      "providers": {
+        "datatrove": {
+          "version": "0.10.1",
+          "module_path": "/private/tmp/sct-foundation-local-20261107/py312/.venv/lib/python3.12/site-packages/datatrove/__init__.py"
+        },
+        "spacy": {
+          "version": "3.8.16",
+          "module_path": "/private/tmp/sct-foundation-local-20261107/py312/.venv/lib/python3.12/site-packages/spacy/__init__.py"
+        },
+        "orjson": {
+          "version": "3.13.0",
+          "module_path": "/private/tmp/sct-foundation-local-20261107/py312/.venv/lib/python3.12/site-packages/orjson/__init__.py"
+        },
+        "datasketch": {
+          "version": "2.0.0",
+          "module_path": "/private/tmp/sct-foundation-local-20261107/py312/.venv/lib/python3.12/site-packages/datasketch/__init__.py"
+        },
+        "numpy": {
+          "version": "2.5.3",
+          "module_path": "/private/tmp/sct-foundation-local-20261107/py312/.venv/lib/python3.12/site-packages/numpy/__init__.py"
+        },
+        "multiprocess": {
+          "version": "0.70.19",
+          "module_path": "/private/tmp/sct-foundation-local-20261107/py312/.venv/lib/python3.12/site-packages/multiprocess/__init__.py"
+        },
+        "huggingface-hub": {
+          "version": "1.32.0",
+          "module_path": "/private/tmp/sct-foundation-local-20261107/py312/.venv/lib/python3.12/site-packages/huggingface_hub/__init__.py"
+        }
+      },
+      "result": "66 passed, 4 skipped, 27 warnings in 7.38s",
+      "log_sha256": "931e1529aacd496ab522ce04c59f047f016a7f8895873083306613cb6e67537b"
+    },
+    {
+      "python": "3.13.12 (main, Mar  3 2026, 15:32:44) [Clang 21.1.4 ]",
+      "executable": "/private/tmp/sct-foundation-local-20261107/py313/.venv/bin/python",
+      "root": "/private/tmp/sct-foundation-local-20261107/py313",
+      "providers": {
+        "datatrove": {
+          "version": "0.10.1",
+          "module_path": "/private/tmp/sct-foundation-local-20261107/py313/.venv/lib/python3.13/site-packages/datatrove/__init__.py"
+        },
+        "spacy": {
+          "version": "3.8.16",
+          "module_path": "/private/tmp/sct-foundation-local-20261107/py313/.venv/lib/python3.13/site-packages/spacy/__init__.py"
+        },
+        "orjson": {
+          "version": "3.13.0",
+          "module_path": "/private/tmp/sct-foundation-local-20261107/py313/.venv/lib/python3.13/site-packages/orjson/__init__.py"
+        },
+        "datasketch": {
+          "version": "2.0.0",
+          "module_path": "/private/tmp/sct-foundation-local-20261107/py313/.venv/lib/python3.13/site-packages/datasketch/__init__.py"
+        },
+        "numpy": {
+          "version": "2.5.3",
+          "module_path": "/private/tmp/sct-foundation-local-20261107/py313/.venv/lib/python3.13/site-packages/numpy/__init__.py"
+        },
+        "multiprocess": {
+          "version": "0.70.19",
+          "module_path": "/private/tmp/sct-foundation-local-20261107/py313/.venv/lib/python3.13/site-packages/multiprocess/__init__.py"
+        },
+        "huggingface-hub": {
+          "version": "1.32.0",
+          "module_path": "/private/tmp/sct-foundation-local-20261107/py313/.venv/lib/python3.13/site-packages/huggingface_hub/__init__.py"
+        }
+      },
+      "result": "66 passed, 4 skipped, 27 warnings in 7.35s",
+      "log_sha256": "a68ac79be01719ed8e63cc5fe7ba09c538105d5a59dc14f1e3c23dd2b679d6fd"
+    },
+    {
+      "python": "3.14.4 (main, Apr  7 2026, 20:47:53) [Clang 22.1.1 ]",
+      "executable": "/home/rehan/sct-improvements-d2-20261107/.venv/bin/python",
+      "archive_base": "e4fe30d737bd6e782301d407642bb79d5fbb6f32",
+      "datatrove": {
+        "version": "0.10.1",
+        "module": "/home/rehan/sct-improvements-d2-20261107/.venv/lib/python3.14/site-packages/datatrove/__init__.py"
+      },
+      "spacy": {
+        "version": "3.8.16",
+        "module": "/home/rehan/sct-improvements-d2-20261107/.venv/lib/python3.14/site-packages/spacy/__init__.py"
+      },
+      "orjson": {
+        "version": "3.13.0",
+        "module": "/home/rehan/sct-improvements-d2-20261107/.venv/lib/python3.14/site-packages/orjson/__init__.py"
+      },
+      "datasketch": {
+        "version": "2.0.0",
+        "module": "/home/rehan/sct-improvements-d2-20261107/.venv/lib/python3.14/site-packages/datasketch/__init__.py"
+      },
+      "numpy": {
+        "version": "2.5.3",
+        "module": "/home/rehan/sct-improvements-d2-20261107/.venv/lib/python3.14/site-packages/numpy/__init__.py"
+      },
+      "multiprocess": {
+        "version": "0.70.19",
+        "module": "/home/rehan/sct-improvements-d2-20261107/.venv/lib/python3.14/site-packages/multiprocess/__init__.py"
+      },
+      "source_hashes": {
+        "sct/corpus/datatrove.py": "561111f12e30f6cd4360cdd255b3fbf2e714885b621624459e696f09e2d06f3e",
+        "sct/corpus/manifest.py": "2c8147d2bb30851df5261ea2d982bd6894226003edf65949119322cba501de6b",
+        "tests/test_corpus_manifest.py": "0800319b29c7e7369a71b24f324ac1d449b46584c77aa095a9f86cb4ba2ec4a6",
+        "tests/test_linux_workers.py": "ff633c9ae285e11c671e9751ae14494ca58b6112588a51a836312942a8fb2f4b",
+        "examples/corpus/clean_select_dedup.py": "5c6d762e107a39669b80df2cd806795a28f82917e2e5645be576e1709dbadbd0",
+        "sct/corpus/__init__.py": "0b0da171e138fc1d750b1b734d8e3e3d3bd043fda390b5b60959a607c967ab43",
+        "docs/INTEGRATIONS.md": "b6b6eb9db951be1f00908b06a1b0885c66cd24e22ca1410388ccbfd743450c5a",
+        "pyproject.toml": "101c93e8315b691df1f11b9df16c38ad6291feb4f0a55e93b72b0a07c9dda9bc",
+        "uv.lock": "d147303f247458c5e1c38e8e3c5a6e79a6d9c7b9a78bad99a08526bddc03242d",
+        "tests/test_corpus_selection.py": "cb7d2caff457978d4f8991b3126ece966ba81a4ab680b1486d5476184306ccf6",
+        "tests/test_optional_profiles.py": "6f7d22e750c58b5aee533339bd3db04cfb6cb2c84f595b4024889a9c33b3a4a3",
+        ".github/workflows/python-package.yml": "bf166473aecb31d92af738b1898d513dd4d8aa3d32ea18a9f535e65615f7852a",
+        ".github/workflows/optional-backends.yml": "8951162dc4a0ba022796ce42e53efa17bd11a02bb7870841aff131082e00faa0"
+      },
+      "platform": "Linux",
+      "root": "/home/rehan/sct-improvements-d2-20261107",
+      "scope": "Expanded D1/D2 and required corpus profile; older model-based Linux tests deselected",
+      "result": "62 passed, 1 skipped, 3 deselected, 37 warnings in 7.95s",
+      "log_sha256": "878a959d876490f1aa152c927948eda4b50d8224da909edbdade788bc320955f"
+    }
+  ],
+  "core_only_qualification": {
+    "scope": "Isolated core dev/test environment without datatrove,datasketch,spacy,orjson",
+    "result": "11 passed, 50 skipped; required corpus profile fails absent dependencies",
+    "limits": "This targeted profile does not establish final whole-project core-only coverage.",
+    "evidence": {
+      "root": "/home/rehan/sct-improvements-d2-20261107/core",
+      "core-green.log_sha256": "ce0c2c7b96e709156e6b9a85d4be177b44bc5462f38061ac1383473b16a1895e",
+      "required-profile-red.log_sha256": "c3d947016f75cbaf97fdeaf3d8823d45dd480c507e0e300efd33c49e70f55b61"
+    }
+  },
+  "limits": [
+    "D2 rejects active experimental presidio_gliner because complete immutable/offline NLP provenance is not qualified.",
+    "Selected native SHA1/English blank spaCy profile is qualified; optional xxhash and every language/hash backend are not qualified.",
+    "Fork deprecation warnings remain visible; no suppression.",
+    "A three-example cached ONNX corpus smoke passes separately at c6be615. Final integrated model/provider matrix and branch protection configuration remain outside this task evidence."
+  ],
+  "committed_byte_verification": "All13 committed reviewed blobs match all qualified runtime snapshots"
+}

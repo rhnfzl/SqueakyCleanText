@@ -27,6 +27,7 @@ on:
       - tests/test_*secret*.py
       - tests/test_baseline_measurement.py
       - sct/corpus/**
+      - tests/test_corpus*.py
       - sct/token_stores/**
       - tests/test_optional_profiles.py
       - evaluation/improvements/**
@@ -112,6 +113,12 @@ jobs:
           SCT_OPTIONAL_PROFILE: ${{ matrix.profile }}
           HF_HUB_OFFLINE: "1"
         run: .venv/bin/python -m pytest tests/test_optional_profiles.py tests/test_processing_compatibility.py tests/test_baseline_measurement.py -v -s
+
+      - name: Exercise complete native corpus workflow
+        if: matrix.profile == 'corpus'
+        env:
+          HF_HUB_OFFLINE: "1"
+        run: .venv/bin/python -m pytest tests/test_corpus_selection.py tests/test_corpus_manifest.py -v
 
   pinned-model-baseline:
     if: github.event_name == 'workflow_dispatch' && inputs.pinned_model_baseline
