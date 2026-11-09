@@ -1,0 +1,59 @@
+{
+  "schema_version": 1,
+  "scope": "Actual installed Presidio SDK source audit only; no GLiNER model inference or AnalyzerEngine construction performed",
+  "runtime": {
+    "executable": "/Users/rehan-8v/projects/personal/SqueakyCleanText-pipeline-research/.venv/bin/python",
+    "prefix": "/Users/rehan-8v/projects/personal/SqueakyCleanText-pipeline-research/.venv",
+    "presidio_analyzer_version": "2.2.362",
+    "presidio_analyzer_file": "/Users/rehan-8v/projects/personal/SqueakyCleanText-pipeline-research/.venv/lib/python3.14/site-packages/presidio_analyzer/__init__.py",
+    "spacy_version": "3.8.16",
+    "spacy_file": "/Users/rehan-8v/projects/personal/SqueakyCleanText-pipeline-research/.venv/lib/python3.14/site-packages/spacy/__init__.py",
+    "gliner_installed": false
+  },
+  "sct_source": {
+    "path": "sct/utils/ner.py",
+    "sha256": "1d95fbcb18adfa9d11765c9e7d71e3d99b8fcd646d9f8abd3b27de4782325c0b",
+    "initializer_line": 286,
+    "analyzer_kwargs": [],
+    "recognizer_kwargs": [
+      "model_name",
+      "supported_entities",
+      "threshold",
+      "map_location"
+    ]
+  },
+  "provider_sources": {
+    "analyzer_engine.py": {
+      "path": "/Users/rehan-8v/projects/personal/SqueakyCleanText-pipeline-research/.venv/lib/python3.14/site-packages/presidio_analyzer/analyzer_engine.py",
+      "sha256": "b804d7a7171a4d94a6c32281abd3b5a62dc30c9df44b4ea3cca9fa791f31aec1"
+    },
+    "nlp_engine/nlp_engine_provider.py": {
+      "path": "/Users/rehan-8v/projects/personal/SqueakyCleanText-pipeline-research/.venv/lib/python3.14/site-packages/presidio_analyzer/nlp_engine/nlp_engine_provider.py",
+      "sha256": "5b881acea5f6fb6eff469c2e30e1f3b34de9785d26f1db0ca6ceda4a3d212c5d"
+    },
+    "nlp_engine/spacy_nlp_engine.py": {
+      "path": "/Users/rehan-8v/projects/personal/SqueakyCleanText-pipeline-research/.venv/lib/python3.14/site-packages/presidio_analyzer/nlp_engine/spacy_nlp_engine.py",
+      "sha256": "c0b57b06278c25091720f740f3f2fc51532ccc9d9644d5b598bb2580eb83a8de"
+    },
+    "predefined_recognizers/ner/gliner_recognizer.py": {
+      "path": "/Users/rehan-8v/projects/personal/SqueakyCleanText-pipeline-research/.venv/lib/python3.14/site-packages/presidio_analyzer/predefined_recognizers/ner/gliner_recognizer.py",
+      "sha256": "446889970c522d21cb6b21f3e55dec763d4db77d57157bacfd12d1c1c78081ea"
+    },
+    "conf/default.yaml": {
+      "path": "/Users/rehan-8v/projects/personal/SqueakyCleanText-pipeline-research/.venv/lib/python3.14/site-packages/presidio_analyzer/conf/default.yaml",
+      "sha256": "97c29e40dc85c2bac711f3375ffac10fcf56ad889ff1a05f0f8eca126be591e5"
+    }
+  },
+  "findings": [
+    "SCT experimental initializer does not pass configured gliner_revision to GLiNERRecognizer.",
+    "Installed recognizer accepts model_kwargs and forwards them to GLiNER.from_pretrained; revision pinning is not intrinsically unsupported by this SDK.",
+    "AnalyzerEngine() builds the default NlpEngineProvider when no nlp_engine is passed.",
+    "Installed default config selects spaCy en_core_web_lg; create_engine calls engine.load.",
+    "SpacyNlpEngine.load calls download helper before spacy.load; absent package/path calls spacy.cli.download.",
+    "Default registry is also constructed with predefined and NLP recognizers; this is not a GLiNER-only detector."
+  ],
+  "limitations": [
+    "Static control-flow audit in actual project runtime; real provider behavior and offline/pinned model qualification remain required.",
+    "No downloads or network probes performed; no assumption about model presence on remote server."
+  ]
+}

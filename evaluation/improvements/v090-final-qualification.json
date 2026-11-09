@@ -1,0 +1,923 @@
+{
+  "schema_version": 1,
+  "captured_at_utc": "2026-11-09T23:43:55.339617+00:00",
+  "base_release": "v0.9.0",
+  "base_commit": "882342fd08c03718d21d22278814cfbfe4b883f3",
+  "scope": "Final code, supported Linux core profiles and component qualification; actual PR checks remain an external merge requirement",
+  "source_archive_sha256": "87e8d5bba8cdbd319033e999611905d64818097b25efd03a99185ebfbe63a4fd",
+  "source_python_sha256": {
+    "benchmarks/__init__.py": "d138012e4bce459831706eb42fa5603ccbb9ed5e644e12ce29549d8719989a0e",
+    "benchmarks/compare/__init__.py": "0576ad7ed821f39a079d2b601e7ef11d2e6672a013061f970053742f31351a5c",
+    "benchmarks/compare/adapters/_hf_token.py": "13a0e4fcc45b47fac746a9ebf8abad4b3fb5e3b7c3c7ebef7e89e06883d835a9",
+    "benchmarks/compare/adapters/_metadata.py": "2b5aa421c3fac58e177edca305e5ef47a65b2573a478758e74681b4ca5a8bffa",
+    "benchmarks/compare/adapters/_protocol.py": "3101d733f50ee6ae63d13d651849077ffe45a115d7bc6202d7491fd008d84027",
+    "benchmarks/compare/adapters/ai4privacy_adapter.py": "c20006bf90a249411727f6faf20bee13270dcccab58380c5685b2b498bafd25a",
+    "benchmarks/compare/adapters/bardsai_v3_adapter.py": "c49255ab7150a09a5ece7f63988b68c5ef7f989f0963fc06c2099fd890139ee4",
+    "benchmarks/compare/adapters/datafog_adapter.py": "f2a7cb30980360551f4f7c7dbecf71fefbcccf14afb581b056fabccb7ca2a574",
+    "benchmarks/compare/adapters/dummy_adapter.py": "00b359d8c77042c9d1af997cee8c81bab3845af26312d42113d6fa6f1f90df15",
+    "benchmarks/compare/adapters/gliner2_fastino_adapter.py": "dbe4714e8f81ed81114df6e7af09099f715be97443fa0d5f2c593417c525787d",
+    "benchmarks/compare/adapters/gliner_knowledgator_adapter.py": "ef85d3e929acaae99708d1dabc6894f9438fb277fb72188d24d297b3d24044de",
+    "benchmarks/compare/adapters/gliner_nvidia_adapter.py": "4ffc413530bb0978711a516c277a2faac03d112b83dade07aff6a3fde5754710",
+    "benchmarks/compare/adapters/llm_guard_adapter.py": "09ae988f64003b6ccbc9ad74399916f2731a1ecf34856307292820e381f294d8",
+    "benchmarks/compare/adapters/openmed_adapter.py": "d7217be71aa8a0830ff1a6166cc483163f425a6f4abc4ec4913a6e50b2732fcf",
+    "benchmarks/compare/adapters/opf_adapter.py": "1ba6df41da998dbad5dfacc55158d588422e412789db2c6290623e8530be18a1",
+    "benchmarks/compare/adapters/pii_tracer_adapter.py": "94d361b2319fb901beaa1629e20ce8162d68d3459b94fa277d0db97eb63cd3cb",
+    "benchmarks/compare/adapters/piiranha_adapter.py": "a3987d13509b093844ea04d6b8d0e9c5839ef7471823a4a516331bbf6fd5ca5a",
+    "benchmarks/compare/adapters/presidio_adapter.py": "a57f05bafc4842d69b367f2733a2c6e2a761f73ff073e661deb26f5f8ff478a2",
+    "benchmarks/compare/adapters/presidio_full_adapter.py": "adf777750546d1102cff67920cc5baa907fe5f304f397eb4c5599542f99914fd",
+    "benchmarks/compare/adapters/scrubadub_adapter.py": "4dcd60a2b9dea73f4c04b4b44e70d3ee53d5d2854ed492e48d9f7abbce15acf0",
+    "benchmarks/compare/adapters/sct_adapter.py": "0c113f90facb87d0088c37882f5705a684e322329c3d568c428d7db7ada6d3b9",
+    "benchmarks/compare/audit_recover.py": "f56604adb51f222083b74fda312b120e2f440e6c5cd9bf5479a2ed791a61f2ad",
+    "benchmarks/compare/entries.py": "eea8f08cd52b7370d156f1e417db9580d2d603ca9518e5de0d91ee2e5997aa00",
+    "benchmarks/compare/report.py": "f04499474488ae788aaef62c627d08e832587f477233336a78e1ed571384cef0",
+    "benchmarks/compare/runner.py": "b8771351c4416206ba452c715c9a4801ac7b4545c50cb6a3a1604c52eae808a5",
+    "benchmarks/compare/runtime.py": "e550a48783c84088b18b57e146824de1afbbfbfee52dbcb712f45f189c0405e9",
+    "benchmarks/compare/scorer.py": "3c1934772abe4200d0a8ef5972352cb63fdd696ebadf7e81fc7bdeca605ef27d",
+    "benchmarks/compare/speed.py": "ada9be6ff70d07dd84b67462cc829f3f26267b4f2c83b0dbefe8b045adffd6af",
+    "benchmarks/compare/split.py": "a752cb46efcde305ac6d1a144409edb6e78654a4d6bad6395647fe9ae328f42d",
+    "benchmarks/compare/tune.py": "af80c6a3d6069cc6a6f376cad1586e526e473c7abba82f9988eb1b09c0fb1777",
+    "benchmarks/compare/views.py": "000d1f7e4d7aa620a478770468db8877c3786ce62c2303f29141abfe93f9930b",
+    "benchmarks/datasets/__init__.py": "35cee6d481aaed10e3e60ee320668c5560910a483e2396d78d554e256adf3cc6",
+    "benchmarks/datasets/argilla_pii.py": "9a11c365a6c067ff8ca5340d09fa3d8c9a0cea91c3200327528ccef793a569bb",
+    "benchmarks/datasets/bayanat.py": "63007ab0d1c29c9af660344f0388a3945a592c69fce00858b7085b9169b25e44",
+    "benchmarks/datasets/carmen.py": "d4844ea958e7782191b551e383b3450418c9a4fefda60f87638a24dc5741b4f7",
+    "benchmarks/datasets/dialogpii.py": "98984e662085aa3745c84a99602635364eb406ed5e048ad857867d654c3ce566",
+    "benchmarks/datasets/europii.py": "e287d8adda9640a658dfaef355d0d5e23dfa4ca948497fff413220493655285b",
+    "benchmarks/datasets/fineweb2.py": "064a9db9311f308af3ad2e79fbad3c2d571c894ce8b80c17d96d2ebf2d3d7dcf",
+    "benchmarks/datasets/greek_deid.py": "bd044546d56ec4adf4b43b11cc2f09fb2fe3dca509be9332bfe107a6f5a6f495",
+    "benchmarks/datasets/gretel.py": "a47551e6b73fbf68b2f3041002ab3365242e9d214b3a1b8ea09001e493690e04",
+    "benchmarks/datasets/gretel_en.py": "442f3077e0e6d4c18f28eba329e9a35ba67dd411f883b4a611bc8182c9205cce",
+    "benchmarks/datasets/iahlt.py": "db1f776271feb735fef0280e3c7a0dd6eef7c4ce4faed1600e0fd92b09b68f61",
+    "benchmarks/datasets/kdpii.py": "52185452425aec7c8dc82f65782420adf9dd0dd8bf8ac83720306a77fc741fab",
+    "benchmarks/datasets/meddeid.py": "1754357531c8c7d3867cf0777eaa1384b3f3575e64372f16e11a8020712b542e",
+    "benchmarks/datasets/multiconer.py": "58f7bd08460c292817f83d7c13bbf9c9e50d098652d18fbac7c448bc5042f1e0",
+    "benchmarks/datasets/naamapadam.py": "3072fd427648037d46a0ce946500f5ae76da70308ed1206fd79fb74cec4856bb",
+    "benchmarks/datasets/nemotron.py": "e43b56d9289e31e136e9521b2739ba152d7681cdd1d118df8c6aa2c1da0864db",
+    "benchmarks/datasets/neonredact.py": "12c38794bb455f8db1d002bdb9d02f7d50e6dcd9164e78201c97fb5532d68f83",
+    "benchmarks/datasets/newmean.py": "ebc4c2c9b511611226d5a22c903086fc0737df492553ed33b424e30541cc1ed6",
+    "benchmarks/datasets/nus_lt.py": "be580013dfa91a38dd4e28c3fe58b013988393ba9682010d5570e17fdbdba66c",
+    "benchmarks/datasets/openpii.py": "1bb7c8999882c80d09d5e6b9809062b3390d07998832891d7e5195552a628779",
+    "benchmarks/datasets/pl_pii.py": "a294cef9a77f221b0c5d0a8576334a8df62160e60c03fbd81704eb6fc55e038c",
+    "benchmarks/datasets/redact.py": "d9db6eed0cea01fd3994ab2e1dd98273b28c3e462f21d367f12ab50cfb618917",
+    "benchmarks/datasets/redactionbench.py": "883373885ebbd8bf14b920c5890674fadd137de0fc4ef2eb23d50b5e7ac93132",
+    "benchmarks/datasets/redmadrobot.py": "3105e61a5ad89b2e2f5176aca8b1fd282069e876dfce3585593d002ae341e5b3",
+    "benchmarks/datasets/stockmark.py": "1d67c50dd3a0658fd0c8f6c57838734377798e4c59e4757cd44b4d16216ecc22",
+    "benchmarks/datasets/tab.py": "2627ba927d884083762f6d47185709daea8351bb8927fa1ba8758f031dc8766e",
+    "benchmarks/datasets/thai_pii.py": "adb0993ffc2b6ce4a7d69d2750024f22886f365fc36797aa9cf1496ebc8175fd",
+    "benchmarks/datasets/thainer.py": "0746bc74fc5a51bdd8a17baa67dcbc46d308bf70db0e3f38a978af948568ad16",
+    "benchmarks/datasets/tonic.py": "8c24dc28f5cf0d389d7332fbf074d21276536479cb6a27182d65250301417334",
+    "benchmarks/datasets/wili.py": "7ab8f03d8a9387dbf03e84322c6460731cea6e06c7ddfd0e4ce10427f7830ad2",
+    "benchmarks/labels.py": "c1b7cf406b22d0b493a41633f9b0bb070563aa5942f66850314917730232b042",
+    "benchmarks/results/compare-2026-11-02/make_comparison.py": "7cb237a349533dc27f62982e07f1319e176eac7aeedc2473c64e85a0c5044d67",
+    "benchmarks/run.py": "797e9f07184054afb10ebe9112f870b270b0bc0a7b2801ef48ca0eb133b86022",
+    "benchmarks/score.py": "c386fdd6b3aaaccba5f3bb4c3eaaef59540ff1219539b7d66df82938b2aeab3e",
+    "benchmarks/speed.py": "51b0cacd337e64e05c0c833a29be962657bc7688548793b587d8948f6020805f",
+    "docs/hooks.py": "92d48338b90d53f1eb211b510fc8d2660227883c19c6dba21b8105c856d9b272",
+    "evaluation/improvements/measure_baseline.py": "242b9db550bc754e76cb9ba2f62bea2d3b4c252154677f7c7cb60d2b73aa8035",
+    "examples/corpus/clean_select_dedup.py": "f9d1d4547771681a8e65f591f0ab70a7d3432489ccf24b7c6c8647670b297cc3",
+    "scripts/benchmark_detector_routing.py": "e8c5a8fec71c08beb0430c94dade95a4eee7783dd3d40044811d532fe5ab2e73",
+    "scripts/benchmark_models.py": "72a89b20ab7bd9188650467b69f39b724638bd9294990779268a50b9728dfc6b",
+    "scripts/benchmark_release.py": "3e48593da2efa7d78f94edf1a15fa2382fb97750ab0a07b70a0c839c43d34745",
+    "scripts/build_multilingual_eval.py": "4cf869ecbdcdea14b5b5b515a676dc3a537de11cfb8726b076ced57529d961ef",
+    "scripts/build_pii_social_cards.py": "79e926cf63ca3eb322fbc2916321f7248fde85b273ae197634f9d7d3bc4b1929",
+    "scripts/diagrams/draw_diagrams.py": "e7679a68525e07ceb5cf7e8000849edc311245c3ca2b6070703a7e010633cbbd",
+    "scripts/evaluate_pii.py": "7f6f59fcd2c554321d30d5f5c2685e3eb43bd1fe34c92972b8505d826dc07a83",
+    "scripts/export_onnx_models.py": "02278910e52602e9a6ae4055962f62c1bfd64c7170ae6de3c145d5d4d28abf1c",
+    "scripts/export_quality_head.py": "076e1391a7b70cfc1664db8e6681e46aa19af28967c6b99d4195fd0972497927",
+    "scripts/fuzz_styled_pii.py": "f77c13da1c83ca5044cd2eee6fc042b1c9e883010639dc5a804a80fed4f018d3",
+    "scripts/plot_pii_comparison.py": "710015e56b7036315399f057e6f48feefe70c4493d70552958c93806c5e6f755",
+    "scripts/plot_version_comparison.py": "6ff541b24d33a5f7aa9f9013a89bdc3bcc7b15608f5d40a12733e19a3d2a5ce4",
+    "scripts/qualify_native_providers.py": "501bde693af9082bc51bca55df140a2a6c6e82bbeccf8bab128f558ec757e918",
+    "scripts/release_comparison_version.py": "65851c80e682b9ec0f684c932485e840eba82d04456b7e159a37fa5faed41696",
+    "scripts/run_multilingual_eval.py": "85d3f5e0e920e5e0d5122d6d2f766cb1f9968e86ef9bad367641444b89bee969",
+    "scripts/watch_release_comparison.py": "09d7af2a79e6fb08af1041a84fbc6fe58e0b5520f64f07cb213d3d9a40046638",
+    "sct/__init__.py": "d6e5aca8eb5cbdbe0781bde805abe658ae869ec35d60b2a42f3af44b9cb9cd01",
+    "sct/adapters.py": "6c14afecf1b1d995e68c866d4a6333349d5c430edaebc1d0201d37daec08ca34",
+    "sct/browser.py": "552541e368fc5403f02294363816917d05bb2b837b6e3f66c30a3ed126c2a8bb",
+    "sct/cli.py": "b25622f4d030bebcb53e8fa4fd59b0e55805c48c5ad36fe852c90b4ef9f6abaa",
+    "sct/config.py": "15ff66b60385383b73d70d873afd7e39c3ddf8a770329ecaf9e67fb45f518710",
+    "sct/coordinates.py": "33d8b74559945bd8a12bd765b8313b4364a01ceb11460dfc4422e493846b7e72",
+    "sct/corpus/__init__.py": "b3589ddd7ab3c2a9fbf62fb3d0d4e932486e610fe308166ea76ddf5a2671124a",
+    "sct/corpus/datatrove.py": "901f069dd09ea1a9aee082b1fcfc6f4016eff720e68b7879942a9ef6cecf9eda",
+    "sct/corpus/manifest.py": "b5dbfaee581fe9f0c38808ebc128c439ea17225b48eb5f8e30ef6236c65aba7f",
+    "sct/corpus/runner.py": "32448b24b82755300dbf91c8e05e378fb4b97d2c343b443a29eb7b0ea72312e4",
+    "sct/corpus/selection.py": "9f11d71de2889607c7a403f26725c35a326909e4f72a849bd2649eb08d4809a4",
+    "sct/corpus/types.py": "c78dd1c36e09e2b2a2c160594b2a529d6e8f04001a7577a391c295fedac1bf1f",
+    "sct/detectors.py": "3892d4886bcdb4be869c763d0db82b240e09521320155d7c98b49c8c3f629456",
+    "sct/detectors_builtin.py": "68ed494896dadc4eb7f70b40ce9f5516063c2378cc0bdd04e79018ace18dd241",
+    "sct/detectors_datafog.py": "eb0601c49a3e8ad093d3cdfbced9a50901a37c0b1876514ac86912981d1ed5d7",
+    "sct/documents.py": "1250c8d780deb4e147767e630296d17bb84b1835fa565f9f9bcf37eeaa119c5a",
+    "sct/evaluation.py": "0744ddaccf6a6f9f26c1b05ac14165d0e140d0dd2cc386d5b8cce914a7f02e27",
+    "sct/findings.py": "c5298b9205f66c63d361096f73189646ecb70e47a5245ec9589493f430a209d2",
+    "sct/integrations/__init__.py": "86572a797863d690fc17eacfeb6baab82b5c2146606d20cc9852abb9fd59e851",
+    "sct/integrations/_runtime.py": "dd1c97c8649338177560b8d872ab8298822dfe072d691b36242cec84e48e6fb7",
+    "sct/integrations/datatrove.py": "60ebe86941848bbc3ce6ba37162fcc286ec9fd3af033381818714b9a0a680205",
+    "sct/integrations/docling.py": "6d1d26bf2fe3b2216261c2270ec2d67db6f5143c9d648d28effce3f1b31458d5",
+    "sct/integrations/haystack.py": "496863210cad7e4048c25aaf24bf4bd40ccdc94f876bcd085716778887cecfed",
+    "sct/integrations/hf.py": "4728d816cf9ac67790960a21b9cd4c33e83cc6ced4259a4cd8295db6654792ec",
+    "sct/integrations/langchain.py": "c3c9ba429153c0acbb38d912851cc89f60a24660b53a307ce8f9e229b300c8b3",
+    "sct/language_policy.py": "e5c60565ad19a50c605ad57f46d5c33f7737affeed8cf972b5396c80070b4a28",
+    "sct/mcp_server.py": "f9aae6e48c3b46f1dcc938196a3f0b150d2f2f716ca2b6399dc4186363cc62f7",
+    "sct/model_benchmark.py": "14c667e194880b7a60e95704605e07cfe4244224aa53724f196fbe2a4cffc3d1",
+    "sct/model_candidates.py": "e800be7bed0b7b256bd4d880f1b3d8027b7e8e92215386778971348cc7adee46",
+    "sct/ocr.py": "1ccb8453e01bf6a0946455b7db2503f966a7a0b602c883b1833f5f745071c6cc",
+    "sct/policy_v2.py": "e25e1f44c4ff7be6beb9bbf3c47a9bcc01dd5c731b053fdc15eff93bebde70b3",
+    "sct/presets.py": "be2446dafbfc8705e05fdea1663de99f6187cca1dfb600f56b8491808aa1db1a",
+    "sct/privacy.py": "b0b7c78d52e5746b841a5f87255180094fab2d08634e0f8bb724ba52e6853d5a",
+    "sct/report_cli.py": "c95d9c4ef190d377b5f2cf80f9848d9177c5cf0135fca291890b49cfdd076320",
+    "sct/risk.py": "55ed1510197fe3361b127fef3c16ac8a7f2d8a0a393668ccce7507a326783bb9",
+    "sct/routing.py": "19ced2813aa8220ab7f08bddd032b384d5ccadf6d9e49f86546b7cd3642f28fc",
+    "sct/schema.py": "6821237c10f3b7a438cee08afdb94b0ce6b7ee6a71ccae639efe899338719584",
+    "sct/score.py": "b7a6548572e29147b85116e2efceeae8b9b30fe2ffd5af9b49bedcbb3fd0e4fc",
+    "sct/sct.py": "92296797236108707be03be9e6e2f242dea4802fdab93f5aafa4e198629c01f8",
+    "sct/signals.py": "6ef22ea0261a6206748613befa672a4900330bfac2349df8e31ba34fe5471626",
+    "sct/streaming.py": "c442a2fb06eea1aa0a4f98e962ecffbf09f4cbc41bd2369f504d8e3084a08a75",
+    "sct/token_stores/__init__.py": "4f8caf8bd1fc12c5ee812a62b0e1e6d35e2d88df613105436fc3ea8c3e86946c",
+    "sct/token_stores/sqlite.py": "bdaedeecfccbc4ef628a93e00ff5ae0dda6f17207dc84628512e00735be7118b",
+    "sct/unified.py": "f844242f43ae099fdc08ecdbbf7e34932c94e609a67ae2ef2131b68fae55e714",
+    "sct/utils/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "sct/utils/anonymization_map.py": "2925f2580dd2666c0a5a71348a0539a1cf84ae305de28f0223a0ffe275803b04",
+    "sct/utils/atomic_file.py": "99f67a1ffb1db33eb229d0d7ac178dff4b669666ad42433888fa007890085d5a",
+    "sct/utils/constants.py": "20966a48e158141a055ab3127c0b99954580a0bd784428fc6be4145ae773dd6a",
+    "sct/utils/contact.py": "627e5ffd3e2a1212f73094b28d9ddf9ca72432225363eff47889e60b998ef2ba",
+    "sct/utils/datetime.py": "420babdfdbff4259a4774faf3cd6dfe33603882606214ab5a8e80869b34b4f30",
+    "sct/utils/gliclass_adapter.py": "d9f054dc7a1831634cbeb1510f18ccfbc80cb7d2595319d492a820a63b1ba8be",
+    "sct/utils/gliner_adapter.py": "99c366d8859637df255d237f9516f2e666b74b5eecfe2f12cb843d39c436c972",
+    "sct/utils/markers.py": "79b03874a953c587e8c530b52ecebe69e29d39b88a8918c7bb26e70c2b9a1856",
+    "sct/utils/ner.py": "dba9b9cdae78b0a6f619741ff26fdcee80e5574e0a95ad88266595f6772f7f35",
+    "sct/utils/ner_chunking.py": "b60046f3b86bbc9e0e0c3273fb7e8c8d62a22f8a8a2b61c7b1155869cbbd0bb1",
+    "sct/utils/ner_spans.py": "d3934998a8f76ae8de354be9cd4a95da9aed324496e7975d3fd552f043685e57",
+    "sct/utils/normtext.py": "538569ee5a14d411c99a63808c0bc144959711d770372128f95d70c1771e63c2",
+    "sct/utils/onnx_pipeline.py": "8214e7ebd532890541d63346986d4557c38b0176bae60b4708b3645b4db71d60",
+    "sct/utils/process_result.py": "b36f7cbdbe79292cefaa4991cedb8408bf4f0c4ac627a450226ab4ffec595562",
+    "sct/utils/resources.py": "18058b215ffdd9d390966ff7485447f03fe8d54968821b4d7902342ee804ed13",
+    "sct/utils/special.py": "705aa6e13607a229f30dfa69c061656aac7d1b3accbc1611c2b6b0caecf36a97",
+    "sct/utils/stopwords.py": "e36784c680695cf4dd1f00a33a379e525d98bae964c39d525e2837792bf9996c",
+    "sct/utils/synthetic.py": "1f3a659abc9d3e1e79d606904e7b58cacde7fedf8229a5fad1072f3403fb4775",
+    "sct/utils/torch_pipeline.py": "b70053c797d8d694dd9f497491e88fe342abdb687fa2e35668d7091a347f34c7",
+    "tests/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "tests/adapter_helpers.py": "cb854fe3b87e35eff8c63e82797226907d1e20b2601956b1df3b280548e6873f",
+    "tests/conftest.py": "206464d3e36eb38cbe758bcd09470e21b1aae9f3d031fafd0af8b91555c0f005",
+    "tests/helpers.py": "bfffe247daad491dd8859d1c717cdf2c2adfa97a86616306f2942b21d038ad20",
+    "tests/test_adapters.py": "f7907f456ddf4ed1bef5e2ab9084ba9b1fd0886ca9352ba88f2a76e8c5bc4952",
+    "tests/test_address_leftovers.py": "c3657332dec9124324f772bfd73b848cdd80e8df446586a5c4508126535bc49f",
+    "tests/test_atomic_file.py": "f0a36800df415132129599288d9aece62bdb7d9f6f552042dd39eb3b94cfb7f7",
+    "tests/test_baseline_measurement.py": "c3c4c65207dffbedbb2ca86d15fa5860c80ee0e4c54ceea5aa01125eee3129d7",
+    "tests/test_batching.py": "df1cf97cef3566a56529c883f9642ee7f0f805edeb9169cb3b99afb7623f5496",
+    "tests/test_benchmark_adapters.py": "e694b2591b51e7c4cda599e48eb156ae7c10be93a03aa4aac072a984b5c2bff5",
+    "tests/test_benchmark_loaders.py": "f9f725063ae453b4b2a3dfa5ba7d8dafc6bebaddbd6301e7be161371a86ed586",
+    "tests/test_benchmark_release.py": "4900973747bff21788c905da18e31c07c775bb3870926d7ff1d05aa02158a8ea",
+    "tests/test_benchmarks_compare.py": "90eb250b3c41145dabeb73cc8a2c3904be955e05c8eb07cd3e1408e0dd5e8bf2",
+    "tests/test_benchmarks_round2.py": "e749c2365c82156a084de5a4f5956ac5eaa9d557a00571fc4e3143990cc43b44",
+    "tests/test_benchmarks_round2_tools.py": "8960d6d35fab1d1dcbe982eb1437ce4cb24d8d8f1bd69f268de333db9f4401f1",
+    "tests/test_benchmarks_score.py": "649a41626d6bd038f6e6ad7be6d913fee294c6cd22dd9c38c5de8f2f43ec5608",
+    "tests/test_browser.py": "75be7e60367b23e16d9f2a53494e2875cb0025d5e0e0a629c7c5e1bbdc43a884",
+    "tests/test_builtin_detections.py": "8244255b6a37593a58035efa324cdbf427bf4b3c898c93aaa425c95127489cca",
+    "tests/test_chunking.py": "c24b4e956ebf6be62f53e71270a8e0863b417706a16bb48ca01cbdf3f9d21e8a",
+    "tests/test_cjk_width.py": "e18b5cac4dc85e3bd2a652497899bca16fc75def11803f840108ad087573b4f7",
+    "tests/test_cleaner_lifecycle.py": "36bcd50b74e526294c345b70770336d6be260ad0d73cd3a1f81c30286a93e865",
+    "tests/test_cli.py": "e2b24c6f93f0ec9ee418fe5c77a5abb2d1173437345a360d05271705e5ced70f",
+    "tests/test_config_state.py": "5a1275f0cdd3cfdf2acd9d56a36ec8572b2e13042988a4d1a4d1ed0e789d5172",
+    "tests/test_contracts.py": "4f7cf467c6209f98a91adc88ef0b91d5ced5e66e6a63d973c6c4961abe3cc9c7",
+    "tests/test_coordinates.py": "3ff626e3297d5d1e13f28a3091cdea81d9d413d9b06f1bdc0c7952251d9f6524",
+    "tests/test_corpus_decontamination.py": "023a9014d0c5f4b4cf516a88e99d23f75376d6583b0ef6f45b506221fac7eb9c",
+    "tests/test_corpus_failure_boundaries.py": "57f20fedd14b8e3a4d3bf8b7d984a84a8c84614de6e25a0e108a146f16eac52f",
+    "tests/test_corpus_identity_boundaries.py": "6e28977a0596470a735041d9fbe3976b8c800926313d7f32e62729f5a0218c4a",
+    "tests/test_corpus_manifest.py": "0800319b29c7e7369a71b24f324ac1d449b46584c77aa095a9f86cb4ba2ec4a6",
+    "tests/test_corpus_resume.py": "b617a7d2832ac2e70f7dd3719717bf4d112430b6c94dfff7af5bddcf864b8ead",
+    "tests/test_corpus_selection.py": "cb7d2caff457978d4f8991b3126ece966ba81a4ab680b1486d5476184306ccf6",
+    "tests/test_date_forms.py": "cc0bb130f703edccab937c01c282838ca8f197f9dd6fd68f542eba08b45cc8cd",
+    "tests/test_dates_cjk_styled.py": "82b3b3262af4a9d1cf127786919bcfd606f79990cdf4e6f403bc28ae26127f19",
+    "tests/test_dates_default.py": "1c3c27d3e88941067ca6744aca5366000bc924a6c27515bf0bab9aaeb489c22d",
+    "tests/test_detections.py": "a6b41971e23ba7a8749530090e3bceda081d9acd4729d6e62368f3034ea3c6e5",
+    "tests/test_detector_registry.py": "749e7a61a4c66024fd475bf25b386b6791d4c127b3476036059bf9d5513fc239",
+    "tests/test_detector_routing.py": "59634b86fa948c0e82e3d002c88ea39734227913f44e6bd605b054a156015be3",
+    "tests/test_device_provenance.py": "92d2fd460a9b264f3403abe379c09995eea840a10deb5fa1a1dbd7e1f9a2980d",
+    "tests/test_docling_integration.py": "8f64cde5978ee48d4fdaca7fe80b633f0f4f8852eac374ecf5c564f7808db541",
+    "tests/test_email_forms.py": "936e64b768def77d5a35e174f60a32954773da42ada5772c5732e7ebae1e0924",
+    "tests/test_escaped_markup.py": "c0762997e3568603be92f799c6a40eaea852a65d00dd6975d2e4570a0da48de6",
+    "tests/test_evaluation.py": "07cbe6d913ba09dbfb318474df3ce92e26924b7a4030e504404efcc656e8c63b",
+    "tests/test_fork_safety.py": "6e64ddd81713debb52f14f29b16600a701769ca0c9e519ee1c5f5ac538f95d18",
+    "tests/test_functional.py": "4c4054d2251dc30376ee9ea4eb62bf72ea8fb34ea36dc950392fbb86c26a901d",
+    "tests/test_fuzz_styled_pii.py": "b406346c99c2b09a33a271b0f60fef03db08e910e0453d6777064b14520447aa",
+    "tests/test_gliner_recipe_identity.py": "fb6edc4dbaffdeef67c0e079a8100af5efa4b9d87ec494bfdbe0e0f5bced88b0",
+    "tests/test_gliner_revision.py": "338f561fa2d3ffbd41415cc2f93f15fb597942d0c23665c024f8daeae495da44",
+    "tests/test_improvements_end_to_end.py": "186fa601222eb50439a5a61e58e5efafb49ab29c6306d735ea8c6009b322f605",
+    "tests/test_integrations_frameworks.py": "058dae396f6dad333ea8581a37112a4a776c9caa29ca4fd6e5688542d694a6d0",
+    "tests/test_integrations_hf.py": "c490d40178287e06b61bdee9fb3eb11df4399267f0be895f59e6043cb1aa5171",
+    "tests/test_integrations_runtime.py": "5b560ea7bb057a69a869def915c2b00af67e585f67fb8b64543a85a0dcd294c8",
+    "tests/test_keep_scripts.py": "d2a817012d09ee4e3d66c49eeb4102b4ab4d698617bdf08150e8718043648e60",
+    "tests/test_language_all.py": "eef9ee54fac3923698ac013538d1262d232e6791f0d87f774bc2b6941e36265d",
+    "tests/test_language_policy.py": "b4d5530ab12f21c25333773495dd6b5c04c6a9c7ab89e55a0a8e307012c08c6b",
+    "tests/test_linux_workers.py": "ff633c9ae285e11c671e9751ae14494ca58b6112588a51a836312942a8fb2f4b",
+    "tests/test_mcp_path.py": "e5c2ce552868fa22554e6081c709eb6d02b4ba8f211adf63be5c2e3f4701a8e9",
+    "tests/test_mcp_server.py": "6166f1aa2a0c3dc7c7145bb6b9e4d05cf4afbd69a64d95408833bab41cd88399",
+    "tests/test_model_benchmarks.py": "ece8fbf234556deaa1f89bef02dea6aa8744ff2a0e3e72e52261668d7a8bb45d",
+    "tests/test_multilingual_eval_set.py": "1348b1accd92b7675949f300d52b1b47ca9f0bca41f27ea48f412e4fc7dd284b",
+    "tests/test_ner_sees_tags.py": "63ac111758ba44773209e4418c04a2c2c80d43520352dd2d8cce7872f6fd0180",
+    "tests/test_ner_span_repair.py": "3e169e19c44a032bb4d1e774ad6b50f9756fd30913eb69cb1ca272e1b71d31fd",
+    "tests/test_ner_spans.py": "f0f4f56f9950b6ae16b4cda41c7736885355ffd3b020a2a585cfc45bdbd2789f",
+    "tests/test_ner_windows.py": "ecf74417c1d491fa236a867fa8bf932eb8c310de53511243448d7baaf1076c00",
+    "tests/test_number_identifiers.py": "df0c00495c2df0bfb90525b04ccf6596f2749318940330fb897c2274b6e1098a",
+    "tests/test_ocr.py": "4e9fc96637f5830c1efbb501d0deea09167fb5cbb571f0bbdce85fdbbd858e1b",
+    "tests/test_onnx_concurrency.py": "07958f94abe3c9c8bff94f2734bd0f537629595b27f7142588163b97214b10cb",
+    "tests/test_onnx_external_data.py": "9f686e31bd4dd4664092d2c7c7b3e523288855b5f4f77ff0a38c523cecccdd6b",
+    "tests/test_onnx_model_cache.py": "9cd74f6a6aa77dea1d501772f51ebd929cae96416a6b2cc8bcd5dedb8fc65d73",
+    "tests/test_optional_profiles.py": "6f7d22e750c58b5aee533339bd3db04cfb6cb2c84f595b4024889a9c33b3a4a3",
+    "tests/test_phone_forms.py": "3bbbd7f5e48c566261aab3ec697a3ec2674aee784ab527d9086d874151847786",
+    "tests/test_pii_social_cards.py": "26e90593f96c9a80cd09ebfe3bdc6e75294a5198a501974de29247ff276b05a7",
+    "tests/test_pipeline_text_steps.py": "0d4fc0d2924de929be92db0301307c6ede7f85ae035ee82c378ba693de60328b",
+    "tests/test_plot_pii_comparison.py": "2ec84f83f5e54ed156cb880b5fbff9192cea5796b59c0975f6eed5af07de9ebb",
+    "tests/test_plot_version_comparison.py": "c8742b73e04ce458a4e63dcb56038abbdb94e0d41ef50c6d5111f6c54ffcd3c2",
+    "tests/test_predicted_spans_monotone.py": "6f76c9ff4445c98584a03908c2c2c82c8b1ec63c0b7764fb37399e8917af3103",
+    "tests/test_presidio_tags_and_fakes.py": "3c572aa71680cdf74b10e5a6645b36be64ad3ee98be278f9d6d32bfcc33eedc4",
+    "tests/test_presidio_type_names.py": "d40e2f63418d92c845b4dfa1ad80f02b9196fcc1e0463764584c79f488cd6a18",
+    "tests/test_privacy.py": "02eb90f65f3cca9b38aa5e6046d415aad8902e81f63c8f1cce0cd8b6cf8528c1",
+    "tests/test_processing_compatibility.py": "c29d5cda04b69e872433501b674674e8e6c74bce01fc05fc44f96287f7a9315b",
+    "tests/test_prose_punctuation_kept.py": "9e592aa1c3ea5ea0a73ac6e8197cbe22dd9294423554fcd9119f239284b83281",
+    "tests/test_public_view.py": "1553e3c9686e589d5ba62dcd7c38fff1b2c91c8225556227ad4778b38c3a1114",
+    "tests/test_quality_export.py": "258a96721e74c5dbcb2a1f065f027b5afb8d7c567be6636c2cf88e6c1dbf43fb",
+    "tests/test_regex_boundaries.py": "d79b5fe0f383b6006d35d9a4293ec09f38645783c12161430a1890e1604fe2bf",
+    "tests/test_regex_counts.py": "51836b05956630c60ba89a51efa59d9a35dbcac2005cad0b60fdbc849c868022",
+    "tests/test_release_comparison_watcher.py": "f7747ddb06797477ec8f1a5d66cb978a2ad583a38af0c6c0834467a38d1d6913",
+    "tests/test_repo_scripts.py": "2e213f7549d760eac7334e804073b66ab7f9d8d68b96d5bccba0b4acbed889aa",
+    "tests/test_report_cli.py": "f621f3369c3447156807a8dcbf63551193f773935c453fa8f392fa64c4f10500",
+    "tests/test_reversible_markers.py": "7cd4f645b203d7ab01cc36a2f25ab7ec316ef55697b5ce24bcd8e5e18dd2be22",
+    "tests/test_risk.py": "8aee6655bf03773cfc62afde27f8480e99127fe6404a37e438f2bc0f1acb7c49",
+    "tests/test_routing_audit.py": "7e5f201e08569c283841dd16b9a61717ca1719b04f073b175e68e7306b21333f",
+    "tests/test_routing_calibration.py": "86613f3bccb3028f78aa8f100ddc5f6f5ceb9d6456a793352f2054d26c6a0faa",
+    "tests/test_schema_context.py": "70e8c0cd5fb0ad490012a042d00287ef2bad770f58bb094b8f5c5602f42005f8",
+    "tests/test_score.py": "4888ccf5ebf8b1b0f4fae283d2bb0e733b6c4d4932a0691fc19d308a8181f54b",
+    "tests/test_sct.py": "7f4bd2e5ca1ad0a02f2b0f80a8a7de4409bab6a29eb85598f22d0cc370db4bf1",
+    "tests/test_secret_detector.py": "e40479636edacf3b85ec7317a117e69988102197c66aa4aa5f1e519eb0784c61",
+    "tests/test_security_leftovers.py": "6c6d4d531ad345090805ba2f7c89191634de1abe942e208cf48bf15f30bc2b5e",
+    "tests/test_sqlite_token_store.py": "2858e40e37984f766783586d75e808521bfba82d5442274e9e20d726c7fddf99",
+    "tests/test_stream_guard_shared_view.py": "5a097043041dc7a4277085693a47eba39ec7de57892b5665ad3a6afc1e15a418",
+    "tests/test_stream_keeps_values_whole.py": "ba2ae17a5338c1a0ad86946da82b6a417eddf29fb3379aaa9484641f542b67b5",
+    "tests/test_streaming.py": "b3b2a91b14c717992968e9792acb24ea0bf0a762c86e7545856e25eb8125f8b9",
+    "tests/test_streaming_split_stability.py": "378c3ae2e674c31c9c9acc5087d89b2d8b3a1385de395db98f8fa874cda91fbe",
+    "tests/test_styled_pii.py": "50584eb3070977e7d674f7b77ec54dba6e27eb6cd314d5f74b577d0f0da1294e",
+    "tests/test_surface_contracts.py": "237d803e1a8c24542d6b221c4c4798037a874b459b6119ca37d5f6883b8aee53",
+    "tests/test_synthetic_determinism.py": "5f1da516b907d6b31bc0cedb54e2c6d7a3a07f4856970878a712fd5aee2d9850",
+    "tests/test_synthetic_per_document.py": "259dc338612ef61559e0023535b2de5913023313f05ffa392735febcb166a04e",
+    "tests/test_token_store_failure_boundaries.py": "18ead9b174eec97b3761d40b7e731dc70d0e0371d75c35144d5ed8f3c09580ba",
+    "tests/test_token_store_operations.py": "74df3873fe3ace32a2790e5a8c5961668497e28b9e2d4cb08e32f43953167d09",
+    "tests/test_torch_ner_backend.py": "97e842d51996d56b9694570c54edd4d496685d2420a1c648f748a2a0095a814d",
+    "tests/test_training_preset.py": "10c1360d2f7908ec8568f949446c70a325d08e3d25a438f7424108a3c222bdfe",
+    "tests/test_type_names.py": "e40053c83d47d07135992dc3065c050918a49aa8d0c7de5cc74f59adc26a9513",
+    "tests/test_unified_processing.py": "4aafe265dddd151ff6a5501160c32bf97f267bef84dfad2354c3758051ee9870",
+    "tests/test_url_forms.py": "85851d9b395d6056c8c71d11b5281e3e8ac92cd9b834b1bcd73ec8bac9ffe749",
+    "tests/test_user_terms.py": "2a4574eb9b5bec1d20b95aff12adf9ba98ee696d50fa8ccccb0315afabe5412e"
+  },
+  "configuration_sha256": {
+    "pyproject.toml": "cf9a9d6794f98cb17b607ef3b7d2f739dee6604d43e9d4675e44da13cf93dc39",
+    "uv.lock": "d147303f247458c5e1c38e8e3c5a6e79a6d9c7b9a78bad99a08526bddc03242d",
+    "pylock.toml": "7bd1216b3f34861b05fe5ed95c367eca04d2d5d448c178ed8bd655b91fedfb93",
+    ".coveragerc-documents": "b713a174a5ea68b93413bceb9b8d673b6c270ea6a6bfb64197241bf2eed47de6",
+    ".coveragerc-integrations": "b3aa6b44b1a155600126c61b78ff35e4bf147c67bc52d7ceb2790d64fc80b8ae"
+  },
+  "post_run_source_verification": {
+    "all_262_python_files_and_5_configs_unchanged": true,
+    "qa_tree": "ffc64d8625d11f5c60661cd8f3fccd593e907c80",
+    "publication_overlay_policy": "Documentation/evidence only. Runtime, tests, CI and dependency configuration remain identical to qualified source."
+  },
+  "core_profiles": {
+    "312": {
+      "passed": 3271,
+      "skipped": 169,
+      "warnings": 2,
+      "seconds": 762.03,
+      "exit_code": 0,
+      "coverage": {
+        "covered_lines": 6695,
+        "num_statements": 7717,
+        "percent_covered": 86.75651159777115,
+        "percent_covered_display": "86.76",
+        "missing_lines": 1022,
+        "excluded_lines": 41,
+        "percent_statements_covered": 86.75651159777115,
+        "percent_statements_covered_display": "86.76"
+      },
+      "coverage_files": 64,
+      "coverage_data_file": "/home/rehan/sct-improvements-final-boundaries-v090-20261110/core312/qualification/coverage/.coverage",
+      "runtime": {
+        "python": "3.12.3 (main, Aug 31 2026, 10:18:26) [GCC 13.3.0]",
+        "executable": "/home/rehan/sct-improvements-final-boundaries-v090-20261110/core312/.venv/bin/python",
+        "sct": "/home/rehan/sct-improvements-final-boundaries-v090-20261110/core312/sct/__init__.py",
+        "modules": {
+          "pytest": {
+            "version": "9.1.1",
+            "path": "/home/rehan/sct-improvements-final-boundaries-v090-20261110/core312/.venv/lib/python3.12/site-packages/pytest/__init__.py"
+          },
+          "pytest_cov": {
+            "version": "7.1.0",
+            "path": "/home/rehan/sct-improvements-final-boundaries-v090-20261110/core312/.venv/lib/python3.12/site-packages/pytest_cov/__init__.py"
+          },
+          "coverage": {
+            "version": "7.16.1",
+            "path": "/home/rehan/sct-improvements-final-boundaries-v090-20261110/core312/.venv/lib/python3.12/site-packages/coverage/__init__.py"
+          },
+          "ruff": {
+            "version": "0.16.8",
+            "path": "/home/rehan/sct-improvements-final-boundaries-v090-20261110/core312/.venv/lib/python3.12/site-packages/ruff/__init__.py"
+          },
+          "onnxruntime": {
+            "version": "1.30.0",
+            "path": "/home/rehan/sct-improvements-final-boundaries-v090-20261110/core312/.venv/lib/python3.12/site-packages/onnxruntime/__init__.py"
+          },
+          "tokenizers": {
+            "version": "0.23.2",
+            "path": "/home/rehan/sct-improvements-final-boundaries-v090-20261110/core312/.venv/lib/python3.12/site-packages/tokenizers/__init__.py"
+          },
+          "huggingface_hub": {
+            "version": "1.32.0",
+            "path": "/home/rehan/sct-improvements-final-boundaries-v090-20261110/core312/.venv/lib/python3.12/site-packages/huggingface_hub/__init__.py"
+          },
+          "numpy": {
+            "version": "2.5.3",
+            "path": "/home/rehan/sct-improvements-final-boundaries-v090-20261110/core312/.venv/lib/python3.12/site-packages/numpy/__init__.py"
+          },
+          "presidio_anonymizer": {
+            "version": "2.2.364",
+            "path": "/home/rehan/sct-improvements-final-boundaries-v090-20261110/core312/.venv/lib/python3.12/site-packages/presidio_anonymizer/__init__.py"
+          },
+          "cryptography": {
+            "version": "48.0.1",
+            "path": "/home/rehan/sct-improvements-final-boundaries-v090-20261110/core312/.venv/lib/python3.12/site-packages/cryptography/__init__.py"
+          },
+          "datasets": {
+            "installed": false
+          },
+          "datatrove": {
+            "installed": false
+          },
+          "docling": {
+            "installed": false
+          }
+        },
+        "distributions": {
+          "squeakycleantext": "0.9.0",
+          "pytest_cov": "7.1.0",
+          "hypothesis": "6.168.0",
+          "hf_xet": "1.6.0",
+          "sortedcontainers": "2.4.0",
+          "httpx": "0.28.1",
+          "onnxruntime": "1.30.0",
+          "wcwidth": "0.8.4",
+          "stop_words": "2025.11.4",
+          "numpy": "2.5.3",
+          "click": "8.5.0",
+          "pyyaml": "6.0.3",
+          "iniconfig": "2.3.0",
+          "regex": "2026.9.10",
+          "pygments": "2.21.0",
+          "httpcore": "1.0.9",
+          "pytest_timeout": "2.4.0",
+          "pycparser": "3.0",
+          "huggingface_hub": "1.32.0",
+          "typing_extensions": "4.16.0",
+          "rapidfuzz": "3.14.6",
+          "cryptography": "48.0.1",
+          "protobuf": "7.36.2",
+          "tokenizers": "0.23.2",
+          "packaging": "26.3",
+          "flatbuffers": "25.12.19",
+          "lingua_language_detector": "2.2.0",
+          "certifi": "2026.10.23",
+          "faker": "40.39.0",
+          "cffi": "2.1.1",
+          "unidecode": "1.4.0",
+          "presidio_anonymizer": "2.2.364",
+          "pluggy": "1.6.0",
+          "pytest": "9.1.1",
+          "tqdm": "4.70.1",
+          "ruff": "0.16.8",
+          "coverage": "7.16.1",
+          "anyio": "4.15.1",
+          "fsspec": "2026.7.0",
+          "filelock": "4.0.1",
+          "h11": "0.16.0",
+          "emoji": "2.16.0",
+          "idna": "3.20",
+          "ftfy": "6.3.1"
+        },
+        "metadata_validation": {
+          "unique_versions": 44,
+          "duplicate_versions_consistent": true,
+          "receipt_sha256": "36c52bd149f6029a7c47d1fc5c18ee1cb730b0c0577c83851a9c65250aa80fac"
+        }
+      },
+      "source_guard": {
+        "frozen": 1278,
+        "changed_paths": [],
+        "unchanged": true
+      },
+      "evidence_sha256": {
+        "coverage.json": "83131a0ecf1f5f038167f8688f389b92bad14e802a7d9914c844240af50619ac",
+        "pytest.log": "8a8b24bd58e3cb77be9518107f37793b629d0ad61e7382408dbaefa5f2000f1b",
+        "runtime.log": "650eb0f9f77e413b6882f4d5656d50c0aa4664482dce629aca623ea2be1cd48e",
+        "runtime-complete.json": "36c52bd149f6029a7c47d1fc5c18ee1cb730b0c0577c83851a9c65250aa80fac",
+        "source-guard.json": "2b713229c342789e11b3a10fcf5335ceec52409bd8dbe8d9b18d30b458b585f8",
+        "frozen-source.json": "a245974c5e0fb857fcc51e1d2a33d4d0006ee27de0bb2bd67a623aeda492e471"
+      },
+      "os_affinity": {
+        "cpus": [
+          64,
+          65,
+          66,
+          67,
+          68,
+          69,
+          70,
+          71,
+          72,
+          73,
+          74,
+          75,
+          76,
+          77,
+          78,
+          79
+        ],
+        "purpose": "Qualification only; no performance claim"
+      }
+    },
+    "313": {
+      "passed": 3271,
+      "skipped": 169,
+      "warnings": 2,
+      "seconds": 668.93,
+      "exit_code": 0,
+      "coverage": {
+        "covered_lines": 6695,
+        "num_statements": 7717,
+        "percent_covered": 86.75651159777115,
+        "percent_covered_display": "86.76",
+        "missing_lines": 1022,
+        "excluded_lines": 41,
+        "percent_statements_covered": 86.75651159777115,
+        "percent_statements_covered_display": "86.76"
+      },
+      "coverage_files": 64,
+      "coverage_data_file": "/home/rehan/sct-improvements-final-boundaries-v090-20261110/core313/qualification/coverage/.coverage",
+      "runtime": {
+        "python": "3.13.3 (main, May 30 2025, 05:38:56) [Clang 20.1.4 ]",
+        "executable": "/home/rehan/sct-improvements-final-boundaries-v090-20261110/core313/.venv/bin/python",
+        "sct": "/home/rehan/sct-improvements-final-boundaries-v090-20261110/core313/sct/__init__.py",
+        "modules": {
+          "pytest": {
+            "version": "9.1.1",
+            "path": "/home/rehan/sct-improvements-final-boundaries-v090-20261110/core313/.venv/lib/python3.13/site-packages/pytest/__init__.py"
+          },
+          "pytest_cov": {
+            "version": "7.1.0",
+            "path": "/home/rehan/sct-improvements-final-boundaries-v090-20261110/core313/.venv/lib/python3.13/site-packages/pytest_cov/__init__.py"
+          },
+          "coverage": {
+            "version": "7.16.1",
+            "path": "/home/rehan/sct-improvements-final-boundaries-v090-20261110/core313/.venv/lib/python3.13/site-packages/coverage/__init__.py"
+          },
+          "ruff": {
+            "version": "0.16.8",
+            "path": "/home/rehan/sct-improvements-final-boundaries-v090-20261110/core313/.venv/lib/python3.13/site-packages/ruff/__init__.py"
+          },
+          "onnxruntime": {
+            "version": "1.30.0",
+            "path": "/home/rehan/sct-improvements-final-boundaries-v090-20261110/core313/.venv/lib/python3.13/site-packages/onnxruntime/__init__.py"
+          },
+          "tokenizers": {
+            "version": "0.23.2",
+            "path": "/home/rehan/sct-improvements-final-boundaries-v090-20261110/core313/.venv/lib/python3.13/site-packages/tokenizers/__init__.py"
+          },
+          "huggingface_hub": {
+            "version": "1.32.0",
+            "path": "/home/rehan/sct-improvements-final-boundaries-v090-20261110/core313/.venv/lib/python3.13/site-packages/huggingface_hub/__init__.py"
+          },
+          "numpy": {
+            "version": "2.5.3",
+            "path": "/home/rehan/sct-improvements-final-boundaries-v090-20261110/core313/.venv/lib/python3.13/site-packages/numpy/__init__.py"
+          },
+          "presidio_anonymizer": {
+            "version": "2.2.364",
+            "path": "/home/rehan/sct-improvements-final-boundaries-v090-20261110/core313/.venv/lib/python3.13/site-packages/presidio_anonymizer/__init__.py"
+          },
+          "cryptography": {
+            "version": "48.0.1",
+            "path": "/home/rehan/sct-improvements-final-boundaries-v090-20261110/core313/.venv/lib/python3.13/site-packages/cryptography/__init__.py"
+          },
+          "datasets": {
+            "installed": false
+          },
+          "datatrove": {
+            "installed": false
+          },
+          "docling": {
+            "installed": false
+          }
+        },
+        "distributions": {
+          "squeakycleantext": "0.9.0",
+          "pytest_cov": "7.1.0",
+          "hypothesis": "6.168.0",
+          "hf_xet": "1.6.0",
+          "sortedcontainers": "2.4.0",
+          "httpx": "0.28.1",
+          "onnxruntime": "1.30.0",
+          "wcwidth": "0.8.4",
+          "stop_words": "2025.11.4",
+          "numpy": "2.5.3",
+          "click": "8.5.0",
+          "pyyaml": "6.0.3",
+          "iniconfig": "2.3.0",
+          "regex": "2026.9.10",
+          "pygments": "2.21.0",
+          "httpcore": "1.0.9",
+          "pytest_timeout": "2.4.0",
+          "pycparser": "3.0",
+          "huggingface_hub": "1.32.0",
+          "typing_extensions": "4.16.0",
+          "rapidfuzz": "3.14.6",
+          "cryptography": "48.0.1",
+          "protobuf": "7.36.2",
+          "tokenizers": "0.23.2",
+          "packaging": "26.3",
+          "flatbuffers": "25.12.19",
+          "lingua_language_detector": "2.2.0",
+          "certifi": "2026.10.23",
+          "faker": "40.39.0",
+          "cffi": "2.1.1",
+          "unidecode": "1.4.0",
+          "presidio_anonymizer": "2.2.364",
+          "pluggy": "1.6.0",
+          "pytest": "9.1.1",
+          "tqdm": "4.70.1",
+          "ruff": "0.16.8",
+          "coverage": "7.16.1",
+          "anyio": "4.15.1",
+          "fsspec": "2026.7.0",
+          "filelock": "4.0.1",
+          "h11": "0.16.0",
+          "emoji": "2.16.0",
+          "idna": "3.20",
+          "ftfy": "6.3.1"
+        },
+        "metadata_validation": {
+          "unique_versions": 44,
+          "duplicate_versions_consistent": true,
+          "receipt_sha256": "395e1e2400066dc0907871f5babc92095d0de53a2487ab6670a80a57e320c4c0"
+        }
+      },
+      "source_guard": {
+        "frozen": 1278,
+        "changed_paths": [],
+        "unchanged": true
+      },
+      "evidence_sha256": {
+        "coverage.json": "9e5cdeee18e63e9fa10158e462d4dc0140864d2c420d7d14100b0d1c22f2b9f7",
+        "pytest.log": "dda5e9d2656141258f6386e1f6e58116f333537fb7a3de6a8d5e48c5958f28eb",
+        "runtime.log": "806a9a76f818cda196c8538f99f59ee05ef4a68bfd68129decd94e32f0c2843a",
+        "runtime-complete.json": "395e1e2400066dc0907871f5babc92095d0de53a2487ab6670a80a57e320c4c0",
+        "source-guard.json": "2b713229c342789e11b3a10fcf5335ceec52409bd8dbe8d9b18d30b458b585f8",
+        "frozen-source.json": "a245974c5e0fb857fcc51e1d2a33d4d0006ee27de0bb2bd67a623aeda492e471"
+      },
+      "os_affinity": {
+        "cpus": [
+          80,
+          81,
+          82,
+          83,
+          84,
+          85,
+          86,
+          87,
+          88,
+          89,
+          90,
+          91,
+          92,
+          93,
+          94,
+          95
+        ],
+        "purpose": "Qualification only; no performance claim"
+      }
+    },
+    "314": {
+      "passed": 3271,
+      "skipped": 169,
+      "warnings": 2,
+      "seconds": 446.71,
+      "exit_code": 0,
+      "coverage": {
+        "covered_lines": 6478,
+        "num_statements": 7502,
+        "percent_covered": 86.3503065849107,
+        "percent_covered_display": "86.35",
+        "missing_lines": 1024,
+        "excluded_lines": 41,
+        "percent_statements_covered": 86.3503065849107,
+        "percent_statements_covered_display": "86.35"
+      },
+      "coverage_files": 64,
+      "coverage_data_file": "/home/rehan/sct-improvements-prefix-v090-20261109/v6/R1/qualification/coverage/.coverage",
+      "runtime": {
+        "python": "3.14.4 (main, Apr  7 2026, 20:47:53) [Clang 22.1.1 ]",
+        "executable": "/home/rehan/sct-improvements-prefix-v090-20261109/v6/R1/.venv/bin/python",
+        "sct": "/home/rehan/sct-improvements-prefix-v090-20261109/v6/R1/sct/__init__.py",
+        "modules": {
+          "pytest": {
+            "version": "9.1.1",
+            "path": "/home/rehan/sct-improvements-prefix-v090-20261109/v6/R1/.venv/lib/python3.14/site-packages/pytest/__init__.py"
+          },
+          "pytest_cov": {
+            "version": "7.1.0",
+            "path": "/home/rehan/sct-improvements-prefix-v090-20261109/v6/R1/.venv/lib/python3.14/site-packages/pytest_cov/__init__.py"
+          },
+          "coverage": {
+            "version": "7.16.1",
+            "path": "/home/rehan/sct-improvements-prefix-v090-20261109/v6/R1/.venv/lib/python3.14/site-packages/coverage/__init__.py"
+          },
+          "ruff": {
+            "version": "0.16.8",
+            "path": "/home/rehan/sct-improvements-prefix-v090-20261109/v6/R1/.venv/lib/python3.14/site-packages/ruff/__init__.py"
+          },
+          "onnxruntime": {
+            "version": "1.30.0",
+            "path": "/home/rehan/sct-improvements-prefix-v090-20261109/v6/R1/.venv/lib/python3.14/site-packages/onnxruntime/__init__.py"
+          },
+          "tokenizers": {
+            "version": "0.23.2",
+            "path": "/home/rehan/sct-improvements-prefix-v090-20261109/v6/R1/.venv/lib/python3.14/site-packages/tokenizers/__init__.py"
+          },
+          "huggingface_hub": {
+            "version": "1.32.0",
+            "path": "/home/rehan/sct-improvements-prefix-v090-20261109/v6/R1/.venv/lib/python3.14/site-packages/huggingface_hub/__init__.py"
+          },
+          "numpy": {
+            "version": "2.5.3",
+            "path": "/home/rehan/sct-improvements-prefix-v090-20261109/v6/R1/.venv/lib/python3.14/site-packages/numpy/__init__.py"
+          },
+          "presidio_anonymizer": {
+            "version": "2.2.364",
+            "path": "/home/rehan/sct-improvements-prefix-v090-20261109/v6/R1/.venv/lib/python3.14/site-packages/presidio_anonymizer/__init__.py"
+          },
+          "cryptography": {
+            "version": "48.0.1",
+            "path": "/home/rehan/sct-improvements-prefix-v090-20261109/v6/R1/.venv/lib/python3.14/site-packages/cryptography/__init__.py"
+          },
+          "datasets": {
+            "installed": false
+          },
+          "datatrove": {
+            "installed": false
+          },
+          "docling": {
+            "installed": false
+          }
+        },
+        "distributions": {
+          "anyio": "4.15.1",
+          "certifi": "2026.10.23",
+          "cffi": "2.1.1",
+          "click": "8.5.0",
+          "coverage": "7.16.1",
+          "cryptography": "48.0.1",
+          "emoji": "2.16.0",
+          "Faker": "40.39.0",
+          "filelock": "4.0.1",
+          "flatbuffers": "25.12.19",
+          "fsspec": "2026.7.0",
+          "ftfy": "6.3.1",
+          "h11": "0.16.0",
+          "hf-xet": "1.6.0",
+          "httpcore": "1.0.9",
+          "httpx": "0.28.1",
+          "huggingface_hub": "1.32.0",
+          "hypothesis": "6.168.0",
+          "idna": "3.20",
+          "iniconfig": "2.3.0",
+          "lingua-language-detector": "2.2.0",
+          "numpy": "2.5.3",
+          "onnxruntime": "1.30.0",
+          "packaging": "26.3",
+          "pluggy": "1.6.0",
+          "presidio_anonymizer": "2.2.364",
+          "protobuf": "7.36.2",
+          "pycparser": "3.0",
+          "Pygments": "2.21.0",
+          "pytest": "9.1.1",
+          "pytest-cov": "7.1.0",
+          "pytest-timeout": "2.4.0",
+          "PyYAML": "6.0.3",
+          "RapidFuzz": "3.14.6",
+          "regex": "2026.9.10",
+          "ruff": "0.16.8",
+          "sortedcontainers": "2.4.0",
+          "SqueakyCleanText": "0.9.0",
+          "stop-words": "2025.11.4",
+          "tokenizers": "0.23.2",
+          "tqdm": "4.70.1",
+          "typing_extensions": "4.16.0",
+          "Unidecode": "1.4.0",
+          "wcwidth": "0.8.4"
+        },
+        "metadata_validation": {
+          "unique_versions": 44,
+          "duplicate_versions_consistent": true,
+          "receipt_sha256": "e00c3ea85f1073b5036c887616ca864a4dc914757ddde2eb32c27533c410b20f"
+        }
+      },
+      "source_guard": {
+        "frozen": 1278,
+        "changed_paths": [],
+        "unchanged": true
+      },
+      "evidence_sha256": {
+        "coverage.json": "a657d47439dff26b0df95c01e5695592198755b8d0d1f5329340247abd93c761",
+        "pytest.log": "41c180444196f090e0e7ac8d84ca7b87d1ed149f0ff6ddfe198839139e7c64d2",
+        "runtime.log": "98498e02246bc1d3393ee4b548385bce645135ff698b19afbc7a9838ec430a83",
+        "runtime-complete.json": "e00c3ea85f1073b5036c887616ca864a4dc914757ddde2eb32c27533c410b20f",
+        "source-guard.json": "2b713229c342789e11b3a10fcf5335ceec52409bd8dbe8d9b18d30b458b585f8",
+        "frozen-source.json": "a245974c5e0fb857fcc51e1d2a33d4d0006ee27de0bb2bd67a623aeda492e471"
+      },
+      "os_affinity": {
+        "task": "R1",
+        "tree": "ffc64d8625d11f5c60661cd8f3fccd593e907c80",
+        "generation": "v6",
+        "purpose": "test qualification runtime only; no benchmark or two-core performance claim",
+        "historical_launch_mask": "18-33",
+        "pytest_start_from_pid_marker_mtime": 1794266832.0530941,
+        "pytest_finished": 1794267281.3760085,
+        "recorded_enforcer_events_within_run": 0,
+        "first_enforcer_event": null,
+        "last_enforcer_event": null,
+        "historical_affinity_log_snapshot": null,
+        "provenance_limit": "Native libraries can override initial leader affinity; periodic enforcer snapshots do not prove every thread stayed inside a set between samples.",
+        "effective_os_policy": "Root-approved disjoint 16-core slot policy",
+        "effective_slot_cpus": [
+          18,
+          19,
+          20,
+          21,
+          22,
+          23,
+          24,
+          25,
+          26,
+          27,
+          28,
+          29,
+          30,
+          31,
+          32,
+          33
+        ],
+        "transition_time": 1794263145.0987954,
+        "spans_two_then_sixteen_core_policy": false,
+        "transition_evidence": {
+          "path": "/home/rehan/sct-improvements-prefix-v090-20261109/v4/affinity-widening-transition.json",
+          "bytes_hashed": 84401,
+          "sha256_prefix": "eb0e2abbb58514e4697eeccf95e1004f5ce92dd1f515ef9692f354eab4fbd0e7"
+        },
+        "effective_policy_evidence": {
+          "path": "/home/rehan/sct-improvements-prefix-v090-20261109/v6/affinity-policy-16.json",
+          "bytes_hashed": 679,
+          "sha256_prefix": "e799e641fa434200a2463f72233c49e237167409f61515b3ab64b9118101d21b"
+        },
+        "sixteen_core_affinity_log_snapshot": {
+          "path": "/home/rehan/sct-improvements-prefix-v090-20261109/v6/affinity-events-16.jsonl",
+          "bytes_hashed": 3942678,
+          "sha256_prefix": "ec20a1002a7af3a3a173a89062f55d33a15ddca30f030304b98db89aab971fb1"
+        },
+        "sixteen_core_events_within_run": 25,
+        "first_sixteen_core_event": 1794266838.3397498,
+        "last_sixteen_core_event": 1794267266.1419156,
+        "sixteen_core_policy_from_launch": true
+      }
+    }
+  },
+  "minimum_coverage": 86.3503065849107,
+  "coverage_precision": 2,
+  "controlled_linux313_coverage_delta_percentage_points": -5.667730826471271,
+  "native_profiles": "v090-native-profiles-qualification.json#isolated_final_profiles",
+  "providers_and_trained_export": "v090-model-qualification.json",
+  "routing": "routing-validation-v2.json",
+  "independent_review": {
+    "original_review_tree": "f7aca678a99ae453d1011c4edd33383013393486",
+    "scoped_candidate_tree": "be03365b8e3c82a044acbc4f53254fe6f0082252",
+    "findings": "All I1 and M1-M3 addressed; no new Critical or Important issue in19pathwave",
+    "scope": "Source approval; no merge or release authorization",
+    "scoped_report_sha256": "2b165dd9d223fcb2fcf0cf713af0477c974b898c1d7dbb2d40d2a5d102ad51ac",
+    "test_only_followup": {
+      "verdict": "approved",
+      "report_sha256": "f15e63197dc0647372713ae35418936954072d6ce45568561ab45e2c469bb3f2",
+      "candidate_sha256": "6e28977a0596470a735041d9fbe3976b8c800926313d7f32e62729f5a0218c4a",
+      "scope": "Additional core unit tests; existing runtime approval unchanged"
+    }
+  },
+  "package_build": {
+    "source_qa_tree": "ffc64d8625d11f5c60661cd8f3fccd593e907c80",
+    "source_archive_sha256": "87e8d5bba8cdbd319033e999611905d64818097b25efd03a99185ebfbe63a4fd",
+    "setuptools_version": "84.0.0",
+    "setuptools_file": "/Users/rehan-8v/projects/personal/SqueakyCleanText-improvements-v090/.venv/lib/python3.14/site-packages/setuptools/__init__.py",
+    "artifacts": {
+      "squeakycleantext-0.9.0-py3-none-any.whl": "4ac05dafb370c58f0dcd33bf2b180ffc33117d812ac73e1b5a43d2d83a1e5a8e",
+      "squeakycleantext-0.9.0.tar.gz": "d42ceebf66b5d29bb61eacab92800c90c2b12d8a174e44e3b47d49499f63bc59"
+    },
+    "package_files_equal_qualified_source": 65,
+    "new_boundary_test_present_in_sdist": true,
+    "private_working_notes_absent": true,
+    "source_directory": "/private/tmp/sct-v090-boundary-package-source-20261110",
+    "output_directory": "/private/tmp/sct-v090-boundary-package-dist-20261110",
+    "isolated_core_only_wheel_checks": [
+      "installed source",
+      "core-only profile",
+      "contact protection",
+      "three-value result",
+      "unified warmup rejection",
+      "malformed counts rejection"
+    ],
+    "wheel_runtime": {
+      "executable": "/Users/rehan-8v/projects/personal/SqueakyCleanText-improvements-v090/.venv-wheel-boundaries-final/bin/python",
+      "python": "3.14.3 (main, Mar  3 2026, 15:46:55) [Clang 21.1.4 ]",
+      "sct_file": "/Users/rehan-8v/projects/personal/SqueakyCleanText-improvements-v090/.venv-wheel-boundaries-final/lib/python3.14/site-packages/sct/__init__.py",
+      "checks": [
+        "installed source",
+        "core-only profile",
+        "contact protection",
+        "three-value result",
+        "unified warmup rejection",
+        "malformed counts rejection"
+      ],
+      "distributions": {
+        "presidio_anonymizer": "2.2.366",
+        "filelock": "4.2.9",
+        "SqueakyCleanText": "0.9.0",
+        "packaging": "26.3",
+        "protobuf": "7.36.2",
+        "tokenizers": "0.23.3",
+        "ftfy": "6.3.1",
+        "wcwidth": "0.9.4",
+        "Unidecode": "1.4.0",
+        "onnxruntime": "1.31.1",
+        "click": "8.5.1",
+        "numpy": "2.5.4",
+        "cryptography": "50.0.2",
+        "pycparser": "3.12",
+        "lingua-language-detector": "2.2.0",
+        "tqdm": "4.70.1",
+        "emoji": "2.16.0",
+        "stop-words": "2025.11.4",
+        "h11": "0.16.0",
+        "PyYAML": "6.0.3",
+        "httpcore2": "2.16.0",
+        "fsspec": "2026.9.0",
+        "truststore": "0.10.5",
+        "cffi": "2.1.1",
+        "httpx2": "2.16.0",
+        "regex": "2026.11.7",
+        "flatbuffers": "25.12.19",
+        "anyio": "4.16.0",
+        "typing_extensions": "4.16.0",
+        "hf-xet": "1.8.0",
+        "huggingface_hub": "2.4.0",
+        "idna": "3.20"
+      }
+    },
+    "wheel_smoke_sha256": "634da78af84c41bbd8562c1cb9955c2f9e3e58ea58904d1498a71809e264fed2",
+    "scope": "Build uses sealed QA source before evidence-only publication overlay; this is not a release."
+  },
+  "verification": [
+    "full Ruff",
+    "pinned mypy2.4.1 across64sourcefiles",
+    "locked dependency validation and semantic all-extras pylock equality",
+    "strict MkDocs and seven humanHTML artifact checks",
+    "all17private prefixes compile/import/workflow/docs/API smoke; no future module/test references"
+  ],
+  "coverage_quarantine": {
+    "reason": "Earlier concurrent profiles shared default pytest-cov data and combination glob; raw pass counts retained, coverage not final proof",
+    "confirmed_contaminated_report": "newroot coverage-acceptance-integration314.json contains64package files, not6integration files",
+    "resolution": "Final core and native runs each have a unique absolute COVERAGE_FILE directory; final JSON scope verified"
+  },
+  "external_merge_gate": {
+    "required": "Pass checks on each actual final task PR head",
+    "asserted_by_this_local_record": false,
+    "merge_and_release_authorized": false
+  },
+  "limits": [
+    "CPU functionality is qualified; new GPU execution is not established.",
+    "Synthetic router exposure remains78/110heldout and3/6mixed for both policies; no production privacy or general speed claim.",
+    "Prepared provider caches/NLP/PSL assets were required; no default network-free guarantee.",
+    "Explicit caller cache fingerprints remain caller-owned behavior identities.",
+    "Warnings remain visible; scoped security review is not infrastructure certification."
+  ],
+  "previous_qualification": {
+    "file": "v090-pre-boundary-qualification.json",
+    "sha256": "6e8f450feed1d58967959825f2bf4c49dc820b6399de5408c1e10451cd33e538"
+  },
+  "test_only_followup": {
+    "file": "v090-boundary-test-qualification.json",
+    "sha256": "e7564d7925385fe7f257d7440b0cbadd3397971fbd3f7879fd8cc792e9cbb441",
+    "runtime_source_changed": false
+  }
+}

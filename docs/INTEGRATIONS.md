@@ -26,6 +26,12 @@ Columns you do not list are left as they are. If they can hold personal data, cl
 
 Document adapters (DataTrove, LangChain, Haystack) also write `metadata["sct"]`: the public signals (language, PII counts and types, warnings, model provenance) merged over all listed columns, so PII in any of them counts. Values only, never entity text.
 
+Unified configurations forward explicit `schema`, `context` and trusted `registry_factory` options through the worker-owned cleaner.
+Use a top-level application factory; workers rebuild the registry after process changes.
+Do not pass live model sessions, token stores or key material through worker configuration.
+Unified adapter summaries use version 2 counts and source-coverage bounds, without matched text or caller field paths.
+Uncertain source coverage remains unset in `pii_chars` and `pii_share`.
+
 ## Hugging Face datasets
 
 ```python
@@ -164,8 +170,17 @@ Pre-cache the pinned artifacts outside the recipe, then start Python with `HF_HU
 The recipe checks the imported Hub runtime flag and never changes global download settings.
 Missing cached artifacts fail privately. Cached model execution needs separate provider qualification.
 Active `presidio_gliner` is unsupported here because its default NLP engine can load separate unpinned models.
+GLiNER v1 recipes require cached, pinned snapshots with embedded `encoder_config`, `tokenizer_config.json`, and `tokenizer.json`.
+Snapshots that load external or auxiliary parent models are unsupported in this recipe; direct detector use remains available.
+Validation reads cached metadata before creating output. Prepare the complete snapshot before starting an offline recipe.
 This restriction does not change the legacy adapter. Trusted external registries remain application-owned.
 Their registry and quality identities must describe immutable artifacts and all behavior-changing configuration.
+
+The installed Presidio 2.2.362 source accepts model kwargs, so its SDK can receive a revision.
+SCT's current legacy initializer does not forward `gliner_revision` to that recognizer.
+It constructs the default analyzer, which can also load or download spaCy's `en_core_web_lg` model and activate other recognizers.
+The recorded source audit does not qualify actual Presidio model inference.
+Keep this route outside reproducible native corpus recipes until all active model routes have explicit provenance.
 
 
 ### Resume private corpus runs and check caller references
@@ -227,6 +242,35 @@ The manifest names and checksums the actual outputs.
 Canonical hashed reference contents, tokenizer identity and configuration are part of the resume identity.
 
 No reference corpus or keyword exclusion list ships with SCT.
+
+## Combining capabilities and rolling back
+
+Extract a document once, then use its canonical text for direct context-aware processing or clean its elements with `clean_document`.
+The direct API accepts `DetectionContext` and an encrypted token store in reversible mode.
+`clean_document` accepts neither caller context nor a field schema; use direct text processing when those are required.
+Layout projection requires unified processing and proven source associations.
+
+Choose non-reversible output before JSON, DataFrame, RAG, framework, streaming or document adapters.
+Corpus selection then works on an explicit text basis. Retain original inputs separately when reprocessing may be needed.
+Close `select_records` reports to remove owned temporary text and shingles.
+Use `curate_resumable` for native checkpoints; completion requires validated output checksums.
+
+| Combination | Required action |
+|---|---|
+| Legacy processing with context or schemas | Opt into unified processing or remove the new arguments |
+| Legacy `PrivacyPolicy` with unified processing | Use the separate `UnifiedPrivacyPolicy` interface |
+| Reversible or indexed document output | Use placeholder/synthetic mode, or the direct text API for maps |
+| Unified windowed streaming or browser manifest | Use the supported legacy profile, or whole-document processing |
+| Opaque callback with strict source mapping or document projection | Remove the callback or use ordinary text output with explicit uncertainty |
+| Network-declared detector with default unified permission | Prepare trusted artifacts and explicitly enable `allow_network_detectors` |
+| Native corpus with active `presidio_gliner` | Choose a qualified pinned backend; the legacy route remains unqualified here |
+| Corpus removal without a declared basis | Choose `pre_pii` or `pii_normalized`, or retain report mode |
+| Changed input, config, policy or model during resume | Start a new run directory; never reuse mismatched checkpoints |
+| Experimental cascade without usable calibration or complete fast coverage | Full-stage execution remains required |
+
+Use the rollback settings in [configuration](CONFIG.md#unified-processing-and-migration).
+Returning to a legacy config does not delete private run state, restore removed values or revoke issued token references.
+Manage those lifecycle actions through the application and token-store APIs.
 The small checked fixture contains one positive, two unrelated or near-miss negatives,
 and one short input. It is a regression check, not a population accuracy estimate.
 Protect run directories, reference databases, IDs and hashes as private identifying state.

@@ -1,0 +1,382 @@
+{
+  "schema_version": 1,
+  "scope": "Pre-publication decomposition of the first fourteen reviewed tasks; rebuilt P0/C1/S1 foundation qualification only, not final R1 acceptance or hosted CI",
+  "baseline": "8afef61c74ea738a2c904374776dea34d9c1c39e",
+  "reviewed_implementation_head": "2fa2240f56e5d3b3a1b163603764361180d1165b",
+  "foundation_tree": "6cca5b188e3be81f56a2ae8b0f793d422b7c330c",
+  "stage_order": [
+    "P0",
+    "C1",
+    "S1",
+    "C2",
+    "C3",
+    "C4",
+    "C5",
+    "D1",
+    "D2",
+    "D3",
+    "S2",
+    "E1",
+    "E2",
+    "L1"
+  ],
+  "prefix_decomposition": {
+    "refs_changed": false,
+    "checkout_unchanged": true,
+    "real_index_unchanged": true,
+    "final_tree_difference_paths": [
+      ".superpowers/sdd/2026-11-07-sct-improvements/C2-report.md",
+      ".superpowers/sdd/2026-11-07-sct-improvements/C3-report.md",
+      "docs/human-html/2026-11-07-plan-sct-improvements-roadmap.html",
+      "evaluation/improvements/PROGRESS.md",
+      "evaluation/improvements/acceptance-ledger.json"
+    ],
+    "intentionally_excluded_scratch": [
+      ".superpowers/sdd/2026-11-07-sct-improvements/C2-report.md",
+      ".superpowers/sdd/2026-11-07-sct-improvements/C3-report.md"
+    ],
+    "scope_verification": [
+      {
+        "task": "P0",
+        "tree": "697b2c427409ca19229ad46148e2d20959454b81",
+        "original_accepted_reference": "56d9e4f9cc052bdfdd56031c0ae2aaddfdcf4897",
+        "code_test_dependency_ci_difference_paths": [
+          "sct/coordinates.py",
+          "sct/findings.py",
+          "sct/token_stores/__init__.py",
+          "sct/token_stores/sqlite.py",
+          "tests/test_coordinates.py",
+          "tests/test_detections.py",
+          "tests/test_sqlite_token_store.py"
+        ]
+      },
+      {
+        "task": "C1",
+        "tree": "31f09a71a65104537d070d7ae52ca86aba2c690b",
+        "original_accepted_reference": "29f9b275b91f68f49fdaf344c527c4d094482706",
+        "code_test_dependency_ci_difference_paths": [
+          ".github/workflows/optional-backends.yml",
+          "pylock.toml",
+          "pyproject.toml",
+          "sct/token_stores/__init__.py",
+          "sct/token_stores/sqlite.py",
+          "tests/test_baseline_measurement.py",
+          "tests/test_optional_profiles.py",
+          "tests/test_processing_compatibility.py",
+          "tests/test_sqlite_token_store.py",
+          "uv.lock"
+        ]
+      },
+      {
+        "task": "S1",
+        "tree": "6cca5b188e3be81f56a2ae8b0f793d422b7c330c",
+        "original_accepted_reference": "b276fa09d3294d6de71017b9e52f1c2d92694fba",
+        "code_test_dependency_ci_difference_paths": [
+          ".github/workflows/optional-backends.yml",
+          "pylock.toml",
+          "pyproject.toml",
+          "sct/coordinates.py",
+          "tests/fixtures/processing_compatibility.json",
+          "tests/test_baseline_measurement.py",
+          "tests/test_optional_profiles.py",
+          "tests/test_processing_compatibility.py",
+          "uv.lock"
+        ]
+      },
+      {
+        "task": "C2",
+        "tree": "05968c3e52e8a453d6ba8243083b8125d37b8e30",
+        "original_accepted_reference": "0dec767934f17d39072f6b34bfc1b5dc0643f174",
+        "code_test_dependency_ci_difference_paths": []
+      },
+      {
+        "task": "C3",
+        "tree": "1c4de10ce6edcd7bb5eb501448e6d4e5f462b9e8",
+        "original_accepted_reference": "08e1ae3ff368515f08f9f2f34e45c9f761db7da1",
+        "code_test_dependency_ci_difference_paths": []
+      },
+      {
+        "task": "C4",
+        "tree": "699d30a7a8c47d06076a6458e2e464027b661cb6",
+        "original_accepted_reference": "bc4efd8d1e2cee95c442232213e52236eaf17d1c",
+        "code_test_dependency_ci_difference_paths": []
+      },
+      {
+        "task": "C5",
+        "tree": "ac440f5c3121f2e598c037d37bcec111e785f4fe",
+        "original_accepted_reference": "2c7b7add4106cb90b2e3a9b8acc40d04ee6df476",
+        "code_test_dependency_ci_difference_paths": []
+      },
+      {
+        "task": "D1",
+        "tree": "a5404f5809075abc67159613e3763972f1d9e8b0",
+        "original_accepted_reference": "fd3880efec45bbe17efac6683f94a30f99b14c7c",
+        "code_test_dependency_ci_difference_paths": []
+      },
+      {
+        "task": "D2",
+        "tree": "a947375b536d6a7e2d97e8109cc8f7f1f37bfe7e",
+        "original_accepted_reference": "a68949582e01bca86869bdeea89b990e1fa4df8e",
+        "code_test_dependency_ci_difference_paths": []
+      },
+      {
+        "task": "D3",
+        "tree": "4ee19cc4346aea7d18fe14456545d1c19ec31699",
+        "original_accepted_reference": "4ddb77a5ad4134fe44b81317bd76d659d9a98cae",
+        "code_test_dependency_ci_difference_paths": []
+      },
+      {
+        "task": "S2",
+        "tree": "0adae4ff26170f1c27634c87f44340a5b86bdd51",
+        "original_accepted_reference": "7cecd6669cc2b54b23ecf9dbddd6ece92e426e93",
+        "code_test_dependency_ci_difference_paths": []
+      },
+      {
+        "task": "E1",
+        "tree": "32578de2aad36d1b4046904faf4a7edcefc573d6",
+        "original_accepted_reference": "76f43a0c4bc7de03e8f6687633d48474cdcb4edc",
+        "code_test_dependency_ci_difference_paths": []
+      },
+      {
+        "task": "E2",
+        "tree": "70467ba682f8af12f2fafee494a3e3f22a64c35c",
+        "original_accepted_reference": "bfc639566d067189a263c8e39487412b855fbec2",
+        "code_test_dependency_ci_difference_paths": []
+      },
+      {
+        "task": "L1",
+        "tree": "cc40dd1cca5fd078e50f2a053d3cd3533a3c89b6",
+        "original_accepted_reference": "dab6d4cd07aab473ed6a4f510f7e9be8d1227b09",
+        "code_test_dependency_ci_difference_paths": []
+      }
+    ],
+    "meaning": "C2 through L1 code/test/dependency/CI bytes match each original accepted task commit. The first three stages split earlier mixed commits; their changed composition is qualified separately here."
+  },
+  "isolated_local_runs": [
+    {
+      "stage": "P0",
+      "root": "/private/tmp/sct-packaged-p0-qhmdxtyf",
+      "passed": 7,
+      "skipped": 1,
+      "duration_seconds": 2.83,
+      "log_sha256": "746f175018bcebcb20ee3aa19631da2d6f733b9f8b489dd5ef33637bf52a010b"
+    },
+    {
+      "stage": "S1 cumulative P0/C1/S1",
+      "root": "/private/tmp/sct-packaged-s1-sdh55u_a",
+      "passed": 55,
+      "skipped": 1,
+      "duration_seconds": 4.02,
+      "log_sha256": "f8d53fabf8b1b43727e221057ed99230a82fa9bd7cb36f7ca09cdb5b774c3195"
+    }
+  ],
+  "remote_full": {
+    "root": "/home/rehan/sct-improvements-stack-foundation-20261107",
+    "creation": "Directory absence checked before creation; existing jobs and environments untouched",
+    "cpu_affinity": [
+      4,
+      5
+    ],
+    "command": "taskset -c 4-5 env HF_HUB_OFFLINE=1 OMP_NUM_THREADS=2 OPENBLAS_NUM_THREADS=2 PYTEST_XDIST_AUTO_NUM_WORKERS=4 .venv/bin/python -m pytest tests/ --cov=sct --cov-fail-under=85 -q",
+    "actual_tool_session": 13560,
+    "observed_exit_code": 0,
+    "passed": 2734,
+    "skipped": 64,
+    "failed": 0,
+    "warnings": 13,
+    "duration_seconds": 298.96,
+    "coverage": {
+      "covered": 4594,
+      "statements": 4985,
+      "exact_percent": 92.15646940822467,
+      "minimum": 85,
+      "margin_above_minimum_percentage_points": 7.156469408224666
+    },
+    "warning_scope": {
+      "multithreaded_fork_deprecations": 2,
+      "legacy_ner_models_list_deprecation": 1,
+      "historical_unclosed_sqlite_test_connections": 10,
+      "note": "This S1 prefix precedes S2 test connection fixes. The final reviewed S2/L1 source has no SQLite ResourceWarnings. No warnings suppressed."
+    },
+    "runtime": {
+      "python": "3.14.4 (main, Apr  7 2026, 20:47:53) [Clang 22.1.1 ]",
+      "executable": "/home/rehan/sct-improvements-stack-foundation-20261107/.venv/bin/python",
+      "prefix": "/home/rehan/sct-improvements-stack-foundation-20261107/.venv",
+      "sct_file": "/home/rehan/sct-improvements-stack-foundation-20261107/sct/__init__.py",
+      "archive_sha256": "22cf864d3e65561ee688e80ad615cb908e2ed26b0e85a55dd5ba8b1ca4f7ca2f",
+      "modules": {
+        "lingua": {
+          "version": "2.2.0",
+          "file": "/home/rehan/sct-improvements-stack-foundation-20261107/.venv/lib/python3.14/site-packages/lingua/__init__.py",
+          "sha256": "d6341b4300102cc3c0ed8fffb2a768d7921ca2ca5177cefc023654b9493bf4e1"
+        },
+        "onnxruntime": {
+          "version": "1.30.0",
+          "file": "/home/rehan/sct-improvements-stack-foundation-20261107/.venv/lib/python3.14/site-packages/onnxruntime/__init__.py",
+          "sha256": "c238c7f2c3660ad216cfe3f794f65adf81a08c99be0f7c8d854f1e4cab076d07"
+        },
+        "cryptography": {
+          "version": "48.0.1",
+          "file": "/home/rehan/sct-improvements-stack-foundation-20261107/.venv/lib/python3.14/site-packages/cryptography/__init__.py",
+          "sha256": "9ad86e52b4dde0544e0a9518ad322a863cfab3a4fd763019ad5ee7675a0c9b6a"
+        }
+      },
+      "source_sha256": {
+        "sct/__init__.py": "29b6f1a117fa3498f1719e2a77a2e288c966eafd4aa6daa95302d8ecfca93ca4",
+        "sct/adapters.py": "7264d8146b65c142e7edcc95f1282c393b9eb7526e81567089c53ecf03c912a3",
+        "sct/browser.py": "3e914903672c6d302b3b696d384aa1b203fe850273c463a0758e2fd394ddc0a3",
+        "sct/cli.py": "64f8a50fe44a8b4699c314b942fe4d4a2186f409ca77b9ebf045c9342a912cfe",
+        "sct/config.py": "d51b769eb02e454040139c4f2b857b5304ddfee5583e35ba5ea2a37a754612fd",
+        "sct/coordinates.py": "3ebe1b239904564743e227a267ff7b551556beefbd5b4d487447c1781116cdcf",
+        "sct/evaluation.py": "0744ddaccf6a6f9f26c1b05ac14165d0e140d0dd2cc386d5b8cce914a7f02e27",
+        "sct/findings.py": "c5298b9205f66c63d361096f73189646ecb70e47a5245ec9589493f430a209d2",
+        "sct/integrations/__init__.py": "86572a797863d690fc17eacfeb6baab82b5c2146606d20cc9852abb9fd59e851",
+        "sct/integrations/_runtime.py": "d781f564c6ffec9dc1861b3d35a62c52153c85555a55c83bbb542c74ee1969ba",
+        "sct/integrations/datatrove.py": "0e852cd46df5972142eab3ce94c6d140605522393ba0746905c86b06be62d61a",
+        "sct/integrations/haystack.py": "152b4e5c9d505d9dfe01d0dcfa6bcfebbf728a8ef6c25bf41a9e7745e6126127",
+        "sct/integrations/hf.py": "4345597a75ae5c4429ed0c1d349bbd9c56abefd34fa21f4986c8e4a0d2c8c57b",
+        "sct/integrations/langchain.py": "3ce63eba39ae4e2698871bf320c5c4e4e0e54cfba4f0aba4d0c97fc38875b08c",
+        "sct/mcp_server.py": "f679404e494602cca069708f8fe5eb756d1314559d3c0b4a3f49004ea2991ae0",
+        "sct/model_benchmark.py": "14c667e194880b7a60e95704605e07cfe4244224aa53724f196fbe2a4cffc3d1",
+        "sct/model_candidates.py": "e800be7bed0b7b256bd4d880f1b3d8027b7e8e92215386778971348cc7adee46",
+        "sct/ocr.py": "1ccb8453e01bf6a0946455b7db2503f966a7a0b602c883b1833f5f745071c6cc",
+        "sct/presets.py": "be2446dafbfc8705e05fdea1663de99f6187cca1dfb600f56b8491808aa1db1a",
+        "sct/privacy.py": "b0b7c78d52e5746b841a5f87255180094fab2d08634e0f8bb724ba52e6853d5a",
+        "sct/report_cli.py": "c95d9c4ef190d377b5f2cf80f9848d9177c5cf0135fca291890b49cfdd076320",
+        "sct/risk.py": "55ed1510197fe3361b127fef3c16ac8a7f2d8a0a393668ccce7507a326783bb9",
+        "sct/score.py": "85a80532c78ebae42a14d0a9de5826e39541a432bd94ce929934ac6e88462967",
+        "sct/sct.py": "17df2677952da2512a6d972fe5ade6f6bf2e8fb9a1fac61e448d8a183723839b",
+        "sct/signals.py": "b8bfb64a5abe37a44582447cba2853931672c559d071dd27161ba7976108f6a2",
+        "sct/streaming.py": "a2d72aae93760945bebd6d2334f3cedac55f89cdb4a3e0bb3e7093f2285641db",
+        "sct/token_stores/__init__.py": "4f8caf8bd1fc12c5ee812a62b0e1e6d35e2d88df613105436fc3ea8c3e86946c",
+        "sct/token_stores/sqlite.py": "bdaedeecfccbc4ef628a93e00ff5ae0dda6f17207dc84628512e00735be7118b",
+        "sct/utils/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "sct/utils/anonymization_map.py": "2925f2580dd2666c0a5a71348a0539a1cf84ae305de28f0223a0ffe275803b04",
+        "sct/utils/atomic_file.py": "99f67a1ffb1db33eb229d0d7ac178dff4b669666ad42433888fa007890085d5a",
+        "sct/utils/constants.py": "20966a48e158141a055ab3127c0b99954580a0bd784428fc6be4145ae773dd6a",
+        "sct/utils/contact.py": "627e5ffd3e2a1212f73094b28d9ddf9ca72432225363eff47889e60b998ef2ba",
+        "sct/utils/datetime.py": "c00d683173ddb905fc9459c24fda302aba552763b484d9cb4629840557bd7321",
+        "sct/utils/gliclass_adapter.py": "d9f054dc7a1831634cbeb1510f18ccfbc80cb7d2595319d492a820a63b1ba8be",
+        "sct/utils/gliner_adapter.py": "8a645bb391dd0139a4b3e83c0341e4c39084d7f0477a8d1bf24e6130d346fecd",
+        "sct/utils/ner.py": "4779b02d069edbbc5d1d381f63d6c601d5338668a8f6ba4cbaed7de461b206ec",
+        "sct/utils/ner_chunking.py": "97c84fa4f20c8fdd4e87a19d779e83bfa6d2f18e22498917fa4575eb8cc21870",
+        "sct/utils/ner_spans.py": "42c91f48aac080e798b242ebc31f7bf3cc79a27262c7125afeab0ea9ba623929",
+        "sct/utils/normtext.py": "538569ee5a14d411c99a63808c0bc144959711d770372128f95d70c1771e63c2",
+        "sct/utils/onnx_pipeline.py": "8214e7ebd532890541d63346986d4557c38b0176bae60b4708b3645b4db71d60",
+        "sct/utils/process_result.py": "99576ff99de2895a1e57414e0b5da771618ced3794d5c7523684f2dfc37a8d93",
+        "sct/utils/resources.py": "18058b215ffdd9d390966ff7485447f03fe8d54968821b4d7902342ee804ed13",
+        "sct/utils/special.py": "817db7f6ffcf509a73b7b411c1ff800cd7aeedc2184f5d253cbb8432317c08ec",
+        "sct/utils/stopwords.py": "e36784c680695cf4dd1f00a33a379e525d98bae964c39d525e2837792bf9996c",
+        "sct/utils/synthetic.py": "1f3a659abc9d3e1e79d606904e7b58cacde7fedf8229a5fad1072f3403fb4775",
+        "sct/utils/torch_pipeline.py": "b70053c797d8d694dd9f497491e88fe342abdb687fa2e35668d7091a347f34c7",
+        "tests/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "tests/conftest.py": "206464d3e36eb38cbe758bcd09470e21b1aae9f3d031fafd0af8b91555c0f005",
+        "tests/helpers.py": "bfffe247daad491dd8859d1c717cdf2c2adfa97a86616306f2942b21d038ad20",
+        "tests/test_adapters.py": "f7907f456ddf4ed1bef5e2ab9084ba9b1fd0886ca9352ba88f2a76e8c5bc4952",
+        "tests/test_address_leftovers.py": "c3657332dec9124324f772bfd73b848cdd80e8df446586a5c4508126535bc49f",
+        "tests/test_atomic_file.py": "f0a36800df415132129599288d9aece62bdb7d9f6f552042dd39eb3b94cfb7f7",
+        "tests/test_baseline_measurement.py": "c3c4c65207dffbedbb2ca86d15fa5860c80ee0e4c54ceea5aa01125eee3129d7",
+        "tests/test_batching.py": "df1cf97cef3566a56529c883f9642ee7f0f805edeb9169cb3b99afb7623f5496",
+        "tests/test_benchmark_adapters.py": "81cef4dd2fddf25daf08c9fecf3f54a61717414d5687b6058ff3003b124a5545",
+        "tests/test_benchmark_loaders.py": "f9f725063ae453b4b2a3dfa5ba7d8dafc6bebaddbd6301e7be161371a86ed586",
+        "tests/test_benchmark_release.py": "eace6fe6026d71388c2764c8b862e77734c5f3eb111ac1b11a03c9b7599c9137",
+        "tests/test_benchmarks_compare.py": "7fbaa451a7d1f63aee4148b7eca8c62badcda68a6d7ff6ca32a0073d944a091f",
+        "tests/test_benchmarks_round2.py": "e749c2365c82156a084de5a4f5956ac5eaa9d557a00571fc4e3143990cc43b44",
+        "tests/test_benchmarks_round2_tools.py": "f92fa6150953747f8e439d855f5251a03290577146d58fca9ab96a9b7f7b45dc",
+        "tests/test_benchmarks_score.py": "649a41626d6bd038f6e6ad7be6d913fee294c6cd22dd9c38c5de8f2f43ec5608",
+        "tests/test_browser.py": "75be7e60367b23e16d9f2a53494e2875cb0025d5e0e0a629c7c5e1bbdc43a884",
+        "tests/test_chunking.py": "44a1a28502a62e5022f2ecbcb6c177efbdd14b7720435ea118c61f499d093e10",
+        "tests/test_cjk_width.py": "6f1d28470588dbc09d9d22e68058e5ec6247181ef9f6b84a639431556953037d",
+        "tests/test_cleaner_lifecycle.py": "5a23af09b9fa3acf8a62da4ac86c568700647fada32cee47237fb7d4b280e7b7",
+        "tests/test_cli.py": "e2b24c6f93f0ec9ee418fe5c77a5abb2d1173437345a360d05271705e5ced70f",
+        "tests/test_config_state.py": "75d282bbfe92d59dbc3c87ce2ebbff90712d7ea252f1c0eed83e7659fa9ffb21",
+        "tests/test_contracts.py": "7441574fec65caa839cb6e67ddda8904f493cd0cc9da1bcd0b2f94f7e86ae949",
+        "tests/test_coordinates.py": "84db0831b35d248623dada18ea00627543d29b286b5a6c40f224dc98cc7b0712",
+        "tests/test_date_forms.py": "cc0bb130f703edccab937c01c282838ca8f197f9dd6fd68f542eba08b45cc8cd",
+        "tests/test_dates_cjk_styled.py": "82b3b3262af4a9d1cf127786919bcfd606f79990cdf4e6f403bc28ae26127f19",
+        "tests/test_dates_default.py": "1c3c27d3e88941067ca6744aca5366000bc924a6c27515bf0bab9aaeb489c22d",
+        "tests/test_detections.py": "a6b41971e23ba7a8749530090e3bceda081d9acd4729d6e62368f3034ea3c6e5",
+        "tests/test_device_provenance.py": "2d8f076f3d714ab5204dc653c8c14c1ef26c20f779a1450ec6579cf6ab291193",
+        "tests/test_email_forms.py": "936e64b768def77d5a35e174f60a32954773da42ada5772c5732e7ebae1e0924",
+        "tests/test_escaped_markup.py": "c0762997e3568603be92f799c6a40eaea852a65d00dd6975d2e4570a0da48de6",
+        "tests/test_evaluation.py": "07cbe6d913ba09dbfb318474df3ce92e26924b7a4030e504404efcc656e8c63b",
+        "tests/test_fork_safety.py": "6e64ddd81713debb52f14f29b16600a701769ca0c9e519ee1c5f5ac538f95d18",
+        "tests/test_functional.py": "2fa398007209d5a1ae7db8c8c0a54e39c3ebb2a7f6e022ca326355893b460a22",
+        "tests/test_fuzz_styled_pii.py": "b406346c99c2b09a33a271b0f60fef03db08e910e0453d6777064b14520447aa",
+        "tests/test_integrations_frameworks.py": "058dae396f6dad333ea8581a37112a4a776c9caa29ca4fd6e5688542d694a6d0",
+        "tests/test_integrations_hf.py": "36da835a70949768d461483792adfac72707e37473824ec704c1ba76ba14ae31",
+        "tests/test_integrations_runtime.py": "5b560ea7bb057a69a869def915c2b00af67e585f67fb8b64543a85a0dcd294c8",
+        "tests/test_keep_scripts.py": "27f9942d06eadb63fe774567cd34b691c00f6c1dfee2d55e5cef5fb93e60dd54",
+        "tests/test_language_all.py": "4592d2980dda2f106109d351098fac0f96a1dbcb0225f7c57a06ea71c5d896d7",
+        "tests/test_linux_workers.py": "0833cec02b2fed8f8b2ac735ad183fc963d178feb11cd864862b27bc038f8478",
+        "tests/test_mcp_path.py": "e5c2ce552868fa22554e6081c709eb6d02b4ba8f211adf63be5c2e3f4701a8e9",
+        "tests/test_mcp_server.py": "6166f1aa2a0c3dc7c7145bb6b9e4d05cf4afbd69a64d95408833bab41cd88399",
+        "tests/test_model_benchmarks.py": "ece8fbf234556deaa1f89bef02dea6aa8744ff2a0e3e72e52261668d7a8bb45d",
+        "tests/test_multilingual_eval_set.py": "1348b1accd92b7675949f300d52b1b47ca9f0bca41f27ea48f412e4fc7dd284b",
+        "tests/test_ner_sees_tags.py": "e2593776466dc57a0b0487928663cbddd7ad3dacfb0647eeef7028add3684836",
+        "tests/test_ner_span_repair.py": "c758d6dc5b52786bca769fdc33df153d74ef968530db61391e7f6a41570ec6ee",
+        "tests/test_ner_spans.py": "f0f4f56f9950b6ae16b4cda41c7736885355ffd3b020a2a585cfc45bdbd2789f",
+        "tests/test_ner_windows.py": "380eaf8dd17c5920941fd502ab29467aa01f0eb001d7cefb4b760fe31e445baa",
+        "tests/test_number_identifiers.py": "8e2969304e1f5b0f3bd26d7f2b570a2bdd9600ac97359a397c545bb2d0994c6d",
+        "tests/test_ocr.py": "4e9fc96637f5830c1efbb501d0deea09167fb5cbb571f0bbdce85fdbbd858e1b",
+        "tests/test_onnx_concurrency.py": "dc47ec134dc1370657320a2ee2632812bff525b605ea4c4b1b54a5bf4a6485e9",
+        "tests/test_onnx_external_data.py": "9f686e31bd4dd4664092d2c7c7b3e523288855b5f4f77ff0a38c523cecccdd6b",
+        "tests/test_onnx_model_cache.py": "9cd74f6a6aa77dea1d501772f51ebd929cae96416a6b2cc8bcd5dedb8fc65d73",
+        "tests/test_optional_profiles.py": "b440034b59376b758cbba17723136100186adfa4cfe0940f32ffcef8a848a44e",
+        "tests/test_phone_forms.py": "3bbbd7f5e48c566261aab3ec697a3ec2674aee784ab527d9086d874151847786",
+        "tests/test_pipeline_text_steps.py": "0d4fc0d2924de929be92db0301307c6ede7f85ae035ee82c378ba693de60328b",
+        "tests/test_predicted_spans_monotone.py": "6f76c9ff4445c98584a03908c2c2c82c8b1ec63c0b7764fb37399e8917af3103",
+        "tests/test_presidio_tags_and_fakes.py": "dc8367c9817bd5bae585e9392863d6a95c4c72d7b26a2fd4ecac9007d9527cb0",
+        "tests/test_presidio_type_names.py": "d40e2f63418d92c845b4dfa1ad80f02b9196fcc1e0463764584c79f488cd6a18",
+        "tests/test_privacy.py": "7384c7387c1e11f6794ea2391ea3a399e304e3a321b60293ea9054760be4736e",
+        "tests/test_processing_compatibility.py": "65e16bc8fbb55345989b3ef98f041e46db46d63e7c32830e5bde6106fa8d6e81",
+        "tests/test_prose_punctuation_kept.py": "9e592aa1c3ea5ea0a73ac6e8197cbe22dd9294423554fcd9119f239284b83281",
+        "tests/test_public_view.py": "1553e3c9686e589d5ba62dcd7c38fff1b2c91c8225556227ad4778b38c3a1114",
+        "tests/test_regex_boundaries.py": "2367fea2d765fd02381111292a6672467c52fb93615c9e1790dd6ff666048754",
+        "tests/test_regex_counts.py": "51836b05956630c60ba89a51efa59d9a35dbcac2005cad0b60fdbc849c868022",
+        "tests/test_repo_scripts.py": "2f2889e213b3bb112bcf64072650b3d509f37f7081d1878655dc0d90015a7ba2",
+        "tests/test_report_cli.py": "f621f3369c3447156807a8dcbf63551193f773935c453fa8f392fa64c4f10500",
+        "tests/test_reversible_markers.py": "7cd4f645b203d7ab01cc36a2f25ab7ec316ef55697b5ce24bcd8e5e18dd2be22",
+        "tests/test_risk.py": "8aee6655bf03773cfc62afde27f8480e99127fe6404a37e438f2bc0f1acb7c49",
+        "tests/test_score.py": "4888ccf5ebf8b1b0f4fae283d2bb0e733b6c4d4932a0691fc19d308a8181f54b",
+        "tests/test_sct.py": "bb5d1af3ec0f9ed539741c569cf2cc8ffa8b51c18567bf84ad29ecce87d67570",
+        "tests/test_security_leftovers.py": "6c6d4d531ad345090805ba2f7c89191634de1abe942e208cf48bf15f30bc2b5e",
+        "tests/test_sqlite_token_store.py": "73647901f70d5e045a94623f4167e016509ff23f0792311e65dcb0837c152298",
+        "tests/test_stream_guard_shared_view.py": "5a097043041dc7a4277085693a47eba39ec7de57892b5665ad3a6afc1e15a418",
+        "tests/test_stream_keeps_values_whole.py": "ba2ae17a5338c1a0ad86946da82b6a417eddf29fb3379aaa9484641f542b67b5",
+        "tests/test_streaming.py": "5bd0b5363e87d90ff898b7295c3d17da4ef40bd7f2097b8da87505ed5fe4e39f",
+        "tests/test_streaming_split_stability.py": "378c3ae2e674c31c9c9acc5087d89b2d8b3a1385de395db98f8fa874cda91fbe",
+        "tests/test_styled_pii.py": "8b495c6d23b897e61912284850f6d80572e8186dda0ffe866384737a7fe2de49",
+        "tests/test_surface_contracts.py": "237d803e1a8c24542d6b221c4c4798037a874b459b6119ca37d5f6883b8aee53",
+        "tests/test_synthetic_determinism.py": "5f1da516b907d6b31bc0cedb54e2c6d7a3a07f4856970878a712fd5aee2d9850",
+        "tests/test_synthetic_per_document.py": "8ec2c72b0e80095115423f6b638c97c901dae676588ebc6b1c02cedda6e9ab8e",
+        "tests/test_torch_ner_backend.py": "97e842d51996d56b9694570c54edd4d496685d2420a1c648f748a2a0095a814d",
+        "tests/test_training_preset.py": "048b5cea8f8fe530957bf5f698ef1c926570d1fd459650accc96328f6efb93b7",
+        "tests/test_type_names.py": "865c6db67a0759a696efc779c120ec32216ba83782b033cb433e6a015f96f17e",
+        "tests/test_url_forms.py": "85851d9b395d6056c8c71d11b5281e3e8ac92cd9b834b1bcd73ec8bac9ffe749",
+        "tests/test_user_terms.py": "82cd1d5f7d8c04e6cb4707988ecded6b25c8485ffff44756deba7d847bb94952",
+        "scripts/benchmark_models.py": "72a89b20ab7bd9188650467b69f39b724638bd9294990779268a50b9728dfc6b",
+        "scripts/benchmark_release.py": "439400e66f991cfa84cd200d54bd1cf838788efc0c8e73796585b0d3b7593a19",
+        "scripts/build_multilingual_eval.py": "4cf869ecbdcdea14b5b5b515a676dc3a537de11cfb8726b076ced57529d961ef",
+        "scripts/diagrams/draw_diagrams.py": "e7679a68525e07ceb5cf7e8000849edc311245c3ca2b6070703a7e010633cbbd",
+        "scripts/evaluate_pii.py": "7f6f59fcd2c554321d30d5f5c2685e3eb43bd1fe34c92972b8505d826dc07a83",
+        "scripts/export_onnx_models.py": "c8ddca43c242156b7e32c63b988ffec4cb229ab289688dd390b9994ed35ae2b9",
+        "scripts/export_quality_head.py": "78f1e3d0cdf045c8216ac62370860763e30542e7e174fa74d4be6807db40a7c6",
+        "scripts/fuzz_styled_pii.py": "f77c13da1c83ca5044cd2eee6fc042b1c9e883010639dc5a804a80fed4f018d3",
+        "scripts/run_multilingual_eval.py": "85d3f5e0e920e5e0d5122d6d2f766cb1f9968e86ef9bad367641444b89bee969"
+      }
+    },
+    "source_verification": "All 142 source/test/script hashes match archived Git tree and post-run files. Runtime provenance was captured during the run; extracted immutable archive identifies the initial source.",
+    "artifact_sha256": {
+      "full.log": "1c3cf025fb30ca09300bf0f3a85fb187e56433fa887af1eab2757f68f201f3a4",
+      "runtime-before.json": "5f69c7cc85ef620a6205a42e272e3ee40ed3d67ddbe971f1401370b88c908b77",
+      "setup.log": "a99ed8effa09bee4b4d58fe812ddb2c067047abdc235eadb2a336a04cf825807",
+      "source-after.json": "3c2015c8bfe71a861989eb114805e15d1e30d82c4dac826e43290fdb59172dee"
+    }
+  },
+  "limits": [
+    "No commits, branch refs, PRs, pushes or releases were created by decomposition.",
+    "Final seventeen-task reconstruction, inherited stacked-base CI triggers, actual PR-head checks and R1 integrated acceptance remain pending.",
+    "The rebuilt foundation is an older, smaller source profile; its test counts, warning count and coverage are not directly compared with the current L2 profile."
+  ]
+}

@@ -1,0 +1,1459 @@
+{
+  "schema_version": 1,
+  "base_commit": "882342fd08c03718d21d22278814cfbfe4b883f3",
+  "scope": "Prepared CPU provider functionality, trained export parity and recipe provenance guard; not accuracy or release acceptance",
+  "current_source_sha256": {
+    "scripts/export_quality_head.py": "076e1391a7b70cfc1664db8e6681e46aa19af28967c6b99d4195fd0972497927",
+    "scripts/qualify_native_providers.py": "501bde693af9082bc51bca55df140a2a6c6e82bbeccf8bab128f558ec757e918",
+    "sct/utils/gliner_adapter.py": "99c366d8859637df255d237f9516f2e666b74b5eecfe2f12cb843d39c436c972",
+    "sct/corpus/datatrove.py": "901f069dd09ea1a9aee082b1fcfc6f4016eff720e68b7879942a9ef6cecf9eda",
+    "tests/test_gliner_revision.py": "338f561fa2d3ffbd41415cc2f93f15fb597942d0c23665c024f8daeae495da44",
+    "tests/test_gliner_recipe_identity.py": "fb6edc4dbaffdeef67c0e079a8100af5efa4b9d87ec494bfdbe0e0f5bced88b0",
+    "docs/INTEGRATIONS.md": "9dd624a32aac006d0f3b359c837201431877b3a2a0dfb64ed4c11363b887bcd2",
+    "sct/corpus/manifest.py": "de9c291a63960d4a1ae4c8a9aa8d318ceb1d643e468295bcc166fac56e6cd577",
+    "tests/test_quality_export.py": "258a96721e74c5dbcb2a1f065f027b5afb8d7c567be6636c2cf88e6c1dbf43fb"
+  },
+  "evidence_record_sha256": {
+    "R1-v090-model-matrix.json": "fecd516bb9f6d51c9864c7041f9e056a7e6d63d2c04c1e75cb3da0b8fb08c128",
+    "R1-v090-core-guard-freeze.json": "dc877f34ccd77381574c4ae7342eb36f19ffeee5d9b279c025c71d18c3306a47",
+    "R1-v090-parity-control-freeze.json": "85120616f58424da5eaee3e4f258d887dc9f7daf3b0be4e123378b8e36df388a"
+  },
+  "provider_matrix": {
+    "312": {
+      "onnx": {
+        "file": "r1-py312-onnx.json",
+        "sha256": "429d15cdb0d2a30fedbdda8f1ed0a9d47f08a77f2d45f336ae5d7b7e80c16246",
+        "python": "3.12.3 (main, Aug 31 2026, 10:18:26) [GCC 13.3.0]",
+        "executable": "/home/rehan/sct-improvements-v090-20261109/.venv-models312/bin/python",
+        "runtime": {
+          "torch": {
+            "version": "2.14.0",
+            "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models312/lib/python3.12/site-packages/torch/__init__.py"
+          },
+          "transformers": {
+            "version": "5.16.1",
+            "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models312/lib/python3.12/site-packages/transformers/__init__.py"
+          },
+          "onnxruntime": {
+            "version": "1.30.0",
+            "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models312/lib/python3.12/site-packages/onnxruntime/__init__.py"
+          },
+          "gliner": {
+            "version": "0.2.29",
+            "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models312/lib/python3.12/site-packages/gliner/__init__.py"
+          },
+          "gliner2": {
+            "version": "1.3.2",
+            "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models312/lib/python3.12/site-packages/gliner2/__init__.py"
+          },
+          "gliclass": {
+            "version": "0.1.20",
+            "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models312/lib/python3.12/site-packages/gliclass/__init__.py"
+          },
+          "presidio-analyzer": {
+            "version": "2.2.362",
+            "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models312/lib/python3.12/site-packages/presidio_analyzer/__init__.py"
+          },
+          "spacy": {
+            "version": "3.8.16",
+            "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models312/lib/python3.12/site-packages/spacy/__init__.py"
+          }
+        },
+        "onnx_session_runs": 4,
+        "torch_module_calls": 0
+      },
+      "torch": {
+        "file": "r1-py312-torch.json",
+        "sha256": "bb84ed5f535a92e71c8a092ecd56fe3357a6177c976de9e94355cb9682965f2a",
+        "python": "3.12.3 (main, Aug 31 2026, 10:18:26) [GCC 13.3.0]",
+        "executable": "/home/rehan/sct-improvements-v090-20261109/.venv-models312/bin/python",
+        "runtime": {
+          "torch": {
+            "version": "2.14.0",
+            "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models312/lib/python3.12/site-packages/torch/__init__.py"
+          },
+          "transformers": {
+            "version": "5.16.1",
+            "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models312/lib/python3.12/site-packages/transformers/__init__.py"
+          },
+          "onnxruntime": {
+            "version": "1.30.0",
+            "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models312/lib/python3.12/site-packages/onnxruntime/__init__.py"
+          },
+          "gliner": {
+            "version": "0.2.29",
+            "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models312/lib/python3.12/site-packages/gliner/__init__.py"
+          },
+          "gliner2": {
+            "version": "1.3.2",
+            "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models312/lib/python3.12/site-packages/gliner2/__init__.py"
+          },
+          "gliclass": {
+            "version": "0.1.20",
+            "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models312/lib/python3.12/site-packages/gliclass/__init__.py"
+          },
+          "presidio-analyzer": {
+            "version": "2.2.362",
+            "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models312/lib/python3.12/site-packages/presidio_analyzer/__init__.py"
+          },
+          "spacy": {
+            "version": "3.8.16",
+            "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models312/lib/python3.12/site-packages/spacy/__init__.py"
+          }
+        },
+        "onnx_session_runs": 0,
+        "torch_module_calls": 860
+      },
+      "gliner": {
+        "file": "r1-py312-gliner.json",
+        "sha256": "bcd5b569da2facaa2a2fab74dfd40bff78eb9277c246ad3e787068b5b5c3955a",
+        "python": "3.12.3 (main, Aug 31 2026, 10:18:26) [GCC 13.3.0]",
+        "executable": "/home/rehan/sct-improvements-v090-20261109/.venv-models312/bin/python",
+        "runtime": {
+          "torch": {
+            "version": "2.14.0",
+            "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models312/lib/python3.12/site-packages/torch/__init__.py"
+          },
+          "transformers": {
+            "version": "5.16.1",
+            "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models312/lib/python3.12/site-packages/transformers/__init__.py"
+          },
+          "onnxruntime": {
+            "version": "1.30.0",
+            "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models312/lib/python3.12/site-packages/onnxruntime/__init__.py"
+          },
+          "gliner": {
+            "version": "0.2.29",
+            "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models312/lib/python3.12/site-packages/gliner/__init__.py"
+          },
+          "gliner2": {
+            "version": "1.3.2",
+            "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models312/lib/python3.12/site-packages/gliner2/__init__.py"
+          },
+          "gliclass": {
+            "version": "0.1.20",
+            "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models312/lib/python3.12/site-packages/gliclass/__init__.py"
+          },
+          "presidio-analyzer": {
+            "version": "2.2.362",
+            "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models312/lib/python3.12/site-packages/presidio_analyzer/__init__.py"
+          },
+          "spacy": {
+            "version": "3.8.16",
+            "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models312/lib/python3.12/site-packages/spacy/__init__.py"
+          }
+        },
+        "onnx_session_runs": 0,
+        "torch_module_calls": 328
+      },
+      "ensemble_onnx": {
+        "file": "r1-py312-ensemble_onnx.json",
+        "sha256": "60da5242a1f29195b26f1d623084ae6841d378545cac5196f099aeac3864ac1d",
+        "python": "3.12.3 (main, Aug 31 2026, 10:18:26) [GCC 13.3.0]",
+        "executable": "/home/rehan/sct-improvements-v090-20261109/.venv-models312/bin/python",
+        "runtime": {
+          "torch": {
+            "version": "2.14.0",
+            "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models312/lib/python3.12/site-packages/torch/__init__.py"
+          },
+          "transformers": {
+            "version": "5.16.1",
+            "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models312/lib/python3.12/site-packages/transformers/__init__.py"
+          },
+          "onnxruntime": {
+            "version": "1.30.0",
+            "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models312/lib/python3.12/site-packages/onnxruntime/__init__.py"
+          },
+          "gliner": {
+            "version": "0.2.29",
+            "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models312/lib/python3.12/site-packages/gliner/__init__.py"
+          },
+          "gliner2": {
+            "version": "1.3.2",
+            "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models312/lib/python3.12/site-packages/gliner2/__init__.py"
+          },
+          "gliclass": {
+            "version": "0.1.20",
+            "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models312/lib/python3.12/site-packages/gliclass/__init__.py"
+          },
+          "presidio-analyzer": {
+            "version": "2.2.362",
+            "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models312/lib/python3.12/site-packages/presidio_analyzer/__init__.py"
+          },
+          "spacy": {
+            "version": "3.8.16",
+            "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models312/lib/python3.12/site-packages/spacy/__init__.py"
+          }
+        },
+        "onnx_session_runs": 4,
+        "torch_module_calls": 328
+      },
+      "ensemble_torch": {
+        "file": "r1-py312-ensemble_torch.json",
+        "sha256": "aa067c17c5222d87f050c79080d73f3a6d4fce06144b7b6d327f665252a69b62",
+        "python": "3.12.3 (main, Aug 31 2026, 10:18:26) [GCC 13.3.0]",
+        "executable": "/home/rehan/sct-improvements-v090-20261109/.venv-models312/bin/python",
+        "runtime": {
+          "torch": {
+            "version": "2.14.0",
+            "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models312/lib/python3.12/site-packages/torch/__init__.py"
+          },
+          "transformers": {
+            "version": "5.16.1",
+            "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models312/lib/python3.12/site-packages/transformers/__init__.py"
+          },
+          "onnxruntime": {
+            "version": "1.30.0",
+            "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models312/lib/python3.12/site-packages/onnxruntime/__init__.py"
+          },
+          "gliner": {
+            "version": "0.2.29",
+            "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models312/lib/python3.12/site-packages/gliner/__init__.py"
+          },
+          "gliner2": {
+            "version": "1.3.2",
+            "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models312/lib/python3.12/site-packages/gliner2/__init__.py"
+          },
+          "gliclass": {
+            "version": "0.1.20",
+            "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models312/lib/python3.12/site-packages/gliclass/__init__.py"
+          },
+          "presidio-analyzer": {
+            "version": "2.2.362",
+            "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models312/lib/python3.12/site-packages/presidio_analyzer/__init__.py"
+          },
+          "spacy": {
+            "version": "3.8.16",
+            "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models312/lib/python3.12/site-packages/spacy/__init__.py"
+          }
+        },
+        "onnx_session_runs": 0,
+        "torch_module_calls": 1188
+      },
+      "presidio_gliner": {
+        "file": "r1-py312-presidio_gliner.json",
+        "sha256": "ec3b1dd8144eb9cf24ab6bd7175c0cbb26a017808b57133f865161445499b6dc",
+        "python": "3.12.3 (main, Aug 31 2026, 10:18:26) [GCC 13.3.0]",
+        "executable": "/home/rehan/sct-improvements-v090-20261109/.venv-models312/bin/python",
+        "runtime": {
+          "torch": {
+            "version": "2.14.0",
+            "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models312/lib/python3.12/site-packages/torch/__init__.py"
+          },
+          "transformers": {
+            "version": "5.16.1",
+            "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models312/lib/python3.12/site-packages/transformers/__init__.py"
+          },
+          "onnxruntime": {
+            "version": "1.30.0",
+            "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models312/lib/python3.12/site-packages/onnxruntime/__init__.py"
+          },
+          "gliner": {
+            "version": "0.2.29",
+            "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models312/lib/python3.12/site-packages/gliner/__init__.py"
+          },
+          "gliner2": {
+            "version": "1.3.2",
+            "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models312/lib/python3.12/site-packages/gliner2/__init__.py"
+          },
+          "gliclass": {
+            "version": "0.1.20",
+            "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models312/lib/python3.12/site-packages/gliclass/__init__.py"
+          },
+          "presidio-analyzer": {
+            "version": "2.2.362",
+            "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models312/lib/python3.12/site-packages/presidio_analyzer/__init__.py"
+          },
+          "spacy": {
+            "version": "3.8.16",
+            "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models312/lib/python3.12/site-packages/spacy/__init__.py"
+          }
+        },
+        "onnx_session_runs": 0,
+        "torch_module_calls": 328
+      },
+      "gliner2": {
+        "file": "r1-py312-gliner2.json",
+        "sha256": "b64e98f16cf00a11fbc5920ca1be8715ddedb4bc6f46b94904bb087b536204e9",
+        "python": "3.12.3 (main, Aug 31 2026, 10:18:26) [GCC 13.3.0]",
+        "executable": "/home/rehan/sct-improvements-v090-20261109/.venv-models312/bin/python",
+        "runtime": {
+          "torch": {
+            "version": "2.14.0",
+            "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models312/lib/python3.12/site-packages/torch/__init__.py"
+          },
+          "transformers": {
+            "version": "5.16.1",
+            "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models312/lib/python3.12/site-packages/transformers/__init__.py"
+          },
+          "onnxruntime": {
+            "version": "1.30.0",
+            "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models312/lib/python3.12/site-packages/onnxruntime/__init__.py"
+          },
+          "gliner": {
+            "version": "0.2.29",
+            "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models312/lib/python3.12/site-packages/gliner/__init__.py"
+          },
+          "gliner2": {
+            "version": "1.3.2",
+            "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models312/lib/python3.12/site-packages/gliner2/__init__.py"
+          },
+          "gliclass": {
+            "version": "0.1.20",
+            "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models312/lib/python3.12/site-packages/gliclass/__init__.py"
+          },
+          "presidio-analyzer": {
+            "version": "2.2.362",
+            "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models312/lib/python3.12/site-packages/presidio_analyzer/__init__.py"
+          },
+          "spacy": {
+            "version": "3.8.16",
+            "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models312/lib/python3.12/site-packages/spacy/__init__.py"
+          }
+        },
+        "onnx_session_runs": 0,
+        "torch_module_calls": 574
+      },
+      "classify": {
+        "file": "r1-py312-classify.json",
+        "sha256": "393627d11497d5818169d58660e6b7bca478fd9a901d1f9c65b9f3f726c0ca3b",
+        "python": "3.12.3 (main, Aug 31 2026, 10:18:26) [GCC 13.3.0]",
+        "executable": "/home/rehan/sct-improvements-v090-20261109/.venv-models312/bin/python",
+        "runtime": {
+          "torch": {
+            "version": "2.14.0",
+            "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models312/lib/python3.12/site-packages/torch/__init__.py"
+          },
+          "transformers": {
+            "version": "5.16.1",
+            "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models312/lib/python3.12/site-packages/transformers/__init__.py"
+          },
+          "onnxruntime": {
+            "version": "1.30.0",
+            "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models312/lib/python3.12/site-packages/onnxruntime/__init__.py"
+          },
+          "gliner": {
+            "version": "0.2.29",
+            "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models312/lib/python3.12/site-packages/gliner/__init__.py"
+          },
+          "gliner2": {
+            "version": "1.3.2",
+            "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models312/lib/python3.12/site-packages/gliner2/__init__.py"
+          },
+          "gliclass": {
+            "version": "0.1.20",
+            "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models312/lib/python3.12/site-packages/gliclass/__init__.py"
+          },
+          "presidio-analyzer": {
+            "version": "2.2.362",
+            "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models312/lib/python3.12/site-packages/presidio_analyzer/__init__.py"
+          },
+          "spacy": {
+            "version": "3.8.16",
+            "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models312/lib/python3.12/site-packages/spacy/__init__.py"
+          }
+        },
+        "onnx_session_runs": 0,
+        "torch_module_calls": 149
+      }
+    },
+    "313": {
+      "onnx": {
+        "file": "r1-native-onnx.json",
+        "sha256": "4a7bd598894c65916549405671d35deb3ab13437556a85c8d2355177f1783703",
+        "python": "3.13.3 (main, May 30 2025, 05:38:56) [Clang 20.1.4 ]",
+        "executable": "/home/rehan/sct-improvements-v090-20261109/.venv-models/bin/python",
+        "runtime": {
+          "torch": {
+            "version": "2.14.0",
+            "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models/lib/python3.13/site-packages/torch/__init__.py"
+          },
+          "transformers": {
+            "version": "5.16.1",
+            "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models/lib/python3.13/site-packages/transformers/__init__.py"
+          },
+          "onnxruntime": {
+            "version": "1.30.0",
+            "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models/lib/python3.13/site-packages/onnxruntime/__init__.py"
+          },
+          "gliner": {
+            "version": "0.2.29",
+            "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models/lib/python3.13/site-packages/gliner/__init__.py"
+          },
+          "gliner2": {
+            "version": "1.3.2",
+            "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models/lib/python3.13/site-packages/gliner2/__init__.py"
+          },
+          "gliclass": {
+            "version": "0.1.20",
+            "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models/lib/python3.13/site-packages/gliclass/__init__.py"
+          },
+          "presidio-analyzer": {
+            "version": "2.2.362",
+            "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models/lib/python3.13/site-packages/presidio_analyzer/__init__.py"
+          },
+          "spacy": {
+            "version": "3.8.16",
+            "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models/lib/python3.13/site-packages/spacy/__init__.py"
+          }
+        },
+        "onnx_session_runs": 4,
+        "torch_module_calls": 0
+      },
+      "torch": {
+        "file": "r1-native-torch.json",
+        "sha256": "0aa28d09139e9d7f9e511bf37c0431e83f7066065b1946aa1adcc5ed5f10838e",
+        "python": "3.13.3 (main, May 30 2025, 05:38:56) [Clang 20.1.4 ]",
+        "executable": "/home/rehan/sct-improvements-v090-20261109/.venv-models/bin/python",
+        "runtime": {
+          "torch": {
+            "version": "2.14.0",
+            "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models/lib/python3.13/site-packages/torch/__init__.py"
+          },
+          "transformers": {
+            "version": "5.16.1",
+            "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models/lib/python3.13/site-packages/transformers/__init__.py"
+          },
+          "onnxruntime": {
+            "version": "1.30.0",
+            "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models/lib/python3.13/site-packages/onnxruntime/__init__.py"
+          },
+          "gliner": {
+            "version": "0.2.29",
+            "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models/lib/python3.13/site-packages/gliner/__init__.py"
+          },
+          "gliner2": {
+            "version": "1.3.2",
+            "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models/lib/python3.13/site-packages/gliner2/__init__.py"
+          },
+          "gliclass": {
+            "version": "0.1.20",
+            "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models/lib/python3.13/site-packages/gliclass/__init__.py"
+          },
+          "presidio-analyzer": {
+            "version": "2.2.362",
+            "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models/lib/python3.13/site-packages/presidio_analyzer/__init__.py"
+          },
+          "spacy": {
+            "version": "3.8.16",
+            "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models/lib/python3.13/site-packages/spacy/__init__.py"
+          }
+        },
+        "onnx_session_runs": 0,
+        "torch_module_calls": 860
+      },
+      "gliner": {
+        "file": "r1-native-gliner.json",
+        "sha256": "343f260e334e4e3c48b255dabec52920849673467757d0fa35be14c4e5684bb5",
+        "python": "3.13.3 (main, May 30 2025, 05:38:56) [Clang 20.1.4 ]",
+        "executable": "/home/rehan/sct-improvements-v090-20261109/.venv-models/bin/python",
+        "runtime": {
+          "torch": {
+            "version": "2.14.0",
+            "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models/lib/python3.13/site-packages/torch/__init__.py"
+          },
+          "transformers": {
+            "version": "5.16.1",
+            "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models/lib/python3.13/site-packages/transformers/__init__.py"
+          },
+          "onnxruntime": {
+            "version": "1.30.0",
+            "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models/lib/python3.13/site-packages/onnxruntime/__init__.py"
+          },
+          "gliner": {
+            "version": "0.2.29",
+            "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models/lib/python3.13/site-packages/gliner/__init__.py"
+          },
+          "gliner2": {
+            "version": "1.3.2",
+            "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models/lib/python3.13/site-packages/gliner2/__init__.py"
+          },
+          "gliclass": {
+            "version": "0.1.20",
+            "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models/lib/python3.13/site-packages/gliclass/__init__.py"
+          },
+          "presidio-analyzer": {
+            "version": "2.2.362",
+            "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models/lib/python3.13/site-packages/presidio_analyzer/__init__.py"
+          },
+          "spacy": {
+            "version": "3.8.16",
+            "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models/lib/python3.13/site-packages/spacy/__init__.py"
+          }
+        },
+        "onnx_session_runs": 0,
+        "torch_module_calls": 328
+      },
+      "ensemble_onnx": {
+        "file": "r1-native-ensemble_onnx.json",
+        "sha256": "205018b29662fe9cebc80c67dd53639d6a3f11a3f30c4fec525471e68340fffa",
+        "python": "3.13.3 (main, May 30 2025, 05:38:56) [Clang 20.1.4 ]",
+        "executable": "/home/rehan/sct-improvements-v090-20261109/.venv-models/bin/python",
+        "runtime": {
+          "torch": {
+            "version": "2.14.0",
+            "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models/lib/python3.13/site-packages/torch/__init__.py"
+          },
+          "transformers": {
+            "version": "5.16.1",
+            "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models/lib/python3.13/site-packages/transformers/__init__.py"
+          },
+          "onnxruntime": {
+            "version": "1.30.0",
+            "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models/lib/python3.13/site-packages/onnxruntime/__init__.py"
+          },
+          "gliner": {
+            "version": "0.2.29",
+            "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models/lib/python3.13/site-packages/gliner/__init__.py"
+          },
+          "gliner2": {
+            "version": "1.3.2",
+            "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models/lib/python3.13/site-packages/gliner2/__init__.py"
+          },
+          "gliclass": {
+            "version": "0.1.20",
+            "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models/lib/python3.13/site-packages/gliclass/__init__.py"
+          },
+          "presidio-analyzer": {
+            "version": "2.2.362",
+            "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models/lib/python3.13/site-packages/presidio_analyzer/__init__.py"
+          },
+          "spacy": {
+            "version": "3.8.16",
+            "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models/lib/python3.13/site-packages/spacy/__init__.py"
+          }
+        },
+        "onnx_session_runs": 4,
+        "torch_module_calls": 328
+      },
+      "ensemble_torch": {
+        "file": "r1-native-ensemble_torch.json",
+        "sha256": "889254acbb0250f0440542062cf50d4b7bf40d711884899c6f74ea6af16bac19",
+        "python": "3.13.3 (main, May 30 2025, 05:38:56) [Clang 20.1.4 ]",
+        "executable": "/home/rehan/sct-improvements-v090-20261109/.venv-models/bin/python",
+        "runtime": {
+          "torch": {
+            "version": "2.14.0",
+            "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models/lib/python3.13/site-packages/torch/__init__.py"
+          },
+          "transformers": {
+            "version": "5.16.1",
+            "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models/lib/python3.13/site-packages/transformers/__init__.py"
+          },
+          "onnxruntime": {
+            "version": "1.30.0",
+            "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models/lib/python3.13/site-packages/onnxruntime/__init__.py"
+          },
+          "gliner": {
+            "version": "0.2.29",
+            "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models/lib/python3.13/site-packages/gliner/__init__.py"
+          },
+          "gliner2": {
+            "version": "1.3.2",
+            "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models/lib/python3.13/site-packages/gliner2/__init__.py"
+          },
+          "gliclass": {
+            "version": "0.1.20",
+            "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models/lib/python3.13/site-packages/gliclass/__init__.py"
+          },
+          "presidio-analyzer": {
+            "version": "2.2.362",
+            "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models/lib/python3.13/site-packages/presidio_analyzer/__init__.py"
+          },
+          "spacy": {
+            "version": "3.8.16",
+            "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models/lib/python3.13/site-packages/spacy/__init__.py"
+          }
+        },
+        "onnx_session_runs": 0,
+        "torch_module_calls": 1188
+      },
+      "presidio_gliner": {
+        "file": "r1-native-presidio-prepared.json",
+        "sha256": "bde4d8a25042b495932d6588496c9ff899c745319166d57eb2e90f8d080ca132",
+        "python": "3.13.3 (main, May 30 2025, 05:38:56) [Clang 20.1.4 ]",
+        "executable": "/home/rehan/sct-improvements-v090-20261109/.venv-models/bin/python",
+        "runtime": {
+          "torch": {
+            "version": "2.14.0",
+            "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models/lib/python3.13/site-packages/torch/__init__.py"
+          },
+          "transformers": {
+            "version": "5.16.1",
+            "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models/lib/python3.13/site-packages/transformers/__init__.py"
+          },
+          "onnxruntime": {
+            "version": "1.30.0",
+            "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models/lib/python3.13/site-packages/onnxruntime/__init__.py"
+          },
+          "gliner": {
+            "version": "0.2.29",
+            "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models/lib/python3.13/site-packages/gliner/__init__.py"
+          },
+          "gliner2": {
+            "version": "1.3.2",
+            "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models/lib/python3.13/site-packages/gliner2/__init__.py"
+          },
+          "gliclass": {
+            "version": "0.1.20",
+            "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models/lib/python3.13/site-packages/gliclass/__init__.py"
+          },
+          "presidio-analyzer": {
+            "version": "2.2.362",
+            "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models/lib/python3.13/site-packages/presidio_analyzer/__init__.py"
+          },
+          "spacy": {
+            "version": "3.8.16",
+            "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models/lib/python3.13/site-packages/spacy/__init__.py"
+          }
+        },
+        "onnx_session_runs": 0,
+        "torch_module_calls": 328
+      },
+      "gliner2": {
+        "file": "r1-native-gliner2-complete-cache.json",
+        "sha256": "b195067caed3d27317766ceefc99f87eff7300d85029ac420c9cc18206c03a70",
+        "python": "3.13.3 (main, May 30 2025, 05:38:56) [Clang 20.1.4 ]",
+        "executable": "/home/rehan/sct-improvements-v090-20261109/.venv-models/bin/python",
+        "runtime": {
+          "torch": {
+            "version": "2.14.0",
+            "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models/lib/python3.13/site-packages/torch/__init__.py"
+          },
+          "transformers": {
+            "version": "5.16.1",
+            "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models/lib/python3.13/site-packages/transformers/__init__.py"
+          },
+          "onnxruntime": {
+            "version": "1.30.0",
+            "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models/lib/python3.13/site-packages/onnxruntime/__init__.py"
+          },
+          "gliner": {
+            "version": "0.2.29",
+            "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models/lib/python3.13/site-packages/gliner/__init__.py"
+          },
+          "gliner2": {
+            "version": "1.3.2",
+            "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models/lib/python3.13/site-packages/gliner2/__init__.py"
+          },
+          "gliclass": {
+            "version": "0.1.20",
+            "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models/lib/python3.13/site-packages/gliclass/__init__.py"
+          },
+          "presidio-analyzer": {
+            "version": "2.2.362",
+            "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models/lib/python3.13/site-packages/presidio_analyzer/__init__.py"
+          },
+          "spacy": {
+            "version": "3.8.16",
+            "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models/lib/python3.13/site-packages/spacy/__init__.py"
+          }
+        },
+        "onnx_session_runs": 0,
+        "torch_module_calls": 574
+      },
+      "classify": {
+        "file": "r1-native-classify.json",
+        "sha256": "64be5c34b9c7d990bc7fc7ffa4b83462e451604f5d215bb661a89e89f60f39af",
+        "python": "3.13.3 (main, May 30 2025, 05:38:56) [Clang 20.1.4 ]",
+        "executable": "/home/rehan/sct-improvements-v090-20261109/.venv-models/bin/python",
+        "runtime": {
+          "torch": {
+            "version": "2.14.0",
+            "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models/lib/python3.13/site-packages/torch/__init__.py"
+          },
+          "transformers": {
+            "version": "5.16.1",
+            "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models/lib/python3.13/site-packages/transformers/__init__.py"
+          },
+          "onnxruntime": {
+            "version": "1.30.0",
+            "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models/lib/python3.13/site-packages/onnxruntime/__init__.py"
+          },
+          "gliner": {
+            "version": "0.2.29",
+            "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models/lib/python3.13/site-packages/gliner/__init__.py"
+          },
+          "gliner2": {
+            "version": "1.3.2",
+            "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models/lib/python3.13/site-packages/gliner2/__init__.py"
+          },
+          "gliclass": {
+            "version": "0.1.20",
+            "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models/lib/python3.13/site-packages/gliclass/__init__.py"
+          },
+          "presidio-analyzer": {
+            "version": "2.2.362",
+            "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models/lib/python3.13/site-packages/presidio_analyzer/__init__.py"
+          },
+          "spacy": {
+            "version": "3.8.16",
+            "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models/lib/python3.13/site-packages/spacy/__init__.py"
+          }
+        },
+        "onnx_session_runs": 0,
+        "torch_module_calls": 149
+      }
+    },
+    "314": {
+      "onnx": {
+        "file": "r1-py314-onnx.json",
+        "sha256": "f51cca7525db7563d2e4158d9a6264bf21a166c341b9d5ff5c55e452ddc3e315",
+        "python": "3.14.4 (main, Apr  7 2026, 20:47:53) [Clang 22.1.1 ]",
+        "executable": "/home/rehan/sct-improvements-v090-20261109/.venv-models314/bin/python",
+        "runtime": {
+          "torch": {
+            "version": "2.14.0",
+            "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models314/lib/python3.14/site-packages/torch/__init__.py"
+          },
+          "transformers": {
+            "version": "5.16.1",
+            "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models314/lib/python3.14/site-packages/transformers/__init__.py"
+          },
+          "onnxruntime": {
+            "version": "1.30.0",
+            "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models314/lib/python3.14/site-packages/onnxruntime/__init__.py"
+          },
+          "gliner": {
+            "version": "0.2.29",
+            "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models314/lib/python3.14/site-packages/gliner/__init__.py"
+          },
+          "gliner2": {
+            "version": "1.3.2",
+            "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models314/lib/python3.14/site-packages/gliner2/__init__.py"
+          },
+          "gliclass": {
+            "version": "0.1.20",
+            "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models314/lib/python3.14/site-packages/gliclass/__init__.py"
+          },
+          "presidio-analyzer": {
+            "version": "2.2.362",
+            "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models314/lib/python3.14/site-packages/presidio_analyzer/__init__.py"
+          },
+          "spacy": {
+            "version": "3.8.16",
+            "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models314/lib/python3.14/site-packages/spacy/__init__.py"
+          }
+        },
+        "onnx_session_runs": 4,
+        "torch_module_calls": 0
+      },
+      "torch": {
+        "file": "r1-py314-torch.json",
+        "sha256": "566e64f094a4307093aeb8bb6e0d74ba680c716eeb8d0bc5c0bc56e8f9af8baa",
+        "python": "3.14.4 (main, Apr  7 2026, 20:47:53) [Clang 22.1.1 ]",
+        "executable": "/home/rehan/sct-improvements-v090-20261109/.venv-models314/bin/python",
+        "runtime": {
+          "torch": {
+            "version": "2.14.0",
+            "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models314/lib/python3.14/site-packages/torch/__init__.py"
+          },
+          "transformers": {
+            "version": "5.16.1",
+            "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models314/lib/python3.14/site-packages/transformers/__init__.py"
+          },
+          "onnxruntime": {
+            "version": "1.30.0",
+            "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models314/lib/python3.14/site-packages/onnxruntime/__init__.py"
+          },
+          "gliner": {
+            "version": "0.2.29",
+            "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models314/lib/python3.14/site-packages/gliner/__init__.py"
+          },
+          "gliner2": {
+            "version": "1.3.2",
+            "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models314/lib/python3.14/site-packages/gliner2/__init__.py"
+          },
+          "gliclass": {
+            "version": "0.1.20",
+            "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models314/lib/python3.14/site-packages/gliclass/__init__.py"
+          },
+          "presidio-analyzer": {
+            "version": "2.2.362",
+            "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models314/lib/python3.14/site-packages/presidio_analyzer/__init__.py"
+          },
+          "spacy": {
+            "version": "3.8.16",
+            "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models314/lib/python3.14/site-packages/spacy/__init__.py"
+          }
+        },
+        "onnx_session_runs": 0,
+        "torch_module_calls": 860
+      },
+      "gliner": {
+        "file": "r1-py314-gliner.json",
+        "sha256": "a59706ac2055aaaf54d35ebc20a5cd702253c922afd21b38563046121d2703ab",
+        "python": "3.14.4 (main, Apr  7 2026, 20:47:53) [Clang 22.1.1 ]",
+        "executable": "/home/rehan/sct-improvements-v090-20261109/.venv-models314/bin/python",
+        "runtime": {
+          "torch": {
+            "version": "2.14.0",
+            "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models314/lib/python3.14/site-packages/torch/__init__.py"
+          },
+          "transformers": {
+            "version": "5.16.1",
+            "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models314/lib/python3.14/site-packages/transformers/__init__.py"
+          },
+          "onnxruntime": {
+            "version": "1.30.0",
+            "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models314/lib/python3.14/site-packages/onnxruntime/__init__.py"
+          },
+          "gliner": {
+            "version": "0.2.29",
+            "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models314/lib/python3.14/site-packages/gliner/__init__.py"
+          },
+          "gliner2": {
+            "version": "1.3.2",
+            "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models314/lib/python3.14/site-packages/gliner2/__init__.py"
+          },
+          "gliclass": {
+            "version": "0.1.20",
+            "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models314/lib/python3.14/site-packages/gliclass/__init__.py"
+          },
+          "presidio-analyzer": {
+            "version": "2.2.362",
+            "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models314/lib/python3.14/site-packages/presidio_analyzer/__init__.py"
+          },
+          "spacy": {
+            "version": "3.8.16",
+            "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models314/lib/python3.14/site-packages/spacy/__init__.py"
+          }
+        },
+        "onnx_session_runs": 0,
+        "torch_module_calls": 328
+      },
+      "ensemble_onnx": {
+        "file": "r1-py314-ensemble_onnx.json",
+        "sha256": "636364c91eeda06ac67696c1270aa1df4d40d9ef23688db5a1893390ccdb51c5",
+        "python": "3.14.4 (main, Apr  7 2026, 20:47:53) [Clang 22.1.1 ]",
+        "executable": "/home/rehan/sct-improvements-v090-20261109/.venv-models314/bin/python",
+        "runtime": {
+          "torch": {
+            "version": "2.14.0",
+            "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models314/lib/python3.14/site-packages/torch/__init__.py"
+          },
+          "transformers": {
+            "version": "5.16.1",
+            "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models314/lib/python3.14/site-packages/transformers/__init__.py"
+          },
+          "onnxruntime": {
+            "version": "1.30.0",
+            "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models314/lib/python3.14/site-packages/onnxruntime/__init__.py"
+          },
+          "gliner": {
+            "version": "0.2.29",
+            "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models314/lib/python3.14/site-packages/gliner/__init__.py"
+          },
+          "gliner2": {
+            "version": "1.3.2",
+            "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models314/lib/python3.14/site-packages/gliner2/__init__.py"
+          },
+          "gliclass": {
+            "version": "0.1.20",
+            "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models314/lib/python3.14/site-packages/gliclass/__init__.py"
+          },
+          "presidio-analyzer": {
+            "version": "2.2.362",
+            "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models314/lib/python3.14/site-packages/presidio_analyzer/__init__.py"
+          },
+          "spacy": {
+            "version": "3.8.16",
+            "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models314/lib/python3.14/site-packages/spacy/__init__.py"
+          }
+        },
+        "onnx_session_runs": 4,
+        "torch_module_calls": 328
+      },
+      "ensemble_torch": {
+        "file": "r1-py314-ensemble_torch.json",
+        "sha256": "a83075685c07f3618d3260baecf54654fabd8339f56ab745f50443052547fb6b",
+        "python": "3.14.4 (main, Apr  7 2026, 20:47:53) [Clang 22.1.1 ]",
+        "executable": "/home/rehan/sct-improvements-v090-20261109/.venv-models314/bin/python",
+        "runtime": {
+          "torch": {
+            "version": "2.14.0",
+            "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models314/lib/python3.14/site-packages/torch/__init__.py"
+          },
+          "transformers": {
+            "version": "5.16.1",
+            "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models314/lib/python3.14/site-packages/transformers/__init__.py"
+          },
+          "onnxruntime": {
+            "version": "1.30.0",
+            "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models314/lib/python3.14/site-packages/onnxruntime/__init__.py"
+          },
+          "gliner": {
+            "version": "0.2.29",
+            "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models314/lib/python3.14/site-packages/gliner/__init__.py"
+          },
+          "gliner2": {
+            "version": "1.3.2",
+            "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models314/lib/python3.14/site-packages/gliner2/__init__.py"
+          },
+          "gliclass": {
+            "version": "0.1.20",
+            "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models314/lib/python3.14/site-packages/gliclass/__init__.py"
+          },
+          "presidio-analyzer": {
+            "version": "2.2.362",
+            "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models314/lib/python3.14/site-packages/presidio_analyzer/__init__.py"
+          },
+          "spacy": {
+            "version": "3.8.16",
+            "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models314/lib/python3.14/site-packages/spacy/__init__.py"
+          }
+        },
+        "onnx_session_runs": 0,
+        "torch_module_calls": 1188
+      },
+      "presidio_gliner": {
+        "file": "r1-py314-presidio_gliner.json",
+        "sha256": "f7cc729e28d79f8db0066074a2f51581ae4855c1a9a32b73fef5b2d5d5d2fa08",
+        "python": "3.14.4 (main, Apr  7 2026, 20:47:53) [Clang 22.1.1 ]",
+        "executable": "/home/rehan/sct-improvements-v090-20261109/.venv-models314/bin/python",
+        "runtime": {
+          "torch": {
+            "version": "2.14.0",
+            "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models314/lib/python3.14/site-packages/torch/__init__.py"
+          },
+          "transformers": {
+            "version": "5.16.1",
+            "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models314/lib/python3.14/site-packages/transformers/__init__.py"
+          },
+          "onnxruntime": {
+            "version": "1.30.0",
+            "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models314/lib/python3.14/site-packages/onnxruntime/__init__.py"
+          },
+          "gliner": {
+            "version": "0.2.29",
+            "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models314/lib/python3.14/site-packages/gliner/__init__.py"
+          },
+          "gliner2": {
+            "version": "1.3.2",
+            "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models314/lib/python3.14/site-packages/gliner2/__init__.py"
+          },
+          "gliclass": {
+            "version": "0.1.20",
+            "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models314/lib/python3.14/site-packages/gliclass/__init__.py"
+          },
+          "presidio-analyzer": {
+            "version": "2.2.362",
+            "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models314/lib/python3.14/site-packages/presidio_analyzer/__init__.py"
+          },
+          "spacy": {
+            "version": "3.8.16",
+            "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models314/lib/python3.14/site-packages/spacy/__init__.py"
+          }
+        },
+        "onnx_session_runs": 0,
+        "torch_module_calls": 328
+      },
+      "gliner2": {
+        "file": "r1-py314-gliner2.json",
+        "sha256": "8789a5b01e5baf5588f6e48d26c054329048e1a0a72177be96fc6ada7afca092",
+        "python": "3.14.4 (main, Apr  7 2026, 20:47:53) [Clang 22.1.1 ]",
+        "executable": "/home/rehan/sct-improvements-v090-20261109/.venv-models314/bin/python",
+        "runtime": {
+          "torch": {
+            "version": "2.14.0",
+            "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models314/lib/python3.14/site-packages/torch/__init__.py"
+          },
+          "transformers": {
+            "version": "5.16.1",
+            "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models314/lib/python3.14/site-packages/transformers/__init__.py"
+          },
+          "onnxruntime": {
+            "version": "1.30.0",
+            "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models314/lib/python3.14/site-packages/onnxruntime/__init__.py"
+          },
+          "gliner": {
+            "version": "0.2.29",
+            "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models314/lib/python3.14/site-packages/gliner/__init__.py"
+          },
+          "gliner2": {
+            "version": "1.3.2",
+            "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models314/lib/python3.14/site-packages/gliner2/__init__.py"
+          },
+          "gliclass": {
+            "version": "0.1.20",
+            "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models314/lib/python3.14/site-packages/gliclass/__init__.py"
+          },
+          "presidio-analyzer": {
+            "version": "2.2.362",
+            "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models314/lib/python3.14/site-packages/presidio_analyzer/__init__.py"
+          },
+          "spacy": {
+            "version": "3.8.16",
+            "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models314/lib/python3.14/site-packages/spacy/__init__.py"
+          }
+        },
+        "onnx_session_runs": 0,
+        "torch_module_calls": 574
+      },
+      "classify": {
+        "file": "r1-py314-classify.json",
+        "sha256": "922af1a0aa32586128d60d05b2069ba416d450790697344c943344e5c443791d",
+        "python": "3.14.4 (main, Apr  7 2026, 20:47:53) [Clang 22.1.1 ]",
+        "executable": "/home/rehan/sct-improvements-v090-20261109/.venv-models314/bin/python",
+        "runtime": {
+          "torch": {
+            "version": "2.14.0",
+            "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models314/lib/python3.14/site-packages/torch/__init__.py"
+          },
+          "transformers": {
+            "version": "5.16.1",
+            "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models314/lib/python3.14/site-packages/transformers/__init__.py"
+          },
+          "onnxruntime": {
+            "version": "1.30.0",
+            "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models314/lib/python3.14/site-packages/onnxruntime/__init__.py"
+          },
+          "gliner": {
+            "version": "0.2.29",
+            "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models314/lib/python3.14/site-packages/gliner/__init__.py"
+          },
+          "gliner2": {
+            "version": "1.3.2",
+            "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models314/lib/python3.14/site-packages/gliner2/__init__.py"
+          },
+          "gliclass": {
+            "version": "0.1.20",
+            "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models314/lib/python3.14/site-packages/gliclass/__init__.py"
+          },
+          "presidio-analyzer": {
+            "version": "2.2.362",
+            "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models314/lib/python3.14/site-packages/presidio_analyzer/__init__.py"
+          },
+          "spacy": {
+            "version": "3.8.16",
+            "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models314/lib/python3.14/site-packages/spacy/__init__.py"
+          }
+        },
+        "onnx_session_runs": 0,
+        "torch_module_calls": 149
+      }
+    }
+  },
+  "provider_source_deviations": {
+    "312": {
+      "onnx": {},
+      "torch": {},
+      "gliner": {},
+      "ensemble_onnx": {},
+      "ensemble_torch": {},
+      "presidio_gliner": {},
+      "gliner2": {},
+      "classify": {}
+    },
+    "313": {
+      "onnx": {
+        "sct/corpus/datatrove.py": "8d724832f5abf339a3eb50511143bdc76807cce692d7b0937ebcdd18266fcb29"
+      },
+      "torch": {
+        "sct/corpus/datatrove.py": "8d724832f5abf339a3eb50511143bdc76807cce692d7b0937ebcdd18266fcb29"
+      },
+      "gliner": {
+        "sct/corpus/datatrove.py": "8d724832f5abf339a3eb50511143bdc76807cce692d7b0937ebcdd18266fcb29"
+      },
+      "ensemble_onnx": {
+        "sct/corpus/datatrove.py": "8d724832f5abf339a3eb50511143bdc76807cce692d7b0937ebcdd18266fcb29"
+      },
+      "ensemble_torch": {
+        "sct/corpus/datatrove.py": "8d724832f5abf339a3eb50511143bdc76807cce692d7b0937ebcdd18266fcb29"
+      },
+      "presidio_gliner": {
+        "sct/corpus/datatrove.py": "8d724832f5abf339a3eb50511143bdc76807cce692d7b0937ebcdd18266fcb29"
+      },
+      "gliner2": {
+        "sct/corpus/datatrove.py": "8d724832f5abf339a3eb50511143bdc76807cce692d7b0937ebcdd18266fcb29"
+      },
+      "classify": {
+        "sct/corpus/datatrove.py": "8d724832f5abf339a3eb50511143bdc76807cce692d7b0937ebcdd18266fcb29"
+      }
+    },
+    "314": {
+      "onnx": {},
+      "torch": {},
+      "gliner": {},
+      "ensemble_onnx": {},
+      "ensemble_torch": {},
+      "presidio_gliner": {},
+      "gliner2": {},
+      "classify": {}
+    }
+  },
+  "provider_source_deviation_explanation": "Python3.13 providers preceded only the recipe guard; actual final guard artifact validation and Linux recipe regression pass. Python3.12 and3.14 bind all current sct source files.",
+  "historical_initial_parity": {
+    "312": {
+      "file": "parity312.json",
+      "sha256": "93ee9fe3661353a37b346a55baa439d03d26179809e9d0c8ce128c457cc19536",
+      "max_absolute_error": 5.960464477539063e-08,
+      "output_sha256": {
+        "model.onnx": "0288133a7eb0209bfb501d1d5dfdcf7763acd727fec744b3443f40241fddeeaa",
+        "tokenizer.json": "1039eb383a85ef2884538e9926eabc97db50f2f56c914e9ca39b2cf927a0f790",
+        "sct_quality.json": "8762d9962d24c1fe0524cf8664b01e7bdb6afe84f8cac0d7ac43415f7efe05bd"
+      },
+      "shapes": [
+        [
+          1,
+          11
+        ],
+        [
+          3,
+          98
+        ],
+        [
+          2,
+          20
+        ]
+      ]
+    },
+    "313": {
+      "file": "parity.json",
+      "sha256": "93ee9fe3661353a37b346a55baa439d03d26179809e9d0c8ce128c457cc19536",
+      "max_absolute_error": 5.960464477539063e-08,
+      "output_sha256": {
+        "model.onnx": "0288133a7eb0209bfb501d1d5dfdcf7763acd727fec744b3443f40241fddeeaa",
+        "tokenizer.json": "1039eb383a85ef2884538e9926eabc97db50f2f56c914e9ca39b2cf927a0f790",
+        "sct_quality.json": "8762d9962d24c1fe0524cf8664b01e7bdb6afe84f8cac0d7ac43415f7efe05bd"
+      },
+      "shapes": [
+        [
+          1,
+          11
+        ],
+        [
+          3,
+          98
+        ],
+        [
+          2,
+          20
+        ]
+      ]
+    },
+    "314": {
+      "file": "parity314.json",
+      "sha256": "93ee9fe3661353a37b346a55baa439d03d26179809e9d0c8ce128c457cc19536",
+      "max_absolute_error": 5.960464477539063e-08,
+      "output_sha256": {
+        "model.onnx": "0288133a7eb0209bfb501d1d5dfdcf7763acd727fec744b3443f40241fddeeaa",
+        "tokenizer.json": "1039eb383a85ef2884538e9926eabc97db50f2f56c914e9ca39b2cf927a0f790",
+        "sct_quality.json": "8762d9962d24c1fe0524cf8664b01e7bdb6afe84f8cac0d7ac43415f7efe05bd"
+      },
+      "shapes": [
+        [
+          1,
+          11
+        ],
+        [
+          3,
+          98
+        ],
+        [
+          2,
+          20
+        ]
+      ]
+    }
+  },
+  "recipe_guard_core_move": {
+    "scope": "Unchanged GLiNER cached metadata validation moved to core-only manifest module; native call imports it. No model behavior change.",
+    "previous_freeze_sha256": "2ee734022481ea22e1fc568e7983bfbba9a93f8420b6819185734d53bd276a3c",
+    "reconstructed_prior_workflow_sha256": "3d34ef340ce893877f5a0cf04c2dd3a1e9500416ca3625e216a702fa7e3bc6d0",
+    "prior_manifest_sha256": "10507f5253e774624b34bd63f96f49f96e1b54dea56ab1801f9829c074791556",
+    "owned_paths": {
+      "scripts/export_quality_head.py": "076e1391a7b70cfc1664db8e6681e46aa19af28967c6b99d4195fd0972497927",
+      "scripts/qualify_native_providers.py": "501bde693af9082bc51bca55df140a2a6c6e82bbeccf8bab128f558ec757e918",
+      "sct/utils/gliner_adapter.py": "99c366d8859637df255d237f9516f2e666b74b5eecfe2f12cb843d39c436c972",
+      "sct/corpus/datatrove.py": "901f069dd09ea1a9aee082b1fcfc6f4016eff720e68b7879942a9ef6cecf9eda",
+      "tests/test_quality_export.py": "2707f532ffc7fa939011973134b16750d21b4f20a7947e5a3b553c2728330814",
+      "tests/test_gliner_revision.py": "338f561fa2d3ffbd41415cc2f93f15fb597942d0c23665c024f8daeae495da44",
+      "tests/test_gliner_recipe_identity.py": "fb6edc4dbaffdeef67c0e079a8100af5efa4b9d87ec494bfdbe0e0f5bced88b0",
+      "docs/INTEGRATIONS.md": "9dd624a32aac006d0f3b359c837201431877b3a2a0dfb64ed4c11363b887bcd2",
+      "sct/corpus/manifest.py": "de9c291a63960d4a1ae4c8a9aa8d318ceb1d643e468295bcc166fac56e6cd577"
+    },
+    "core_result": "14 passed, 29 skipped; 9 new direct metadata checks run without DataTrove",
+    "native_result": "102 passed, 1 skipped, 26 warnings",
+    "helper_executed_lines": [
+      14,
+      15,
+      17,
+      20,
+      21,
+      26,
+      27,
+      28,
+      32,
+      33,
+      34
+    ],
+    "helper_missing_lines": [],
+    "full_core_baseline": {
+      "covered": 6546,
+      "statements": 7692,
+      "percent": 85.10140405616224
+    },
+    "full_core_current": "Pending root full gate; focused coverage is not whole-core acceptance",
+    "evidence_sha256": {
+      "r1-core-guard-coverage.json": "4d9b3719cc337f0c610f14228a89af0e281e84a8bd020302bd6fd3780c9fae33",
+      "r1-core-guard-native.log": "83d3aaeb145e764b09d9023c612f4d1adfc391482bea00f4a22d88ea326bd529",
+      "r1-core-guard-package.log": "28aaaa1308ba589a49294de805f2c4f84a0b7cc887195482334238bc9292608f",
+      "r1-core-guard.log": "4bcab8b6bd32d2c6cefa27dbdfd93c15c4d7996d707bb9e724786f35309393b6"
+    },
+    "local_red_log_sha256": "fe60acc78657a151c7dae0504ed9638bc9888badd92bf11c93ad1a9b1af29554"
+  },
+  "strengthened_parity_controls": {
+    "scope": "Only trained parity test controls and assertions changed; no model quality, heldout, production, exporter or tolerance change",
+    "prior_test_sha256": "2707f532ffc7fa939011973134b16750d21b4f20a7947e5a3b553c2728330814",
+    "test_sha256": "258a96721e74c5dbcb2a1f065f027b5afb8d7c567be6636c2cf88e6c1dbf43fb",
+    "red_test_sha256": "66a14ab2a2e501e8e6abb7d7838519125123f17ed8955ab9c79e004996500816",
+    "prior_source_freeze_sha256": "dc877f34ccd77381574c4ae7342eb36f19ffeee5d9b279c025c71d18c3306a47",
+    "unchanged_owned_paths": {
+      "scripts/export_quality_head.py": "076e1391a7b70cfc1664db8e6681e46aa19af28967c6b99d4195fd0972497927",
+      "scripts/qualify_native_providers.py": "501bde693af9082bc51bca55df140a2a6c6e82bbeccf8bab128f558ec757e918",
+      "sct/utils/gliner_adapter.py": "99c366d8859637df255d237f9516f2e666b74b5eecfe2f12cb843d39c436c972",
+      "sct/corpus/datatrove.py": "901f069dd09ea1a9aee082b1fcfc6f4016eff720e68b7879942a9ef6cecf9eda",
+      "tests/test_gliner_revision.py": "338f561fa2d3ffbd41415cc2f93f15fb597942d0c23665c024f8daeae495da44",
+      "tests/test_gliner_recipe_identity.py": "fb6edc4dbaffdeef67c0e079a8100af5efa4b9d87ec494bfdbe0e0f5bced88b0",
+      "docs/INTEGRATIONS.md": "9dd624a32aac006d0f3b359c837201431877b3a2a0dfb64ed4c11363b887bcd2",
+      "sct/corpus/manifest.py": "de9c291a63960d4a1ae4c8a9aa8d318ceb1d643e468295bcc166fac56e6cd577"
+    },
+    "frozen_control_source_sha256": "51a79b1fc63fa3e4120a6aa03d6a6df0f37572061fa351afd280a3dba50f4487",
+    "frozen_control_text_sha256": [
+      "2ba00ea2703915cddae71853562a63f29ff524d5606b59ce40a84d3b6868e2a2",
+      "8f7ed405fb94c04a51ecbce4073d808a8fb87d0ad1cbb2d0f75235fa98f518d2"
+    ],
+    "red": {
+      "status": "failed as intended",
+      "session": 72584,
+      "exit_code": 1,
+      "minimum_reference_score": 0.9999973773956299,
+      "warnings": 5,
+      "seconds": 10.45
+    },
+    "green": {
+      "312": {
+        "runtime": {
+          "executable": "/home/rehan/sct-improvements-v090-20261109/.venv-models312/bin/python",
+          "python": "3.12.3 (main, Aug 31 2026, 10:18:26) [GCC 13.3.0]",
+          "runtime": {
+            "torch": {
+              "version": "2.14.0",
+              "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models312/lib/python3.12/site-packages/torch/__init__.py"
+            },
+            "transformers": {
+              "version": "5.16.1",
+              "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models312/lib/python3.12/site-packages/transformers/__init__.py"
+            },
+            "onnx": {
+              "version": "1.23.2",
+              "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models312/lib/python3.12/site-packages/onnx/__init__.py"
+            },
+            "onnxruntime": {
+              "version": "1.30.0",
+              "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models312/lib/python3.12/site-packages/onnxruntime/__init__.py"
+            }
+          },
+          "source_sha256": {
+            "scripts/export_quality_head.py": "076e1391a7b70cfc1664db8e6681e46aa19af28967c6b99d4195fd0972497927",
+            "sct/score.py": "b7a6548572e29147b85116e2efceeae8b9b30fe2ffd5af9b49bedcbb3fd0e4fc",
+            "tests/test_quality_export.py": "258a96721e74c5dbcb2a1f065f027b5afb8d7c567be6636c2cf88e6c1dbf43fb"
+          }
+        },
+        "result": "passed",
+        "parity_file": "parity312.json",
+        "minimum_reference_score": 0.8099353909492493,
+        "frozen_control_reference_scores": [
+          0.9995785355567932,
+          0.8099353909492493
+        ],
+        "max_absolute_error": 6.556510925292969e-07,
+        "shapes": [
+          [
+            1,
+            11
+          ],
+          [
+            3,
+            98
+          ],
+          [
+            2,
+            20
+          ],
+          [
+            2,
+            80
+          ]
+        ],
+        "output_sha256": {
+          "model.onnx": "0288133a7eb0209bfb501d1d5dfdcf7763acd727fec744b3443f40241fddeeaa",
+          "tokenizer.json": "1039eb383a85ef2884538e9926eabc97db50f2f56c914e9ca39b2cf927a0f790",
+          "sct_quality.json": "8762d9962d24c1fe0524cf8664b01e7bdb6afe84f8cac0d7ac43415f7efe05bd"
+        }
+      },
+      "313": {
+        "runtime": {
+          "executable": "/home/rehan/sct-improvements-v090-20261109/.venv-models/bin/python",
+          "python": "3.13.3 (main, May 30 2025, 05:38:56) [Clang 20.1.4 ]",
+          "runtime": {
+            "torch": {
+              "version": "2.14.0",
+              "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models/lib/python3.13/site-packages/torch/__init__.py"
+            },
+            "transformers": {
+              "version": "5.16.1",
+              "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models/lib/python3.13/site-packages/transformers/__init__.py"
+            },
+            "onnx": {
+              "version": "1.23.2",
+              "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models/lib/python3.13/site-packages/onnx/__init__.py"
+            },
+            "onnxruntime": {
+              "version": "1.30.0",
+              "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models/lib/python3.13/site-packages/onnxruntime/__init__.py"
+            }
+          },
+          "source_sha256": {
+            "scripts/export_quality_head.py": "076e1391a7b70cfc1664db8e6681e46aa19af28967c6b99d4195fd0972497927",
+            "sct/score.py": "b7a6548572e29147b85116e2efceeae8b9b30fe2ffd5af9b49bedcbb3fd0e4fc",
+            "tests/test_quality_export.py": "258a96721e74c5dbcb2a1f065f027b5afb8d7c567be6636c2cf88e6c1dbf43fb"
+          }
+        },
+        "result": "passed",
+        "parity_file": "parity313.json",
+        "minimum_reference_score": 0.8099353909492493,
+        "frozen_control_reference_scores": [
+          0.9995785355567932,
+          0.8099353909492493
+        ],
+        "max_absolute_error": 6.556510925292969e-07,
+        "shapes": [
+          [
+            1,
+            11
+          ],
+          [
+            3,
+            98
+          ],
+          [
+            2,
+            20
+          ],
+          [
+            2,
+            80
+          ]
+        ],
+        "output_sha256": {
+          "model.onnx": "0288133a7eb0209bfb501d1d5dfdcf7763acd727fec744b3443f40241fddeeaa",
+          "tokenizer.json": "1039eb383a85ef2884538e9926eabc97db50f2f56c914e9ca39b2cf927a0f790",
+          "sct_quality.json": "8762d9962d24c1fe0524cf8664b01e7bdb6afe84f8cac0d7ac43415f7efe05bd"
+        }
+      },
+      "314": {
+        "runtime": {
+          "executable": "/home/rehan/sct-improvements-v090-20261109/.venv-models314/bin/python",
+          "python": "3.14.4 (main, Apr  7 2026, 20:47:53) [Clang 22.1.1 ]",
+          "runtime": {
+            "torch": {
+              "version": "2.14.0",
+              "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models314/lib/python3.14/site-packages/torch/__init__.py"
+            },
+            "transformers": {
+              "version": "5.16.1",
+              "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models314/lib/python3.14/site-packages/transformers/__init__.py"
+            },
+            "onnx": {
+              "version": "1.23.2",
+              "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models314/lib/python3.14/site-packages/onnx/__init__.py"
+            },
+            "onnxruntime": {
+              "version": "1.30.0",
+              "path": "/home/rehan/sct-improvements-v090-20261109/.venv-models314/lib/python3.14/site-packages/onnxruntime/__init__.py"
+            }
+          },
+          "source_sha256": {
+            "scripts/export_quality_head.py": "076e1391a7b70cfc1664db8e6681e46aa19af28967c6b99d4195fd0972497927",
+            "sct/score.py": "b7a6548572e29147b85116e2efceeae8b9b30fe2ffd5af9b49bedcbb3fd0e4fc",
+            "tests/test_quality_export.py": "258a96721e74c5dbcb2a1f065f027b5afb8d7c567be6636c2cf88e6c1dbf43fb"
+          }
+        },
+        "result": "passed",
+        "parity_file": "parity314.json",
+        "minimum_reference_score": 0.8099353909492493,
+        "frozen_control_reference_scores": [
+          0.9995785355567932,
+          0.8099353909492493
+        ],
+        "max_absolute_error": 6.556510925292969e-07,
+        "shapes": [
+          [
+            1,
+            11
+          ],
+          [
+            3,
+            98
+          ],
+          [
+            2,
+            20
+          ],
+          [
+            2,
+            80
+          ]
+        ],
+        "output_sha256": {
+          "model.onnx": "0288133a7eb0209bfb501d1d5dfdcf7763acd727fec744b3443f40241fddeeaa",
+          "tokenizer.json": "1039eb383a85ef2884538e9926eabc97db50f2f56c914e9ca39b2cf927a0f790",
+          "sct_quality.json": "8762d9962d24c1fe0524cf8664b01e7bdb6afe84f8cac0d7ac43415f7efe05bd"
+        }
+      }
+    },
+    "green_session": 61419,
+    "green_exit_code": 0,
+    "warnings": "Five existing exporter warnings per run remain visible; accepted scoped limitation for tested runtimes and shapes only",
+    "evidence_sha256": {
+      "frozen-probe-quality-torch.py": "51a79b1fc63fa3e4120a6aa03d6a6df0f37572061fa351afd280a3dba50f4487",
+      "parity312.json": "81654109ad25e89e0dde4e08d1f2fb3ffcae3d8c6c17d618a9c839d54e4dc99a",
+      "parity313.json": "81654109ad25e89e0dde4e08d1f2fb3ffcae3d8c6c17d618a9c839d54e4dc99a",
+      "parity314.json": "81654109ad25e89e0dde4e08d1f2fb3ffcae3d8c6c17d618a9c839d54e4dc99a",
+      "r1-parity-control-py312.log": "8fe21026e1ae8a5195ceb64ae64192ef50305e4317d156b1211a752bc9732b03",
+      "r1-parity-control-py312.xml": "de7d3331814223c3faf36204ebbd7f59bd28777de94437be4ded6c9b07895ac2",
+      "r1-parity-control-py313.log": "f878d15a3a0c8e178092018606662c70904a2e3bfe336390f28c26d6afd2c446",
+      "r1-parity-control-py313.xml": "49c761893b9b8b5efc29dcbdf6850b67c461607bd8e63d143bf78b990d5305b1",
+      "r1-parity-control-py314.log": "5275b3c1fad706dd0ea31ff7fef6505b884f925517e8f7ac4555096a23972405",
+      "r1-parity-control-py314.xml": "d330a242e045b343f29c4c269256781acdf87d5416c9f3229ae6b29682d7e85f",
+      "r1-parity-control-red.log": "9fe6f8b9f685b00282a8e6116dbc3583fd123ee5dd6688fbb45fe710c21d0bc6",
+      "r1-parity-control-red.xml": "5312d568099f3273ed6a8484de1b43047ccfa68b424fdc2717bbe82303b3a28c",
+      "runtimes.jsonl": "3c077cef1c61fd697138788ea0405b8da800fc193ef0e90925b54263d12c7e1f",
+      "test-quality-parity.diff": "eb7971537c97caf6c6f86267781ae75cd483dc8250e2f5d4e900f75bebe24181",
+      "test_quality_export.after.py": "258a96721e74c5dbcb2a1f065f027b5afb8d7c567be6636c2cf88e6c1dbf43fb",
+      "test_quality_export.before.py": "2707f532ffc7fa939011973134b16750d21b4f20a7947e5a3b553c2728330814",
+      "test_quality_export.red.py": "66a14ab2a2e501e8e6abb7d7838519125123f17ed8955ab9c79e004996500816"
+    }
+  },
+  "limits": [
+    "Prepared pinned local caches and Presidio NLP/PSL assets were required.",
+    "Zero observed network attempts in these controls is not a default network-free guarantee.",
+    "Synthetic functionality and numerical parity do not establish quality or privacy accuracy.",
+    "Core matrix, routing evidence, final review and actual staged PR checks remain separate gates."
+  ],
+  "evidence_locations": [
+    "/private/tmp/sct-v090-r1-model-evidence",
+    "/private/tmp/sct-v090-r1-parity-control"
+  ],
+  "test_only_followup_binding": {
+    "qa_tree": "ffc64d8625d11f5c60661cd8f3fccd593e907c80",
+    "archive_sha256": "87e8d5bba8cdbd319033e999611905d64818097b25efd03a99185ebfbe63a4fd",
+    "package_runtime_files_identical_to_prior_qualified_source": 65,
+    "new_test_sha256": "6e28977a0596470a735041d9fbe3976b8c800926313d7f32e62729f5a0218c4a",
+    "new_native_fixture_checks": "v090-boundary-test-qualification.json",
+    "original_receipts_rebound": false,
+    "scope": "Existing SDK/model observations retain original snapshot identities. New test-only change alters no runtime source."
+  }
+}

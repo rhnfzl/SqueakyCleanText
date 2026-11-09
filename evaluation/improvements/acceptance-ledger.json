@@ -1,0 +1,1737 @@
+{
+  "schema_version": 1,
+  "baseline": "8afef61c74ea738a2c904374776dea34d9c1c39e",
+  "objective": "Implement all ten improvements as planned",
+  "tasks": [
+    {
+      "id": "P0",
+      "status": "Current-base source/runtime qualification and independent source review complete; actual task-head CI is an external merge gate",
+      "commit": "29f9b27 + fa97cc1 + 56d9e4f",
+      "historical_status": "reviewed; baseline and 12 provider profiles pass",
+      "historical_commit": "29f9b27 + fa97cc1 + 56d9e4f",
+      "current_evidence": "evaluation/improvements/v090-final-qualification.json"
+    },
+    {
+      "id": "C1",
+      "status": "Current-base source/runtime qualification and independent source review complete; actual task-head CI is an external merge gate",
+      "commit": "eb7f42c + 29f9b27 annotation fix",
+      "historical_status": "reviewed; targeted tests/lint/types pass; global acceptance pending",
+      "historical_commit": "eb7f42c + 29f9b27 annotation fix",
+      "current_evidence": "evaluation/improvements/v090-final-qualification.json"
+    },
+    {
+      "id": "C2",
+      "status": "Current-base source/runtime qualification and independent source review complete; actual task-head CI is an external merge gate",
+      "commit": "0dec767",
+      "historical_status": "reviewed; focused/real-model/broad checks pass; final integrated CI pending",
+      "historical_commit": "0dec767",
+      "current_evidence": "evaluation/improvements/v090-final-qualification.json"
+    },
+    {
+      "id": "C3",
+      "status": "Current-base source/runtime qualification and independent source review complete; actual task-head CI is an external merge gate",
+      "commit": "1299e1d + 08e1ae3",
+      "historical_status": "reviewed after boundary fixes; current schema/runtime checks pass; C4/C5 execution integration pending",
+      "historical_commit": "1299e1d + 08e1ae3",
+      "current_evidence": "evaluation/improvements/v090-final-qualification.json"
+    },
+    {
+      "id": "C4",
+      "status": "Current-base source/runtime qualification and independent source review complete; actual task-head CI is an external merge gate",
+      "commit": "bc4efd8",
+      "historical_status": "reviewed and committed; local full/focused/native smoke and Python3.12/3.13 focused checks pass; final Linux/integration acceptance pending",
+      "historical_commit": "bc4efd8",
+      "current_evidence": "evaluation/improvements/v090-final-qualification.json"
+    },
+    {
+      "id": "C5",
+      "status": "Current-base source/runtime qualification and independent source review complete; actual task-head CI is an external merge gate",
+      "commit": "2c7b7add4106cb90b2e3a9b8acc40d04ee6df476",
+      "historical_status": "reviewed; schema/adapters and privacy summaries pass; integrated acceptance pending",
+      "historical_commit": "2c7b7add4106cb90b2e3a9b8acc40d04ee6df476",
+      "current_evidence": "evaluation/improvements/v090-final-qualification.json"
+    },
+    {
+      "id": "D1",
+      "status": "Current-base source/runtime qualification and independent source review complete; actual task-head CI is an external merge gate",
+      "commit": "fd3880efec45bbe17efac6683f94a30f99b14c7c",
+      "historical_status": "reviewed; corpus selection, ownership and cleanup tests pass; integrated qualification pending",
+      "historical_commit": "fd3880efec45bbe17efac6683f94a30f99b14c7c",
+      "current_evidence": "evaluation/improvements/v090-final-qualification.json"
+    },
+    {
+      "id": "D2",
+      "status": "Current-base source/runtime qualification and independent source review complete; actual task-head CI is an external merge gate",
+      "commit": "a68949582e01bca86869bdeea89b990e1fa4df8e",
+      "historical_status": "reviewed; native workflow, identity, optional/core install and configured CI gates pass; integrated acceptance pending",
+      "historical_commit": "a68949582e01bca86869bdeea89b990e1fa4df8e",
+      "current_evidence": "evaluation/improvements/v090-final-qualification.json"
+    },
+    {
+      "id": "D3",
+      "status": "Current-base source/runtime qualification and independent source review complete; actual task-head CI is an external merge gate",
+      "commit": "4ddb77a5ad4134fe44b81317bd76d659d9a98cae",
+      "historical_status": "reviewed; actual native replay, immutable reference identity and regular-artifact guards pass; integrated acceptance pending",
+      "historical_commit": "4ddb77a5ad4134fe44b81317bd76d659d9a98cae",
+      "current_evidence": "evaluation/improvements/v090-final-qualification.json"
+    },
+    {
+      "id": "S1",
+      "status": "Current-base source/runtime qualification and independent source review complete; actual task-head CI is an external merge gate",
+      "commit": "b276fa0",
+      "historical_status": "reviewed; targeted tests/lint/types pass; S2 operational acceptance pending",
+      "historical_commit": "b276fa0",
+      "current_evidence": "evaluation/improvements/v090-final-qualification.json"
+    },
+    {
+      "id": "S2",
+      "status": "Current-base source/runtime qualification and independent source review complete; actual task-head CI is an external merge gate",
+      "commit": "7cecd6669cc2b54b23ecf9dbddd6ece92e426e93",
+      "historical_status": "reviewed; operational and scoped source-security gates pass; integrated acceptance pending",
+      "historical_commit": "7cecd6669cc2b54b23ecf9dbddd6ece92e426e93",
+      "current_evidence": "evaluation/improvements/v090-final-qualification.json"
+    },
+    {
+      "id": "E1",
+      "status": "Current-base source/runtime qualification and independent source review complete; actual task-head CI is an external merge gate",
+      "commit": "76f43a0c4bc7de03e8f6687633d48474cdcb4edc",
+      "historical_status": "reviewed; corrected native three-Python matrix, full core and document projection gates pass; integrated acceptance pending",
+      "historical_commit": "76f43a0c4bc7de03e8f6687633d48474cdcb4edc",
+      "current_evidence": "evaluation/improvements/v090-final-qualification.json"
+    },
+    {
+      "id": "E2",
+      "status": "Current-base source/runtime qualification and independent source review complete; actual task-head CI is an external merge gate",
+      "commit": "bfc639566d067189a263c8e39487412b855fbec2",
+      "historical_status": "reviewed; frozen full and three-Python native rule-scanner gates pass; integrated acceptance pending",
+      "historical_commit": "bfc639566d067189a263c8e39487412b855fbec2",
+      "current_evidence": "evaluation/improvements/v090-final-qualification.json"
+    },
+    {
+      "id": "L1",
+      "status": "Current-base source/runtime qualification and independent source review complete; actual task-head CI is an external merge gate",
+      "commit": "dab6d4cd07aab473ed6a4f510f7e9be8d1227b09",
+      "historical_status": "reviewed; final frozen full, three-Python native routes and paired synthetic language metrics pass; integrated acceptance pending",
+      "historical_commit": "dab6d4cd07aab473ed6a4f510f7e9be8d1227b09",
+      "current_evidence": "evaluation/improvements/v090-final-qualification.json"
+    },
+    {
+      "id": "L2",
+      "status": "Current-base source/runtime qualification and independent source review complete; actual task-head CI is an external merge gate",
+      "commit": "b23250791ea9c6a4286a8ec9b648b6126ed75d87",
+      "historical_status": "reviewed; final full, three-Python native routes, warning/error and semantic identity fixes pass; L3 calibration and global acceptance pending",
+      "historical_commit": "b23250791ea9c6a4286a8ec9b648b6126ed75d87",
+      "current_evidence": "evaluation/improvements/v090-final-qualification.json"
+    },
+    {
+      "id": "L3",
+      "status": "Current-base source/runtime qualification and independent source review complete; actual task-head CI is an external merge gate",
+      "commit": null,
+      "historical_status": "saved results and empirical documentation validated with explicit raw-observation audit limits; scoped tests/lint/strict docs pass; commit and integrated acceptance pending",
+      "historical_commit": null,
+      "current_evidence": "evaluation/improvements/v090-final-qualification.json"
+    },
+    {
+      "id": "R1",
+      "status": "Current-base source/runtime qualification and independent source review complete; actual task-head CI is an external merge gate",
+      "commit": null,
+      "historical_status": "local preparation and frozen-patch quality review complete; server access restored; actual exporter/native/runtime/quality qualification and final review/PR CI pending",
+      "historical_commit": null,
+      "current_evidence": "evaluation/improvements/v090-final-qualification.json"
+    }
+  ],
+  "requirements": [
+    {
+      "id": "P0.1",
+      "requirement": "Capture independent expected outputs for default/training and placeholder/synthetic/reversible modes, blank input, source markers, custom steps and batch ordering.",
+      "status": "verified for task scope; global acceptance still pending",
+      "evidence": [
+        "evaluation/improvements/baseline-manifest.json",
+        "evaluation/improvements/measure_baseline.py",
+        "tests/test_baseline_measurement.py",
+        "tests/test_processing_compatibility.py",
+        "tests/test_optional_profiles.py",
+        "docs/NER_BACKENDS.md",
+        "56d9e4f; scoped independent re-review approved"
+      ],
+      "current_acceptance": "Source/runtime evidence qualified; final task-head CI is an external merge gate",
+      "historical_status": "verified for task scope; global acceptance still pending",
+      "current_evidence": [
+        "evaluation/improvements/v090-final-qualification.json",
+        "evaluation/improvements/v090-native-profiles-qualification.json",
+        "evaluation/improvements/v090-model-qualification.json",
+        "evaluation/improvements/routing-validation-v2.json"
+      ]
+    },
+    {
+      "id": "P0.2",
+      "requirement": "Install each proposed optional profile on Python 3.12/3.13/3.14 and verify versions plus module paths using that project interpreter; a registry classifier is not an install test.",
+      "status": "verified for task scope; global acceptance still pending",
+      "evidence": [
+        "evaluation/improvements/baseline-manifest.json",
+        "evaluation/improvements/measure_baseline.py",
+        "tests/test_baseline_measurement.py",
+        "tests/test_processing_compatibility.py",
+        "tests/test_optional_profiles.py",
+        "docs/NER_BACKENDS.md",
+        "56d9e4f; scoped independent re-review approved"
+      ],
+      "current_acceptance": "Source/runtime evidence qualified; final task-head CI is an external merge gate",
+      "historical_status": "verified for task scope; global acceptance still pending",
+      "current_evidence": [
+        "evaluation/improvements/v090-final-qualification.json",
+        "evaluation/improvements/v090-native-profiles-qualification.json",
+        "evaluation/improvements/v090-model-qualification.json",
+        "evaluation/improvements/routing-validation-v2.json"
+      ]
+    },
+    {
+      "id": "P0.3",
+      "requirement": "Measure current exact-span metrics, document exposure, median/p95 latency, model calls and peak memory on identical fixed samples before editing behavior.",
+      "status": "verified for task scope; global acceptance still pending",
+      "evidence": [
+        "evaluation/improvements/baseline-manifest.json",
+        "evaluation/improvements/measure_baseline.py",
+        "tests/test_baseline_measurement.py",
+        "tests/test_processing_compatibility.py",
+        "tests/test_optional_profiles.py",
+        "docs/NER_BACKENDS.md",
+        "56d9e4f; scoped independent re-review approved"
+      ],
+      "current_acceptance": "Source/runtime evidence qualified; final task-head CI is an external merge gate",
+      "historical_status": "verified for task scope; global acceptance still pending",
+      "current_evidence": [
+        "evaluation/improvements/v090-final-qualification.json",
+        "evaluation/improvements/v090-native-profiles-qualification.json",
+        "evaluation/improvements/v090-model-qualification.json",
+        "evaluation/improvements/routing-validation-v2.json"
+      ]
+    },
+    {
+      "id": "P0.4",
+      "requirement": "Correct the stale averaging sentence to reflect configurable max/mean voting, without changing the default.",
+      "status": "verified for task scope; global acceptance still pending",
+      "evidence": [
+        "evaluation/improvements/baseline-manifest.json",
+        "evaluation/improvements/measure_baseline.py",
+        "tests/test_baseline_measurement.py",
+        "tests/test_processing_compatibility.py",
+        "tests/test_optional_profiles.py",
+        "docs/NER_BACKENDS.md",
+        "56d9e4f; scoped independent re-review approved"
+      ],
+      "current_acceptance": "Source/runtime evidence qualified; final task-head CI is an external merge gate",
+      "historical_status": "verified for task scope; global acceptance still pending",
+      "current_evidence": [
+        "evaluation/improvements/v090-final-qualification.json",
+        "evaluation/improvements/v090-native-profiles-qualification.json",
+        "evaluation/improvements/v090-model-qualification.json",
+        "evaluation/improvements/routing-validation-v2.json"
+      ]
+    },
+    {
+      "id": "C1.1",
+      "requirement": "Reject reversed/out-of-bounds ranges, NaN/out-of-range scores and mixed coordinate spaces. None confidence remains None.",
+      "status": "verified for task scope; global acceptance still pending",
+      "evidence": [
+        "sct/findings.py",
+        "sct/coordinates.py",
+        "tests/test_detections.py",
+        "tests/test_coordinates.py",
+        "32 focused/compat tests; Ruff; pinned mypy; independent review approved"
+      ],
+      "current_acceptance": "Source/runtime evidence qualified; final task-head CI is an external merge gate",
+      "historical_status": "verified for task scope; global acceptance still pending",
+      "current_evidence": [
+        "evaluation/improvements/v090-final-qualification.json",
+        "evaluation/improvements/v090-native-profiles-qualification.json",
+        "evaluation/improvements/v090-model-qualification.json",
+        "evaluation/improvements/routing-validation-v2.json"
+      ]
+    },
+    {
+      "id": "C1.2",
+      "requirement": "Compose identity, insertion, deletion, many-to-one and one-to-many edits; classify exact/covering/unavailable correctly.",
+      "status": "verified for task scope; global acceptance still pending",
+      "evidence": [
+        "sct/findings.py",
+        "sct/coordinates.py",
+        "tests/test_detections.py",
+        "tests/test_coordinates.py",
+        "32 focused/compat tests; Ruff; pinned mypy; independent review approved"
+      ],
+      "current_acceptance": "Source/runtime evidence qualified; final task-head CI is an external merge gate",
+      "historical_status": "verified for task scope; global acceptance still pending",
+      "current_evidence": [
+        "evaluation/improvements/v090-final-qualification.json",
+        "evaluation/improvements/v090-native-profiles-qualification.json",
+        "evaluation/improvements/v090-model-qualification.json",
+        "evaluation/improvements/routing-validation-v2.json"
+      ]
+    },
+    {
+      "id": "C1.3",
+      "requirement": "For original \"\ud83d\udc4b A&amp;B\" and decoded text \"\ud83d\udc4b A&B\", B maps from [4,5) to [8,9); & maps conservatively to [3,8).",
+      "status": "verified for task scope; global acceptance still pending",
+      "evidence": [
+        "sct/findings.py",
+        "sct/coordinates.py",
+        "tests/test_detections.py",
+        "tests/test_coordinates.py",
+        "32 focused/compat tests; Ruff; pinned mypy; independent review approved"
+      ],
+      "current_acceptance": "Source/runtime evidence qualified; final task-head CI is an external merge gate",
+      "historical_status": "verified for task scope; global acceptance still pending",
+      "current_evidence": [
+        "evaluation/improvements/v090-final-qualification.json",
+        "evaluation/improvements/v090-native-profiles-qualification.json",
+        "evaluation/improvements/v090-model-qualification.json",
+        "evaluation/improvements/routing-validation-v2.json"
+      ]
+    },
+    {
+      "id": "C1.4",
+      "requirement": "An opaque reverse-string callback cannot produce claimed exact raw offsets. Findings/repr/JSON contain no matched values.",
+      "status": "verified for task scope; global acceptance still pending",
+      "evidence": [
+        "sct/findings.py",
+        "sct/coordinates.py",
+        "tests/test_detections.py",
+        "tests/test_coordinates.py",
+        "32 focused/compat tests; Ruff; pinned mypy; independent review approved"
+      ],
+      "current_acceptance": "Source/runtime evidence qualified; final task-head CI is an external merge gate",
+      "historical_status": "verified for task scope; global acceptance still pending",
+      "current_evidence": [
+        "evaluation/improvements/v090-final-qualification.json",
+        "evaluation/improvements/v090-native-profiles-qualification.json",
+        "evaluation/improvements/v090-model-qualification.json",
+        "evaluation/improvements/routing-validation-v2.json"
+      ]
+    },
+    {
+      "id": "C2.1",
+      "requirement": "Regex spans match the existing contact/date/number/custom-pattern behavior and validations. Do not copy independent regex tables.",
+      "status": "verified for task scope; final integrated provider matrix still pending",
+      "evidence": [
+        "sct/detectors_builtin.py",
+        "sct/utils/ner_spans.py",
+        "tests/test_builtin_detections.py",
+        "0dec767; independent review approved; Linux2742pass64skip92.18%; final63focused+realONNX parity passed"
+      ],
+      "current_acceptance": "Source/runtime evidence qualified; final task-head CI is an external merge gate",
+      "historical_status": "verified for task scope; final integrated provider matrix still pending",
+      "current_evidence": [
+        "evaluation/improvements/v090-final-qualification.json",
+        "evaluation/improvements/v090-native-profiles-qualification.json",
+        "evaluation/improvements/v090-model-qualification.json",
+        "evaluation/improvements/routing-validation-v2.json"
+      ]
+    },
+    {
+      "id": "C2.2",
+      "requirement": "All six existing NER backends return canonical findings; model-window merges, votes and offsets remain stable.",
+      "status": "verified for task scope; final integrated provider matrix still pending",
+      "evidence": [
+        "sct/detectors_builtin.py",
+        "sct/utils/ner_spans.py",
+        "tests/test_builtin_detections.py",
+        "0dec767; independent review approved; Linux2742pass64skip92.18%; final63focused+realONNX parity passed"
+      ],
+      "current_acceptance": "Source/runtime evidence qualified; final task-head CI is an external merge gate",
+      "historical_status": "verified for task scope; final integrated provider matrix still pending",
+      "current_evidence": [
+        "evaluation/improvements/v090-final-qualification.json",
+        "evaluation/improvements/v090-native-profiles-qualification.json",
+        "evaluation/improvements/v090-model-qualification.json",
+        "evaluation/improvements/routing-validation-v2.json"
+      ]
+    },
+    {
+      "id": "C2.3",
+      "requirement": "Use fake models for unit tests and one pinned real model per applicable optional profile for smoke tests.",
+      "status": "verified for task scope; final integrated provider matrix still pending",
+      "evidence": [
+        "sct/detectors_builtin.py",
+        "sct/utils/ner_spans.py",
+        "tests/test_builtin_detections.py",
+        "0dec767; independent review approved; Linux2742pass64skip92.18%; final63focused+realONNX parity passed"
+      ],
+      "current_acceptance": "Source/runtime evidence qualified; final task-head CI is an external merge gate",
+      "historical_status": "verified for task scope; final integrated provider matrix still pending",
+      "current_evidence": [
+        "evaluation/improvements/v090-final-qualification.json",
+        "evaluation/improvements/v090-native-profiles-qualification.json",
+        "evaluation/improvements/v090-model-qualification.json",
+        "evaluation/improvements/routing-validation-v2.json"
+      ]
+    },
+    {
+      "id": "C2.4",
+      "requirement": "Legacy process outputs and include_entities metadata match P0 fixtures; no extra model call appears in legacy mode.",
+      "status": "verified for task scope; final integrated provider matrix still pending",
+      "evidence": [
+        "sct/detectors_builtin.py",
+        "sct/utils/ner_spans.py",
+        "tests/test_builtin_detections.py",
+        "0dec767; independent review approved; Linux2742pass64skip92.18%; final63focused+realONNX parity passed"
+      ],
+      "current_acceptance": "Source/runtime evidence qualified; final task-head CI is an external merge gate",
+      "historical_status": "verified for task scope; final integrated provider matrix still pending",
+      "current_evidence": [
+        "evaluation/improvements/v090-final-qualification.json",
+        "evaluation/improvements/v090-native-profiles-qualification.json",
+        "evaluation/improvements/v090-model-qualification.json",
+        "evaluation/improvements/routing-validation-v2.json"
+      ]
+    },
+    {
+      "id": "C3.1",
+      "requirement": "Duplicate/unknown IDs and invalid data-only options fail before processing; untrusted config does not trigger imports.",
+      "status": "verified for registry/factory scope; execution/forwarding belongs to C4/C5",
+      "evidence": [
+        "sct/detectors.py",
+        "sct/integrations/_runtime.py",
+        "tests/test_detector_registry.py",
+        "evaluation/improvements/c3-schema-qualification.json",
+        "08e1ae3; independent fix re-review approved; Linux2777pass65skip91.95%; Ruff/mypy49pass"
+      ],
+      "current_acceptance": "Source/runtime evidence qualified; final task-head CI is an external merge gate",
+      "historical_status": "verified for registry/factory scope; execution/forwarding belongs to C4/C5",
+      "current_evidence": [
+        "evaluation/improvements/v090-final-qualification.json",
+        "evaluation/improvements/v090-native-profiles-qualification.json",
+        "evaluation/improvements/v090-model-qualification.json",
+        "evaluation/improvements/routing-validation-v2.json"
+      ]
+    },
+    {
+      "id": "C3.2",
+      "requirement": "Registry freezes at cleaner construction; factories instantiate inside each process, never pickle sessions/keys.",
+      "status": "verified for registry/factory scope; execution/forwarding belongs to C4/C5",
+      "evidence": [
+        "sct/detectors.py",
+        "sct/integrations/_runtime.py",
+        "tests/test_detector_registry.py",
+        "evaluation/improvements/c3-schema-qualification.json",
+        "08e1ae3; independent fix re-review approved; Linux2777pass65skip91.95%; Ruff/mypy49pass"
+      ],
+      "current_acceptance": "Source/runtime evidence qualified; final task-head CI is an external merge gate",
+      "historical_status": "verified for registry/factory scope; execution/forwarding belongs to C4/C5",
+      "current_evidence": [
+        "evaluation/improvements/v090-final-qualification.json",
+        "evaluation/improvements/v090-native-profiles-qualification.json",
+        "evaluation/improvements/v090-model-qualification.json",
+        "evaluation/improvements/routing-validation-v2.json"
+      ]
+    },
+    {
+      "id": "C3.3",
+      "requirement": "Threaded batches have stable order and no leaked per-document context. Remote/network-required detectors fail unless explicitly allowed.",
+      "status": "verified for registry/factory scope; execution/forwarding belongs to C4/C5",
+      "evidence": [
+        "sct/detectors.py",
+        "sct/integrations/_runtime.py",
+        "tests/test_detector_registry.py",
+        "evaluation/improvements/c3-schema-qualification.json",
+        "08e1ae3; independent fix re-review approved; Linux2777pass65skip91.95%; Ruff/mypy49pass"
+      ],
+      "current_acceptance": "Source/runtime evidence qualified; final task-head CI is an external merge gate",
+      "historical_status": "verified for registry/factory scope; execution/forwarding belongs to C4/C5",
+      "current_evidence": [
+        "evaluation/improvements/v090-final-qualification.json",
+        "evaluation/improvements/v090-native-profiles-qualification.json",
+        "evaluation/improvements/v090-model-qualification.json",
+        "evaluation/improvements/routing-validation-v2.json"
+      ]
+    },
+    {
+      "id": "C3.4",
+      "requirement": "Round-trip DetectorSpec config through supported config serialization and legacy-global conventions.",
+      "status": "verified for registry/factory scope; execution/forwarding belongs to C4/C5",
+      "evidence": [
+        "sct/detectors.py",
+        "sct/integrations/_runtime.py",
+        "tests/test_detector_registry.py",
+        "evaluation/improvements/c3-schema-qualification.json",
+        "08e1ae3; independent fix re-review approved; Linux2777pass65skip91.95%; Ruff/mypy49pass"
+      ],
+      "current_acceptance": "Source/runtime evidence qualified; final task-head CI is an external merge gate",
+      "current_interpretation": "The v0.9.0 port addendum supersedes legacy-global conventions. Explicit config serialization remains supported; removed mutable globals stay removed.",
+      "historical_status": "verified for registry/factory scope; execution/forwarding belongs to C4/C5",
+      "current_evidence": [
+        "evaluation/improvements/v090-final-qualification.json",
+        "evaluation/improvements/v090-native-profiles-qualification.json",
+        "evaluation/improvements/v090-model-qualification.json",
+        "evaluation/improvements/routing-validation-v2.json"
+      ]
+    },
+    {
+      "id": "C4.1",
+      "requirement": "Mixed EMAIL regex and PERSON NER findings receive the same per-type policy in all three replacement modes.",
+      "status": "verified for core task scope; adapter forwarding and final integrated matrix remain pending",
+      "evidence": [
+        "sct/unified.py",
+        "sct/policy_v2.py",
+        "tests/test_unified_processing.py",
+        "evaluation/improvements/c4-python-qualification.json",
+        "bc4efd8: provisional and scoped reviews accepted; all11 committed hashes match;2829passed66skipped2sandboxfailures then2outsidepasses;92.17%coverage;Ruff/mypy51pass"
+      ],
+      "current_acceptance": "Source/runtime evidence qualified; final task-head CI is an external merge gate",
+      "historical_status": "verified for core task scope; adapter forwarding and final integrated matrix remain pending",
+      "current_evidence": [
+        "evaluation/improvements/v090-final-qualification.json",
+        "evaluation/improvements/v090-native-profiles-qualification.json",
+        "evaluation/improvements/v090-model-qualification.json",
+        "evaluation/improvements/routing-validation-v2.json"
+      ]
+    },
+    {
+      "id": "C4.2",
+      "requirement": "keep affects the PII stage; redact dominates overlap and is deliberately irreversible; unknown scores are not dropped.",
+      "status": "verified for core task scope; adapter forwarding and final integrated matrix remain pending",
+      "evidence": [
+        "sct/unified.py",
+        "sct/policy_v2.py",
+        "tests/test_unified_processing.py",
+        "evaluation/improvements/c4-python-qualification.json",
+        "bc4efd8: provisional and scoped reviews accepted; all11 committed hashes match;2829passed66skipped2sandboxfailures then2outsidepasses;92.17%coverage;Ruff/mypy51pass"
+      ],
+      "current_acceptance": "Source/runtime evidence qualified; final task-head CI is an external merge gate",
+      "historical_status": "verified for core task scope; adapter forwarding and final integrated matrix remain pending",
+      "current_evidence": [
+        "evaluation/improvements/v090-final-qualification.json",
+        "evaluation/improvements/v090-native-profiles-qualification.json",
+        "evaluation/improvements/v090-model-qualification.json",
+        "evaluation/improvements/routing-validation-v2.json"
+      ]
+    },
+    {
+      "id": "C4.3",
+      "requirement": "Source marker strings, overlapping spans, custom maps and Unicode do not cause double masking or marker collisions.",
+      "status": "verified for core task scope; adapter forwarding and final integrated matrix remain pending",
+      "evidence": [
+        "sct/unified.py",
+        "sct/policy_v2.py",
+        "tests/test_unified_processing.py",
+        "evaluation/improvements/c4-python-qualification.json",
+        "bc4efd8: provisional and scoped reviews accepted; all11 committed hashes match;2829passed66skipped2sandboxfailures then2outsidepasses;92.17%coverage;Ruff/mypy51pass"
+      ],
+      "current_acceptance": "Source/runtime evidence qualified; final task-head CI is an external merge gate",
+      "historical_status": "verified for core task scope; adapter forwarding and final integrated matrix remain pending",
+      "current_evidence": [
+        "evaluation/improvements/v090-final-qualification.json",
+        "evaluation/improvements/v090-native-profiles-qualification.json",
+        "evaluation/improvements/v090-model-qualification.json",
+        "evaluation/improvements/routing-validation-v2.json"
+      ]
+    },
+    {
+      "id": "C4.4",
+      "requirement": "Best-effort mapping reports unavailable instead of fabricating raw positions; require_source rejects opaque transforms explicitly.",
+      "status": "verified for core task scope; adapter forwarding and final integrated matrix remain pending",
+      "evidence": [
+        "sct/unified.py",
+        "sct/policy_v2.py",
+        "tests/test_unified_processing.py",
+        "evaluation/improvements/c4-python-qualification.json",
+        "bc4efd8: provisional and scoped reviews accepted; all11 committed hashes match;2829passed66skipped2sandboxfailures then2outsidepasses;92.17%coverage;Ruff/mypy51pass"
+      ],
+      "current_acceptance": "Source/runtime evidence qualified; final task-head CI is an external merge gate",
+      "historical_status": "verified for core task scope; adapter forwarding and final integrated matrix remain pending",
+      "current_evidence": [
+        "evaluation/improvements/v090-final-qualification.json",
+        "evaluation/improvements/v090-native-profiles-qualification.json",
+        "evaluation/improvements/v090-model-qualification.json",
+        "evaluation/improvements/routing-validation-v2.json"
+      ]
+    },
+    {
+      "id": "C4.5",
+      "requirement": "Buffered streaming uses the same document path; windowed streaming and browser manifests reject unsupported opt-in combinations.",
+      "status": "verified for core task scope; adapter forwarding and final integrated matrix remain pending",
+      "evidence": [
+        "sct/unified.py",
+        "sct/policy_v2.py",
+        "tests/test_unified_processing.py",
+        "evaluation/improvements/c4-python-qualification.json",
+        "bc4efd8: provisional and scoped reviews accepted; all11 committed hashes match;2829passed66skipped2sandboxfailures then2outsidepasses;92.17%coverage;Ruff/mypy51pass"
+      ],
+      "current_acceptance": "Source/runtime evidence qualified; final task-head CI is an external merge gate",
+      "historical_status": "verified for core task scope; adapter forwarding and final integrated matrix remain pending",
+      "current_evidence": [
+        "evaluation/improvements/v090-final-qualification.json",
+        "evaluation/improvements/v090-native-profiles-qualification.json",
+        "evaluation/improvements/v090-model-qualification.json",
+        "evaluation/improvements/routing-validation-v2.json"
+      ]
+    },
+    {
+      "id": "C4.6",
+      "requirement": "Legacy defaults, presets, 3-tuple unpacking, public exports and existing reversible adapter refusal remain compatible.",
+      "status": "verified for core task scope; adapter forwarding and final integrated matrix remain pending",
+      "evidence": [
+        "sct/unified.py",
+        "sct/policy_v2.py",
+        "tests/test_unified_processing.py",
+        "evaluation/improvements/c4-python-qualification.json",
+        "bc4efd8: provisional and scoped reviews accepted; all11 committed hashes match;2829passed66skipped2sandboxfailures then2outsidepasses;92.17%coverage;Ruff/mypy51pass"
+      ],
+      "current_acceptance": "Source/runtime evidence qualified; final task-head CI is an external merge gate",
+      "historical_status": "verified for core task scope; adapter forwarding and final integrated matrix remain pending",
+      "current_evidence": [
+        "evaluation/improvements/v090-final-qualification.json",
+        "evaluation/improvements/v090-native-profiles-qualification.json",
+        "evaluation/improvements/v090-model-qualification.json",
+        "evaluation/improvements/routing-validation-v2.json"
+      ]
+    },
+    {
+      "id": "C5.1",
+      "requirement": "No built-in field-name guessing. Identical text receives identical default treatment regardless of key name.",
+      "status": "task review passed; final integrated acceptance pending",
+      "evidence": [
+        "2c7b7add4106cb90b2e3a9b8acc40d04ee6df476:tests/test_schema_context.py",
+        "evaluation/improvements/PROGRESS.md"
+      ],
+      "current_acceptance": "Source/runtime evidence qualified; final task-head CI is an external merge gate",
+      "historical_status": "task review passed; final integrated acceptance pending",
+      "current_evidence": [
+        "evaluation/improvements/v090-final-qualification.json",
+        "evaluation/improvements/v090-native-profiles-qualification.json",
+        "evaluation/improvements/v090-model-qualification.json",
+        "evaluation/improvements/routing-validation-v2.json"
+      ]
+    },
+    {
+      "id": "C5.2",
+      "requirement": "Caller-declared protect_value can explicitly mask a whole value; hints reach only a context-capable provider and are not silently ignored.",
+      "status": "task review passed; final integrated acceptance pending",
+      "evidence": [
+        "2c7b7add4106cb90b2e3a9b8acc40d04ee6df476:tests/test_schema_context.py",
+        "evaluation/improvements/PROGRESS.md"
+      ],
+      "current_acceptance": "Source/runtime evidence qualified; final task-head CI is an external merge gate",
+      "historical_status": "task review passed; final integrated acceptance pending",
+      "current_evidence": [
+        "evaluation/improvements/v090-final-qualification.json",
+        "evaluation/improvements/v090-native-profiles-qualification.json",
+        "evaluation/improvements/v090-model-qualification.json",
+        "evaluation/improvements/routing-validation-v2.json"
+      ]
+    },
+    {
+      "id": "C5.3",
+      "requirement": "JSON key cleaning, duplicate cleaned keys, tuples, non-string cells, metadata and input-copy semantics stay compatible.",
+      "status": "task review passed; final integrated acceptance pending",
+      "evidence": [
+        "2c7b7add4106cb90b2e3a9b8acc40d04ee6df476:tests/test_schema_context.py",
+        "evaluation/improvements/PROGRESS.md"
+      ],
+      "current_acceptance": "Source/runtime evidence qualified; final task-head CI is an external merge gate",
+      "historical_status": "task review passed; final integrated acceptance pending",
+      "current_evidence": [
+        "evaluation/improvements/v090-final-qualification.json",
+        "evaluation/improvements/v090-native-profiles-qualification.json",
+        "evaluation/improvements/v090-model-qualification.json",
+        "evaluation/improvements/routing-validation-v2.json"
+      ]
+    },
+    {
+      "id": "C5.4",
+      "requirement": "A Presidio-capable analysis path receives explicit context; ONNX-only providers reject unsupported required hints clearly.",
+      "status": "task review passed; final integrated acceptance pending",
+      "evidence": [
+        "2c7b7add4106cb90b2e3a9b8acc40d04ee6df476:tests/test_schema_context.py",
+        "evaluation/improvements/PROGRESS.md"
+      ],
+      "current_acceptance": "Source/runtime evidence qualified; final task-head CI is an external merge gate",
+      "historical_status": "task review passed; final integrated acceptance pending",
+      "current_evidence": [
+        "evaluation/improvements/v090-final-qualification.json",
+        "evaluation/improvements/v090-native-profiles-qualification.json",
+        "evaluation/improvements/v090-model-qualification.json",
+        "evaluation/improvements/routing-validation-v2.json"
+      ]
+    },
+    {
+      "id": "C5.5",
+      "requirement": "CLI/MCP expose data-only schema with an application whitelist, not arbitrary Python factory loading.",
+      "status": "task review passed; final integrated acceptance pending",
+      "evidence": [
+        "2c7b7add4106cb90b2e3a9b8acc40d04ee6df476:tests/test_schema_context.py",
+        "evaluation/improvements/PROGRESS.md"
+      ],
+      "current_acceptance": "Source/runtime evidence qualified; final task-head CI is an external merge gate",
+      "historical_status": "task review passed; final integrated acceptance pending",
+      "current_evidence": [
+        "evaluation/improvements/v090-final-qualification.json",
+        "evaluation/improvements/v090-native-profiles-qualification.json",
+        "evaluation/improvements/v090-model-qualification.json",
+        "evaluation/improvements/routing-validation-v2.json"
+      ]
+    },
+    {
+      "id": "C5.6",
+      "requirement": "HF/process workers recreate configured detectors; reversible mode remains refused on adapters that cannot return maps.",
+      "status": "task review passed; final integrated acceptance pending",
+      "evidence": [
+        "2c7b7add4106cb90b2e3a9b8acc40d04ee6df476:tests/test_schema_context.py",
+        "evaluation/improvements/PROGRESS.md"
+      ],
+      "current_acceptance": "Source/runtime evidence qualified; final task-head CI is an external merge gate",
+      "historical_status": "task review passed; final integrated acceptance pending",
+      "current_evidence": [
+        "evaluation/improvements/v090-final-qualification.json",
+        "evaluation/improvements/v090-native-profiles-qualification.json",
+        "evaluation/improvements/v090-model-qualification.json",
+        "evaluation/improvements/routing-validation-v2.json"
+      ]
+    },
+    {
+      "id": "D1.1",
+      "requirement": "Default report mode retains every record. A non-None quality_min requires an available scorer.",
+      "status": "task review passed; final integrated acceptance pending",
+      "evidence": [
+        "fd3880efec45bbe17efac6683f94a30f99b14c7c:tests/test_corpus_selection.py",
+        "evaluation/improvements/PROGRESS.md"
+      ],
+      "current_acceptance": "Source/runtime evidence qualified; final task-head CI is an external merge gate",
+      "historical_status": "task review passed; final integrated acceptance pending",
+      "current_evidence": [
+        "evaluation/improvements/v090-final-qualification.json",
+        "evaluation/improvements/v090-native-profiles-qualification.json",
+        "evaluation/improvements/v090-model-qualification.json",
+        "evaluation/improvements/routing-validation-v2.json"
+      ]
+    },
+    {
+      "id": "D1.2",
+      "requirement": "Exact matching and near matching produce real clusters and deterministic min_stable_id keepers, including transitive clusters and tied scores.",
+      "status": "task review passed; final integrated acceptance pending",
+      "evidence": [
+        "fd3880efec45bbe17efac6683f94a30f99b14c7c:tests/test_corpus_selection.py",
+        "evaluation/improvements/PROGRESS.md"
+      ],
+      "current_acceptance": "Source/runtime evidence qualified; final task-head CI is an external merge gate",
+      "historical_status": "task review passed; final integrated acceptance pending",
+      "current_evidence": [
+        "evaluation/improvements/v090-final-qualification.json",
+        "evaluation/improvements/v090-native-profiles-qualification.json",
+        "evaluation/improvements/v090-model-qualification.json",
+        "evaluation/improvements/routing-validation-v2.json"
+      ]
+    },
+    {
+      "id": "D1.3",
+      "requirement": "Reject duplicate record IDs and incompatible signature metadata, including tokenizer/library/config identity.",
+      "status": "task review passed; final integrated acceptance pending",
+      "evidence": [
+        "fd3880efec45bbe17efac6683f94a30f99b14c7c:tests/test_corpus_selection.py",
+        "evaluation/improvements/PROGRESS.md"
+      ],
+      "current_acceptance": "Source/runtime evidence qualified; final task-head CI is an external merge gate",
+      "historical_status": "task review passed; final integrated acceptance pending",
+      "current_evidence": [
+        "evaluation/improvements/v090-final-qualification.json",
+        "evaluation/improvements/v090-native-profiles-qualification.json",
+        "evaluation/improvements/v090-model-qualification.json",
+        "evaluation/improvements/routing-validation-v2.json"
+      ]
+    },
+    {
+      "id": "D1.4",
+      "requirement": "Two different sensitive records that normalize to the same placeholder text are flagged as a basis-dependent collision; apply mode requires an explicit basis choice.",
+      "status": "task review passed; final integrated acceptance pending",
+      "evidence": [
+        "fd3880efec45bbe17efac6683f94a30f99b14c7c:tests/test_corpus_selection.py",
+        "evaluation/improvements/PROGRESS.md"
+      ],
+      "current_acceptance": "Source/runtime evidence qualified; final task-head CI is an external merge gate",
+      "historical_status": "task review passed; final integrated acceptance pending",
+      "current_evidence": [
+        "evaluation/improvements/v090-final-qualification.json",
+        "evaluation/improvements/v090-native-profiles-qualification.json",
+        "evaluation/improvements/v090-model-qualification.json",
+        "evaluation/improvements/routing-validation-v2.json"
+      ]
+    },
+    {
+      "id": "D1.5",
+      "requirement": "Missing/short signatures are not equated; audit rows contain stable IDs, scores and reasons, not raw text.",
+      "status": "task review passed; final integrated acceptance pending",
+      "evidence": [
+        "fd3880efec45bbe17efac6683f94a30f99b14c7c:tests/test_corpus_selection.py",
+        "evaluation/improvements/PROGRESS.md"
+      ],
+      "current_acceptance": "Source/runtime evidence qualified; final task-head CI is an external merge gate",
+      "historical_status": "task review passed; final integrated acceptance pending",
+      "current_evidence": [
+        "evaluation/improvements/v090-final-qualification.json",
+        "evaluation/improvements/v090-native-profiles-qualification.json",
+        "evaluation/improvements/v090-model-qualification.json",
+        "evaluation/improvements/routing-validation-v2.json"
+      ]
+    },
+    {
+      "id": "D2.1",
+      "requirement": "End-to-end fixture writes a new kept corpus plus stable decisions, with filtered/rejected counts reconciling to input IDs.",
+      "status": "task review passed; final integrated acceptance pending",
+      "evidence": [
+        "a68949582e01bca86869bdeea89b990e1fa4df8e:tests/test_corpus_manifest.py",
+        "evaluation/improvements/d2-python-qualification.json"
+      ],
+      "current_acceptance": "Source/runtime evidence qualified; final task-head CI is an external merge gate",
+      "historical_status": "task review passed; final integrated acceptance pending",
+      "current_evidence": [
+        "evaluation/improvements/v090-final-qualification.json",
+        "evaluation/improvements/v090-native-profiles-qualification.json",
+        "evaluation/improvements/v090-model-qualification.json",
+        "evaluation/improvements/routing-validation-v2.json"
+      ]
+    },
+    {
+      "id": "D2.2",
+      "requirement": "No incompatible reuse of SCT signatures as DataTrove files; use one complete native workflow or an explicit tested conversion.",
+      "status": "task review passed; final integrated acceptance pending",
+      "evidence": [
+        "a68949582e01bca86869bdeea89b990e1fa4df8e:tests/test_corpus_manifest.py",
+        "evaluation/improvements/d2-python-qualification.json"
+      ],
+      "current_acceptance": "Source/runtime evidence qualified; final task-head CI is an external merge gate",
+      "historical_status": "task review passed; final integrated acceptance pending",
+      "current_evidence": [
+        "evaluation/improvements/v090-final-qualification.json",
+        "evaluation/improvements/v090-native-profiles-qualification.json",
+        "evaluation/improvements/v090-model-qualification.json",
+        "evaluation/improvements/routing-validation-v2.json"
+      ]
+    },
+    {
+      "id": "D2.3",
+      "requirement": "Manifest excludes raw text, custom term values, keys, anon maps and raw SDK objects. Treat config digests and IDs as private identifying state.",
+      "status": "task review passed; final integrated acceptance pending",
+      "evidence": [
+        "a68949582e01bca86869bdeea89b990e1fa4df8e:tests/test_corpus_manifest.py",
+        "evaluation/improvements/d2-python-qualification.json"
+      ],
+      "current_acceptance": "Source/runtime evidence qualified; final task-head CI is an external merge gate",
+      "historical_status": "task review passed; final integrated acceptance pending",
+      "current_evidence": [
+        "evaluation/improvements/v090-final-qualification.json",
+        "evaluation/improvements/v090-native-profiles-qualification.json",
+        "evaluation/improvements/v090-model-qualification.json",
+        "evaluation/improvements/routing-validation-v2.json"
+      ]
+    },
+    {
+      "id": "D2.4",
+      "requirement": "Input source remains unchanged; apply mode writes new outputs and report-only remains the default.",
+      "status": "task review passed; final integrated acceptance pending",
+      "evidence": [
+        "a68949582e01bca86869bdeea89b990e1fa4df8e:tests/test_corpus_manifest.py",
+        "evaluation/improvements/d2-python-qualification.json"
+      ],
+      "current_acceptance": "Source/runtime evidence qualified; final task-head CI is an external merge gate",
+      "historical_status": "task review passed; final integrated acceptance pending",
+      "current_evidence": [
+        "evaluation/improvements/v090-final-qualification.json",
+        "evaluation/improvements/v090-native-profiles-qualification.json",
+        "evaluation/improvements/v090-model-qualification.json",
+        "evaluation/improvements/routing-validation-v2.json"
+      ]
+    },
+    {
+      "id": "D2.5",
+      "requirement": "Run the real DataTrove 0.10.1 profile on Linux with process-owned cleaner handles.",
+      "status": "task review passed; final integrated acceptance pending",
+      "evidence": [
+        "a68949582e01bca86869bdeea89b990e1fa4df8e:tests/test_corpus_manifest.py",
+        "evaluation/improvements/d2-python-qualification.json"
+      ],
+      "current_acceptance": "Source/runtime evidence qualified; final task-head CI is an external merge gate",
+      "historical_status": "task review passed; final integrated acceptance pending",
+      "current_evidence": [
+        "evaluation/improvements/v090-final-qualification.json",
+        "evaluation/improvements/v090-native-profiles-qualification.json",
+        "evaluation/improvements/v090-model-qualification.json",
+        "evaluation/improvements/routing-validation-v2.json"
+      ]
+    },
+    {
+      "id": "D3.1",
+      "requirement": "Crash after output write but before completion publication; restart has identical stable-ID outputs to uninterrupted execution, with no duplicate writes.",
+      "status": "task review passed; final integrated acceptance pending",
+      "evidence": [
+        "4ddb77a5ad4134fe44b81317bd76d659d9a98cae:tests/test_corpus_resume.py",
+        "4ddb77a5ad4134fe44b81317bd76d659d9a98cae:tests/test_corpus_decontamination.py",
+        "evaluation/improvements/d3-python-qualification.json",
+        "evaluation/improvements/d3-cached-model-resume.json"
+      ],
+      "current_acceptance": "Source/runtime evidence qualified; final task-head CI is an external merge gate",
+      "historical_status": "task review passed; final integrated acceptance pending",
+      "current_evidence": [
+        "evaluation/improvements/v090-final-qualification.json",
+        "evaluation/improvements/v090-native-profiles-qualification.json",
+        "evaluation/improvements/v090-model-qualification.json",
+        "evaluation/improvements/routing-validation-v2.json"
+      ]
+    },
+    {
+      "id": "D3.2",
+      "requirement": "Changed input partition, config, detector/model revision, seed or signature identity refuses reuse.",
+      "status": "task review passed; final integrated acceptance pending",
+      "evidence": [
+        "4ddb77a5ad4134fe44b81317bd76d659d9a98cae:tests/test_corpus_resume.py",
+        "4ddb77a5ad4134fe44b81317bd76d659d9a98cae:tests/test_corpus_decontamination.py",
+        "evaluation/improvements/d3-python-qualification.json",
+        "evaluation/improvements/d3-cached-model-resume.json"
+      ],
+      "current_acceptance": "Source/runtime evidence qualified; final task-head CI is an external merge gate",
+      "historical_status": "task review passed; final integrated acceptance pending",
+      "current_evidence": [
+        "evaluation/improvements/v090-final-qualification.json",
+        "evaluation/improvements/v090-native-profiles-qualification.json",
+        "evaluation/improvements/v090-model-qualification.json",
+        "evaluation/improvements/routing-validation-v2.json"
+      ]
+    },
+    {
+      "id": "D3.3",
+      "requirement": "Completion requires atomic output plus checksum; incomplete work replays and sinks are idempotent.",
+      "status": "task review passed; final integrated acceptance pending",
+      "evidence": [
+        "4ddb77a5ad4134fe44b81317bd76d659d9a98cae:tests/test_corpus_resume.py",
+        "4ddb77a5ad4134fe44b81317bd76d659d9a98cae:tests/test_corpus_decontamination.py",
+        "evaluation/improvements/d3-python-qualification.json",
+        "evaluation/improvements/d3-cached-model-resume.json"
+      ],
+      "current_acceptance": "Source/runtime evidence qualified; final task-head CI is an external merge gate",
+      "historical_status": "task review passed; final integrated acceptance pending",
+      "current_evidence": [
+        "evaluation/improvements/v090-final-qualification.json",
+        "evaluation/improvements/v090-native-profiles-qualification.json",
+        "evaluation/improvements/v090-model-qualification.json",
+        "evaluation/improvements/routing-validation-v2.json"
+      ]
+    },
+    {
+      "id": "D3.4",
+      "requirement": "Retries are bounded; failure ledger stores reason and stable ID, not raw exception values or document contents.",
+      "status": "task review passed; final integrated acceptance pending",
+      "evidence": [
+        "4ddb77a5ad4134fe44b81317bd76d659d9a98cae:tests/test_corpus_resume.py",
+        "4ddb77a5ad4134fe44b81317bd76d659d9a98cae:tests/test_corpus_decontamination.py",
+        "evaluation/improvements/d3-python-qualification.json",
+        "evaluation/improvements/d3-cached-model-resume.json"
+      ],
+      "current_acceptance": "Source/runtime evidence qualified; final task-head CI is an external merge gate",
+      "historical_status": "task review passed; final integrated acceptance pending",
+      "current_evidence": [
+        "evaluation/improvements/v090-final-qualification.json",
+        "evaluation/improvements/v090-native-profiles-qualification.json",
+        "evaluation/improvements/v090-model-qualification.json",
+        "evaluation/improvements/routing-validation-v2.json"
+      ]
+    },
+    {
+      "id": "D3.5",
+      "requirement": "Reference matching has report/apply behavior, measured false-positive fixtures and no built-in benchmark/keyword lists.",
+      "status": "task review passed; final integrated acceptance pending",
+      "evidence": [
+        "4ddb77a5ad4134fe44b81317bd76d659d9a98cae:tests/test_corpus_resume.py",
+        "4ddb77a5ad4134fe44b81317bd76d659d9a98cae:tests/test_corpus_decontamination.py",
+        "evaluation/improvements/d3-python-qualification.json",
+        "evaluation/improvements/d3-cached-model-resume.json"
+      ],
+      "current_acceptance": "Source/runtime evidence qualified; final task-head CI is an external merge gate",
+      "historical_status": "task review passed; final integrated acceptance pending",
+      "current_evidence": [
+        "evaluation/improvements/v090-final-qualification.json",
+        "evaluation/improvements/v090-native-profiles-qualification.json",
+        "evaluation/improvements/v090-model-qualification.json",
+        "evaluation/improvements/routing-validation-v2.json"
+      ]
+    },
+    {
+      "id": "S1.1",
+      "requirement": "Round-trip across a process restart, preserving marker reservations and counters.",
+      "status": "verified for task scope; global acceptance still pending",
+      "evidence": [
+        "sct/token_stores/sqlite.py",
+        "tests/test_sqlite_token_store.py",
+        "38 focused/privacy/compat tests; Ruff; pinned mypy; independent review approved"
+      ],
+      "current_acceptance": "Source/runtime evidence qualified; final task-head CI is an external merge gate",
+      "historical_status": "verified for task scope; global acceptance still pending",
+      "current_evidence": [
+        "evaluation/improvements/v090-final-qualification.json",
+        "evaluation/improvements/v090-native-profiles-qualification.json",
+        "evaluation/improvements/v090-model-qualification.json",
+        "evaluation/improvements/routing-validation-v2.json"
+      ]
+    },
+    {
+      "id": "S1.2",
+      "requirement": "Expired/missing/wrong-scope references return None. Tamper/key substitution and malformed authenticated payloads fail explicitly.",
+      "status": "verified for task scope; global acceptance still pending",
+      "evidence": [
+        "sct/token_stores/sqlite.py",
+        "tests/test_sqlite_token_store.py",
+        "38 focused/privacy/compat tests; Ruff; pinned mypy; independent review approved"
+      ],
+      "current_acceptance": "Source/runtime evidence qualified; final task-head CI is an external merge gate",
+      "historical_status": "verified for task scope; global acceptance still pending",
+      "current_evidence": [
+        "evaluation/improvements/v090-final-qualification.json",
+        "evaluation/improvements/v090-native-profiles-qualification.json",
+        "evaluation/improvements/v090-model-qualification.json",
+        "evaluation/improvements/routing-validation-v2.json"
+      ]
+    },
+    {
+      "id": "S1.3",
+      "requirement": "Keys and raw values do not appear in database bytes, returned references, repr, exceptions or audit events.",
+      "status": "verified for task scope; global acceptance still pending",
+      "evidence": [
+        "sct/token_stores/sqlite.py",
+        "tests/test_sqlite_token_store.py",
+        "38 focused/privacy/compat tests; Ruff; pinned mypy; independent review approved"
+      ],
+      "current_acceptance": "Source/runtime evidence qualified; final task-head CI is an external merge gate",
+      "historical_status": "verified for task scope; global acceptance still pending",
+      "current_evidence": [
+        "evaluation/improvements/v090-final-qualification.json",
+        "evaluation/improvements/v090-native-profiles-qualification.json",
+        "evaluation/improvements/v090-model-qualification.json",
+        "evaluation/improvements/routing-validation-v2.json"
+      ]
+    },
+    {
+      "id": "S1.4",
+      "requirement": "SQLite file/directory access and transaction handling are explicit; no plaintext fallback on encryption/store errors.",
+      "status": "verified for task scope; global acceptance still pending",
+      "evidence": [
+        "sct/token_stores/sqlite.py",
+        "tests/test_sqlite_token_store.py",
+        "38 focused/privacy/compat tests; Ruff; pinned mypy; independent review approved"
+      ],
+      "current_acceptance": "Source/runtime evidence qualified; final task-head CI is an external merge gate",
+      "historical_status": "verified for task scope; global acceptance still pending",
+      "current_evidence": [
+        "evaluation/improvements/v090-final-qualification.json",
+        "evaluation/improvements/v090-native-profiles-qualification.json",
+        "evaluation/improvements/v090-model-qualification.json",
+        "evaluation/improvements/routing-validation-v2.json"
+      ]
+    },
+    {
+      "id": "S2.1",
+      "requirement": "Concurrent threads/processes cannot collide references or observe partially committed maps; connections are not reused across fork.",
+      "status": "task review passed; final integrated acceptance pending",
+      "evidence": [
+        "7cecd6669cc2b54b23ecf9dbddd6ece92e426e93:tests/test_token_store_operations.py",
+        "evaluation/improvements/s2-python-qualification.json",
+        "evaluation/improvements/s2-security-review.json"
+      ],
+      "current_acceptance": "Source/runtime evidence qualified; final task-head CI is an external merge gate",
+      "historical_status": "task review passed; final integrated acceptance pending",
+      "current_evidence": [
+        "evaluation/improvements/v090-final-qualification.json",
+        "evaluation/improvements/v090-native-profiles-qualification.json",
+        "evaluation/improvements/v090-model-qualification.json",
+        "evaluation/improvements/routing-validation-v2.json"
+      ]
+    },
+    {
+      "id": "S2.2",
+      "requirement": "New saves use the current key ID, old maps remain readable through their retained key IDs, and explicit rotation is tested.",
+      "status": "task review passed; final integrated acceptance pending",
+      "evidence": [
+        "7cecd6669cc2b54b23ecf9dbddd6ece92e426e93:tests/test_token_store_operations.py",
+        "evaluation/improvements/s2-python-qualification.json",
+        "evaluation/improvements/s2-security-review.json"
+      ],
+      "current_acceptance": "Source/runtime evidence qualified; final task-head CI is an external merge gate",
+      "historical_status": "task review passed; final integrated acceptance pending",
+      "current_evidence": [
+        "evaluation/improvements/v090-final-qualification.json",
+        "evaluation/improvements/v090-native-profiles-qualification.json",
+        "evaluation/improvements/v090-model-qualification.json",
+        "evaluation/improvements/routing-validation-v2.json"
+      ]
+    },
+    {
+      "id": "S2.3",
+      "requirement": "Deletion/expiry does not claim to erase SQLite WAL, backups or storage media; key retirement consequences are explicit.",
+      "status": "task review passed; final integrated acceptance pending",
+      "evidence": [
+        "7cecd6669cc2b54b23ecf9dbddd6ece92e426e93:tests/test_token_store_operations.py",
+        "evaluation/improvements/s2-python-qualification.json",
+        "evaluation/improvements/s2-security-review.json"
+      ],
+      "current_acceptance": "Source/runtime evidence qualified; final task-head CI is an external merge gate",
+      "historical_status": "task review passed; final integrated acceptance pending",
+      "current_evidence": [
+        "evaluation/improvements/v090-final-qualification.json",
+        "evaluation/improvements/v090-native-profiles-qualification.json",
+        "evaluation/improvements/v090-model-qualification.json",
+        "evaluation/improvements/routing-validation-v2.json"
+      ]
+    },
+    {
+      "id": "S2.4",
+      "requirement": "An independent security-focused review must pass before labelling the reference integration ready for supported production use.",
+      "status": "task review passed; final integrated acceptance pending",
+      "evidence": [
+        "7cecd6669cc2b54b23ecf9dbddd6ece92e426e93:tests/test_token_store_operations.py",
+        "evaluation/improvements/s2-python-qualification.json",
+        "evaluation/improvements/s2-security-review.json"
+      ],
+      "current_acceptance": "Source/runtime evidence qualified; final task-head CI is an external merge gate",
+      "historical_status": "task review passed; final integrated acceptance pending",
+      "current_evidence": [
+        "evaluation/improvements/v090-final-qualification.json",
+        "evaluation/improvements/v090-native-profiles-qualification.json",
+        "evaluation/improvements/v090-model-qualification.json",
+        "evaluation/improvements/routing-validation-v2.json"
+      ]
+    },
+    {
+      "id": "E1.1",
+      "requirement": "A synthetic multi-page fixture includes cross-element names, table values, OCR text and metadata PII. Detection uses joined mapped text, not blind per-line isolated calls.",
+      "status": "verified for task scope; global acceptance still pending",
+      "evidence": [
+        "evaluation/improvements/e1-python-qualification.json",
+        "evaluation/improvements/e1-artifact-manifest.json",
+        "tests/test_docling_integration.py",
+        "tests/test_coordinates.py",
+        "tests/test_unified_processing.py",
+        "76f43a0c4bc7de03e8f6687633d48474cdcb4edc; corrected independent task review approved"
+      ],
+      "current_acceptance": "Source/runtime evidence qualified; final task-head CI is an external merge gate",
+      "historical_status": "verified for task scope; global acceptance still pending",
+      "current_evidence": [
+        "evaluation/improvements/v090-final-qualification.json",
+        "evaluation/improvements/v090-native-profiles-qualification.json",
+        "evaluation/improvements/v090-model-qualification.json",
+        "evaluation/improvements/routing-validation-v2.json"
+      ]
+    },
+    {
+      "id": "E1.2",
+      "requirement": "Only cleaned output text/elements and allowlisted structural provenance survive; no raw Docling objects, source text or original-element metadata is retained in output.",
+      "status": "verified for task scope; global acceptance still pending",
+      "evidence": [
+        "evaluation/improvements/e1-python-qualification.json",
+        "evaluation/improvements/e1-artifact-manifest.json",
+        "tests/test_docling_integration.py",
+        "tests/test_coordinates.py",
+        "tests/test_unified_processing.py",
+        "76f43a0c4bc7de03e8f6687633d48474cdcb4edc; corrected independent task review approved"
+      ],
+      "current_acceptance": "Source/runtime evidence qualified; final task-head CI is an external merge gate",
+      "historical_status": "verified for task scope; global acceptance still pending",
+      "current_evidence": [
+        "evaluation/improvements/v090-final-qualification.json",
+        "evaluation/improvements/v090-native-profiles-qualification.json",
+        "evaluation/improvements/v090-model-qualification.json",
+        "evaluation/improvements/routing-validation-v2.json"
+      ]
+    },
+    {
+      "id": "E1.3",
+      "requirement": "Missing offline artifacts cause a clear error; no network/model download occurs unless explicitly enabled.",
+      "status": "verified for task scope; global acceptance still pending",
+      "evidence": [
+        "evaluation/improvements/e1-python-qualification.json",
+        "evaluation/improvements/e1-artifact-manifest.json",
+        "tests/test_docling_integration.py",
+        "tests/test_coordinates.py",
+        "tests/test_unified_processing.py",
+        "76f43a0c4bc7de03e8f6687633d48474cdcb4edc; corrected independent task review approved"
+      ],
+      "current_acceptance": "Source/runtime evidence qualified; final task-head CI is an external merge gate",
+      "historical_status": "verified for task scope; global acceptance still pending",
+      "current_evidence": [
+        "evaluation/improvements/v090-final-qualification.json",
+        "evaluation/improvements/v090-native-profiles-qualification.json",
+        "evaluation/improvements/v090-model-qualification.json",
+        "evaluation/improvements/routing-validation-v2.json"
+      ]
+    },
+    {
+      "id": "E1.4",
+      "requirement": "Run real Docling conversion in the optional CI profile as well as fake-provider unit tests.",
+      "status": "verified for task scope; global acceptance still pending",
+      "evidence": [
+        "evaluation/improvements/e1-python-qualification.json",
+        "evaluation/improvements/e1-artifact-manifest.json",
+        "tests/test_docling_integration.py",
+        "tests/test_coordinates.py",
+        "tests/test_unified_processing.py",
+        "76f43a0c4bc7de03e8f6687633d48474cdcb4edc; corrected independent task review approved"
+      ],
+      "current_acceptance": "Source/runtime evidence qualified; final task-head CI is an external merge gate",
+      "historical_status": "verified for task scope; global acceptance still pending",
+      "current_evidence": [
+        "evaluation/improvements/v090-final-qualification.json",
+        "evaluation/improvements/v090-native-profiles-qualification.json",
+        "evaluation/improvements/v090-model-qualification.json",
+        "evaluation/improvements/routing-validation-v2.json"
+      ]
+    },
+    {
+      "id": "E1.5",
+      "requirement": "Never claim original PDF/images/attachments are redacted; coordinates describe extracted text and layout provenance.",
+      "status": "verified for task scope; global acceptance still pending",
+      "evidence": [
+        "evaluation/improvements/e1-python-qualification.json",
+        "evaluation/improvements/e1-artifact-manifest.json",
+        "tests/test_docling_integration.py",
+        "tests/test_coordinates.py",
+        "tests/test_unified_processing.py",
+        "76f43a0c4bc7de03e8f6687633d48474cdcb4edc; corrected independent task review approved"
+      ],
+      "current_acceptance": "Source/runtime evidence qualified; final task-head CI is an external merge gate",
+      "historical_status": "verified for task scope; global acceptance still pending",
+      "current_evidence": [
+        "evaluation/improvements/v090-final-qualification.json",
+        "evaluation/improvements/v090-native-profiles-qualification.json",
+        "evaluation/improvements/v090-model-qualification.json",
+        "evaluation/improvements/routing-validation-v2.json"
+      ]
+    },
+    {
+      "id": "E2.1",
+      "requirement": "Synthetic API_KEY, BEARER_TOKEN, JWT and PRIVATE_KEY examples return correct Unicode code-point spans, including emoji prefixes.",
+      "status": "verified for task scope; global acceptance still pending",
+      "evidence": [
+        "evaluation/improvements/e2-python-qualification.json",
+        "sct/detectors_datafog.py",
+        "tests/test_secret_detector.py",
+        "docs/SECRET_DETECTION.md",
+        "bfc639566d067189a263c8e39487412b855fbec2; independent task review approved"
+      ],
+      "current_acceptance": "Source/runtime evidence qualified; final task-head CI is an external merge gate",
+      "historical_status": "verified for task scope; global acceptance still pending",
+      "current_evidence": [
+        "evaluation/improvements/v090-final-qualification.json",
+        "evaluation/improvements/v090-native-profiles-qualification.json",
+        "evaluation/improvements/v090-model-qualification.json",
+        "evaluation/improvements/routing-validation-v2.json"
+      ]
+    },
+    {
+      "id": "E2.2",
+      "requirement": "Vendor byte/UTF-16 ranges are not misread as Python positions; malformed ranges fail validation.",
+      "status": "verified for task scope; global acceptance still pending",
+      "evidence": [
+        "evaluation/improvements/e2-python-qualification.json",
+        "sct/detectors_datafog.py",
+        "tests/test_secret_detector.py",
+        "docs/SECRET_DETECTION.md",
+        "bfc639566d067189a263c8e39487412b855fbec2; independent task review approved"
+      ],
+      "current_acceptance": "Source/runtime evidence qualified; final task-head CI is an external merge gate",
+      "historical_status": "verified for task scope; global acceptance still pending",
+      "current_evidence": [
+        "evaluation/improvements/v090-final-qualification.json",
+        "evaluation/improvements/v090-native-profiles-qualification.json",
+        "evaluation/improvements/v090-model-qualification.json",
+        "evaluation/improvements/routing-validation-v2.json"
+      ]
+    },
+    {
+      "id": "E2.3",
+      "requirement": "Unknown selected types, missing extra and scanner errors fail explicitly without a successful regex-only disguise.",
+      "status": "verified for task scope; global acceptance still pending",
+      "evidence": [
+        "evaluation/improvements/e2-python-qualification.json",
+        "sct/detectors_datafog.py",
+        "tests/test_secret_detector.py",
+        "docs/SECRET_DETECTION.md",
+        "bfc639566d067189a263c8e39487412b855fbec2; independent task review approved"
+      ],
+      "current_acceptance": "Source/runtime evidence qualified; final task-head CI is an external merge gate",
+      "historical_status": "verified for task scope; global acceptance still pending",
+      "current_evidence": [
+        "evaluation/improvements/v090-final-qualification.json",
+        "evaluation/improvements/v090-native-profiles-qualification.json",
+        "evaluation/improvements/v090-model-qualification.json",
+        "evaluation/improvements/routing-validation-v2.json"
+      ]
+    },
+    {
+      "id": "E2.4",
+      "requirement": "Raw matched_text and vendor result objects do not reach public findings/logs. Near-miss code literals and false positives are evaluated.",
+      "status": "verified for task scope; global acceptance still pending",
+      "evidence": [
+        "evaluation/improvements/e2-python-qualification.json",
+        "sct/detectors_datafog.py",
+        "tests/test_secret_detector.py",
+        "docs/SECRET_DETECTION.md",
+        "bfc639566d067189a263c8e39487412b855fbec2; independent task review approved"
+      ],
+      "current_acceptance": "Source/runtime evidence qualified; final task-head CI is an external merge gate",
+      "historical_status": "verified for task scope; global acceptance still pending",
+      "current_evidence": [
+        "evaluation/improvements/v090-final-qualification.json",
+        "evaluation/improvements/v090-native-profiles-qualification.json",
+        "evaluation/improvements/v090-model-qualification.json",
+        "evaluation/improvements/routing-validation-v2.json"
+      ]
+    },
+    {
+      "id": "E2.5",
+      "requirement": "Existing GLiNER password/api_key/access_token labels remain usable; do not describe secret recognition as previously absent.",
+      "status": "verified for task scope; global acceptance still pending",
+      "evidence": [
+        "evaluation/improvements/e2-python-qualification.json",
+        "sct/detectors_datafog.py",
+        "tests/test_secret_detector.py",
+        "docs/SECRET_DETECTION.md",
+        "bfc639566d067189a263c8e39487412b855fbec2; independent task review approved"
+      ],
+      "current_acceptance": "Source/runtime evidence qualified; final task-head CI is an external merge gate",
+      "historical_status": "verified for task scope; global acceptance still pending",
+      "current_evidence": [
+        "evaluation/improvements/v090-final-qualification.json",
+        "evaluation/improvements/v090-native-profiles-qualification.json",
+        "evaluation/improvements/v090-model-qualification.json",
+        "evaluation/improvements/routing-validation-v2.json"
+      ]
+    },
+    {
+      "id": "L1.1",
+      "requirement": "Pinned languages bypass thresholding. No-score/tie and restricted-tuple fallback remain unchanged by default.",
+      "status": "verified for task scope; global acceptance still pending",
+      "evidence": [
+        "evaluation/improvements/l1-python-qualification.json",
+        "sct/language_policy.py",
+        "tests/test_language_policy.py",
+        "tests/test_language_all.py",
+        "dab6d4cd07aab473ed6a4f510f7e9be8d1227b09; independent fix1 scoped review approved"
+      ],
+      "current_acceptance": "Source/runtime evidence qualified; final task-head CI is an external merge gate",
+      "historical_status": "verified for task scope; global acceptance still pending",
+      "current_evidence": [
+        "evaluation/improvements/v090-final-qualification.json",
+        "evaluation/improvements/v090-native-profiles-qualification.json",
+        "evaluation/improvements/v090-model-qualification.json",
+        "evaluation/improvements/routing-validation-v2.json"
+      ]
+    },
+    {
+      "id": "L1.2",
+      "requirement": "With min_confidence=0.8 and min_margin=0.1, confidence 0.79 abstains; 0.8 with margin 0.1 passes.",
+      "status": "verified for task scope; global acceptance still pending",
+      "evidence": [
+        "evaluation/improvements/l1-python-qualification.json",
+        "sct/language_policy.py",
+        "tests/test_language_policy.py",
+        "tests/test_language_all.py",
+        "dab6d4cd07aab473ed6a4f510f7e9be8d1227b09; independent fix1 scoped review approved"
+      ],
+      "current_acceptance": "Source/runtime evidence qualified; final task-head CI is an external merge gate",
+      "historical_status": "verified for task scope; global acceptance still pending",
+      "current_evidence": [
+        "evaluation/improvements/v090-final-qualification.json",
+        "evaluation/improvements/v090-native-profiles-qualification.json",
+        "evaluation/improvements/v090-model-qualification.json",
+        "evaluation/improvements/routing-validation-v2.json"
+      ]
+    },
+    {
+      "id": "L1.3",
+      "requirement": "Opt-in abstention records None language, source=abstained and language_abstained warning.",
+      "status": "verified for task scope; global acceptance still pending",
+      "evidence": [
+        "evaluation/improvements/l1-python-qualification.json",
+        "sct/language_policy.py",
+        "tests/test_language_policy.py",
+        "tests/test_language_all.py",
+        "dab6d4cd07aab473ed6a4f510f7e9be8d1227b09; independent fix1 scoped review approved"
+      ],
+      "current_acceptance": "Source/runtime evidence qualified; final task-head CI is an external merge gate",
+      "historical_status": "verified for task scope; global acceptance still pending",
+      "current_evidence": [
+        "evaluation/improvements/v090-final-qualification.json",
+        "evaluation/improvements/v090-native-profiles-qualification.json",
+        "evaluation/improvements/v090-model-qualification.json",
+        "evaluation/improvements/routing-validation-v2.json"
+      ]
+    },
+    {
+      "id": "L1.4",
+      "requirement": "Multilingual/error/explicit skip actions are tested; no language outside a configured restriction is invented.",
+      "status": "verified for task scope; global acceptance still pending",
+      "evidence": [
+        "evaluation/improvements/l1-python-qualification.json",
+        "sct/language_policy.py",
+        "tests/test_language_policy.py",
+        "tests/test_language_all.py",
+        "dab6d4cd07aab473ed6a4f510f7e9be8d1227b09; independent fix1 scoped review approved"
+      ],
+      "current_acceptance": "Source/runtime evidence qualified; final task-head CI is an external merge gate",
+      "historical_status": "verified for task scope; global acceptance still pending",
+      "current_evidence": [
+        "evaluation/improvements/v090-final-qualification.json",
+        "evaluation/improvements/v090-native-profiles-qualification.json",
+        "evaluation/improvements/v090-model-qualification.json",
+        "evaluation/improvements/routing-validation-v2.json"
+      ]
+    },
+    {
+      "id": "L1.5",
+      "requirement": "Measure known-language accuracy/coverage and unknown-language false answers before choosing any new default.",
+      "status": "verified for task scope; global acceptance still pending",
+      "evidence": [
+        "evaluation/improvements/l1-python-qualification.json",
+        "sct/language_policy.py",
+        "tests/test_language_policy.py",
+        "tests/test_language_all.py",
+        "dab6d4cd07aab473ed6a4f510f7e9be8d1227b09; independent fix1 scoped review approved"
+      ],
+      "current_acceptance": "Source/runtime evidence qualified; final task-head CI is an external merge gate",
+      "historical_status": "verified for task scope; global acceptance still pending",
+      "current_evidence": [
+        "evaluation/improvements/v090-final-qualification.json",
+        "evaluation/improvements/v090-native-profiles-qualification.json",
+        "evaluation/improvements/v090-model-qualification.json",
+        "evaluation/improvements/routing-validation-v2.json"
+      ]
+    },
+    {
+      "id": "L2.1",
+      "requirement": "Unknown language, unsupported entity coverage/context, missing calibration and detector errors do not authorize an early exit.",
+      "status": "verified for task scope; global acceptance still pending",
+      "evidence": [
+        "evaluation/improvements/l2-python-qualification.json",
+        "sct/routing.py",
+        "tests/test_detector_routing.py",
+        "b23250791ea9c6a4286a8ec9b648b6126ed75d87; independent scoped fix rounds1/2 approved"
+      ],
+      "current_acceptance": "Source/runtime evidence qualified; final task-head CI is an external merge gate",
+      "historical_status": "verified for task scope; global acceptance still pending",
+      "current_evidence": [
+        "evaluation/improvements/v090-final-qualification.json",
+        "evaluation/improvements/v090-native-profiles-qualification.json",
+        "evaluation/improvements/v090-model-qualification.json",
+        "evaluation/improvements/routing-validation-v2.json"
+      ]
+    },
+    {
+      "id": "L2.2",
+      "requirement": "One regex email never proves names absent; mixed-entity fixture routes to the full detector.",
+      "status": "verified for task scope; global acceptance still pending",
+      "evidence": [
+        "evaluation/improvements/l2-python-qualification.json",
+        "sct/routing.py",
+        "tests/test_detector_routing.py",
+        "b23250791ea9c6a4286a8ec9b648b6126ed75d87; independent scoped fix rounds1/2 approved"
+      ],
+      "current_acceptance": "Source/runtime evidence qualified; final task-head CI is an external merge gate",
+      "historical_status": "verified for task scope; global acceptance still pending",
+      "current_evidence": [
+        "evaluation/improvements/v090-final-qualification.json",
+        "evaluation/improvements/v090-native-profiles-qualification.json",
+        "evaluation/improvements/v090-model-qualification.json",
+        "evaluation/improvements/routing-validation-v2.json"
+      ]
+    },
+    {
+      "id": "L2.3",
+      "requirement": "Routing cannot skip a requested capability that the fast path does not declare. All skip decisions carry a value-free reason and experimental policy identity.",
+      "status": "verified for task scope; global acceptance still pending",
+      "evidence": [
+        "evaluation/improvements/l2-python-qualification.json",
+        "sct/routing.py",
+        "tests/test_detector_routing.py",
+        "b23250791ea9c6a4286a8ec9b648b6126ed75d87; independent scoped fix rounds1/2 approved"
+      ],
+      "current_acceptance": "Source/runtime evidence qualified; final task-head CI is an external merge gate",
+      "historical_status": "verified for task scope; global acceptance still pending",
+      "current_evidence": [
+        "evaluation/improvements/v090-final-qualification.json",
+        "evaluation/improvements/v090-native-profiles-qualification.json",
+        "evaluation/improvements/v090-model-qualification.json",
+        "evaluation/improvements/routing-validation-v2.json"
+      ]
+    },
+    {
+      "id": "L2.4",
+      "requirement": "Always_run reproduces unified baseline results; incompatible model/revision/config identities reject the artifact.",
+      "status": "verified for task scope; global acceptance still pending",
+      "evidence": [
+        "evaluation/improvements/l2-python-qualification.json",
+        "sct/routing.py",
+        "tests/test_detector_routing.py",
+        "b23250791ea9c6a4286a8ec9b648b6126ed75d87; independent scoped fix rounds1/2 approved"
+      ],
+      "current_acceptance": "Source/runtime evidence qualified; final task-head CI is an external merge gate",
+      "historical_status": "verified for task scope; global acceptance still pending",
+      "current_evidence": [
+        "evaluation/improvements/v090-final-qualification.json",
+        "evaluation/improvements/v090-native-profiles-qualification.json",
+        "evaluation/improvements/v090-model-qualification.json",
+        "evaluation/improvements/routing-validation-v2.json"
+      ]
+    },
+    {
+      "id": "L3.1",
+      "requirement": "Model/config/input hashes separate development from the untouched test split; no test tuning or threshold search until a desired result appears.",
+      "status": "saved-report validation complete with explicit raw-observation audit limits; integrated acceptance pending",
+      "evidence": [
+        "evaluation/improvements/routing-protocol.md",
+        "evaluation/improvements/routing-manifest-v1.json",
+        "evaluation/improvements/routing-development-v1.json",
+        "evaluation/improvements/routing-heldout-v1.json",
+        "evaluation/improvements/routing-test-consumed-v1.json",
+        "evaluation/improvements/routing-validation-v1.json",
+        "docs/PERFORMANCE.md"
+      ],
+      "current_acceptance": "Source/runtime evidence qualified; final task-head CI is an external merge gate",
+      "historical_status": "saved-report validation complete with explicit raw-observation audit limits; integrated acceptance pending",
+      "current_evidence": [
+        "evaluation/improvements/v090-final-qualification.json",
+        "evaluation/improvements/v090-native-profiles-qualification.json",
+        "evaluation/improvements/v090-model-qualification.json",
+        "evaluation/improvements/routing-validation-v2.json"
+      ]
+    },
+    {
+      "id": "L3.2",
+      "requirement": "Every language/entity/domain slice reports recall, precision and document exposure; shared/full taxonomies are not pooled.",
+      "status": "saved-report validation complete with explicit raw-observation audit limits; integrated acceptance pending",
+      "evidence": [
+        "evaluation/improvements/routing-protocol.md",
+        "evaluation/improvements/routing-manifest-v1.json",
+        "evaluation/improvements/routing-development-v1.json",
+        "evaluation/improvements/routing-heldout-v1.json",
+        "evaluation/improvements/routing-test-consumed-v1.json",
+        "evaluation/improvements/routing-validation-v1.json",
+        "docs/PERFORMANCE.md"
+      ],
+      "current_acceptance": "Source/runtime evidence qualified; final task-head CI is an external merge gate",
+      "historical_status": "saved-report validation complete with explicit raw-observation audit limits; integrated acceptance pending",
+      "current_evidence": [
+        "evaluation/improvements/v090-final-qualification.json",
+        "evaluation/improvements/v090-native-profiles-qualification.json",
+        "evaluation/improvements/v090-model-qualification.json",
+        "evaluation/improvements/routing-validation-v2.json"
+      ]
+    },
+    {
+      "id": "L3.3",
+      "requirement": "Record common-runtime model calls, median/p95 latency and peak memory with warmup/repeats.",
+      "status": "saved-report validation complete with explicit raw-observation audit limits; integrated acceptance pending",
+      "evidence": [
+        "evaluation/improvements/routing-protocol.md",
+        "evaluation/improvements/routing-manifest-v1.json",
+        "evaluation/improvements/routing-development-v1.json",
+        "evaluation/improvements/routing-heldout-v1.json",
+        "evaluation/improvements/routing-test-consumed-v1.json",
+        "evaluation/improvements/routing-validation-v1.json",
+        "docs/PERFORMANCE.md"
+      ],
+      "current_acceptance": "Source/runtime evidence qualified; final task-head CI is an external merge gate",
+      "historical_status": "saved-report validation complete with explicit raw-observation audit limits; integrated acceptance pending",
+      "current_evidence": [
+        "evaluation/improvements/v090-final-qualification.json",
+        "evaluation/improvements/v090-native-profiles-qualification.json",
+        "evaluation/improvements/v090-model-qualification.json",
+        "evaluation/improvements/routing-validation-v2.json"
+      ]
+    },
+    {
+      "id": "L3.4",
+      "requirement": "Promotion uses the fixed exposure interval and efficiency gates. Inconclusive/failing candidates leave always_run as default and retain the negative result.",
+      "status": "saved-report validation complete with explicit raw-observation audit limits; integrated acceptance pending",
+      "evidence": [
+        "evaluation/improvements/routing-protocol.md",
+        "evaluation/improvements/routing-manifest-v1.json",
+        "evaluation/improvements/routing-development-v1.json",
+        "evaluation/improvements/routing-heldout-v1.json",
+        "evaluation/improvements/routing-test-consumed-v1.json",
+        "evaluation/improvements/routing-validation-v1.json",
+        "docs/PERFORMANCE.md"
+      ],
+      "current_acceptance": "Source/runtime evidence qualified; final task-head CI is an external merge gate",
+      "historical_status": "saved-report validation complete with explicit raw-observation audit limits; integrated acceptance pending",
+      "current_evidence": [
+        "evaluation/improvements/v090-final-qualification.json",
+        "evaluation/improvements/v090-native-profiles-qualification.json",
+        "evaluation/improvements/v090-model-qualification.json",
+        "evaluation/improvements/routing-validation-v2.json"
+      ]
+    },
+    {
+      "id": "R1.1",
+      "requirement": "Exercise extract -> context-aware unified processing -> encrypted references for direct processing -> corpus selection -> interrupted/resumed outputs. Adapters retaining reversible restrictions use non-reversible mode.",
+      "status": "local deterministic-provider integration and privacy checks pass; final native combined acceptance pending",
+      "evidence": [
+        "tests/test_improvements_end_to_end.py",
+        "evaluation/improvements/r1-local-qualification.json",
+        "evaluation/improvements/ACCEPTANCE.md"
+      ],
+      "current_acceptance": "Source/runtime evidence qualified; final task-head CI is an external merge gate",
+      "historical_status": "local deterministic-provider integration and privacy checks pass; final native combined acceptance pending",
+      "current_evidence": [
+        "evaluation/improvements/v090-final-qualification.json",
+        "evaluation/improvements/v090-native-profiles-qualification.json",
+        "evaluation/improvements/v090-model-qualification.json",
+        "evaluation/improvements/routing-validation-v2.json"
+      ]
+    },
+    {
+      "id": "R1.2",
+      "requirement": "Check no raw values survive default manifests, traces, document metadata, exceptions or public findings.",
+      "status": "local deterministic-provider integration and privacy checks pass; final native combined acceptance pending",
+      "evidence": [
+        "tests/test_improvements_end_to_end.py",
+        "evaluation/improvements/r1-local-qualification.json",
+        "evaluation/improvements/ACCEPTANCE.md"
+      ],
+      "current_acceptance": "Source/runtime evidence qualified; final task-head CI is an external merge gate",
+      "historical_status": "local deterministic-provider integration and privacy checks pass; final native combined acceptance pending",
+      "current_evidence": [
+        "evaluation/improvements/v090-final-qualification.json",
+        "evaluation/improvements/v090-native-profiles-qualification.json",
+        "evaluation/improvements/v090-model-qualification.json",
+        "evaluation/improvements/routing-validation-v2.json"
+      ]
+    },
+    {
+      "id": "R1.3",
+      "requirement": "Run supported Python and optional-provider CI, Linux fork/forkserver tests, packaging, locks, strict docs and current quality baseline comparisons.",
+      "status": "pending",
+      "evidence": [],
+      "current_acceptance": "Source/runtime evidence qualified; final task-head CI is an external merge gate",
+      "historical_status": "pending",
+      "current_evidence": [
+        "evaluation/improvements/v090-final-qualification.json",
+        "evaluation/improvements/v090-native-profiles-qualification.json",
+        "evaluation/improvements/v090-model-qualification.json",
+        "evaluation/improvements/routing-validation-v2.json"
+      ]
+    },
+    {
+      "id": "R1.4",
+      "requirement": "Each feature is complete only with its own acceptance evidence. Adaptive implementation can be delivered as experimental without claiming a successful optimization.",
+      "status": "pending",
+      "evidence": [],
+      "current_acceptance": "Source/runtime evidence qualified; final task-head CI is an external merge gate",
+      "historical_status": "pending",
+      "current_evidence": [
+        "evaluation/improvements/v090-final-qualification.json",
+        "evaluation/improvements/v090-native-profiles-qualification.json",
+        "evaluation/improvements/v090-model-qualification.json",
+        "evaluation/improvements/routing-validation-v2.json"
+      ]
+    },
+    {
+      "id": "R1.5",
+      "requirement": "Document every unsupported combination and rollback profile; existing default fixtures must still pass.",
+      "status": "pending",
+      "evidence": [],
+      "current_acceptance": "Source/runtime evidence qualified; final task-head CI is an external merge gate",
+      "historical_status": "pending",
+      "current_evidence": [
+        "evaluation/improvements/v090-final-qualification.json",
+        "evaluation/improvements/v090-native-profiles-qualification.json",
+        "evaluation/improvements/v090-model-qualification.json",
+        "evaluation/improvements/routing-validation-v2.json"
+      ]
+    }
+  ],
+  "completion": "Source/runtime qualification complete. Merge requires passing checks on each actual task PR head.",
+  "integration_base": {
+    "release": "v0.9.0",
+    "commit": "882342fd08c03718d21d22278814cfbfe4b883f3",
+    "branch": "feat/pipeline-improvements-v090",
+    "status": "ported; source review and isolated supported-runtime gates complete",
+    "compatibility": "currentv0.9config-only API/max_workers; no removed aliases, model tuples or mutable globals",
+    "original_worktree_preserved": true
+  },
+  "historical_evidence_scope": "Existing task commits/statuses and baseline refer to original research. Current qualification appears separately; historical identities are not rewritten.",
+  "current_qualification": {
+    "final_record": "evaluation/improvements/v090-final-qualification.json",
+    "source_manifest": "evaluation/improvements/v090-source-manifest.json",
+    "native_profiles": "evaluation/improvements/v090-native-profiles-qualification.json#isolated_final_profiles",
+    "provider_export_evidence": "evaluation/improvements/v090-model-qualification.json",
+    "routing_evidence": "evaluation/improvements/routing-validation-v2.json",
+    "base_release": "v0.9.0",
+    "source_review": "Whole-branch, combined scoped fix, and additional core boundary-test reviews approved",
+    "defaults": "124 existing defaults unchanged; 13 safe opt-in fields appended",
+    "actual_pr_checks": "External merge gate; inspect each immutable PR head and current GitHub checks",
+    "full_prefix_qualification": "17 exact staged trees pass full Python 3.14 and static/source checks; unchanged 85% gate",
+    "test_only_followup": "evaluation/improvements/v090-boundary-test-qualification.json"
+  },
+  "historical_pending_qualifications": [
+    {
+      "owner": "R1",
+      "requirement": "Actual MCP/Pydantic schema generation with DetectorSpec and registered data-only configuration",
+      "status": "C3 review-fix snapshot qualified:62 passed,11 skipped with actual runtimes; final C4/C5 acceptance remains pending",
+      "evidence": [
+        "evaluation/improvements/c3-schema-qualification.json"
+      ]
+    },
+    {
+      "owner": "R1",
+      "requirement": "Real Haystack serialization with the trusted registry factory",
+      "status": "C3 review-fix snapshot qualified:62 passed,11 skipped with actual runtimes; final C4/C5 acceptance remains pending",
+      "evidence": [
+        "evaluation/improvements/c3-schema-qualification.json"
+      ]
+    },
+    {
+      "owner": "R1",
+      "requirement": "Real non-ONNX inference and supported Python matrix for the final integrated implementation",
+      "status": "unverified; ONNX and provider-install matrix evidence do not establish these checks"
+    },
+    {
+      "owner": "S2",
+      "requirement": "Multiprocess encrypted-store writers, rotation/expiry operations, and explicit closing of test-only SQLite connections",
+      "status": "Frozen S2 operational/scoped-security qualification passes; test-only SQLite warnings removed, final combined source remains R1",
+      "evidence": [
+        "evaluation/improvements/s2-python-qualification.json",
+        "evaluation/improvements/s2-security-review.json"
+      ]
+    },
+    {
+      "owner": "R1",
+      "requirement": "Foundation code checks on Python3.12 and3.13 from pinned c409ab0 snapshot",
+      "status": "verified locally on pinned C3 snapshot: Python3.12.15 and3.13.12 each209passed11skipped; remote setup failed before testing",
+      "evidence": [
+        "evaluation/improvements/foundation-python-matrix.json"
+      ]
+    },
+    {
+      "owner": "R1",
+      "requirement": "Audit the existing experimental presidio_gliner loader: cfg.gliner_revision is not forwarded and default AnalyzerEngine can load additional NLP models. Keep native corpus recipe rejection explicit until full immutable/offline provenance is qualified.",
+      "status": "unverified provider audit item; D2 guards this unsupported combination before output creation",
+      "evidence": [
+        "sct/utils/ner.py:286",
+        ".superpowers/sdd/2026-11-07-sct-improvements/D2-report.md"
+      ]
+    },
+    {
+      "owner": "R1",
+      "requirement": "Cached model-enabled native corpus recipe execution without hidden downloads",
+      "status": "Frozen D2 ONNX CPU smoke passed on three artificial English examples; final integrated model/provider qualification remains pending",
+      "evidence": [
+        "evaluation/improvements/d2-cached-model-smoke.json"
+      ]
+    },
+    {
+      "owner": "R1",
+      "requirement": "Final native checkpoint and cached model integration after all remaining features",
+      "status": "Frozen D3 native replay and three-example cached ONNX checkpoint proof pass; final combined source still pending",
+      "evidence": [
+        "evaluation/improvements/d3-python-qualification.json",
+        "evaluation/improvements/d3-cached-model-resume.json"
+      ]
+    }
+  ]
+}
