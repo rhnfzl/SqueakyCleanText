@@ -191,6 +191,12 @@ cleaner = TextCleaner(cfg=cfg)
 # Descriptions are used for inference, results are mapped back to original label names
 ```
 
+## Optional credential format scanner
+
+Existing GLiNER `password`, `api_key`, and `access_token` labels remain available.
+The optional [credential format scanner](SECRET_DETECTION.md) adds rule-only detection through an application-owned registry.
+It requires explicit unified processing and does not change the NER backend defaults.
+
 ## Optional integration qualification
 
 Optional integrations keep document, secret, storage and corpus dependencies out of the base install.

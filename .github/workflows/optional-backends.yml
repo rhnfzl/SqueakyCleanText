@@ -121,6 +121,13 @@ jobs:
           HF_HUB_OFFLINE: "1"
         run: .venv/bin/python -m pytest tests/test_optional_profiles.py tests/test_processing_compatibility.py tests/test_baseline_measurement.py -v -s
 
+      - name: Exercise native credential detector
+        if: matrix.profile == 'secrets'
+        env:
+          SCT_OPTIONAL_PROFILE: secrets
+          HF_HUB_OFFLINE: "1"
+        run: .venv/bin/python -m pytest tests/test_secret_detector.py -v
+
       - name: Prepare explicit pinned PDF artifacts
         if: matrix.profile == 'documents'
         run: |
