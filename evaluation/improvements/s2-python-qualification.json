@@ -1,0 +1,110 @@
+{
+  "schema_version": 1,
+  "scope": "Frozen S2 token-store operational tests, actual cryptography and scoped source review; final integrated acceptance remains pending",
+  "commit": "7cecd6669cc2b54b23ecf9dbddd6ece92e426e93",
+  "changed_source_sha256": {
+    "tests/test_token_store_operations.py": "74df3873fe3ace32a2790e5a8c5961668497e28b9e2d4cb08e32f43953167d09",
+    "tests/test_sqlite_token_store.py": "2858e40e37984f766783586d75e808521bfba82d5442274e9e20d726c7fddf99",
+    "docs/TOKEN_STORES.md": "ca938f54bdc60194aa39335e26f396963108a172799adc2b57002c337f6eed2a",
+    "README.md": "11cb24bb50f0d73d5dc0585210af126da1cf32b00224a73a71677c866711503f",
+    "docs/PRIVACY.md": "0ecf5baf7e87acdbdfd5d5d7c02c53e59b3a9df79c1b0d32f20c5fb7b9164dc7",
+    "docs/INSTALL.md": "f6152aa659a51470f31acbe00bcb140dade9faada10f4fd85debc8f6e1af9a37",
+    "mkdocs.yml": "03d5490a5f4e047929dd43e768abf5de9e27e0b7249e83962dcff028c84b6739",
+    ".github/workflows/optional-backends.yml": "28db4a7a036c8cf745708cf9acf77f960d163d30cea0b23e1a6b7a3c93bf40ec"
+  },
+  "security_source_sha256": {
+    "sct/token_stores/sqlite.py": "bdaedeecfccbc4ef628a93e00ff5ae0dda6f17207dc84628512e00735be7118b",
+    "sct/privacy.py": "b0b7c78d52e5746b841a5f87255180094fab2d08634e0f8bb724ba52e6853d5a",
+    "sct/utils/anonymization_map.py": "2925f2580dd2666c0a5a71348a0539a1cf84ae305de28f0223a0ffe275803b04",
+    "sct/sct.py": "c8379bd44c00556f2ee0436894d9d38026b08d42455cd13d6049d8de21e6076b"
+  },
+  "committed_byte_verification": "All eight changed files and four security source references match the reviewed committed blobs",
+  "runs": [
+    {
+      "python": "3.12.15 (main, Sep 30 2026, 22:04:19) [Clang 21.0.0 (clang-2100.3.34.2)]",
+      "executable": "/private/tmp/sct-foundation-local-20261107/py312/.venv/bin/python",
+      "root": "/private/tmp/sct-foundation-local-20261107/py312",
+      "providers": {
+        "cryptography": {
+          "version": "48.0.1",
+          "module_path": "/private/tmp/sct-foundation-local-20261107/py312/.venv/lib/python3.12/site-packages/cryptography/__init__.py"
+        }
+      },
+      "sqlite_version": "3.54.1",
+      "result": "49 passed in 7.41s",
+      "log_sha256": "af7bf35ded999b862f047bd5af4bb63bcff8fea5bc1c936fba115b7297a2bbdb"
+    },
+    {
+      "python": "3.13.12 (main, Mar  3 2026, 15:32:44) [Clang 21.1.4 ]",
+      "executable": "/private/tmp/sct-foundation-local-20261107/py313/.venv/bin/python",
+      "root": "/private/tmp/sct-foundation-local-20261107/py313",
+      "providers": {
+        "cryptography": {
+          "version": "48.0.1",
+          "module_path": "/private/tmp/sct-foundation-local-20261107/py313/.venv/lib/python3.13/site-packages/cryptography/__init__.py"
+        }
+      },
+      "sqlite_version": "3.50.4",
+      "result": "49 passed in 6.96s",
+      "log_sha256": "62f34ebba09dec5ab3ba1e84110284d125b98e58ace99fad85cd92603913ed90"
+    },
+    {
+      "archive_base": "c201a56e2fcc3f3178de3f1bfc1b1779574ed271",
+      "source_overlay": "uncommitted S2 owned paths; no production changes",
+      "snapshot_note": "Operational code SHA256 unchanged across passed35 tests; final documentation/CI synchronized afterward to complete12-path manifest.",
+      "interpreter": "/home/rehan/sct-improvements-s2-20261107/.venv/bin/python",
+      "prefix": "/home/rehan/sct-improvements-s2-20261107/.venv",
+      "python": "3.14.4 (main, Apr  7 2026, 20:47:53) [Clang 22.1.1 ]",
+      "platform": "Linux-6.11.0-26-generic-x86_64-with-glibc2.39",
+      "cryptography": {
+        "version": "48.0.1",
+        "file": "/home/rehan/sct-improvements-s2-20261107/.venv/lib/python3.14/site-packages/cryptography/__init__.py"
+      },
+      "sqlite": {
+        "version": "3.50.4",
+        "file": "/home/rehan/.local/share/uv/python/cpython-3.14.4-linux-x86_64-gnu/lib/python3.14/sqlite3/__init__.py"
+      },
+      "start_methods": [
+        "forkserver",
+        "fork",
+        "spawn"
+      ],
+      "source_sha256": {
+        "tests/test_token_store_operations.py": "74df3873fe3ace32a2790e5a8c5961668497e28b9e2d4cb08e32f43953167d09",
+        "tests/test_sqlite_token_store.py": "2858e40e37984f766783586d75e808521bfba82d5442274e9e20d726c7fddf99",
+        "docs/TOKEN_STORES.md": "ca938f54bdc60194aa39335e26f396963108a172799adc2b57002c337f6eed2a",
+        "README.md": "11cb24bb50f0d73d5dc0585210af126da1cf32b00224a73a71677c866711503f",
+        "docs/PRIVACY.md": "0ecf5baf7e87acdbdfd5d5d7c02c53e59b3a9df79c1b0d32f20c5fb7b9164dc7",
+        "docs/INSTALL.md": "f6152aa659a51470f31acbe00bcb140dade9faada10f4fd85debc8f6e1af9a37",
+        "mkdocs.yml": "03d5490a5f4e047929dd43e768abf5de9e27e0b7249e83962dcff028c84b6739",
+        ".github/workflows/optional-backends.yml": "28db4a7a036c8cf745708cf9acf77f960d163d30cea0b23e1a6b7a3c93bf40ec",
+        "sct/token_stores/sqlite.py": "bdaedeecfccbc4ef628a93e00ff5ae0dda6f17207dc84628512e00735be7118b",
+        "sct/token_stores/__init__.py": "4f8caf8bd1fc12c5ee812a62b0e1e6d35e2d88df613105436fc3ea8c3e86946c",
+        "sct/privacy.py": "b0b7c78d52e5746b841a5f87255180094fab2d08634e0f8bb724ba52e6853d5a",
+        "sct/utils/anonymization_map.py": "2925f2580dd2666c0a5a71348a0539a1cf84ae305de28f0223a0ffe275803b04"
+      },
+      "test_log": "/home/rehan/sct-improvements-s2-20261107-tests-final-snapshot.log",
+      "test_log_sha256": "691a388122b3f3111abe5e9b908337fd31516507d2308c73cc62ad57b07f0598",
+      "test_result": "35 passed in 5.78s; exit0",
+      "log_sha256": "691a388122b3f3111abe5e9b908337fd31516507d2308c73cc62ad57b07f0598"
+    }
+  ],
+  "full_gate": {
+    "result": "3023 passed,26 skipped,two known sandbox stdout failures; outside rerun2passed",
+    "coverage_percent": 95.31,
+    "previous_same_profile_percent": 95.27,
+    "delta_percentage_points": 0.04,
+    "sqlite_resource_warning_count": 0,
+    "s2_warning_count": 0,
+    "remaining_warnings": "95 existing corpus/schema fork notices and one legacy model-list warning",
+    "log_sha256": "a7dae4ec9ec9468afd0cf33991211255491ee0d20b5090392e3caac2c7adc57c",
+    "stdout_rerun_log_sha256": "3459dd0fd3d0918a7a46de3c450cbd0bf495e128eeaf38ff04b2267ff461d462",
+    "before_after_manifest_sha256": "526a0f6947864a846c6aa36e07e3b62889627b71d2908f9e463df323b012e87f"
+  },
+  "limits": [
+    "Trusted local POSIX scope, not Windows/distributed storage/sustained-load qualification.",
+    "Fork operation requires a quiescent parent; the test isolates it without warning filters.",
+    "Application owns authorization, scopes,keys,filesystem,audit reconciliation,backups and recovery.",
+    "Logical deletion and expiry do not erase retained storage copies."
+  ]
+}

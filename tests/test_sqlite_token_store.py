@@ -2,12 +2,18 @@
 
 import importlib.util
 import json
+import os
 import sqlite3
 import subprocess
 import sys
 from concurrent.futures import ThreadPoolExecutor
+from contextlib import closing
 
 import pytest
+
+if importlib.util.find_spec("cryptography") is None and os.environ.get("SCT_OPTIONAL_PROFILE") != "token-store":
+    pytest.skip("install the token-store extra", allow_module_level=True)
+
 from cryptography.fernet import Fernet
 
 from sct.utils.anonymization_map import AnonymizationMap
@@ -102,7 +108,7 @@ assert mapping.next_placeholder('PERSON') == '<PERSON_2>'
 def test_tampering_fails_without_sensitive_errors(setup_store, mutation):
     store, mapping, _, keys, _, _, path, error = setup_store
     ref = store.save(mapping)
-    with sqlite3.connect(path) as conn:
+    with closing(sqlite3.connect(path)) as conn, conn:
         (ciphertext,) = conn.execute("SELECT ciphertext FROM tokens WHERE reference = ?", (ref,)).fetchone()
         if mutation == "key":
             keys.keys["first"] = Fernet.generate_key()
@@ -146,7 +152,7 @@ def test_concurrent_saves_rotation_expiry_and_delete(setup_store):
 def test_authenticated_invalid_counters_fail(setup_store, counter):
     store, mapping, _, keys, _, _, path, error = setup_store
     ref = store.save(mapping)
-    with sqlite3.connect(path) as conn:
+    with closing(sqlite3.connect(path)) as conn, conn:
         (ciphertext,) = conn.execute("SELECT ciphertext FROM tokens").fetchone()
         fernet = Fernet(keys.keys["first"])
         payload = json.loads(fernet.decrypt(ciphertext))

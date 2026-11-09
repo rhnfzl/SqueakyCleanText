@@ -55,8 +55,12 @@ result = cleaner.process("Maria lives in Utrecht.")
 reference = result.metadata["anon_map_reference"]
 ```
 
-`InMemoryTokenStore` supports tests and short sessions. Production systems
-should implement `TokenStore` with encryption, access control, expiry, and audit logs.
+`InMemoryTokenStore` supports tests and short sessions.
+For encrypted maps across restarts, install the optional `token-store` extra and use
+[`EncryptedSQLiteTokenStore`](TOKEN_STORES.md). The application owns trusted scope assignment,
+authorization, keys, audit, backups, and retention.
+Deletion and expiry are logical operations, not secure erasure of journals, WAL files, backups, or media.
+The local reference integration requires an independent security-focused review before production readiness is claimed.
 
 ## Re-identification risk
 
