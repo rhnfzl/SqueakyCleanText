@@ -1,0 +1,52 @@
+{
+  "schema_version": 1,
+  "scope": "Frozen D1 selection and legacy compatibility checks on two additional supported Python runtimes",
+  "commit": "fd3880efec45bbe17efac6683f94a30f99b14c7c",
+  "source_snapshot_sha256": {
+    "sct/corpus/__init__.py": "d8de61a55418171d974fa946fd90d500d1f64729bd77ab177fac820d7f9b3b99",
+    "sct/corpus/types.py": "c78dd1c36e09e2b2a2c160594b2a529d6e8f04001a7577a391c295fedac1bf1f",
+    "sct/corpus/selection.py": "9f11d71de2889607c7a403f26725c35a326909e4f72a849bd2649eb08d4809a4",
+    "tests/test_corpus_selection.py": "b129117bbd69972add91b53b5119666857da191152ec0738804e2c9cdb20a5bc"
+  },
+  "committed_byte_verification": "All four committed reviewed files match the two qualified runtime sources",
+  "runs": [
+    {
+      "python": "3.12.15 (main, Sep 30 2026, 22:04:19) [Clang 21.0.0 (clang-2100.3.34.2)]",
+      "executable": "/private/tmp/sct-foundation-local-20261107/py312/.venv/bin/python",
+      "root": "/private/tmp/sct-foundation-local-20261107/py312",
+      "providers": {
+        "datasketch": {
+          "version": "2.0.0",
+          "module_path": "/private/tmp/sct-foundation-local-20261107/py312/.venv/lib/python3.12/site-packages/datasketch/__init__.py"
+        },
+        "sqlite3": {
+          "sqlite_version": "3.54.1",
+          "module_path": "/opt/homebrew/Cellar/python@3.12/3.12.15/Frameworks/Python.framework/Versions/3.12/lib/python3.12/sqlite3/__init__.py"
+        }
+      },
+      "result": "36 passed in 1.69s",
+      "log_sha256": "0799119131787f56a29c068ed4dbcc252e85a6d4484dcd8be8e48e58756d50d0"
+    },
+    {
+      "python": "3.13.12 (main, Mar  3 2026, 15:32:44) [Clang 21.1.4 ]",
+      "executable": "/private/tmp/sct-foundation-local-20261107/py313/.venv/bin/python",
+      "root": "/private/tmp/sct-foundation-local-20261107/py313",
+      "providers": {
+        "datasketch": {
+          "version": "2.0.0",
+          "module_path": "/private/tmp/sct-foundation-local-20261107/py313/.venv/lib/python3.13/site-packages/datasketch/__init__.py"
+        },
+        "sqlite3": {
+          "sqlite_version": "3.50.4",
+          "module_path": "/Users/rehan-8v/.local/share/uv/python/cpython-3.13.12-macos-aarch64-none/lib/python3.13/sqlite3/__init__.py"
+        }
+      },
+      "result": "36 passed in 1.86s",
+      "log_sha256": "1768501e5fd61b041da0d9cec3580c5df0d1230c24a3bafe01b6801c64e765c8"
+    }
+  ],
+  "limits": [
+    "Real neural quality-model evaluation and the final integrated Linux/Python/provider matrix remain pending.",
+    "MinHash candidate recall is probabilistic; confirmed candidate similarities use exact same-basis shingles."
+  ]
+}
