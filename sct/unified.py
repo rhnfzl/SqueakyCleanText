@@ -86,7 +86,8 @@ def _canonical(cleaner: TextCleaner, text: str) -> SourceMap:
     return mapping
 
 
-def _resolve(decisions: tuple[FindingDecision, ...]) -> list[tuple[int, int, FindingDecision]]:
+def _resolve(decisions: tuple[FindingDecision, ...],
+             schema_hits: tuple[Detection, ...] = ()) -> list[tuple[int, int, FindingDecision]]:
     protected = sorted((d for d in decisions if d.action != 'keep'),
                        key=lambda d: (d.detection.start, d.detection.end, d.detection.detector_id, d.detection.entity_type))
     groups: list[list[FindingDecision]] = []
@@ -103,7 +104,8 @@ def _resolve(decisions: tuple[FindingDecision, ...]) -> list[tuple[int, int, Fin
     for group, end in zip(groups, ends, strict=True):
         winner = min(group, key=lambda d: (
             d.action != 'redact', -(d.detection.end - d.detection.start),
-            d.detection.start, d.detection.detector_id, d.detection.entity_type))
+            d.detection.start, not any(d.detection is hit for hit in schema_hits),
+            d.detection.detector_id, d.detection.entity_type))
         resolved.append((group[0].detection.start, end, winner))
     return resolved
 
@@ -131,7 +133,7 @@ class UnifiedProcessor:
             self._local.pid = os.getpid()
         return self._local.detectors
 
-    def process(self, text: str, context: DetectionContext) -> UnifiedDocument:
+    def process(self, text: str, context: DetectionContext, *, protect_value: tuple[str, ...] = ()) -> UnifiedDocument:
         cleaner, cfg = self.cleaner, self.cleaner.cfg
         started = time.perf_counter()
         if not text or text.isspace():
@@ -166,18 +168,22 @@ class UnifiedProcessor:
         if synthetic:
             synthetic.reset_cache(text, language, cleaner._language_low_confidence(source, confidence, margin))
         hits = []
+        regex_origins: dict[int, Detection] = {}
         provenance = []
-        for detector in self._detectors():
+        detectors = self._detectors()
+        if context.declared_entity_types and not protect_value:
+            capable_types = {kind for detector in detectors if detector.capabilities.supports_context
+                             for kind in detector.capabilities.entity_types}
+            if not set(context.declared_entity_types) <= capable_types:
+                raise ValueError('Required field hints have no context-capable detector')
+        for detector in detectors:
             capabilities = detector.capabilities
-            if context != DetectionContext() and not capabilities.supports_context:
-                # Native detectors have no context-specific behavior; schema hints remain caller-owned.
-                if capabilities.id not in ('builtin_regex', 'builtin_ner'):
-                    raise ValueError('Selected detector does not support context')
+            detector_context = context if capabilities.supports_context else DetectionContext()
             helper = detector._helper if isinstance(detector, BuiltinRegexDetector) else None
             if helper is not None:
                 helper._document_context.warnings = cleaner._document_context.warnings
             try:
-                found = detector.detect(canonical, language=language, context=context)
+                found = detector.detect(canonical, language=language, context=detector_context)
                 if not isinstance(found, tuple):
                     raise ValueError('Detector results must be a tuple')
                 for hit in found:
@@ -190,7 +196,10 @@ class UnifiedProcessor:
                     if any(r.end > len(text) for r in hit.source_ranges):
                         raise ValueError('Detector source range exceeds the input')
                     projection = mapping.project(hit.start, hit.end)
-                    hits.append(replace(hit, source_ranges=projection.ranges, mapping_quality=projection.mapping_quality))
+                    projected_hit = replace(hit, source_ranges=projection.ranges, mapping_quality=projection.mapping_quality)
+                    hits.append(projected_hit)
+                    if isinstance(detector, BuiltinRegexDetector):
+                        regex_origins[id(projected_hit)] = projected_hit
             except DetectorUnavailable:
                 raise DetectorUnavailable('Selected detector is unavailable during analysis') from None
             except Exception:
@@ -200,13 +209,36 @@ class UnifiedProcessor:
                     helper._document_context.clear()
             provenance.append(asdict(capabilities))
         hits = drop_allowed(cleaner._allow_regex, canonical, hits, lambda hit: (hit.start, hit.end))
+        schema_hits = []
+        if protect_value and canonical:
+            if cleaner._allow_regex is not None and cleaner._allow_regex.search(canonical):
+                raise ValueError('protect_value conflicts with configured allow terms')
+            for kind in protect_value:
+                projection = mapping.project(0, len(canonical))
+                hit = Detection(kind, 0, len(canonical), 'field_schema', None, 'canonical',
+                                projection.ranges, projection.mapping_quality)
+                hits.append(hit)
+                schema_hits.append(hit)
+            provenance.append({'id': 'field_schema', 'version': '1', 'entity_types': protect_value})
         if amap is not None:
             for kind in {hit.entity_type for hit in hits}:
                 marker = re.compile(rf"<{re.escape(kind)}_[0-9]+>")
                 amap.reserved.update(marker.findall(text))
                 amap.reserved.update(marker.findall(canonical))
-        decisions = self.policy.evaluate(tuple(hits))
-        resolved = _resolve(decisions)
+        try:
+            decisions = self.policy.evaluate(tuple(hits))
+        except ValueError:
+            if protect_value:
+                raise ValueError('protect_value conflicts with the selected protection policy') from None
+            raise
+        for decision in decisions:
+            if any(decision.detection is hit for hit in schema_hits):
+                kind = decision.detection.entity_type
+                label = constants.LEGACY_TYPE_NAMES.get(kind, kind) if cfg.legacy_type_names else kind
+                if decision.action == 'keep' or (decision.action != 'redact'
+                        and cleaner._tags.get(label, f'<{label}>') is None):
+                    raise ValueError('protect_value conflicts with the selected protection policy or tag')
+        resolved = _resolve(decisions, tuple(schema_hits))
         replacements = []
         for start, end, decision in resolved:
             kind = decision.detection.entity_type
@@ -232,7 +264,8 @@ class UnifiedProcessor:
             'provenance': {'backend': None, 'models': []},
             'findings_v2': [asdict(decision.detection) | {
                 'source_ranges': [asdict(r) for r in decision.detection.source_ranges],
-                'action': decision.action, 'reason': decision.reason} for decision in decisions],
+                'action': decision.action, 'reason': decision.reason,
+                'builtin_regex_origin': id(decision.detection) in regex_origins} for decision in decisions],
             'counts_v2': {'version': 2, 'detector_hits': len(hits), 'resolved_replacements': len(resolved)},
             'provenance_v2': {'version': 2, 'detectors': provenance,
                               'policy': {'name': self.policy.name, 'version': self.policy.version}},

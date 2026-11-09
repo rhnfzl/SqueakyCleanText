@@ -223,7 +223,7 @@ def finalize_spans(ner, text, windows, window_results, ner_confidence_threshold,
     return ensemble_results
 
 
-def presidio_results(ner, text, language, source_markers=None, *, protect_markers=True):
+def presidio_results(ner, text, language, source_markers=None, *, protect_markers=True, context=None):
     """Use Presidio decisions unchanged, independently of rendering."""
     from sct.utils.resources import language_to_iso
 
@@ -235,6 +235,7 @@ def presidio_results(ner, text, language, source_markers=None, *, protect_marker
     analyzer_results = ner._analyzer.analyze(
         text=text,
         language=analyzer_language,
+        **({"context": list(context.declared_entity_types)} if context is not None and context.declared_entity_types else {}),
     )
     markers = ner._marker_spans(text, source_markers) if protect_markers else []
     kept = []

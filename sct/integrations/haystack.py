@@ -7,7 +7,11 @@ from typing import Any
 from haystack import Document, component, default_from_dict, default_to_dict
 
 from sct.config import TextCleanerConfig
-from sct.integrations._runtime import CleanerHandle, as_columns, clean_records
+from sct.schema import FieldSchema
+from sct.findings import DetectionContext
+from sct.detectors import DetectorRegistry
+from collections.abc import Callable
+from sct.integrations._runtime import CleanerHandle, as_columns, clean_records, registered_registry_factory
 
 
 def _plain(value: Any) -> Any:
@@ -31,11 +35,14 @@ class SCTDocumentCleaner:
         columns: Sequence[str] = ("content",),
         output: str = "overwrite",
         config: TextCleanerConfig | str | None = None,
+        *, schema: FieldSchema | None = None, context: DetectionContext | None = None,
+        registry_factory: Callable[[TextCleanerConfig], DetectorRegistry] | None = None,
     ):
         self.columns = as_columns(columns)
         self.output = output
         self._config = config
-        self.handle = CleanerHandle(config)
+        self.schema, self.context = schema, context
+        self.handle = CleanerHandle(config, registry_factory=registry_factory)
 
     def to_dict(self) -> dict[str, Any]:
         """Preset names stay names; a config keeps only its non-default fields.
@@ -54,11 +61,32 @@ class SCTDocumentCleaner:
                 if f.name != "supported_languages"
                 and (value := state[f.name]) != getattr(default, f.name)
             }
-        return default_to_dict(self, columns=self.columns, output=self.output, config=config)
+        params: dict[str, Any] = {'columns': self.columns, 'output': self.output, 'config': config}
+        if self.schema is not None:
+            params['schema'] = self.schema.to_dict()
+        if self.context is not None:
+            params['context'] = {'document_id': self.context.document_id, 'path': list(self.context.path),
+                                 'declared_entity_types': list(self.context.declared_entity_types),
+                                 'schema_id': self.context.schema_id}
+        if self.handle._registry_factory_reference is not None:
+            params['registry_factory_reference'] = list(self.handle._registry_factory_reference)
+        return default_to_dict(self, **params)
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "SCTDocumentCleaner":
         params = dict(data.get("init_parameters", {}))
+        if 'registry_factory' in params:
+            raise ValueError('Component data must use a registered registry factory reference')
+        reference = params.pop('registry_factory_reference', None)
+        if reference is not None:
+            params['registry_factory'] = registered_registry_factory(reference)
+        if isinstance(params.get('schema'), dict):
+            params['schema'] = FieldSchema.from_dict(params['schema'])
+        if isinstance(params.get('context'), dict):
+            context = dict(params['context'])
+            context['path'] = tuple(context.get('path', ()))
+            context['declared_entity_types'] = tuple(context.get('declared_entity_types', ()))
+            params['context'] = DetectionContext(**context)
         if isinstance(params.get("config"), dict):
             params["config"] = TextCleanerConfig(**params["config"])
         return default_from_dict(cls, {**data, "init_parameters": params})
@@ -66,7 +94,8 @@ class SCTDocumentCleaner:
     @component.output_types(documents=list[Document])
     def run(self, documents: list[Document]) -> dict[str, list[Document]]:
         pairs = clean_records(
-            self.handle, [(d.content, d.meta) for d in documents], "content", self.columns, self.output
+            self.handle, [(d.content, d.meta) for d in documents], "content", self.columns, self.output,
+            schema=self.schema, context=self.context
         )
         # id="" makes Document recompute it, so no hash of the raw text survives.
         return {"documents": [replace(d, id="", content=t, meta=m) for d, (t, m) in zip(documents, pairs)]}

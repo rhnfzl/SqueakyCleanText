@@ -11,7 +11,7 @@ import sys
 from types import FunctionType
 import threading
 from dataclasses import replace
-from typing import Any
+from typing import Any, cast
 from collections.abc import Callable, Iterable, Mapping, Sequence
 
 from sct.config import ONNX_BACKENDS, TextCleanerConfig, require_adapter_mode
@@ -19,9 +19,25 @@ from sct.detectors import DetectorRegistry
 from sct.presets import preset_config
 from sct.score import SCORE_A_COLUMNS, score_record
 from sct.sct import TextCleaner
+from sct.schema import FieldSchema, process_value, validate_options
+from sct.findings import DetectionContext
 from sct.signals import merge_views
 
 OUTPUTS = ("overwrite", "new_column")
+_TRUSTED_REGISTRY_FACTORIES: dict[tuple[str, str], Callable[[TextCleanerConfig], DetectorRegistry]] = {}
+
+
+def registered_registry_factory(reference):
+    """Resolve component data only against factories registered by trusted application code."""
+    if reference is None:
+        return None
+    if not isinstance(reference, (tuple, list)) or len(reference) != 2 or any(
+            not isinstance(part, str) for part in reference):
+        raise ValueError('Invalid trusted registry factory reference')
+    factory = _TRUSTED_REGISTRY_FACTORIES.get(tuple(reference))
+    if factory is None:
+        raise ValueError('Registry factory must first be registered by trusted application code')
+    return factory
 
 # One lock for first builds: threads sharing a handle build one cleaner, not one each.
 _BUILD_LOCK = threading.Lock()
@@ -58,7 +74,8 @@ class CleanerHandle:
     """Picklable owner of one ``TextCleaner`` per process."""
 
     def __init__(self, config: TextCleanerConfig | str | None = None, *,
-                 registry_factory: Callable[[TextCleanerConfig], DetectorRegistry] | None = None):
+                 registry_factory: Callable[[TextCleanerConfig], DetectorRegistry] | None = None,
+                 include_entities: bool = False):
         self._registry_factory_reference: tuple[str, str] | None = None
         if registry_factory is not None:
             if not isinstance(registry_factory, FunctionType):
@@ -70,7 +87,10 @@ class CleanerHandle:
                 or vars(module).get(name) is not registry_factory):
                 raise ValueError("registry_factory must be a trusted importable module-level function")
             self._registry_factory_reference = (module_name, name)
+            _TRUSTED_REGISTRY_FACTORIES[(module_name, name)] = cast(
+                Callable[[TextCleanerConfig], DetectorRegistry], registry_factory)
         self.registry_factory = registry_factory
+        self.include_entities = include_entities
         self.config = resolve_config(config)
         self._cleaner: TextCleaner | None = None
         self._pid: int | None = None
@@ -82,19 +102,22 @@ class CleanerHandle:
                 if self._cleaner is None or self._pid != pid:
                     # Forked child: reuse the parent's resolved commits (no network after fork).
                     self.config = _pin_loaded_revisions(self._cleaner, self.config)
+                    options: dict[str, Any] = {'include_entities': True} if self.include_entities else {}
                     if self.registry_factory is None:
-                        self._cleaner = TextCleaner(self.config)
+                        self._cleaner = TextCleaner(self.config, **options)
                     else:
-                        self._cleaner = TextCleaner(self.config, detector_registry=self.registry_factory(self.config))
+                        self._cleaner = TextCleaner(
+                            self.config, detector_registry=self.registry_factory(self.config), **options)
                     self._pid = pid
         return self._cleaner
 
     def __getstate__(self):
         return {"config": _pin_loaded_revisions(self._cleaner, self.config),
-                "registry_factory_reference": self._registry_factory_reference}
+                "registry_factory_reference": self._registry_factory_reference, "include_entities": self.include_entities}
 
     def __setstate__(self, state):
         self.config = state["config"]
+        self.include_entities = state.get("include_entities", False)
         self._registry_factory_reference = state.get("registry_factory_reference")
         self.registry_factory = None
         if self._registry_factory_reference is not None:
@@ -114,7 +137,8 @@ def output_column(col: str, output: str) -> str:
     return col if output == "overwrite" else f"{col}_clean"
 
 
-def _clean(handle: CleanerHandle, batch: Mapping[str, Sequence], columns, output: str):
+def _clean(handle: CleanerHandle, batch: Mapping[str, Sequence], columns, output: str, *,
+           schema: FieldSchema | None = None, context: DetectionContext | None = None):
     """Return (new batch, {column: ProcessResult-or-None per row})."""
     if output not in OUTPUTS:
         raise ValueError(f"output must be one of {OUTPUTS}, got {output!r}")
@@ -125,14 +149,20 @@ def _clean(handle: CleanerHandle, batch: Mapping[str, Sequence], columns, output
     if missing:
         raise KeyError(f"columns not in batch: {missing}")
     cleaner = handle.get()
+    validate_options(cleaner, schema, context)
+    if schema is not None and any(len(rule.path) != 1 or rule.path[0] not in columns for rule in schema.rules):
+        raise ValueError("Framework schema paths must select a configured column")
     out = dict(batch)
     per_column: dict[str, list] = {}
     for col in columns:
         values = list(batch[col])
         idx = [i for i, v in enumerate(values) if isinstance(v, str)]
         results: list = [None] * len(values)
-        for i, result in zip(idx, cleaner.process_batch([values[i] for i in idx])):
-            results[i] = result
+        if schema is None and context is None:
+            for i, result in zip(idx, cleaner.process_batch([values[i] for i in idx])):
+                results[i] = result
+        else:
+            results = [process_value(cleaner, value, (col,), schema=schema, context=context) for value in values]
         out[output_column(col, output)] = [
             v if r is None else r.lm_text for v, r in zip(values, results)
         ]
@@ -147,13 +177,14 @@ def clean_columns(
     output: str = "overwrite",
     *,
     score: bool = False,
+    schema: FieldSchema | None = None, context: DetectionContext | None = None,
 ) -> dict[str, list]:
     """Clean ``columns`` of a column batch; non-str cells and other columns pass through.
 
     ``output="new_column"`` writes ``<col>_clean`` and keeps the raw text.
     ``score=True`` adds ``sct.score.SCORE_A_COLUMNS`` for the first column.
     """
-    out, per_column = _clean(handle, batch, columns, output)
+    out, per_column = _clean(handle, batch, columns, output, schema=schema, context=context)
     if score:
         first = as_columns(columns)[0]
         records = [
@@ -171,6 +202,7 @@ def clean_records(
     text_key: str,
     columns: Sequence[str],
     output: str,
+    *, schema: FieldSchema | None = None, context: DetectionContext | None = None,
 ) -> list[tuple[str | None, dict]]:
     """Clean ``(text, metadata)`` pairs of document objects.
 
@@ -180,7 +212,7 @@ def clean_records(
     """
     columns = as_columns(columns)
     batch = {c: [t if c == text_key else m.get(c) for t, m in records] for c in columns}
-    out, per_column = _clean(handle, batch, columns, output)
+    out, per_column = _clean(handle, batch, columns, output, schema=schema, context=context)
     cleaned = []
     for i, (text, meta) in enumerate(records):
         meta = dict(meta)

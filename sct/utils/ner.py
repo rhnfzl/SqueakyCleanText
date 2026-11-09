@@ -281,6 +281,7 @@ class GeneralNER:
         self._presidio_types = _presidio_type_map(cfg.legacy_type_names, cfg.gliner_label_map)
         try:
             from presidio_analyzer.predefined_recognizers import GLiNERRecognizer  # noqa: S404
+            assert cfg.gliner_model is not None  # Config validation requires this model for the backend.
             gliner_recognizer = GLiNERRecognizer(
                 model_name=cfg.gliner_model,
                 supported_entities=[label.upper() for label in cfg.gliner_labels],
@@ -546,10 +547,12 @@ class GeneralNER:
     def analyze(self, text: str, *, language: str | None, context: DetectionContext) -> tuple[Detection, ...]:
         """Return value-free findings in canonical input coordinates, without replacement."""
         if self.cfg.ner_backend == 'presidio_gliner':
-            results = presidio_results(self, text, language, protect_markers=False)
+            results = presidio_results(self, text, language, protect_markers=False, context=context)
             return tuple(Detection(r.entity_type, r.start, r.end, 'builtin_ner',
                                    None if r.score is None else float(r.score), 'canonical')
                          for r in results)
+        if context.declared_entity_types:
+            raise ValueError("This NER backend does not support required field context")
         tags, cutoff = self._tags_and_cut(None, None)
         self._load_models([language])
         windows = self._plan_windows(text, self._window_keys(language))

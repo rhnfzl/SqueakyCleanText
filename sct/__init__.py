@@ -4,6 +4,7 @@ from sct.config import TextCleanerConfig, PII_LABELS, PII_LABEL_MAP
 from sct.detectors import Detector, DetectorCapabilities, DetectorRegistry, DetectorSpec, DetectorUnavailable
 from sct.policy_v2 import UnifiedPrivacyPolicy, HandlingRule, FindingDecision
 from sct.findings import Detection, DetectionContext, TextRange
+from sct.schema import FieldRule, FieldSchema
 from sct.privacy import (
     DetectedEntity,
     EntityFinding,
@@ -19,6 +20,7 @@ from sct.presets import PRESETS, preset_config
 from sct.adapters import (
     DataFrameResult,
     PathFinding,
+    PathFindingV2,
     ProcessedRAGChunk,
     RAGChunk,
     StructuredResult,
@@ -64,6 +66,7 @@ __all__ = [
     "DetectedEntity", "EntityFinding", "EntityRule",
     "PrivacyPolicy", "ProcessingMetrics",
     "TokenStore", "InMemoryTokenStore",
+    "FieldRule", "FieldSchema", "PathFindingV2",
     "DataFrameResult", "PathFinding", "ProcessedRAGChunk",
     "RAGChunk", "StructuredResult",
     "process_dataframe", "process_json", "process_rag_chunks",
