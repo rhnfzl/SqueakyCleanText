@@ -1,0 +1,662 @@
+[
+  {
+    "id": "P0",
+    "title": "Qualify dependencies and freeze compatibility evidence",
+    "features": [],
+    "depends": [],
+    "create": [
+      "tests/test_processing_compatibility.py",
+      "tests/fixtures/processing_compatibility.json",
+      "evaluation/improvements/baseline-manifest.json"
+    ],
+    "modify": [
+      ".github/workflows/optional-backends.yml",
+      "pyproject.toml",
+      "uv.lock",
+      "pylock.toml",
+      "docs/NER_BACKENDS.md"
+    ],
+    "tests": [
+      "tests/test_processing_compatibility.py"
+    ],
+    "interfaces": [
+      "Produces baseline-manifest.json with source/config/model/input identities and measured quality/runtime results.",
+      "Optional profiles: secrets, documents, token-store, corpus; exact resolved locks must be recorded before each dependent PR."
+    ],
+    "checks": [
+      "Capture independent expected outputs for default/training and placeholder/synthetic/reversible modes, blank input, source markers, custom steps and batch ordering.",
+      "Install each proposed optional profile on Python 3.12/3.13/3.14 and verify versions plus module paths using that project interpreter; a registry classifier is not an install test.",
+      "Measure current exact-span metrics, document exposure, median/p95 latency, model calls and peak memory on identical fixed samples before editing behavior.",
+      "Correct the stale averaging sentence to reflect configurable max/mean voting, without changing the default."
+    ],
+    "implementation": "Add model-free golden fixtures and an opt-in pinned-model baseline job. Preserve existing Linux worker CI and add path-filtered optional-provider smoke jobs. Do not install heavy extras in the base job.",
+    "example": "assert run_fixture(\"default_contacts\") == golden[\"default_contacts\"]\nassert run_fixture(\"reversible_source_marker\").restored == original"
+  },
+  {
+    "id": "C1",
+    "title": "Add canonical findings and honest coordinate maps",
+    "features": [
+      1
+    ],
+    "depends": [
+      "P0"
+    ],
+    "create": [
+      "sct/findings.py",
+      "sct/coordinates.py",
+      "tests/test_coordinates.py",
+      "tests/test_detections.py"
+    ],
+    "modify": [],
+    "tests": [
+      "tests/test_coordinates.py",
+      "tests/test_detections.py"
+    ],
+    "interfaces": [
+      "Produces Detection, DetectionContext, TextRange, Projection and SourceMap from the common specification.",
+      "No public cleaner behavior changes in this PR."
+    ],
+    "checks": [
+      "Reject reversed/out-of-bounds ranges, NaN/out-of-range scores and mixed coordinate spaces. None confidence remains None.",
+      "Compose identity, insertion, deletion, many-to-one and one-to-many edits; classify exact/covering/unavailable correctly.",
+      "For original \"\ud83d\udc4b A&amp;B\" and decoded text \"\ud83d\udc4b A&B\", B maps from [4,5) to [8,9); & maps conservatively to [3,8).",
+      "An opaque reverse-string callback cannot produce claimed exact raw offsets. Findings/repr/JSON contain no matched values."
+    ],
+    "implementation": "Use immutable DTOs and explicit edit composition. Keep source text transient and out of default serializers. Never infer exact provenance from a generic diff after an arbitrary callable.",
+    "example": "assert projected_b.ranges == (TextRange(8, 9),)\nassert projected_amp.mapping_quality == \"covering\"\nassert opaque_projection.mapping_quality == \"unavailable\""
+  },
+  {
+    "id": "C2",
+    "title": "Expose native regex and NER span analysis without replacement",
+    "features": [
+      1,
+      2
+    ],
+    "depends": [
+      "C1"
+    ],
+    "create": [
+      "sct/detectors_builtin.py",
+      "tests/test_builtin_detections.py"
+    ],
+    "modify": [
+      "sct/utils/contact.py",
+      "sct/utils/datetime.py",
+      "sct/utils/ner.py",
+      "sct/utils/ner_spans.py",
+      "sct/utils/normtext.py"
+    ],
+    "tests": [
+      "tests/test_builtin_detections.py",
+      "tests/test_ner_windows.py",
+      "tests/test_ner_spans.py"
+    ],
+    "interfaces": [
+      "Produces BuiltinRegexDetector and BuiltinNERDetector implementing Detector.",
+      "Add GeneralNER.analyze(text: str, *, language: str | None, context: DetectionContext) -> tuple[Detection, ...]; legacy rendering reuses extracted span finalization."
+    ],
+    "checks": [
+      "Regex spans match the existing contact/date/number/custom-pattern behavior and validations. Do not copy independent regex tables.",
+      "All six existing NER backends return canonical findings; model-window merges, votes and offsets remain stable.",
+      "Use fake models for unit tests and one pinned real model per applicable optional profile for smoke tests.",
+      "Legacy process outputs and include_entities metadata match P0 fixtures; no extra model call appears in legacy mode."
+    ],
+    "implementation": "Separate native span discovery from rendering with small helpers in ner_spans.py. Preserve current validation, timeout, source-marker and NER voting rules.",
+    "example": "assert regex_adapter.detect(text, language=None, context=ctx)[0].entity_type == \"EMAIL\"\nassert text == original_text\nassert legacy_cleaner.process(text) == golden_result"
+  },
+  {
+    "id": "C3",
+    "title": "Add explicit detector registration and worker-owned factories",
+    "features": [
+      2
+    ],
+    "depends": [
+      "C2"
+    ],
+    "create": [
+      "sct/detectors.py",
+      "tests/test_detector_registry.py"
+    ],
+    "modify": [
+      "sct/config.py",
+      "sct/sct.py",
+      "sct/integrations/_runtime.py",
+      "sct/__init__.py"
+    ],
+    "tests": [
+      "tests/test_detector_registry.py",
+      "tests/test_integrations_runtime.py",
+      "tests/test_cleaner_lifecycle.py"
+    ],
+    "interfaces": [
+      "Produces DetectorRegistry, DetectorSpec, DetectorCapabilities and DetectorUnavailable.",
+      "Consumes BuiltinRegexDetector/BuiltinNERDetector; supplies create(spec,cfg) and trusted registry_factory(cfg) for workers."
+    ],
+    "checks": [
+      "Duplicate/unknown IDs and invalid data-only options fail before processing; untrusted config does not trigger imports.",
+      "Registry freezes at cleaner construction; factories instantiate inside each process, never pickle sessions/keys.",
+      "Threaded batches have stable order and no leaked per-document context. Remote/network-required detectors fail unless explicitly allowed.",
+      "Round-trip DetectorSpec config through supported config serialization and legacy-global conventions."
+    ],
+    "implementation": "Make registration application-owned. Built-in factories remain lazy; optional package imports occur only when selected. Add kwargs without replacing existing constructor arguments.",
+    "example": "registry.register(\"example\", factory)\nwith raises(ValueError): registry.register(\"example\", factory)\nassert worker_result.session_pid == worker_pid"
+  },
+  {
+    "id": "C4",
+    "title": "Apply one unified policy and renderer across detector families",
+    "features": [
+      1
+    ],
+    "depends": [
+      "C3"
+    ],
+    "create": [
+      "sct/policy_v2.py",
+      "sct/unified.py",
+      "tests/test_unified_processing.py"
+    ],
+    "modify": [
+      "sct/sct.py",
+      "sct/config.py",
+      "sct/privacy.py",
+      "sct/utils/process_result.py",
+      "sct/utils/anonymization_map.py",
+      "sct/streaming.py",
+      "sct/browser.py",
+      "sct/__init__.py"
+    ],
+    "tests": [
+      "tests/test_unified_processing.py",
+      "tests/test_privacy.py",
+      "tests/test_processing_compatibility.py"
+    ],
+    "interfaces": [
+      "Produces UnifiedPrivacyPolicy and HandlingRule; adds opt-in pii_processing and source_mapping config.",
+      "process/process_batch use the shared unified path; metadata.findings_v2 is value-free. Existing PrivacyPolicy and post-regex metadata remain unchanged."
+    ],
+    "checks": [
+      "Mixed EMAIL regex and PERSON NER findings receive the same per-type policy in all three replacement modes.",
+      "keep affects the PII stage; redact dominates overlap and is deliberately irreversible; unknown scores are not dropped.",
+      "Source marker strings, overlapping spans, custom maps and Unicode do not cause double masking or marker collisions.",
+      "Best-effort mapping reports unavailable instead of fabricating raw positions; require_source rejects opaque transforms explicitly.",
+      "Buffered streaming uses the same document path; windowed streaming and browser manifests reject unsupported opt-in combinations.",
+      "Legacy defaults, presets, 3-tuple unpacking, public exports and existing reversible adapter refusal remain compatible."
+    ],
+    "implementation": "Collect detections before marker replacement and render once. Reuse existing replacement/map code. Explicitly version unified counts and metadata rather than changing legacy signal meanings.",
+    "example": "assert unified_process(text, mode=\"reversible\").restored == normalized_original\nassert \"original\" not in public_findings_json\nassert legacy_process(text) == golden_result"
+  },
+  {
+    "id": "C5",
+    "title": "Carry caller schema through existing structured and framework adapters",
+    "features": [
+      5
+    ],
+    "depends": [
+      "C4"
+    ],
+    "create": [
+      "sct/schema.py",
+      "tests/test_schema_context.py"
+    ],
+    "modify": [
+      "sct/adapters.py",
+      "sct/integrations/_runtime.py",
+      "sct/integrations/hf.py",
+      "sct/integrations/datatrove.py",
+      "sct/integrations/langchain.py",
+      "sct/integrations/haystack.py",
+      "sct/mcp_server.py",
+      "sct/cli.py",
+      "sct/utils/ner.py"
+    ],
+    "tests": [
+      "tests/test_schema_context.py",
+      "tests/test_integrations_frameworks.py",
+      "tests/test_integrations_hf.py"
+    ],
+    "interfaces": [
+      "Produces FieldSchema and FieldRule(path, entity_types, mode=\"hint\"|\"protect_value\").",
+      "Add schema/context keyword options to process_json/process_dataframe/process_rag_chunks and propagate the trusted registry factory through adapters."
+    ],
+    "checks": [
+      "No built-in field-name guessing. Identical text receives identical default treatment regardless of key name.",
+      "Caller-declared protect_value can explicitly mask a whole value; hints reach only a context-capable provider and are not silently ignored.",
+      "JSON key cleaning, duplicate cleaned keys, tuples, non-string cells, metadata and input-copy semantics stay compatible.",
+      "A Presidio-capable analysis path receives explicit context; ONNX-only providers reject unsupported required hints clearly.",
+      "CLI/MCP expose data-only schema with an application whitelist, not arbitrary Python factory loading.",
+      "HF/process workers recreate configured detectors; reversible mode remains refused on adapters that cannot return maps."
+    ],
+    "implementation": "Reuse current traversal and runtime modules. Field paths are transient context, not automatically logged. Preserve cleaned structural metadata and identify unsupported schema/path combinations explicitly.",
+    "example": "assert default_process_json({\"name\": \"May\", \"status\": \"May\"}) == existing_result\nassert protected_schema_result[\"name\"] == \"<PERSON>\"\nassert original_input == unchanged_copy"
+  },
+  {
+    "id": "D1",
+    "title": "Implement report-first quality selection and corpus duplicate decisions",
+    "features": [
+      3
+    ],
+    "depends": [
+      "P0"
+    ],
+    "create": [
+      "sct/corpus/__init__.py",
+      "sct/corpus/types.py",
+      "sct/corpus/selection.py",
+      "tests/test_corpus_selection.py"
+    ],
+    "modify": [
+      "sct/score.py"
+    ],
+    "tests": [
+      "tests/test_corpus_selection.py"
+    ],
+    "interfaces": [
+      "Produces CorpusRecord, SelectionConfig, RecordAnalysis, SelectionReport; implements analyse_records and select_records.",
+      "Consumes existing ScoreConfig/QualityScorer/MinHash semantics without changing score_record defaults."
+    ],
+    "checks": [
+      "Default report mode retains every record. A non-None quality_min requires an available scorer.",
+      "Exact matching and near matching produce real clusters and deterministic min_stable_id keepers, including transitive clusters and tied scores.",
+      "Reject duplicate record IDs and incompatible signature metadata, including tokenizer/library/config identity.",
+      "Two different sensitive records that normalize to the same placeholder text are flagged as a basis-dependent collision; apply mode requires an explicit basis choice.",
+      "Missing/short signatures are not equated; audit rows contain stable IDs, scores and reasons, not raw text."
+    ],
+    "implementation": "Use existing datasketch support plus disk-backed candidate/decision state. Keep threshold decisions outside the ordinary cleaner and avoid holding the whole text corpus in memory.",
+    "example": "assert report_mode.kept_ids == all_ids\nassert apply_mode.kept_ids == expected_representatives\nwith raises(SignatureMismatch): compare(incompatible_a, incompatible_b)"
+  },
+  {
+    "id": "D2",
+    "title": "Compose a complete DataTrove curation recipe with private run identity",
+    "features": [
+      3,
+      4
+    ],
+    "depends": [
+      "D1"
+    ],
+    "create": [
+      "sct/corpus/manifest.py",
+      "sct/corpus/datatrove.py",
+      "tests/test_corpus_manifest.py",
+      "examples/corpus/clean_select_dedup.py"
+    ],
+    "modify": [
+      "sct/integrations/datatrove.py",
+      "docs/INTEGRATIONS.md",
+      "pyproject.toml",
+      "uv.lock",
+      "pylock.toml"
+    ],
+    "tests": [
+      "tests/test_corpus_manifest.py",
+      "tests/test_linux_workers.py"
+    ],
+    "interfaces": [
+      "Produces RunIdentity and RunManifest(schema_version=1); fingerprint configuration and record output identities.",
+      "Provides a DataTrove-compatible workflow through identification, clustering and actual duplicate removal on an explicitly declared basis."
+    ],
+    "checks": [
+      "End-to-end fixture writes a new kept corpus plus stable decisions, with filtered/rejected counts reconciling to input IDs.",
+      "No incompatible reuse of SCT signatures as DataTrove files; use one complete native workflow or an explicit tested conversion.",
+      "Manifest excludes raw text, custom term values, keys, anon maps and raw SDK objects. Treat config digests and IDs as private identifying state.",
+      "Input source remains unchanged; apply mode writes new outputs and report-only remains the default.",
+      "Run the real DataTrove 0.10.1 profile on Linux with process-owned cleaner handles."
+    ],
+    "implementation": "Prefer DataTrove execution rather than adding a second scheduler. Store deterministic shard references and secret-free operational metadata; no automatic raw rejected-document writer.",
+    "example": "assert kept_count + rejected_count == input_count\nassert manifest[\"schema_version\"] == 1\nassert sensitive_literal not in serialized_manifest"
+  },
+  {
+    "id": "D3",
+    "title": "Add safe resumption, failure quarantine and reference decontamination",
+    "features": [
+      3,
+      4
+    ],
+    "depends": [
+      "D2"
+    ],
+    "create": [
+      "sct/corpus/runner.py",
+      "tests/test_corpus_resume.py",
+      "tests/test_corpus_decontamination.py"
+    ],
+    "modify": [
+      "examples/corpus/clean_select_dedup.py"
+    ],
+    "tests": [
+      "tests/test_corpus_resume.py",
+      "tests/test_corpus_decontamination.py"
+    ],
+    "interfaces": [
+      "Implements resume_run(manifest_path: Path, *, expected: RunIdentity) -> ResumeState.",
+      "Adds caller-supplied decontamination reference indexes and typed private failure/quarantine records."
+    ],
+    "checks": [
+      "Crash after output write but before completion publication; restart has identical stable-ID outputs to uninterrupted execution, with no duplicate writes.",
+      "Changed input partition, config, detector/model revision, seed or signature identity refuses reuse.",
+      "Completion requires atomic output plus checksum; incomplete work replays and sinks are idempotent.",
+      "Retries are bounded; failure ledger stores reason and stable ID, not raw exception values or document contents.",
+      "Reference matching has report/apply behavior, measured false-positive fixtures and no built-in benchmark/keyword lists."
+    ],
+    "implementation": "Use framework checkpoint boundaries plus an SCT identity guard. Never claim exactly-once semantics. Make retention of optional private samples explicit and separate from count-only quarantine.",
+    "example": "assert sorted(resumed_ids) == sorted(uninterrupted_ids)\nassert len(resumed_ids) == len(set(resumed_ids))\nwith raises(RunIdentityMismatch): resume_run(path, expected=changed)"
+  },
+  {
+    "id": "S1",
+    "title": "Implement encrypted, scoped and expiring local token storage",
+    "features": [
+      6
+    ],
+    "depends": [
+      "P0"
+    ],
+    "create": [
+      "sct/token_stores/__init__.py",
+      "sct/token_stores/sqlite.py",
+      "tests/test_sqlite_token_store.py"
+    ],
+    "modify": [
+      "sct/privacy.py",
+      "pyproject.toml",
+      "uv.lock",
+      "pylock.toml",
+      "sct/__init__.py"
+    ],
+    "tests": [
+      "tests/test_sqlite_token_store.py",
+      "tests/test_privacy.py"
+    ],
+    "interfaces": [
+      "Produces EncryptedSQLiteTokenStore, KeyProvider, StoreEvent and TokenStoreError under the specified interface.",
+      "Implements existing TokenStore.save/load/delete and existing AnonymizationMap.to_dict/from_dict."
+    ],
+    "checks": [
+      "Round-trip across a process restart, preserving marker reservations and counters.",
+      "Expired/missing/wrong-scope references return None. Tamper/key substitution and malformed authenticated payloads fail explicitly.",
+      "Keys and raw values do not appear in database bytes, returned references, repr, exceptions or audit events.",
+      "SQLite file/directory access and transaction handling are explicit; no plaintext fallback on encryption/store errors."
+    ],
+    "implementation": "Use vetted Fernet authentication, random references and an encrypted envelope binding scope/reference/expiry. Inject clock/keys for deterministic tests. Do not change the default in-memory store.",
+    "example": "assert restarted_store.load(ref).deanonymize(masked) == original\nassert other_scope.load(ref) is None\nassert expired_store.load(ref) is None"
+  },
+  {
+    "id": "S2",
+    "title": "Prove token-store concurrency, rotation and documented operational limits",
+    "features": [
+      6
+    ],
+    "depends": [
+      "S1"
+    ],
+    "create": [
+      "tests/test_token_store_operations.py",
+      "docs/TOKEN_STORES.md"
+    ],
+    "modify": [
+      "sct/token_stores/sqlite.py",
+      "README.md",
+      "docs/PRIVACY.md",
+      "docs/INSTALL.md"
+    ],
+    "tests": [
+      "tests/test_token_store_operations.py"
+    ],
+    "interfaces": [
+      "Adds rotation/expiry/cleanup operations without changing save/load/delete compatibility.",
+      "Documents trusted scope assignment, key ownership, audit and logical-deletion semantics."
+    ],
+    "checks": [
+      "Concurrent threads/processes cannot collide references or observe partially committed maps; connections are not reused across fork.",
+      "New saves use the current key ID, old maps remain readable through their retained key IDs, and explicit rotation is tested.",
+      "Deletion/expiry does not claim to erase SQLite WAL, backups or storage media; key retirement consequences are explicit.",
+      "An independent security-focused review must pass before labelling the reference integration ready for supported production use."
+    ],
+    "implementation": "Keep scope/key/provider access application-owned. Document backup, access-control and retention obligations instead of inventing a hosted auth service.",
+    "example": "assert concurrent_reference_count == saved_map_count\nassert rotated_store.load(old_ref) == original_map\nassert deleted_ref_not_loadable"
+  },
+  {
+    "id": "E1",
+    "title": "Add offline structure-preserving Docling extraction and cleaning",
+    "features": [
+      7
+    ],
+    "depends": [
+      "C1",
+      "C4",
+      "C5",
+      "P0"
+    ],
+    "create": [
+      "sct/documents.py",
+      "sct/integrations/docling.py",
+      "tests/test_docling_integration.py",
+      "tests/fixtures/documents/pii-layout.pdf",
+      "docs/DOCUMENTS.md"
+    ],
+    "modify": [
+      "pyproject.toml",
+      "uv.lock",
+      "pylock.toml",
+      "docs/INTEGRATIONS.md"
+    ],
+    "tests": [
+      "tests/test_docling_integration.py"
+    ],
+    "interfaces": [
+      "Produces DocumentExtractor, ExtractedDocument, ProcessedDocument; implements extract_document and clean_document.",
+      "Consumes SourceMap and unified findings to map canonical extracted text back to element/page IDs."
+    ],
+    "checks": [
+      "A synthetic multi-page fixture includes cross-element names, table values, OCR text and metadata PII. Detection uses joined mapped text, not blind per-line isolated calls.",
+      "Only cleaned output text/elements and allowlisted structural provenance survive; no raw Docling objects, source text or original-element metadata is retained in output.",
+      "Missing offline artifacts cause a clear error; no network/model download occurs unless explicitly enabled.",
+      "Run real Docling conversion in the optional CI profile as well as fake-provider unit tests.",
+      "Never claim original PDF/images/attachments are redacted; coordinates describe extracted text and layout provenance."
+    ],
+    "implementation": "Use the documented Docling 2.148.0 adapter contract validated in P0. Preserve element IDs and mapped separators; use SCT existing long-document windows. Unstructured is a later optional adapter, not a prerequisite.",
+    "example": "assert secret not in processed_text_or_metadata\nassert processed.element_ids == extracted.element_ids\nassert no_network_calls_in_offline_mode"
+  },
+  {
+    "id": "E2",
+    "title": "Add an optional format-aware credential detector",
+    "features": [
+      9
+    ],
+    "depends": [
+      "C3",
+      "C4",
+      "P0"
+    ],
+    "create": [
+      "sct/detectors_datafog.py",
+      "tests/test_secret_detector.py",
+      "docs/SECRET_DETECTION.md"
+    ],
+    "modify": [
+      "pyproject.toml",
+      "uv.lock",
+      "pylock.toml",
+      "docs/NER_BACKENDS.md"
+    ],
+    "tests": [
+      "tests/test_secret_detector.py"
+    ],
+    "interfaces": [
+      "Produces DataFogSecretDetector implementing Detector with explicit rule-based capabilities.",
+      "Calls datafog-core 1.0.0 scan(text, {\"entities\": [...]}) for the four declared credential categories; no ML session required."
+    ],
+    "checks": [
+      "Synthetic API_KEY, BEARER_TOKEN, JWT and PRIVATE_KEY examples return correct Unicode code-point spans, including emoji prefixes.",
+      "Vendor byte/UTF-16 ranges are not misread as Python positions; malformed ranges fail validation.",
+      "Unknown selected types, missing extra and scanner errors fail explicitly without a successful regex-only disguise.",
+      "Raw matched_text and vendor result objects do not reach public findings/logs. Near-miss code literals and false positives are evaluated.",
+      "Existing GLiNER password/api_key/access_token labels remain usable; do not describe secret recognition as previously absent."
+    ],
+    "implementation": "Convert rule-based findings into the canonical interface and drop raw values. Register explicitly through an application-owned factory. Do not load optional models or silently expand detector scope.",
+    "example": "assert detected.entity_type == \"JWT\"\nassert input_text[detected.start:detected.end] == synthetic_token\nassert synthetic_token not in public_metadata"
+  },
+  {
+    "id": "L1",
+    "title": "Add explicit low-confidence language abstention and fallback policy",
+    "features": [
+      10
+    ],
+    "depends": [
+      "P0"
+    ],
+    "create": [
+      "sct/language_policy.py",
+      "tests/test_language_policy.py"
+    ],
+    "modify": [
+      "sct/sct.py",
+      "sct/config.py",
+      "sct/signals.py",
+      "sct/utils/process_result.py",
+      "docs/LANGUAGES.md",
+      "docs/CONFIG.md"
+    ],
+    "tests": [
+      "tests/test_language_policy.py",
+      "tests/test_language_all.py"
+    ],
+    "interfaces": [
+      "Produces LanguageDecision and apply_language_policy(decision, policy) -> LanguageDecision.",
+      "Adds opt-in decision thresholds/actions; defaults remain legacy and thresholds None."
+    ],
+    "checks": [
+      "Pinned languages bypass thresholding. No-score/tie and restricted-tuple fallback remain unchanged by default.",
+      "With min_confidence=0.8 and min_margin=0.1, confidence 0.79 abstains; 0.8 with margin 0.1 passes.",
+      "Opt-in abstention records None language, source=abstained and language_abstained warning.",
+      "Multilingual/error/explicit skip actions are tested; no language outside a configured restriction is invented.",
+      "Measure known-language accuracy/coverage and unknown-language false answers before choosing any new default."
+    ],
+    "implementation": "Keep raw confidence/margin evidence and make the decision layer pure. Distinguish synthetic-locale fallback from language detection. Never imply a threshold alone guarantees unknown-language detection.",
+    "example": "assert abstained.language is None and abstained.source == \"abstained\"\nassert boundary_case.language == \"ENGLISH\"\nassert pinned.language == \"DUTCH\""
+  },
+  {
+    "id": "L2",
+    "title": "Implement opt-in detector routing with safe fallback and trace identity",
+    "features": [
+      8
+    ],
+    "depends": [
+      "C3",
+      "C4",
+      "L1"
+    ],
+    "create": [
+      "sct/routing.py",
+      "tests/test_detector_routing.py"
+    ],
+    "modify": [
+      "sct/unified.py",
+      "sct/config.py",
+      "sct/utils/process_result.py"
+    ],
+    "tests": [
+      "tests/test_detector_routing.py"
+    ],
+    "interfaces": [
+      "Produces RoutingContext, DetectorRun, RoutingDecision and RoutingPolicy.plan.",
+      "Provides always_run and experimental calibrated_cascade using explicit fast/full specs plus a calibration artifact."
+    ],
+    "checks": [
+      "Unknown language, unsupported entity coverage/context, missing calibration and detector errors do not authorize an early exit.",
+      "One regex email never proves names absent; mixed-entity fixture routes to the full detector.",
+      "Routing cannot skip a requested capability that the fast path does not declare. All skip decisions carry a value-free reason and experimental policy identity.",
+      "Always_run reproduces unified baseline results; incompatible model/revision/config identities reject the artifact."
+    ],
+    "implementation": "Keep routing separate from model implementation. Treat completion of configured stages as execution status, never complete privacy. Default to always_run and bound stages/calls.",
+    "example": "assert \"full\" in route(mixed_name_and_email).selected_ids\nassert missing_calibration_uses_full\nassert always_run_result == unified_baseline"
+  },
+  {
+    "id": "L3",
+    "title": "Calibrate, benchmark and gate adaptive promotion",
+    "features": [
+      8,
+      10
+    ],
+    "depends": [
+      "L2"
+    ],
+    "create": [
+      "scripts/benchmark_detector_routing.py",
+      "evaluation/improvements/routing-protocol.md",
+      "tests/test_routing_calibration.py"
+    ],
+    "modify": [
+      "benchmarks/compare/PROTOCOL.md",
+      "docs/PERFORMANCE.md"
+    ],
+    "tests": [
+      "tests/test_routing_calibration.py"
+    ],
+    "interfaces": [
+      "Produces a versioned calibration JSON and held-out evaluation report, including failed candidates.",
+      "Consumes the 12-candidate dev-only grid and promotion criteria fixed in the design spec."
+    ],
+    "checks": [
+      "Model/config/input hashes separate development from the untouched test split; no test tuning or threshold search until a desired result appears.",
+      "Every language/entity/domain slice reports recall, precision and document exposure; shared/full taxonomies are not pooled.",
+      "Record common-runtime model calls, median/p95 latency and peak memory with warmup/repeats.",
+      "Promotion uses the fixed exposure interval and efficiency gates. Inconclusive/failing candidates leave always_run as default and retain the negative result."
+    ],
+    "implementation": "Use the existing evaluators and paired resampling with pinned models and samples. No new library is needed to enumerate the finite grid. Keep calibration artifacts free of source documents or reversible maps.",
+    "example": "assert fit_uses_dev_only and test_runs_once\nassert failed_gate.default_policy == \"always_run\"\nassert artifact.model_ids == evaluated_model_ids"
+  },
+  {
+    "id": "R1",
+    "title": "Run cross-feature acceptance and prepare a reviewed staged release",
+    "features": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10
+    ],
+    "depends": [
+      "C5",
+      "D3",
+      "S2",
+      "E1",
+      "E2",
+      "L3"
+    ],
+    "create": [
+      "tests/test_improvements_end_to_end.py",
+      "evaluation/improvements/ACCEPTANCE.md"
+    ],
+    "modify": [
+      "README.md",
+      "docs/API.md",
+      "docs/CONFIG.md",
+      "docs/PRIVACY.md",
+      "docs/INTEGRATIONS.md",
+      "docs/INSTALL.md",
+      "llms.txt",
+      "CHANGELOG.md"
+    ],
+    "tests": [
+      "tests/test_improvements_end_to_end.py"
+    ],
+    "interfaces": [
+      "Produces a per-feature completion ledger with test/evaluation evidence, compatibility status and documented limits.",
+      "No automatic release publication or default migration is included."
+    ],
+    "checks": [
+      "Exercise extract -> context-aware unified processing -> encrypted references for direct processing -> corpus selection -> interrupted/resumed outputs. Adapters retaining reversible restrictions use non-reversible mode.",
+      "Check no raw values survive default manifests, traces, document metadata, exceptions or public findings.",
+      "Run supported Python and optional-provider CI, Linux fork/forkserver tests, packaging, locks, strict docs and current quality baseline comparisons.",
+      "Each feature is complete only with its own acceptance evidence. Adaptive implementation can be delivered as experimental without claiming a successful optimization.",
+      "Document every unsupported combination and rollback profile; existing default fixtures must still pass."
+    ],
+    "implementation": "Release in reviewed opt-in milestones. Update examples/exports/types and user-facing docs together. A later default switch needs a separate reviewed migration decision.",
+    "example": "assert all(feature.evidence for feature in acceptance.features)\nassert legacy_golden_suite_passes\nassert no_sensitive_values_in_default_artifacts"
+  }
+]

@@ -5,7 +5,7 @@
 - The default backend is `onnx`: ONNX Runtime with no PyTorch or Transformers install
   (about 3-5x faster than PyTorch).
 - Each language runs an ensemble of models (`ner_ensemble`, default below) and the
-  ensemble combines their spans and averages their scores. English runs the English and multilingual models; Dutch,
+  ensemble combines their spans and uses configurable max/mean score voting (max by default). English runs the English and multilingual models; Dutch,
   German and Spanish run their own model plus the English and multilingual models. Every
   other language runs the multilingual and English models (`ner_ensemble_default_keys`)
   and gets the `ner_fallback_models` warning, unless you bring a model for it with
@@ -189,3 +189,28 @@ cfg = TextCleanerConfig(
 cleaner = TextCleaner(cfg=cfg)
 # Descriptions are used for inference, results are mapped back to original label names
 ```
+
+## Optional integration qualification
+
+Optional integrations keep document, secret, storage and corpus dependencies out of the base install.
+Install only the profile your application uses:
+
+| Extra | Locked candidate | Offline smoke |
+|---|---|---|
+| `secrets` | `datafog-core==1.0.0` | Bearer-token scan and code-point range |
+| `documents` | `docling==2.148.0` | Local Markdown extraction, no model fetch |
+| `token-store` | `cryptography==48.0.1` | Fernet authenticated round trip |
+| `corpus` | `datatrove==0.10.1`, locked datasketch | JSONL reader and MinHash agreement |
+
+Use `uv sync --locked --extra dev --extra test --extra secrets`, then run
+`SCT_OPTIONAL_PROFILE=secrets .venv/bin/python -m pytest tests/test_optional_profiles.py -v -s`.
+Replace `secrets` with the selected profile. The test prints the installed version and module path from that environment.
+The optional workflow exercises each profile on Python 3.12, 3.13 and 3.14.
+A configured CI matrix does not prove those jobs passed. Local evidence and remaining checks are recorded in
+`evaluation/improvements/baseline-manifest.json` and the P0 implementation report.
+
+Markdown smoke checks qualify local extraction only. PDF extraction still needs separately provisioned local artifacts
+and real PDF coverage before the document adapter can claim support.
+The manual `pinned_model_baseline` workflow input runs pinned CPU model checks and exports measured baseline results.
+Its three artificial English examples detect compatibility changes; they do not establish representative privacy quality
+or justify promoting adaptive routing. The original source document is never redacted by text extraction.

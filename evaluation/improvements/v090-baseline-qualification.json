@@ -1,0 +1,41 @@
+{
+  "schema_version": 1,
+  "scope": "v0.9.0 release baseline, before ten-feature port; not feature acceptance",
+  "source_commit": "882342fd08c03718d21d22278814cfbfe4b883f3",
+  "source_tree": "aa752ba093afb5a857127a364dc560dc05502167",
+  "release_tag": "v0.9.0",
+  "release_owner": "untangle-sct",
+  "publication_state_at_handoff": "completed; GitHub v0.9.0 release and version-specific PyPI distribution metadata verified live",
+  "full_suite": {
+    "passed": 2716,
+    "skipped": 36,
+    "warnings": 9,
+    "seconds": 383.66,
+    "profile": "Linux Python3.13 per release owner handoff",
+    "evidence": "gpuserver:/tmp/sct-release-0.9.0.AbOiEr/full.log"
+  },
+  "coverage": {
+    "covered": 4612,
+    "statements": 4818,
+    "exact_percent": 95.72436695724367,
+    "minimum": 85,
+    "original_json_sha256": "3661a7aaa21b0d7fc21f32e6401dad770a9321f8dcfa162b0ae4f30df34ae490",
+    "evidence": "gpuserver:/tmp/sct-release-0.9.0.AbOiEr/coverage-full.json"
+  },
+  "limits": [
+    "Release baseline does not qualify newly ported feature source.",
+    "Old routing experiment retains original source/config identities and must not be replayed or rebound."
+  ],
+  "published_release": {
+    "tag": "v0.9.0",
+    "github_url": "https://github.com/rhnfzl/SqueakyCleanText/releases/tag/v0.9.0",
+    "github_published_at": "2026-11-09T18:00:22Z",
+    "pypi_version_url": "https://pypi.org/pypi/SqueakyCleanText/0.9.0/json",
+    "pypi_distribution_sha256": {
+      "squeakycleantext-0.9.0-py3-none-any.whl": "e763a737b300aa2dd333bfe7a6117ea48a825d7c03173d8102ca0f8e08679c84",
+      "squeakycleantext-0.9.0.tar.gz": "a061a92f5335a4a9f79fd6497d2f63fcd3685786c0480ba765b6fa84ee0a3d11"
+    },
+    "latest_pypi_default_metadata_observation": "unversioned JSON still reported0.8.4 immediately after0.9.0 publication; version-specific0.9.0 metadata exists",
+    "fresh_pypi_install": "verified by release owner untangle-sct; not independently rerun here"
+  }
+}

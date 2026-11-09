@@ -1,0 +1,429 @@
+{
+  "catalogue": [
+    {
+      "name": "Presidio",
+      "slug": "data-privacy-stack/presidio",
+      "group": "PII orchestration",
+      "role": "Closest reference for an open recognizer ecosystem.",
+      "facts": "Registry-based recognition, configurable NLP engines and language-specific models, decision explanations, and structured analysis are documented and implemented. Dictionary keys are passed as recognition context. The caller supplies the analysis language; this is not SCT-style automatic language detection.",
+      "learn": "A public recognizer contract, registration/configuration, schema context and inspectable decisions.",
+      "boundary": "SCT already has a Presidio/GLiNER backend. Use the registry design or optional adapter; replacing SCT with Presidio alone would leave the wider curation pipeline to other components. The original Microsoft repository redirects to Data Privacy Stack.",
+      "sources": [
+        "presidio-registry",
+        "presidio-fields",
+        "presidio-languages"
+      ],
+      "sha": "05b60e1a6805f3b2c0ad6cbe7526ccd226647971",
+      "license": "MIT",
+      "license_url": "https://github.com/data-privacy-stack/presidio/blob/05b60e1a6805f3b2c0ad6cbe7526ccd226647971/LICENSE",
+      "repo_url": "https://github.com/data-privacy-stack/presidio"
+    },
+    {
+      "name": "DataFog Python",
+      "slug": "DataFog/datafog-python",
+      "group": "PII orchestration",
+      "role": "Engine selection with distinct public scan and TextService routing paths.",
+      "facts": "The inspected dev snapshot offers regex, spaCy, GLiNER, auto/smart choices. Public scan smart mode merges regex with GLiNER when requested entity types need NER, falling back to spaCy if GLiNER is unavailable. The separate TextService smart path uses an entity-count cascade.",
+      "learn": "Make routing and fallback decisions explicit, observable and configurable.",
+      "boundary": "Only TextService returns early after any regex entity or two GLiNER entities. Public scan smart mode does not use that count-based early exit. Copying the TextService rule could miss other entity categories; this is a source-derived design risk, not an executed accuracy result. Missing public NER backends produce warnings and can leave regex-only results.",
+      "sources": [
+        "datafog-public-smart",
+        "datafog-cascade",
+        "datafog-readme"
+      ],
+      "sha": "cf81370dfd7a667d05969f38b88ebad9e38c94c1",
+      "license": "MIT",
+      "license_url": "https://github.com/DataFog/datafog-python/blob/cf81370dfd7a667d05969f38b88ebad9e38c94c1/LICENSE",
+      "repo_url": "https://github.com/DataFog/datafog-python"
+    },
+    {
+      "name": "DataFog Core",
+      "slug": "DataFog/datafog-core",
+      "group": "PII orchestration",
+      "role": "Strongest close reference for cross-runtime finding and transformation contracts.",
+      "facts": "Rust core with Python, Node and browser bindings. Explicit byte/code-point/UTF-16 ranges, detector provenance, validated supplied findings, per-entity transformations, and capability discovery are documented. Browser support differs for provider-backed transformations. Its documented detector catalogue also includes several credential formats.",
+      "learn": "Named coordinate systems, separate detection and transformation, per-type policy, explicit capabilities and application-owned token/key providers.",
+      "boundary": "This is a separate repository from DataFog Python. It is not a Go implementation. Do not import its built-in name-field aliases or word exceptions into SCT. Compare contracts and user-declared schema instead.",
+      "sources": [
+        "core-ranges",
+        "core-policy",
+        "core-capabilities",
+        "core-provider"
+      ],
+      "sha": "177cb6b57e00caeef5c096f5c7a9ad2b8db60328",
+      "license": "MIT",
+      "license_url": "https://github.com/DataFog/datafog-core/blob/177cb6b57e00caeef5c096f5c7a9ad2b8db60328/LICENSE",
+      "repo_url": "https://github.com/DataFog/datafog-core"
+    },
+    {
+      "name": "scrubadub",
+      "slug": "LeapBeyond/scrubadub",
+      "group": "PII orchestration",
+      "role": "Small, comprehensible detector/postprocessor extension pattern.",
+      "facts": "Scrubber accepts configurable detector and postprocessor lists, exposes add/remove detector operations and applies locale compatibility rules.",
+      "learn": "A lightweight detector interface that can live in a separate package.",
+      "boundary": "Locale configuration is not automatic multilingual detection. The API snapshot is useful, but the repository reports a 2023 last push; that alone does not prove abandonment or present compatibility.",
+      "sources": [
+        "scrubadub-detectors"
+      ],
+      "sha": "53772cbef417da290d25c95373031f786ab3b5c6",
+      "license": "Apache-2.0",
+      "license_url": "https://github.com/LeapBeyond/scrubadub/blob/53772cbef417da290d25c95373031f786ab3b5c6/LICENSE",
+      "repo_url": "https://github.com/LeapBeyond/scrubadub"
+    },
+    {
+      "name": "Gorget",
+      "slug": "Perruer/gorget",
+      "group": "PII orchestration",
+      "role": "A self-described LLM Guard continuation with explicit plugin contracts.",
+      "facts": "Source defines callable span detectors and classifier protocols, plus import-path and Python entry-point plugin loading. Anonymization and other input/output scanners are separate stages.",
+      "learn": "Plugins with a small span-returning contract, explicit model/license inventory, and scanner result composition.",
+      "boundary": "The repository is not archived in the snapshot. That does not establish production maturity. Its code is MIT, but the documented default PII model has CC-BY-NC-4.0 weights; code and model permissions require separate checks.",
+      "sources": [
+        "gorget-plugins",
+        "gorget-models"
+      ],
+      "sha": "8c3bca6a46280f5c47b07a4c551bdf02f57fa018",
+      "license": "MIT",
+      "license_url": "https://github.com/Perruer/gorget/blob/8c3bca6a46280f5c47b07a4c551bdf02f57fa018/LICENSE",
+      "repo_url": "https://github.com/Perruer/gorget"
+    },
+    {
+      "name": "LLM Guard",
+      "slug": "protectai/llm-guard",
+      "group": "PII orchestration",
+      "role": "Historical reference for input/output scanner composition.",
+      "facts": "The official repository is archived and its README states that the project and associated models are no longer actively maintained.",
+      "learn": "Study the scanner/vault interface as historical design, with source-specific license checks.",
+      "boundary": "Do not select it as the default new dependency on the basis of its past popularity or the older SCT benchmark. Current alternatives and model licenses need independent validation.",
+      "sources": [
+        "llmguard-archive"
+      ],
+      "sha": "168c1034ffdb33837e7ae6fd6a16b80567c1be03",
+      "license": "MIT",
+      "license_url": "https://github.com/protectai/llm-guard/blob/168c1034ffdb33837e7ae6fd6a16b80567c1be03/LICENSE",
+      "repo_url": "https://github.com/protectai/llm-guard"
+    },
+    {
+      "name": "PII Vault",
+      "slug": "Jiansen/pii-vault",
+      "group": "PII orchestration",
+      "role": "Prototype reference for a shared recognizer specification and cross-language fixtures.",
+      "facts": "The root README identifies implemented Rust/TypeScript paths and a Python placeholder. Recognizer JSON specifications and reversible tokens are part of the design.",
+      "learn": "Portable contract fixtures and versioned recognizer metadata.",
+      "boundary": "Not a ready Python replacement. SCT already has reversible replacement and a TokenStore protocol. The README describes FNV hashing for one strategy; do not treat that as cryptographic privacy protection or an audited production vault.",
+      "sources": [
+        "vault-readme"
+      ],
+      "sha": "e5fc84c3848c017668ec0149080a10b421b37d51",
+      "license": "MIT",
+      "license_url": "https://github.com/Jiansen/pii-vault/blob/e5fc84c3848c017668ec0149080a10b421b37d51/LICENSE-MIT",
+      "repo_url": "https://github.com/Jiansen/pii-vault"
+    },
+    {
+      "name": "DataTrove",
+      "slug": "huggingface/datatrove",
+      "group": "Corpus curation",
+      "role": "Best immediate composition target because SCT already supplies an adapter.",
+      "facts": "Composable blocks, local/Slurm execution, completed-task resumption, filtering reasons, corpus MinHash discovery/removal and reference-index decontamination are present.",
+      "learn": "Recipes for curation around SCT; rejection accounting and job identity.",
+      "boundary": "Task completion markers do not checkpoint arbitrary intermediate model state. Its inspected built-in PII formatter is narrow email/IP handling, not evidence of the same multilingual PII routing.",
+      "sources": [
+        "datatrove-resume",
+        "datatrove-dedup",
+        "datatrove-filter",
+        "datatrove-decontam"
+      ],
+      "sha": "384d81c011fda5cf54be3ba1d58967c21fafe25d",
+      "license": "Apache-2.0",
+      "license_url": "https://github.com/huggingface/datatrove/blob/384d81c011fda5cf54be3ba1d58967c21fafe25d/LICENSE",
+      "repo_url": "https://github.com/huggingface/datatrove"
+    },
+    {
+      "name": "Data-Juicer",
+      "slug": "datajuicer/data-juicer",
+      "group": "Corpus curation",
+      "role": "Closest broad reference for composable curation, quality analysis and execution provenance.",
+      "facts": "Operator pipelines, quality statistics, actual deduplication and partitioned Ray execution with content validation/checkpoints are implemented.",
+      "learn": "Analyse first, then select; reuse statistics; validate source identity before resume.",
+      "boundary": "The tracer stores original and processed text. Copying that behavior into a privacy pipeline would retain sensitive material. Prefer value-free traces and private, explicit sample retention. No blanket reliability or speed claim is established.",
+      "sources": [
+        "datajuicer-analysis",
+        "datajuicer-resume",
+        "datajuicer-trace"
+      ],
+      "sha": "65383e6f8f0dc0b3c74de8475b0f8abdab700f51",
+      "license": "Apache-2.0",
+      "license_url": "https://github.com/datajuicer/data-juicer/blob/65383e6f8f0dc0b3c74de8475b0f8abdab700f51/LICENSE",
+      "repo_url": "https://github.com/datajuicer/data-juicer"
+    },
+    {
+      "name": "NeMo Curator",
+      "slug": "NVIDIA-NeMo/Curator",
+      "group": "Corpus curation",
+      "role": "Broad optional reference for large-corpus CPU/GPU curation.",
+      "facts": "Ray-based pipelines, exact/fuzzy/semantic deduplication and source-partition resumability are documented. Current PII material includes a GLiNER tutorial.",
+      "learn": "Separate duplicate identification from removal and state recovery guarantees precisely.",
+      "boundary": "Fuzzy workflow defaults to identification without removal. Resumption can replay incomplete partitions and requires idempotent sinks. Current GLiNER tutorial is not proof of a built-in SCT-equivalent router, and older PiiModifier imports may not match this source version.",
+      "sources": [
+        "nemo-dedup",
+        "nemo-resume",
+        "nemo-pii"
+      ],
+      "sha": "db56fbae11b0672fbc7f822629948a786a14cfb4",
+      "license": "Apache-2.0",
+      "license_url": "https://github.com/NVIDIA-NeMo/Curator/blob/db56fbae11b0672fbc7f822629948a786a14cfb4/LICENSE",
+      "repo_url": "https://github.com/NVIDIA-NeMo/Curator"
+    },
+    {
+      "name": "Dolma toolkit",
+      "slug": "allenai/dolma",
+      "group": "Corpus curation",
+      "role": "Reference for stable document identity and reusable derived attributes.",
+      "facts": "Document/attribute sidecars, duplicate tagging, later mixing/removal and decontamination recipes separate analysis from corpus decisions.",
+      "learn": "Versioned sidecars and repeatable threshold/filter changes without rerunning detection.",
+      "boundary": "Bloom-filter duplicate matches can be false positives. Attribute tagging alone does not remove duplicates. Toolkit licensing does not establish the license of every corpus it processes.",
+      "sources": [
+        "dolma-sidecars",
+        "dolma-dedup",
+        "dolma-mix"
+      ],
+      "sha": "669f534823b08d266a8fff01f8a1c916a5a56576",
+      "license": "Apache-2.0",
+      "license_url": "https://github.com/allenai/dolma/blob/669f534823b08d266a8fff01f8a1c916a5a56576/LICENSE",
+      "repo_url": "https://github.com/allenai/dolma"
+    },
+    {
+      "name": "Ray Data",
+      "slug": "ray-project/ray",
+      "group": "Extraction and execution",
+      "role": "Distributed executor, not a replacement for SCT privacy semantics.",
+      "facts": "Source includes job-level row checkpointing; CheckpointConfig is beta and CheckpointBackend is alpha. Stable preserved row IDs or restricted generated IDs are required.",
+      "learn": "Use an optional executor recipe for retry/resume and cluster execution.",
+      "boundary": "Do not confuse Ray Data row checkpoints with Ray Train model checkpoints. A recipe is not proof of tested native SCT distributed execution.",
+      "sources": [
+        "ray-checkpoint"
+      ],
+      "sha": "e29f035ad4d9a8163e7b0e0c42a05b49c81b6d4d",
+      "license": "Apache-2.0",
+      "license_url": "https://github.com/ray-project/ray/blob/e29f035ad4d9a8163e7b0e0c42a05b49c81b6d4d/LICENSE",
+      "repo_url": "https://github.com/ray-project/ray"
+    },
+    {
+      "name": "CocoIndex",
+      "slug": "cocoindex-io/cocoindex",
+      "group": "Extraction and execution",
+      "role": "Reference for incremental RAG data preparation and lineage.",
+      "facts": "Official core concepts describe a state-driven target, source/code changes and incremental recomputation of affected transformations.",
+      "learn": "Config/model/input identity and cache invalidation for repeated processing.",
+      "boundary": "This is orchestration to integrate or learn from, not a replacement PII detector. Its timing/cost marketing claims were not adopted. Persistent execution state has its own privacy and lifecycle requirements.",
+      "sources": [
+        "cocoindex-core",
+        "cocoindex-readme"
+      ],
+      "sha": "1c8709569fb85f4b23bce81b2e60b329fa86d6c5",
+      "license": "Apache-2.0",
+      "license_url": "https://github.com/cocoindex-io/cocoindex/blob/1c8709569fb85f4b23bce81b2e60b329fa86d6c5/LICENSE",
+      "repo_url": "https://github.com/cocoindex-io/cocoindex"
+    },
+    {
+      "name": "Docling",
+      "slug": "docling-project/docling",
+      "group": "Extraction and execution",
+      "role": "Structure-preserving extraction upstream of SCT.",
+      "facts": "Document hierarchy, reading order, tables, OCR and page/item provenance are documented.",
+      "learn": "Extract typed document elements, retain IDs/coordinates, then pass their text through SCT.",
+      "boundary": "SCT already supports OCR providers. The opportunity is PDF/DOCX/layout extraction, not simply adding OCR. Cleaning extracted text does not prove the original binary file, metadata or embedded content has been redacted.",
+      "sources": [
+        "docling-structure"
+      ],
+      "sha": "1e26b84c5f5690128ddcd65a20a5d7ffb9e80dcd",
+      "license": "MIT",
+      "license_url": "https://github.com/docling-project/docling/blob/1e26b84c5f5690128ddcd65a20a5d7ffb9e80dcd/LICENSE",
+      "repo_url": "https://github.com/docling-project/docling"
+    },
+    {
+      "name": "Unstructured",
+      "slug": "Unstructured-IO/unstructured",
+      "group": "Extraction and execution",
+      "role": "Alternative document partitioning and structural chunking upstream of SCT.",
+      "facts": "Format partitioning and title-aware chunks can preserve original elements and metadata.",
+      "learn": "Preserve section boundaries and document identity while preparing RAG input.",
+      "boundary": "Retained metadata.orig_elements can include original text-bearing elements. Cleaning chunk text alone could leave source text in metadata; this is an inferred integration risk, not an observed SCT leak. Hosted-platform features must not be attributed automatically to the local library.",
+      "sources": [
+        "unstructured-chunks"
+      ],
+      "sha": "293d235cfcd5f5e89c3cc5ff85562005e182ae33",
+      "license": "Apache-2.0",
+      "license_url": "https://github.com/Unstructured-IO/unstructured/blob/293d235cfcd5f5e89c3cc5ff85562005e182ae33/LICENSE.md",
+      "repo_url": "https://github.com/Unstructured-IO/unstructured"
+    }
+  ],
+  "gaps": [
+    {
+      "rank": "1",
+      "title": "Consistent finding, coordinate and policy contracts",
+      "status": "Native privacy policy is NER-scoped and placeholder-only; finding offsets are post-regex.",
+      "idea": "Design one detector-independent finding contract and transformation policy. Track coordinate spaces explicitly, including original-to-transformed mappings where needed. Preserve source/model provenance without raw values by default.",
+      "scope": "Core contract work. Existing modes and APIs must retain behavior unless a caller explicitly chooses the new contract.",
+      "proof": "Mixed regex/NER inputs, all replacement modes, Unicode/emoji, normalization, overlap and long-text slices. Verify raw-span correspondence and report exposure/precision/recall; do not use a higher average as the only gate.",
+      "sct": [
+        "sct-policy",
+        "sct-findings"
+      ],
+      "other": [
+        "core-ranges",
+        "core-policy",
+        "presidio-analyzer"
+      ]
+    },
+    {
+      "rank": "2",
+      "title": "A public detector protocol and registry",
+      "status": "Six named backend choices and configurable model IDs exist. No generic public span-detector registration protocol was found.",
+      "idea": "Allow external packages to return validated canonical spans with declared languages, entity types, batching support, coordinate system, offline/network behavior, model revision and license metadata.",
+      "scope": "Core extension point; keep optional adapters outside base dependencies. Custom string transforms already exist and do not supply equivalent structured findings.",
+      "proof": "Wrap two different detector families, reject malformed/out-of-range spans, test missing optional dependencies and explicit failure behavior, and confirm existing configured backends still work.",
+      "sct": [
+        "sct-config",
+        "sct-routing"
+      ],
+      "other": [
+        "presidio-registry",
+        "gorget-plugins",
+        "scrubadub-detectors",
+        "core-capabilities"
+      ]
+    },
+    {
+      "rank": "3",
+      "title": "Corpus deduplication and quality-selection recipes",
+      "status": "SCT emits quality scores and PII-normalised MinHash signatures. Matching/indexing, cluster keeper rules, duplicate removal and quality-based rejection are caller-owned in the audited scope.",
+      "idea": "Complete the corpus workflow using DataTrove or another executor: analyse, match, choose representatives, filter and account for reasons. Add report-first decontamination against caller-supplied reference text if needed.",
+      "scope": "Prefer recipes or an optional corpus package. Do not rebuild a scheduler or remove records silently in the ordinary cleaner.",
+      "proof": "Check deterministic representatives, duplicate/false-positive rates, rejected counts, language slices and sample identities. Test the effects of deduplication before versus after PII normalization.",
+      "sct": [
+        "sct-score",
+        "sct-filter",
+        "sct-executor"
+      ],
+      "other": [
+        "datatrove-dedup",
+        "datatrove-filter",
+        "datatrove-decontam",
+        "dolma-mix",
+        "datajuicer-analysis"
+      ]
+    },
+    {
+      "rank": "4",
+      "title": "Durable job identity, safe resume and value-free lineage",
+      "status": "Data cards, model revisions, value-free signals, HF caching and adapters exist. No native corpus run controller or complete persistent input/config/output lineage manifest was found.",
+      "idea": "Provide an example run manifest linking input identities, config, model/policy versions and output shards. Let the selected executor own checkpoints, retry/quarantine and scheduling.",
+      "scope": "Integration first. Treat cache/ledger contents as data with lifecycle controls.",
+      "proof": "Interrupt a multi-shard run; resumed output must match an uninterrupted run by stable ID, without duplicate writes. Changed input/config/model identity must invalidate or refuse the old resume state.",
+      "sct": [
+        "sct-provenance",
+        "sct-executor"
+      ],
+      "other": [
+        "datatrove-resume",
+        "datajuicer-resume",
+        "nemo-resume",
+        "ray-checkpoint",
+        "cocoindex-core"
+      ]
+    },
+    {
+      "rank": "Next",
+      "title": "Field/schema context in existing structured adapters",
+      "status": "JSON, DataFrame and RAG adapters already exist, but leaf text is processed independently. Paths are provenance rather than detector context.",
+      "idea": "Pass caller-declared schema, field path and relevant context through the detector contract. Assess model/context support without hardcoded field-name exception tables.",
+      "scope": "Optional, explicit context. Presidio passes dictionary keys as recognition context; learn the interface rather than copy keyword lists.",
+      "proof": "Compare ambiguous values with/without caller schema and measure both false positives and misses by field/language. Define how nested metadata is handled.",
+      "sct": [
+        "sct-structured"
+      ],
+      "other": [
+        "presidio-fields",
+        "presidio-structured"
+      ]
+    },
+    {
+      "rank": "Next",
+      "title": "A production token-store reference integration",
+      "status": "Reversible replacement and TokenStore are native; the included store is process-local memory. Durable security and lifecycle are caller-owned.",
+      "idea": "Publish an optional provider integration with explicit scope/tenant isolation, authenticated access, encryption, expiry and deletion semantics.",
+      "scope": "Do not invent a new crypto scheme or equate opaque tokens with anonymity. Native token APIs should remain usable without a hosted service.",
+      "proof": "Exercise restarts, tenant separation, expiry, deletion, wrong-scope restoration and audit logs that omit original values.",
+      "sct": [
+        "sct-tokenstore"
+      ],
+      "other": [
+        "core-provider",
+        "core-policy"
+      ]
+    },
+    {
+      "rank": "Next",
+      "title": "Structure-preserving document extraction",
+      "status": "OCR providers exist; no full PDF/DOCX/table/layout extraction engine was found in the audited core.",
+      "idea": "Add a documented upstream Docling or Unstructured composition, retaining page/element identity and establishing which text and metadata are cleaned.",
+      "scope": "An adapter/recipe, not a replacement parser implementation. Binary-document redaction is a separate claim.",
+      "proof": "Use a synthetic document with PII in text, tables and metadata. Verify extracted text and retained original elements; do not claim the source PDF is safe without a separate binary audit.",
+      "sct": [
+        "sct-ocr",
+        "sct-structured"
+      ],
+      "other": [
+        "docling-structure",
+        "unstructured-chunks"
+      ]
+    },
+    {
+      "rank": "Research only",
+      "title": "Adaptive detector escalation",
+      "status": "SCT has deterministic language routing, classification and confidence controls, but no cost/quality-driven backend cascade was found.",
+      "idea": "Evaluate an opt-in escalation policy that preserves requested entity coverage, rather than stopping because one cheap detector found something.",
+      "scope": "An experiment, not a default or a speed promise. DataFog TextService illustrates entity-count exits; its public smart scanner instead combines regex/NER. These paths must not be conflated.",
+      "proof": "Use fixed mixed-entity and multilingual samples; compare against the always-run baseline. Record exposure, precision, recall, model calls, latency and memory by slice before considering a default.",
+      "sct": [
+        "sct-routing",
+        "sct-classify"
+      ],
+      "other": [
+        "datafog-public-smart",
+        "datafog-cascade"
+      ]
+    },
+    {
+      "rank": "Next",
+      "title": "Dedicated format-aware credential scanning",
+      "status": "GLiNER PII mode already includes password, api_key and access_token labels. No dedicated JWT/PEM parser, vendor-key pattern pack or entropy-based secret scanner was found in the inspected scope.",
+      "idea": "Evaluate a separate, opt-in credential detector through the proposed span interface. Keep format-aware checks distinct from model recognition and from replacement generators.",
+      "scope": "Optional detector integration. Learn from DataFog Core credential coverage and Gorget secret-scanner composition; do not assume all strings called tokens are secrets.",
+      "proof": "Test synthetic valid/invalid credentials, code samples, false positives, partial masking and multilingual surroundings. Do not use live credentials. Record the selected detector/model license and offline behavior.",
+      "sct": [
+        "sct-secret-labels"
+      ],
+      "other": [
+        "core-secrets",
+        "gorget-plugins"
+      ]
+    },
+    {
+      "rank": "Research only",
+      "title": "Low-confidence language abstention and downstream policy",
+      "status": "SCT can return unknown on no-positive-score or top-score ties in unrestricted mode. Confidence/margin thresholds emit warnings rather than forcing abstention; restricted-language fallback has separate behavior.",
+      "idea": "Evaluate an explicit unknown/abstain or review route for uncertain language decisions. Use existing confidence and margin signals, preserving caller-pinned/restricted-language semantics.",
+      "scope": "Optional decision policy, not a claim that SCT lacks unknown-language support. DataTrove language filtering illustrates threshold-based decisions, but corpus rejection is different from choosing a cleaner fallback.",
+      "proof": "Measure in-set accuracy/coverage and out-of-set false answers across held-out languages. Compare warning-only, abstain and explicit fallback modes, then measure their effect on downstream PII detection.",
+      "sct": [
+        "sct-language-decision"
+      ],
+      "other": [
+        "datatrove-language"
+      ]
+    }
+  ]
+}

@@ -2,12 +2,37 @@ name: Optional backend tests
 
 on:
   workflow_dispatch:
+    inputs:
+      pinned_model_baseline:
+        type: boolean
+        default: false
   pull_request:
     paths:
       - sct/utils/gliner_adapter.py
       - sct/utils/gliclass_adapter.py
       - sct/utils/torch_pipeline.py
       - sct/utils/ner.py
+      - sct/adapters/**
+      - sct/integrations/**
+      - sct/detectors*.py
+      - sct/findings.py
+      - sct/coordinates.py
+      - sct/config.py
+      - sct/sct.py
+      - sct/unified.py
+      - sct/routing.py
+      - sct/field*.py
+      - tests/test_*document*.py
+      - tests/test_*datafog*.py
+      - tests/test_*secret*.py
+      - tests/test_baseline_measurement.py
+      - sct/corpus/**
+      - sct/token_stores/**
+      - tests/test_optional_profiles.py
+      - evaluation/improvements/**
+      - tests/test_processing_compatibility.py
+      - tests/fixtures/processing_compatibility*.json
+      - uv.lock
       - pyproject.toml
       - .github/workflows/optional-backends.yml
   schedule:
@@ -61,3 +86,49 @@ jobs:
         env:
           TEST_FILTER: ${{ matrix.filter }}
         run: pytest tests/test_functional.py -v -rs -k "$TEST_FILTER"
+
+  provider-profile:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.12", "3.13", "3.14"]
+        profile: [secrets, documents, token-store, corpus]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: "0.10.9"
+      - name: Install locked provider profile
+        env:
+          PROFILE: ${{ matrix.profile }}
+        run: uv sync --locked --extra dev --extra test --extra "$PROFILE"
+      - name: Exercise installed provider
+        env:
+          SCT_OPTIONAL_PROFILE: ${{ matrix.profile }}
+          HF_HUB_OFFLINE: "1"
+        run: .venv/bin/python -m pytest tests/test_optional_profiles.py tests/test_processing_compatibility.py tests/test_baseline_measurement.py -v -s
+
+  pinned-model-baseline:
+    if: github.event_name == 'workflow_dispatch' && inputs.pinned_model_baseline
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: "0.10.9"
+      - run: uv sync --locked --extra dev --extra test
+      - run: .venv/bin/python -m pytest tests/test_batching.py tests/test_processing_compatibility.py -v
+      - run: PYTHONPATH=. .venv/bin/python evaluation/improvements/measure_baseline.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pinned-model-baseline
+          path: baseline-measured.json

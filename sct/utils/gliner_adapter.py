@@ -5,6 +5,7 @@ Auto-detects bi-encoder models (ModernBERT, etc.) and caches label embeddings.
 Optional backend. Requires: pip install squeakycleantext[gliner] or [gliner2]
 """
 import logging
+from pathlib import Path
 from typing import Any
 
 logger = logging.getLogger(__name__)
@@ -96,6 +97,10 @@ class GLiNERAdapter:
                 "Install with: pip install squeakycleantext[gliner2]"
             ) from exc
         self._onnx = False  # GLiNER2 has no ONNX loader; it always runs in torch
+        if load_kwargs.get('revision') and not Path(model_id).is_dir():
+            from huggingface_hub import snapshot_download
+            # GLiNER2 ignores revision kwargs, so bind every bundled file before SDK loading.
+            model_id = snapshot_download(model_id, revision=load_kwargs['revision'])
         return GLiNER2.from_pretrained(model_id, **load_kwargs)
 
     def _get_inference_labels(self) -> list:
