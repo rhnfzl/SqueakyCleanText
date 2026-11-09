@@ -50,11 +50,16 @@ class BufferedStreamingRedactor:
         return ""
 
     def finish(self) -> str:
-        """Process and return the complete buffered document."""
+        """Return the processed document; a processing failure leaves the stream open for retry."""
         if self._finished:
             raise RuntimeError("Stream is already finished")
+        # Reject callback writes while processing a snapshot of the input.
         self._finished = True
-        return self._cleaner.process("".join(self._chunks)).lm_text
+        try:
+            return self._cleaner.process("".join(self._chunks)).lm_text
+        except BaseException:
+            self._finished = False
+            raise
 
 
 def _sub_fuzzy_dates(cleaner, score_cutoff, language, repl, text):
@@ -229,13 +234,14 @@ class WindowedStreamingRedactor:
         self._overlap_chars = overlap_chars
         self._buffer = ""
         self._pending = ""  # the separator after the last emitted text, held until more text follows it
-        self._ready: list[str] = []  # processed windows not yet returned; they outlive a BufferError
+        self._ready: list[str] = []  # processed windows not yet returned; they outlive a failed feed or finish
         self._finished = False
 
     def feed(self, chunk: str) -> str:
         """Process stable prefixes until the buffer fits max_buffer_chars, retaining a trailing overlap window.
 
-        Text processed before a BufferError comes back from the next successful feed or finish.
+        Text retained after an error comes back from the next successful feed or finish.
+        Retry with feed("") to process retained input without adding the failed call's chunk again.
         """
         if self._finished:
             raise RuntimeError("Cannot feed a finished stream")
@@ -287,13 +293,19 @@ class WindowedStreamingRedactor:
         prefix = self._buffer[:split_at]
         # the cleaner's whitespace step turns any space (\u00a0, \u202f) into " "; the separator follows it
         separator = " " if cfg.check_normalize_whitespace else separator
+        out = self._emit(self._cleaner.process(prefix).lm_text, separator)
         self._buffer = self._buffer[split_at + 1:]
-        return self._emit(self._cleaner.process(prefix).lm_text, separator)
+        return out
 
     def finish(self) -> str:
-        """Process the final retained window."""
+        """Process the final retained window; a processing failure leaves the stream open for retry."""
         if self._finished:
             raise RuntimeError("Stream is already finished")
+        # Reject callback writes while processing a snapshot of the input.
         self._finished = True
-        out, self._ready = "".join(self._ready) + self._emit(self._cleaner.process(self._buffer).lm_text, ""), []
+        try:
+            out, self._ready = "".join(self._ready) + self._emit(self._cleaner.process(self._buffer).lm_text, ""), []
+        except BaseException:
+            self._finished = False
+            raise
         return out

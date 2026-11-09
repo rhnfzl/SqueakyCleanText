@@ -43,6 +43,14 @@ When its buffer passes `max_buffer_chars` (default 4096) and has no safe whitesp
 It never splits a window inside an email, phone, URL, IP (or a date or number when those steps are on): it reads the
 cleaner's own `TextCleaner.normalise` view of the buffer, so its split points follow every pre-regex step.
 
+Both redactors stay open if processing raises during `finish()`. Retry `finish()` after resolving the error.
+After a windowed processing error, unprocessed text stays buffered and previously processed output stays queued.
+A failed `feed(chunk)` has already accepted its chunk.
+Retry with `feed("")` or call `finish()`. Do not resend the same chunk, because that adds it again.
+Retries can repeat side effects in custom steps or callbacks; stream recovery does not undo those effects.
+Calls to `feed()` or `finish()` during finalization raise `RuntimeError`, including calls from callbacks.
+A successful `finish()` closes the stream. Later `feed()` and `finish()` calls raise `RuntimeError`.
+
 The OCR adapter accepts any `OCRProvider`. The included Tesseract provider also
 needs a local Tesseract executable. Browser export writes an ONNX Runtime Web
 manifest, but it does not copy model files or Python language detection.
