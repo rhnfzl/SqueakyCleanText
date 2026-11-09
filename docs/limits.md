@@ -6,7 +6,7 @@ edit_url: https://github.com/rhnfzl/SqueakyCleanText/edit/main/README.md
 
 --8<-- "README.md:limits"
 
-## Known limits of 0.8.3
+## Known limits of 0.8.4
 
 Details in [CHANGELOG.md](https://github.com/rhnfzl/SqueakyCleanText/blob/main/CHANGELOG.md).
 
@@ -21,3 +21,4 @@ Details in [CHANGELOG.md](https://github.com/rhnfzl/SqueakyCleanText/blob/main/C
 - Score B's quality head was tested with a small ONNX graph only; GLiNER PII mode was not run end to end for this release.
 - An unpinned NER model makes one Hub request per worker when the parent never loaded it before forking; pin `ner_model_revisions` or set `HF_HUB_OFFLINE=1`.
 - `WindowedStreamingRedactor` raises `BufferError` when the buffer passes `max_buffer_chars` (default 4096) with no safe whitespace split; raise the limit or use `BufferedStreamingRedactor`. A date or IBAN longer than `overlap_chars` (default 256) that is still unfinished at the buffer end can be split and leak; it refuses `custom_allow_terms`.
+- Retrying a failed streaming call can repeat external actions performed by custom steps or callbacks. SCT retains text for retry, but cannot undo those actions. Make such actions idempotent if you retry them.

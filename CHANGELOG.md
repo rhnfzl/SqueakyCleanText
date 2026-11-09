@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.8.4 - 2026-11-09
+
+Streaming retries keep text after a processing failure.
+Both redactors stay open when `finish()` fails during processing.
+The windowed redactor retains the failed window for another attempt.
+Previously processed output remains available after the error.
+Breaking changes: none.
+
+### Fixed
+- Windowed streaming consumes a prefix only after processing succeeds, so a failed window can be retried without losing text.
+- Both streaming redactors close only after `finish()` succeeds. Retry `finish()`, or use `feed("")` after a failed windowed `feed()`.
+- Streaming finalization still rejects reentrant `feed()` and `finish()` calls, so callbacks cannot add text to an input snapshot already being processed.
+
 ## 0.8.3 - 2026-11-06
 
 **Leak fixes, cleaner internals, faster import, clearer errors.**
