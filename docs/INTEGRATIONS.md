@@ -163,3 +163,69 @@ Missing cached artifacts fail privately. Cached model execution needs separate p
 Active `presidio_gliner` is unsupported here because its default NLP engine can load separate unpinned models.
 This restriction does not change the legacy adapter. Trusted external registries remain application-owned.
 Their registry and quality identities must describe immutable artifacts and all behavior-changing configuration.
+
+
+### Resume private corpus runs and check caller references
+
+Interrupted corpus jobs can resume without appending duplicate output records.
+Use `sct.corpus.curate_resumable(source, output, retention="caller_managed", config=...)`
+or add `--resume` to `examples/corpus/clean_select_dedup.py`.
+The existing `curate_datatrove` API still requires a fresh output directory.
+
+The runner compares input digests, sorted stable IDs, configuration, model revisions,
+component identities, native signature format and seed before reusing state.
+Completed native prepare, signature, bucket, cluster and filter stages require exact
+artifact inventories and SHA256 checksums. Missing or corrupt completed artifacts fail.
+Incomplete stage files move to private `incomplete-*` paths and that stage executes again.
+Native DataTrove still executes the work. The runner adds no distributed scheduler.
+Execution can repeat. This API does not promise exactly-once execution.
+
+`resume_run(Path("run/manifest.json"), expected=identity)` returns a `ResumeState`.
+A matching completed run verifies every published output checksum.
+An incomplete run verifies its native stage checkpoints.
+`RunIdentityMismatch` refuses changed computations. `InvalidCheckpoint` refuses invalid artifacts.
+An exclusive SQLite transaction prevents concurrent runner writers.
+`max_attempts=1` is the default retry bound per invocation.
+`CorpusRunFailed` reports exhaustion. Private `FailureRecord` rows contain stable IDs,
+`native_stage_failed`, attempt numbers and `scope="run"`.
+These rows do not claim that each listed record caused the failure.
+They contain no exception messages or raw rejection samples.
+
+Build a reference index from caller-selected `CorpusRecord` values:
+
+```python
+from pathlib import Path
+from sct.config import TextCleanerConfig
+from sct.corpus import CorpusRecord, ReferenceConfig, ReferenceIndex, curate_resumable
+
+with ReferenceIndex.build(
+    Path("private-references.sqlite"),
+    [CorpusRecord("reference-1", "caller supplied reference text with enough tokens")],
+    config=ReferenceConfig(mode="report", basis="pii_normalized"),
+) as references:
+    manifest = curate_resumable(
+        Path("source.jsonl"), Path("private-run"), references=references,
+        config=TextCleanerConfig(check_ner_process=False), retention="caller_managed",
+    )
+```
+
+Reference matching uses SCT's versioned tokenizer and exact hashed-shingle Jaccard.
+It never reads or converts native DataTrove signatures.
+The default threshold is 0.9, shingle length is 3, and minimum token count is 5.
+Short inputs receive `reference_short_input` and do not match.
+The caller controls all four settings through `ReferenceConfig`.
+Reference values must already use the intended text basis.
+Index configuration and its derived identity are read-only. Build a new index to change matching or output behavior.
+For `basis="pre_pii"`, the native selection must explicitly use that same basis.
+Report mode adds reference IDs and safe reason codes while retaining native decisions.
+`mode="apply"` requires an explicit basis and removes matches only from new outputs.
+Reference-enabled outputs are `selected.jsonl` and `reference-decisions.jsonl`.
+The manifest names and checksums the actual outputs.
+Canonical hashed reference contents, tokenizer identity and configuration are part of the resume identity.
+
+No reference corpus or keyword exclusion list ships with SCT.
+The small checked fixture contains one positive, two unrelated or near-miss negatives,
+and one short input. It is a regression check, not a population accuracy estimate.
+Protect run directories, reference databases, IDs and hashes as private identifying state.
+Caller-managed retention includes source-basis staging and preserved incomplete artifacts.
+The runner never deletes caller inputs and provides no raw rejection-sample writer.

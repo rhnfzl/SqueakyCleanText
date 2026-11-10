@@ -129,10 +129,14 @@ class _SafeStage(PipelineStep):
             raise ValueError(f'Corpus stage failed ({self.operation}); private state remains incomplete') from None
 
 
-def _execute(pipeline, output, name, *, tasks=1, workers=1):
+def _execute(pipeline, output, name, *, tasks=1, workers=1, lifecycle=None, paths=()):
+    if lifecycle is not None and lifecycle.reuse(name, paths):
+        return
     LocalPipelineExecutor([_SafeStage(stage) for stage in pipeline], tasks=tasks, workers=workers,
                           logging_dir=str(output / 'logs' / name),
                           skip_completed=False, randomize_start_duration=0).run()
+    if lifecycle is not None:
+        lifecycle.checkpoint(name, paths)
 
 
 def _cluster_keepers(path: Path, eligible_count: int) -> dict[int, int]:
@@ -181,22 +185,12 @@ def _model_identities(config: TextCleanerConfig) -> tuple[tuple[str, str], ...]:
     return tuple(sorted(identities))
 
 
-def curate_datatrove(
-    source: Path, output: Path, *, retention: str,
-    config: TextCleanerConfig | str | None = None, selection: SelectionConfig = SelectionConfig(),
-    native_config: MinhashConfig | None = None, language: str = 'eng', workers: int = 1,
-    registry_factory=None, schema=None, context=None, scorer=None,
-    component_identities: tuple[tuple[str, str], ...] = (),
-) -> RunManifest:
-    """Write a separate cleaned corpus using native approximate bucket matching.
-
-    Private state contains source text and identifying hashes. Caller-managed
-    retention requires the caller to protect and eventually remove the run directory.
-    D1's exact similarity threshold is unsupported here; native configuration controls matching.
-    """
+def _identity_for_run(source, output, *, retention, config=None, selection=SelectionConfig(),
+                      native_config=None, language='eng', workers=1, registry_factory=None,
+                      schema=None, context=None, scorer=None, component_identities=()):
     if not isinstance(source, Path) or not isinstance(output, Path):
         raise TypeError('Corpus paths must be pathlib.Path objects')
-    if (retention != 'caller_managed' or output.exists() or output.is_symlink()
+    if (retention != 'caller_managed' or output.is_symlink()
             or not source.is_file() or source.is_symlink()
             or source.resolve().is_relative_to(output.resolve())):
         raise ValueError('Require a new separate output directory and explicit caller-managed retention')
@@ -237,26 +231,95 @@ def curate_datatrove(
                                  'components': component_identities})
     RunIdentity(output.name, 'baseline', 'package', (), fingerprint, component_identities, native.seed)
     input_digest = file_digest(source)
-    output.mkdir(mode=0o700, parents=False)
+    record_ids = []
+    try:
+        with source.open(encoding='utf-8') as stream:
+            for line in stream:
+                row = json.loads(line)
+                if not isinstance(row, dict):
+                    raise ValueError('Invalid corpus record')
+                record_ids.append(CorpusRecord(row['id'], row['text']).id)
+    except (ValueError, TypeError, KeyError):
+        raise ValueError('Corpus stage failed (_StageRecords); invalid input') from None
+    stable_ids = tuple(sorted(record_ids))
+    identity = RunIdentity(output.name, '0.8.3/8afef61c74ea738a2c904374776dea34d9c1c39e', version('SqueakyCleanText'),
+                           (('input', input_digest, stable_ids),), fingerprint,
+                           (('datatrove', version('datatrove')), *model_identities,
+                            ('model_configuration', config_digest({key: value for key, value in cleaner_config.items()
+                                                                 if 'model' in key or 'revision' in key})),
+                            ('detector_configuration', config_digest(cleaner_config['detector_specs'])),
+                            ('policy_configuration', config_digest({'pii_processing': handle.config.pii_processing})),
+                            ('native_minhash', json.dumps(asdict(native), sort_keys=True)),
+                            ('native_format', 'datatrove-0.10.1/rank0/clusters-le-u32-u32/remove-le-u32'),
+                            *component_identities), native.seed)
+    return identity, handle, native
+
+
+def curate_datatrove(
+    source: Path, output: Path, *, retention: str,
+    config: TextCleanerConfig | str | None = None, selection: SelectionConfig = SelectionConfig(),
+    native_config: MinhashConfig | None = None, language: str = 'eng', workers: int = 1,
+    registry_factory=None, schema=None, context=None, scorer=None,
+    component_identities: tuple[tuple[str, str], ...] = (),
+    _lifecycle=None,
+) -> RunManifest:
+    """Write a separate cleaned corpus using native approximate bucket matching.
+
+    Private state contains source text and identifying hashes. Caller-managed
+    retention requires the caller to protect and eventually remove the run directory.
+    D1's exact similarity threshold is unsupported here; native configuration controls matching.
+    """
+    if not isinstance(source, Path) or not isinstance(output, Path):
+        raise TypeError('Corpus paths must be pathlib.Path objects')
+    if _lifecycle is None and (output.exists() or output.is_symlink()):
+        raise ValueError('Require a new separate output directory and explicit caller-managed retention')
+    identity, handle, native = _identity_for_run(
+        source, output, retention=retention, config=config, selection=selection,
+        native_config=native_config, language=language, workers=workers, registry_factory=registry_factory,
+        schema=schema, context=context, scorer=scorer, component_identities=component_identities,
+    )
+    input_digest = identity.input_partitions[0][1]
+    if _lifecycle is None:
+        output.mkdir(mode=0o700, parents=False)
+    else:
+        identity = _lifecycle.prepare(identity)
+        if _lifecycle.completed is not None:
+            return _lifecycle.completed
     database = output / 'private.sqlite'
-    _execute([_StageRecords(source, database, handle, selection, schema, context, scorer)], output, 'prepare', workers=workers)
+    _execute([_StageRecords(source, database, handle, selection, schema, context, scorer)],
+             output, 'prepare', workers=workers, lifecycle=_lifecycle, paths=(database,))
     signatures, buckets, clusters = (output / name for name in ('signatures', 'buckets', 'clusters'))
     _execute([_ReadBasis(database), MinhashDedupSignature(str(signatures), config=native, language=language)],
-             output, 'signatures', workers=workers)
+             output, 'signatures', workers=workers, lifecycle=_lifecycle, paths=(signatures,))
     _execute([MinhashDedupBuckets(str(signatures), str(buckets), config=native)],
-             output, 'buckets', tasks=native.num_buckets, workers=workers)
-    _execute([MinhashDedupCluster(str(buckets), str(clusters), config=native, save_cluster_id=True)],
-             output, 'clusters', workers=workers)
-    # Native cluster roots depend on union order. Sorted input plus minimum index fixes the keeper.
+             output, 'buckets', tasks=native.num_buckets, workers=workers, lifecycle=_lifecycle, paths=(buckets,))
+    reuse_clusters = _lifecycle is not None and _lifecycle.reuse('clusters', (clusters,))
+    if not reuse_clusters:
+        _execute([MinhashDedupCluster(str(buckets), str(clusters), config=native, save_cluster_id=True)],
+                 output, 'clusters', workers=workers)
+        # Native cluster roots depend on union order. Sorted input plus minimum index fixes the keeper.
+        with closing(sqlite3.connect(database)) as db:
+            eligible_count = db.execute('SELECT COUNT(*) FROM records WHERE quality=1').fetchone()[0]
+        keeper_indexes = _cluster_keepers(clusters / '000000.clusters', eligible_count)
+        clusters.mkdir(exist_ok=True, mode=0o700)
+        with (clusters / '000000.remove').open('wb') as removal_stream:
+            for index in sorted(i for i, keeper in keeper_indexes.items() if i != keeper):
+                removal_stream.write(struct.pack('<I', index))
+        if _lifecycle is not None:
+            _lifecycle.checkpoint('clusters', (clusters,))
     with closing(sqlite3.connect(database)) as db:
         eligible_count = db.execute('SELECT COUNT(*) FROM records WHERE quality=1').fetchone()[0]
     keeper_indexes = _cluster_keepers(clusters / '000000.clusters', eligible_count)
-    clusters.mkdir(exist_ok=True, mode=0o700)
-    with (clusters / '000000.remove').open('wb') as removal_stream:
-        for index in sorted(i for i, keeper in keeper_indexes.items() if i != keeper):
-            removal_stream.write(struct.pack('<I', index))
-    _execute([_ReadBasis(database), MinhashDedupFilter(str(clusters)), _KeepIDs(database)], output, 'filter', workers=workers)
+    kept_database = output / 'kept.sqlite'
+    _execute([_ReadBasis(database), MinhashDedupFilter(str(clusters)), _KeepIDs(kept_database)],
+             output, 'filter', workers=workers,
+             lifecycle=_lifecycle, paths=(kept_database,))
+    if _lifecycle is not None:
+        _lifecycle.reuse('publish', tuple(output / name for name in
+                                       ('kept.pending', 'decisions.pending', 'kept.jsonl', 'decisions.jsonl',
+                                        'manifest.pending', 'native-manifest.pending', 'native-manifest.json')))
     with closing(sqlite3.connect(database)) as db:
+        db.execute('ATTACH DATABASE ? AS selected', (str(kept_database),))
         stable_ids = tuple(row[0] for row in db.execute('SELECT id FROM records ORDER BY id'))
         eligible = tuple(row[0] for row in db.execute('SELECT id FROM records WHERE quality=1 ORDER BY id'))
         counts = {'input': len(stable_ids), 'kept': 0, 'rejected': 0}
@@ -267,7 +330,7 @@ def curate_datatrove(
         ):
             for record_id, cleaned, scores, quality, native_kept in db.execute(
                 'SELECT r.id,r.cleaned,r.scores,r.quality,k.id IS NOT NULL FROM records r '
-                'LEFT JOIN native_kept k ON k.id=r.id ORDER BY r.id'
+                'LEFT JOIN selected.native_kept k ON k.id=r.id ORDER BY r.id'
             ):
                 retain = selection.dedup_mode == 'report' or bool(quality and native_kept)
                 counts['kept' if retain else 'rejected'] += 1
@@ -286,19 +349,12 @@ def curate_datatrove(
         (output / f'{stem}.pending').rename(output / f'{stem}.jsonl')
     if file_digest(source) != input_digest:
         raise ValueError('Input changed during corpus processing')
-    identity = RunIdentity(output.name, '0.8.3/8afef61c74ea738a2c904374776dea34d9c1c39e', version('SqueakyCleanText'),
-                           (('input', input_digest, stable_ids),), fingerprint,
-                           (('datatrove', version('datatrove')), *model_identities,
-                            ('model_configuration', config_digest({key: value for key, value in cleaner_config.items()
-                                                                 if 'model' in key or 'revision' in key})),
-                            ('detector_configuration', config_digest(cleaner_config['detector_specs'])),
-                            ('policy_configuration', config_digest({'pii_processing': handle.config.pii_processing})),
-                            ('native_minhash', json.dumps(asdict(native), sort_keys=True)),
-                            ('native_format', 'datatrove-0.10.1/rank0/clusters-le-u32-u32/remove-le-u32'),
-                            *component_identities), native.seed)
     shards = tuple((name, file_digest(output / name)) for name in ('kept.jsonl', 'decisions.jsonl'))
     manifest = RunManifest(identity, shards, counts)
     for path in output.rglob('*'):
         path.chmod(0o700 if path.is_dir() else 0o600)
-    manifest.publish(output / 'manifest.json')
+    manifest.publish(output / ('manifest.json' if _lifecycle is None else 'native-manifest.json'))
+    if _lifecycle is not None:
+        _lifecycle.checkpoint('publish', tuple(output / name for name in
+                                             ('kept.jsonl', 'decisions.jsonl', 'native-manifest.json')))
     return manifest

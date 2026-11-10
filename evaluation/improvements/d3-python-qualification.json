@@ -1,0 +1,193 @@
+{
+  "schema_version": 1,
+  "scope": "Frozen D3 native checkpoint replay, reference matching and core-only compatibility; final integrated acceptance remains pending",
+  "commit": "4ddb77a5ad4134fe44b81317bd76d659d9a98cae",
+  "source_snapshot_sha256": {
+    "sct/corpus/runner.py": "d00e80f9f3bb1d2cceee814ad9cddf986bef6db95fa65cc49e5dd10201d3cbc9",
+    "sct/corpus/datatrove.py": "102f46d23af729eeb0e3a31069237120482ef09255f6ab07c98ec94c20bc0efd",
+    "sct/corpus/__init__.py": "b3589ddd7ab3c2a9fbf62fb3d0d4e932486e610fe308166ea76ddf5a2671124a",
+    "tests/test_corpus_resume.py": "b617a7d2832ac2e70f7dd3719717bf4d112430b6c94dfff7af5bddcf864b8ead",
+    "tests/test_corpus_decontamination.py": "023a9014d0c5f4b4cf516a88e99d23f75376d6583b0ef6f45b506221fac7eb9c",
+    "examples/corpus/clean_select_dedup.py": "f9d1d4547771681a8e65f591f0ab70a7d3432489ccf24b7c6c8647670b297cc3",
+    "docs/INTEGRATIONS.md": "d09c37ba893a4a6f39332e8254f0c57368082bccba8d50499b0a691f45d5102e",
+    ".github/workflows/optional-backends.yml": "f472fede90e126e348fe461e58555c9ebe572ade6414bf153a668a6eca9c491f",
+    "sct/corpus/manifest.py": "10507f5253e774624b34bd63f96f49f96e1b54dea56ab1801f9829c074791556"
+  },
+  "runs": [
+    {
+      "python": "3.12.15 (main, Sep 30 2026, 22:04:19) [Clang 21.0.0 (clang-2100.3.34.2)]",
+      "executable": "/private/tmp/sct-foundation-local-20261107/py312/.venv/bin/python",
+      "root": "/private/tmp/sct-foundation-local-20261107/py312",
+      "providers": {
+        "datatrove": {
+          "version": "0.10.1",
+          "module_path": "/private/tmp/sct-foundation-local-20261107/py312/.venv/lib/python3.12/site-packages/datatrove/__init__.py"
+        },
+        "spacy": {
+          "version": "3.8.16",
+          "module_path": "/private/tmp/sct-foundation-local-20261107/py312/.venv/lib/python3.12/site-packages/spacy/__init__.py"
+        },
+        "orjson": {
+          "version": "3.13.0",
+          "module_path": "/private/tmp/sct-foundation-local-20261107/py312/.venv/lib/python3.12/site-packages/orjson/__init__.py"
+        },
+        "datasketch": {
+          "version": "2.0.0",
+          "module_path": "/private/tmp/sct-foundation-local-20261107/py312/.venv/lib/python3.12/site-packages/datasketch/__init__.py"
+        },
+        "numpy": {
+          "version": "2.5.3",
+          "module_path": "/private/tmp/sct-foundation-local-20261107/py312/.venv/lib/python3.12/site-packages/numpy/__init__.py"
+        },
+        "multiprocess": {
+          "version": "0.70.19",
+          "module_path": "/private/tmp/sct-foundation-local-20261107/py312/.venv/lib/python3.12/site-packages/multiprocess/__init__.py"
+        },
+        "huggingface-hub": {
+          "version": "1.32.0",
+          "module_path": "/private/tmp/sct-foundation-local-20261107/py312/.venv/lib/python3.12/site-packages/huggingface_hub/__init__.py"
+        },
+        "regex": {
+          "version": "2026.9.10",
+          "module_path": "/private/tmp/sct-foundation-local-20261107/py312/.venv/lib/python3.12/site-packages/regex/__init__.py"
+        }
+      },
+      "result": "94 passed, 92 warnings in 13.41s",
+      "log_sha256": "96d91f504f67b98999533aeec961fffdac726a864e7bb99928a69f2425b3a180"
+    },
+    {
+      "python": "3.13.12 (main, Mar  3 2026, 15:32:44) [Clang 21.1.4 ]",
+      "executable": "/private/tmp/sct-foundation-local-20261107/py313/.venv/bin/python",
+      "root": "/private/tmp/sct-foundation-local-20261107/py313",
+      "providers": {
+        "datatrove": {
+          "version": "0.10.1",
+          "module_path": "/private/tmp/sct-foundation-local-20261107/py313/.venv/lib/python3.13/site-packages/datatrove/__init__.py"
+        },
+        "spacy": {
+          "version": "3.8.16",
+          "module_path": "/private/tmp/sct-foundation-local-20261107/py313/.venv/lib/python3.13/site-packages/spacy/__init__.py"
+        },
+        "orjson": {
+          "version": "3.13.0",
+          "module_path": "/private/tmp/sct-foundation-local-20261107/py313/.venv/lib/python3.13/site-packages/orjson/__init__.py"
+        },
+        "datasketch": {
+          "version": "2.0.0",
+          "module_path": "/private/tmp/sct-foundation-local-20261107/py313/.venv/lib/python3.13/site-packages/datasketch/__init__.py"
+        },
+        "numpy": {
+          "version": "2.5.3",
+          "module_path": "/private/tmp/sct-foundation-local-20261107/py313/.venv/lib/python3.13/site-packages/numpy/__init__.py"
+        },
+        "multiprocess": {
+          "version": "0.70.19",
+          "module_path": "/private/tmp/sct-foundation-local-20261107/py313/.venv/lib/python3.13/site-packages/multiprocess/__init__.py"
+        },
+        "huggingface-hub": {
+          "version": "1.32.0",
+          "module_path": "/private/tmp/sct-foundation-local-20261107/py313/.venv/lib/python3.13/site-packages/huggingface_hub/__init__.py"
+        },
+        "regex": {
+          "version": "2026.9.10",
+          "module_path": "/private/tmp/sct-foundation-local-20261107/py313/.venv/lib/python3.13/site-packages/regex/__init__.py"
+        }
+      },
+      "result": "94 passed, 92 warnings in 13.53s",
+      "log_sha256": "92829f66b0a19276b92abc7eba10b93bd92adf020761d173bd38aca6f90570c3"
+    },
+    {
+      "executable": "/home/rehan/sct-improvements-d3-20261107/.venv/bin/python",
+      "python": "3.14.4 (main, Apr  7 2026, 20:47:53) [Clang 22.1.1 ]",
+      "archive_base": "19ab8228c2a72bd31e16bdf01085633f5a313142",
+      "modules": {
+        "datatrove": {
+          "version": "0.10.1",
+          "file": "/home/rehan/sct-improvements-d3-20261107/.venv/lib/python3.14/site-packages/datatrove/__init__.py"
+        },
+        "spacy": {
+          "version": "3.8.16",
+          "file": "/home/rehan/sct-improvements-d3-20261107/.venv/lib/python3.14/site-packages/spacy/__init__.py"
+        },
+        "orjson": {
+          "version": "3.13.0",
+          "file": "/home/rehan/sct-improvements-d3-20261107/.venv/lib/python3.14/site-packages/orjson/__init__.py"
+        },
+        "datasketch": {
+          "version": "2.0.0",
+          "file": "/home/rehan/sct-improvements-d3-20261107/.venv/lib/python3.14/site-packages/datasketch/__init__.py"
+        },
+        "regex": {
+          "version": "2026.9.10",
+          "file": "/home/rehan/sct-improvements-d3-20261107/.venv/lib/python3.14/site-packages/regex/__init__.py"
+        }
+      },
+      "source_sha256": {
+        "sct/corpus/runner.py": "d00e80f9f3bb1d2cceee814ad9cddf986bef6db95fa65cc49e5dd10201d3cbc9",
+        "sct/corpus/manifest.py": "10507f5253e774624b34bd63f96f49f96e1b54dea56ab1801f9829c074791556",
+        "sct/corpus/datatrove.py": "102f46d23af729eeb0e3a31069237120482ef09255f6ab07c98ec94c20bc0efd",
+        "sct/corpus/__init__.py": "b3589ddd7ab3c2a9fbf62fb3d0d4e932486e610fe308166ea76ddf5a2671124a",
+        "tests/test_corpus_resume.py": "b617a7d2832ac2e70f7dd3719717bf4d112430b6c94dfff7af5bddcf864b8ead",
+        "tests/test_corpus_decontamination.py": "023a9014d0c5f4b4cf516a88e99d23f75376d6583b0ef6f45b506221fac7eb9c",
+        "examples/corpus/clean_select_dedup.py": "f9d1d4547771681a8e65f591f0ab70a7d3432489ccf24b7c6c8647670b297cc3",
+        "docs/INTEGRATIONS.md": "d09c37ba893a4a6f39332e8254f0c57368082bccba8d50499b0a691f45d5102e",
+        ".github/workflows/optional-backends.yml": "f472fede90e126e348fe461e58555c9ebe572ade6414bf153a668a6eca9c491f"
+      },
+      "platform": "Linux",
+      "profile": "native",
+      "result": "89 passed, 1 skipped, 92 warnings in 7.81s",
+      "log_sha256": "cd3a39cac00ce0400fabcfc932fe86554ae3f4447f5315bcea9b58d037ba1812"
+    },
+    {
+      "executable": "/home/rehan/sct-improvements-d3-20261107/core/.venv/bin/python",
+      "python": "3.14.4 (main, Apr  7 2026, 20:47:53) [Clang 22.1.1 ]",
+      "archive_base": "19ab8228c2a72bd31e16bdf01085633f5a313142",
+      "modules": {
+        "datatrove": {
+          "absent": true
+        },
+        "spacy": {
+          "absent": true
+        },
+        "orjson": {
+          "absent": true
+        },
+        "datasketch": {
+          "absent": true
+        },
+        "regex": {
+          "version": "2026.9.10",
+          "file": "/home/rehan/sct-improvements-d3-20261107/core/.venv/lib/python3.14/site-packages/regex/__init__.py"
+        }
+      },
+      "source_sha256": {
+        "sct/corpus/runner.py": "d00e80f9f3bb1d2cceee814ad9cddf986bef6db95fa65cc49e5dd10201d3cbc9",
+        "sct/corpus/manifest.py": "10507f5253e774624b34bd63f96f49f96e1b54dea56ab1801f9829c074791556",
+        "sct/corpus/datatrove.py": "102f46d23af729eeb0e3a31069237120482ef09255f6ab07c98ec94c20bc0efd",
+        "sct/corpus/__init__.py": "b3589ddd7ab3c2a9fbf62fb3d0d4e932486e610fe308166ea76ddf5a2671124a",
+        "tests/test_corpus_resume.py": "b617a7d2832ac2e70f7dd3719717bf4d112430b6c94dfff7af5bddcf864b8ead",
+        "tests/test_corpus_decontamination.py": "023a9014d0c5f4b4cf516a88e99d23f75376d6583b0ef6f45b506221fac7eb9c",
+        "examples/corpus/clean_select_dedup.py": "f9d1d4547771681a8e65f591f0ab70a7d3432489ccf24b7c6c8647670b297cc3",
+        "docs/INTEGRATIONS.md": "d09c37ba893a4a6f39332e8254f0c57368082bccba8d50499b0a691f45d5102e",
+        ".github/workflows/optional-backends.yml": "f472fede90e126e348fe461e58555c9ebe572ade6414bf153a668a6eca9c491f"
+      },
+      "platform": "Linux",
+      "profile": "core",
+      "result": "23 passed, 66 skipped in 0.20s",
+      "log_sha256": "aa9551e410e91049cc3e1d84aba0a36cbc2f85d464b15bb30d022dbc17bf6411"
+    }
+  ],
+  "cached_model_evidence": "evaluation/improvements/d3-cached-model-resume.json",
+  "warning_attribution": {
+    "fork": "Visible multiprocess fork deprecation notices; no global suppression",
+    "resource": "All10 full-suite SQLite ResourceWarnings traced to pre-existing token-store test connections: six at105 and four at149. S2 owns cleanup. Corpus-only explicit-GC probe reports no SQLite resource warning.",
+    "deprecated_argument": "Existing tests/test_sct.py242 calls deprecated ner_models_list; R1 warning handling remains pending."
+  },
+  "limits": [
+    "Python3.12/13 qualification is targeted macOS execution, not the final Linux supported-Python matrix.",
+    "Optional xxhash is not required for the qualified native SHA1 profile.",
+    "Private run data and reference hashes remain identifying and caller-managed.",
+    "Final combined feature acceptance and non-ONNX/provider quality remain pending."
+  ],
+  "committed_byte_verification": "All nine committed reviewed source files match the qualified runtime source hashes"
+}

@@ -1,0 +1,67 @@
+{
+  "scope": "Artificial English cached ONNX checkpoint smoke; no broad quality claim.",
+  "python": "3.14.4 (main, Apr  7 2026, 20:47:53) [Clang 22.1.1 ]",
+  "executable": "/home/rehan/sct-improvements-d3-20261107/.venv/bin/python",
+  "providers": {
+    "onnxruntime": {
+      "version": "1.30.0",
+      "file": "/home/rehan/sct-improvements-d3-20261107/.venv/lib/python3.14/site-packages/onnxruntime/__init__.py"
+    },
+    "tokenizers": {
+      "version": "0.23.2",
+      "file": "/home/rehan/sct-improvements-d3-20261107/.venv/lib/python3.14/site-packages/tokenizers/__init__.py"
+    },
+    "numpy": {
+      "version": "2.5.3",
+      "file": "/home/rehan/sct-improvements-d3-20261107/.venv/lib/python3.14/site-packages/numpy/__init__.py"
+    },
+    "datatrove": {
+      "version": "0.10.1",
+      "file": "/home/rehan/sct-improvements-d3-20261107/.venv/lib/python3.14/site-packages/datatrove/__init__.py"
+    },
+    "spacy": {
+      "version": "3.8.16",
+      "file": "/home/rehan/sct-improvements-d3-20261107/.venv/lib/python3.14/site-packages/spacy/__init__.py"
+    },
+    "huggingface_hub": {
+      "version": "1.32.0",
+      "file": "/home/rehan/sct-improvements-d3-20261107/.venv/lib/python3.14/site-packages/huggingface_hub/__init__.py"
+    }
+  },
+  "model": "protectai/bert-base-NER-onnx",
+  "revision": "84d28ab2bc28401b4353b26033eb043c8c8a0739",
+  "offline_hub": true,
+  "device": "cpu",
+  "samples": 3,
+  "protected_gold_strings": 4,
+  "negative_control_preserved": true,
+  "interrupted_before_signature_checkpoint": true,
+  "prepared_checkpoint_reused_without_writing": true,
+  "resumed_matches_uninterrupted": true,
+  "changed_revision_refused": true,
+  "input_unchanged": true,
+  "counts": {
+    "input": 3,
+    "kept": 3,
+    "rejected": 0
+  },
+  "elapsed_seconds": 2.687113119987771,
+  "thread_env": {
+    "OMP_NUM_THREADS": "2",
+    "OPENBLAS_NUM_THREADS": "2",
+    "MKL_NUM_THREADS": "2"
+  },
+  "source_sha256": {
+    "sct/corpus/runner.py": "d00e80f9f3bb1d2cceee814ad9cddf986bef6db95fa65cc49e5dd10201d3cbc9",
+    "sct/corpus/datatrove.py": "102f46d23af729eeb0e3a31069237120482ef09255f6ab07c98ec94c20bc0efd",
+    "sct/corpus/manifest.py": "10507f5253e774624b34bd63f96f49f96e1b54dea56ab1801f9829c074791556"
+  },
+  "remote_root": "/home/rehan/sct-improvements-d3-20261107",
+  "script": "d3-model-resume-final.py",
+  "script_sha256": "1f285005830bb045a95c653bb9b175bd0030ba495a15afef64e4431fb4fd1ff7",
+  "log_sha256": "ff04d59a7adbd7a79f10f312652fbd52d56998c0304641ba50933b6158f21897",
+  "limits": [
+    "Three artificial English samples are bounded integration evidence, not broad privacy quality or non-ONNX qualification."
+  ],
+  "source_commit": "4ddb77a5ad4134fe44b81317bd76d659d9a98cae"
+}
