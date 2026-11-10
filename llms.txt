@@ -73,8 +73,8 @@ Opt-in capability contract:
 - Unified windowed streaming and browser manifests are unsupported. Adapters retain reversible restrictions; document output also rejects indexed mode.
 - clean_document has no context/schema parameter; use the extracted text with direct processing when caller context is needed.
 - Native corpus rejects active presidio_gliner: SCT does not forward its revision and the default analyzer can load separate NLP models.
-- The current trained Torch quality controls prove functional scores only. Gibberish scored highest; trained ONNX parity remains pending.
-- Combined release acceptance remains pending in evaluation/improvements/ACCEPTANCE.md. One provider's evidence does not qualify other providers.
+- Trained Torch and ONNX scores agree on the parity controls. Gibberish scored highest in a synthetic control, so quality-filter accuracy remains unverified.
+- See evaluation/improvements/ACCEPTANCE.md for the tested provider profiles and their limits.
 
 Rollback: select legacy processing, remove unified policies/contexts/schemas/specs, and restore legacy language policy with unset thresholds.
 For unified full execution, use always_run with the intended groups. Corpus report mode retains records.

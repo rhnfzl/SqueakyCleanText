@@ -300,7 +300,7 @@ Language detection covers 75 languages. Full NER models cover English, Dutch, Ge
 - **Offsets name their text stage.** Legacy findings use post-regex positions. Unified findings use canonical positions and explicit source mapping quality.
 <!-- --8<-- [end:limits] -->
 
-Detailed known limits of 0.9.0: [docs/limits.md](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/limits.md).
+Detailed known limits: [docs/limits.md](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/limits.md).
 
 ## Opt-in document and corpus workflows
 
@@ -318,9 +318,8 @@ The original documents and private corpus checkpoints remain caller-owned sensit
 | Language uncertainty | `language_policy='abstain'`; explicit thresholds and unknown-language action |
 | Detector routing | `routing_policy='always_run'` stays default; calibrated cascade remains experimental |
 
-Combined release acceptance is still pending. Per-feature evidence and remaining gates are recorded in `evaluation/improvements/ACCEPTANCE.md`.
-Real Torch quality scoring has functional evidence, but the synthetic gibberish control scored highest.
-This does not establish quality-filter accuracy. No default switch or release publication is included.
+See the [combined acceptance evidence](https://github.com/rhnfzl/SqueakyCleanText/blob/main/evaluation/improvements/ACCEPTANCE.md) for the tested profiles.
+Trained Torch and ONNX scores agree on the parity controls. The synthetic gibberish control scored highest, so quality-filter accuracy remains unverified.
 
 ## Documentation
 
@@ -353,7 +352,7 @@ Issues and pull requests are welcome. Read [AGENTS.md](https://github.com/rhnfzl
   author = {Fazal, Rehan},
   title = {SqueakyCleanText},
   url = {https://github.com/rhnfzl/SqueakyCleanText},
-  version = {0.9.0},
+  version = {0.10.0},
   year = {2026}
 }
 ```

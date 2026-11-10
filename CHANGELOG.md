@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.10.0 - 2026-11-11
 
 Users can opt into one privacy policy across format matches and model findings.
 Caller-declared fields add explicit protection without guessing field meanings.
@@ -8,7 +8,7 @@ Encrypted local references keep reversible maps separate from cleaned output.
 Document extraction and corpus selection add private, resumable data workflows.
 Credential-format scanning and language abstention are optional.
 Detector routing remains experimental; existing full execution stays the default.
-Combined release acceptance and trained ONNX quality parity remain pending.
+Trained Torch and ONNX quality scores agree in the tested profiles.
 Breaking changes: none to default behavior; unified callback ordering differs when explicitly enabled.
 
 ### Added
@@ -30,7 +30,7 @@ Breaking changes: none to default behavior; unified callback ordering differs wh
 - PDF source files remain unredacted. Corpus staging and signatures need caller-managed private storage and retention.
 - Logical token deletion cannot erase journals, backups or storage media. Keys and authorization remain application-owned.
 - The trained Torch quality scorer passed functional controls, but gibberish scored highest. No quality-accuracy claim is established.
-- Optional provider and runtime evidence remains scoped to the recorded tests; configured CI jobs are not completed verification.
+- GPU inference, quality score parity and dataset resume passed on one prepared RTX 4090 setup. See the [GPU qualification evidence](https://github.com/rhnfzl/SqueakyCleanText/blob/v0.10.0/evaluation/improvements/v090-gpu-qualification.json).
 
 ## 0.9.0 - 2026-11-09
 

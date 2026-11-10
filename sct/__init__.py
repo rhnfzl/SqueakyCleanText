@@ -59,7 +59,7 @@ from sct.streaming import (
 from sct.utils.anonymization_map import AnonymizationMap, MapEntry
 from sct.utils.process_result import ProcessResult
 
-__version__ = "0.9.0"
+__version__ = "0.10.0"
 __all__ = [
     "DocumentElement", "DocumentExtractor", "ExtractedDocument", "ProcessedDocument", "clean_document", "extract_document",
     "UnifiedPrivacyPolicy", "HandlingRule", "FindingDecision", "Detection", "DetectionContext", "TextRange",

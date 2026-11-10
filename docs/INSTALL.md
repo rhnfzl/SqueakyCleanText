@@ -55,5 +55,5 @@ The current combined acceptance record is maintained in `evaluation/improvements
 
 The quality export script needs the `torch` and `quantize` extras at export time.
 Runtime quality inference uses ONNX and tokenizer files, without loading the trained pickle.
-The trained Torch scorer has functional integration evidence; trained ONNX export/parity remains pending in the current acceptance record.
+The trained Torch and ONNX scorers passed parity checks on the recorded test profiles.
 The synthetic controls do not establish effective quality filtering.
