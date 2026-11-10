@@ -1,0 +1,57 @@
+{
+  "schema_version": 1,
+  "status": "cancelled after confirmed independent review findings; not selection evidence",
+  "manifest_sha256": "3958ab724ed820340f9cac6754f1f651cefe13e6851a08a07bee2c915c671c67",
+  "process": {
+    "pid": 2091360,
+    "uid": 1002,
+    "user": "rehan",
+    "start": "Sat Nov 7 07:12:45 2026",
+    "cwd": "/home/rehan/sct-improvements-l3-20261107",
+    "terminal_exit": 143
+  },
+  "completed_candidate_summaries": [
+    {
+      "id": "c90-m10-s256",
+      "eligible": true,
+      "median_ms": 160.94494552817196,
+      "actual_model_calls": {
+        "fast": 1494,
+        "full": 1494
+      },
+      "skipped_stages": 0
+    },
+    {
+      "id": "c90-m10-s512",
+      "eligible": true,
+      "median_ms": 159.0950865065679,
+      "actual_model_calls": {
+        "fast": 1494,
+        "full": 1494
+      },
+      "skipped_stages": 0
+    },
+    {
+      "id": "c90-m20-s256",
+      "eligible": true,
+      "median_ms": 159.50959047768265,
+      "actual_model_calls": {
+        "fast": 1494,
+        "full": 1494
+      },
+      "skipped_stages": 0
+    },
+    {
+      "id": "c90-m20-s512",
+      "eligible": true,
+      "median_ms": 157.94854843989015,
+      "actual_model_calls": {
+        "fast": 1494,
+        "full": 1494
+      },
+      "skipped_stages": 0
+    }
+  ],
+  "test_evaluations": 0,
+  "reason": "Repair result serialization, held-out entity exposure guard, development validation, and complete scoring-source identity. Re-run entire fixed development grid under new manifest; no test/data/model/threshold changes."
+}

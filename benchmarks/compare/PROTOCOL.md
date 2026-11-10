@@ -740,3 +740,115 @@ section 17 rule views (`own`, `same_set`, `pairwise`). Not yet built: the common
   1 repeat). Fixes: partial e-mail detections no longer fail the offset check (ai4privacy); CPU-only entries get
   no GPU in a cuda run; speed keeps the adapter's last stderr line and records a batch size that raises; OPF and
   OpenMed use `flex_attention` on cuda; llm-guard's own chunking now runs (section 11).
+
+## 21. Separate experimental routing calibration
+
+The routing experiment changes execution policy within SCT, so it has a separate frozen protocol:
+`evaluation/improvements/routing-protocol.md`. It does not revise historical tool-comparison results.
+The script reuses this directory's exact-span counts, exposure scoring and paired bootstrap.
+It reports shared neural types and the full annotated taxonomy separately.
+
+Development uses all 220 previously inspected multilingual synthetic records.
+A new 110-record synthetic test cohort is frozen before inference, with six separate mixed-entity fixtures.
+Exactly 12 development candidates are measured on identical pinned CPU models and runtime.
+The baseline `always_run` executes the configured fast-plus-full model union, not SCT's default model profile.
+This experiment cannot establish a general production speedup.
+Development safety precedes latency selection. Test is evaluated once after selection, with three fixed timing repeats.
+If no candidate qualifies, a preregistered conservative candidate is retained as a negative comparison.
+
+The report includes every candidate, all declared language/entity/domain slices, support counts,
+undefined denominators, language coverage, actual session calls, median/p95 latency and qualified peak memory.
+Promotion needs a nonpositive upper paired 95% exposure interval, no mixed regression,
+strictly fewer expensive calls and lower median latency. `always_run` stays the default regardless.
+Acceptance also rejects added exposure on any declared held-out language, entity or domain slice.
+Results on unsupported neural languages are extrapolation; synthetic data does not prove production privacy.
+
+### Version 1 result and audit scope
+
+The saved test result passes the five experiment gates for `c95-m20-s256` and keeps `always_run` as the default.
+This covers the frozen 110-document synthetic cohort, with eleven template groups, against the configured fast-plus-full baseline.
+All twelve development candidates were safety-eligible but skipped no stages and saved no full-model calls.
+Development selected the lowest measured median, 158.534528 ms versus the baseline's 160.356714 ms.
+
+Held-out full-model calls fall from 750 to 690 across three repeats; fast-model calls remain 750.
+The ten English early exits produce 30 skipped stages and an 8% full-call reduction.
+Median latency falls from 314.978201 to 313.561970 ms (0.449628%); p95 falls from 387.812853 to 385.098284 ms.
+These quantiles use 330 document durations per policy, excluding model loading and two document warmups.
+No latency uncertainty interval was measured; fixed order and host drift can affect the observed difference.
+
+Both policies expose 74/110 documents and have full-taxonomy precision 538/574 and recall 538/660.
+Shared neural-type precision is 208/244 and recall is 208/330.
+Every saved shared/full language, entity and domain summary is identical between policies.
+All 22 added-exposure slice counts are zero; the saved paired exposure interval is `[0.0, 0.0]`.
+The bootstrap uses 1,000 paired template-group samples, language-macro aggregation and seed 20261107.
+Zero observed added exposure does not establish complete protection or zero population risk.
+All 110 documents have detected language; 70 use languages outside declared neural support.
+The six mixed fixtures have zero exposure and no call savings.
+Their cascade median is slower: 118.674737 ms versus 111.708482 ms.
+The shared-process cumulative peak is 1,649,020 KiB for every test and mixed measurement, without a policy-specific memory comparison.
+
+`evaluation/improvements/routing-validation-v1.json` records artifact identities and the saved-result audit.
+It checks the frozen source, inputs, model files and runtime, plus complete selection, consumption identity, ratios and call totals.
+The held-out and development JSON files retain all summaries, support counts, undefined values and first-pass per-document call counts.
+They omit raw latency observations, predictions and per-document exposure counters; surviving remote logs also contain summaries only.
+Thus saved-result validation cannot independently rescore predictions, reconstruct timing quantiles or repeat the paired bootstrap.
+The reported five gates are consistent with the saved summaries, with that audit limit.
+The held-out set was consumed once; validation performed no inference replay or test-driven tuning.
+
+### Version 2 result and reproducible numeric audit
+
+The selected cascade passes the relative synthetic gates, while both policies expose 78/110 documents (70.9091%).
+This is a limited comparison against the configured two-model baseline, not a production privacy or speed guarantee.
+The separate protocol and evidence live under `evaluation/improvements/routing-v090-v2/`; historical v1 artifacts remain unchanged.
+
+Development selected `c95-m20-s512` from twelve eligible candidates.
+None skipped stages or saved model calls on the 220 development records.
+Its median was 161.103002 ms versus the baseline's 166.432187 ms, with 660 durations and 1,494 calls per model for each policy.
+The timing-only selection remains subject to fixed-order and host effects.
+
+Held-out evaluation used exactly one new 110-document cohort, with three predeclared timing repeats and eleven language-template clusters.
+Full-model calls fall from 750 to 690 (8%); fast-model calls remain 750, so total calls fall 4%.
+The median falls from 395.409150 to 381.347755 ms (3.556163%); p95 falls from 481.847735 to 468.015126 ms.
+Each quantile uses 330 retained document durations, excluding model initialization and two warmup documents per policy.
+Ten English early exits account for 30 skipped stages across the repeats.
+
+Both policies have full-taxonomy precision 560/614 and recall 560/660; shared neural-type precision is 230/284 and recall is 230/330.
+Both taxonomy views expose 78/110 documents and have zero added exposure in all 22 declared language/entity/domain slices.
+The paired exposure intervals are `[0.0, 0.0]` in both views, using 1,000 template-group draws and seed 20261109.
+Resampling uses eleven language-template groups, not fifty-five domain-prefix groups.
+All 110 documents remain in the accuracy denominator, including 70 outside declared neural language support.
+Zero observed added exposure does not establish zero population risk or sufficient absolute protection.
+
+Mixed fixtures have zero additional exposed mentions, but both policies expose three of six documents.
+Their full-taxonomy precision is 33/89 and recall is 33/36; both execute 42 calls per model across three repeats.
+Across 18 timings, the mixed median falls from 212.856895 to 212.251151 ms while p95 rises from 873.196982 to 874.181043 ms.
+Peak RSS is 1,660,124 KiB for all held-out and mixed measurements, cumulative with both models resident.
+It is not evidence of independent per-policy memory savings.
+The cohort has no independent native-language expert review, and no latency uncertainty interval was measured.
+All preregistered gates pass for this limited experiment. `always_run` remains the default.
+
+The manifest binds the pinned BERT and WikiNEURAL revisions, offline CPU affinity 2-3, actual runtime and frozen experiment source.
+The held-out consumption marker and completion receipt bind one evaluation and successful postflight verification.
+The completion receipts cover all 39 development and 12 held-out/mixed raw repeat files.
+Source-free predictions, individual durations and actual counter deltas permit numeric reconstruction without model inference.
+Numeric audit checks recorded postflight provenance; it does not independently repeat runtime/model-byte verification or provide remote attestation.
+
+The experiment predates later fixes to `sct/integrations/hf.py`, `sct/mcp_server.py` and warmup handling in `sct/sct.py`.
+Those paths were not exercised here, but the current files have different hashes and must not replace the frozen audit source.
+The 82-file portable archive preserves the exact required source, inputs, license and package files.
+Its SHA256 is `75f292b5c847626e68a401a4e66052b298c3c900d8b13658b242145b913776b2`.
+Use an existing project Python with the scoring dependencies installed; no model cache is required:
+
+```sh
+# Start in the repository root.
+SCT_AUDIT_PYTHON="$PWD/.venv/bin/python"
+SCT_AUDIT_ARTIFACTS="$PWD/evaluation/improvements/routing-v090-v2"
+SCT_AUDIT_DIR="$(mktemp -d /tmp/sct-routing-v2-audit.XXXXXX)"
+tar -xzf "$SCT_AUDIT_ARTIFACTS/frozen-audit-source-v2.tar.gz" -C "$SCT_AUDIT_DIR"
+cp "$SCT_AUDIT_ARTIFACTS"/routing-*.json "$SCT_AUDIT_DIR/evaluation/improvements/routing-v090-v2/"
+cd "$SCT_AUDIT_DIR"
+"$SCT_AUDIT_PYTHON" -m scripts.benchmark_detector_routing audit-dev --experiment v090-v2
+"$SCT_AUDIT_PYTHON" -m scripts.benchmark_detector_routing audit-test --experiment v090-v2
+```
+
+These commands check existing summaries against retained observations; they do not repeat the consumed held-out inference.
