@@ -3284,13 +3284,12 @@
         "bytes": 3119
       }
     },
-    "gpu_after": "0, GPU-65a53008-60d3-05ac-97c1-be5b94f4f44c, NVIDIA GeForce RTX 4090, 560.35.05, 24564 MiB, 16925 MiB, 0 %\n1, GPU-7ff6f815-c49c-b4b4-adf1-51ad379d72b9, NVIDIA GeForce RTX 4090, 560.35.05, 24564 MiB, 19107 MiB, 0 %\n2, GPU-ff4f4d00-872a-c859-0233-c9c87831b2cb, NVIDIA GeForce RTX 4090, 560.35.05, 24564 MiB, 18919 MiB, 0 %\n3, GPU-5a285e5a-6883-d8af-9928-81d2ab04a33e, NVIDIA GeForce RTX 4090, 560.35.05, 24564 MiB, 16442 MiB, 0 %\n",
-    "processes_after": "GPU-65a53008-60d3-05ac-97c1-be5b94f4f44c, 259509, python, 478 MiB\nGPU-65a53008-60d3-05ac-97c1-be5b94f4f44c, 1915589, VLLM::Worker_TP0, 16432 MiB\nGPU-7ff6f815-c49c-b4b4-adf1-51ad379d72b9, 15964, /shared8vbm/venv/semantic/bin/python, 2660 MiB\nGPU-7ff6f815-c49c-b4b4-adf1-51ad379d72b9, 1915801, VLLM::Worker_TP1, 16432 MiB\nGPU-ff4f4d00-872a-c859-0233-c9c87831b2cb, 356898, /shared8vbm/venv/2d-reranker-endpoint/bin/python, 2472 MiB\nGPU-ff4f4d00-872a-c859-0233-c9c87831b2cb, 1916100, VLLM::Worker_TP2, 16432 MiB\nGPU-5a285e5a-6883-d8af-9928-81d2ab04a33e, 1916275, VLLM::Worker_TP3, 16432 MiB\n"
+    "gpu_after": "0, GPU-65a53008-60d3-05ac-97c1-be5b94f4f44c, NVIDIA GeForce RTX 4090, 560.35.05, 24564 MiB, 16925 MiB, 0 %\n1, GPU-7ff6f815-c49c-b4b4-adf1-51ad379d72b9, NVIDIA GeForce RTX 4090, 560.35.05, 24564 MiB, 19107 MiB, 0 %\n2, GPU-ff4f4d00-872a-c859-0233-c9c87831b2cb, NVIDIA GeForce RTX 4090, 560.35.05, 24564 MiB, 18919 MiB, 0 %\n3, GPU-5a285e5a-6883-d8af-9928-81d2ab04a33e, NVIDIA GeForce RTX 4090, 560.35.05, 24564 MiB, 16442 MiB, 0 %\n"
   },
   "frozen_qa_bundle": {
     "path": "v090-gpu-evidence.tar.gz",
-    "sha256": "5dedc8b63170b97335cb1400ddcaf54e18de7ae08b577da071049cdeaa4b5d8e",
-    "bytes": 57749
+    "sha256": "cd6ebf49218c75901e9881131c10e08424c1bf1b41e6a55b77327be9e3e3a4fa",
+    "bytes": 58321
   },
   "earlier_exploratory_profile": {
     "path": "/home/rehan/sct-gpu-merge-20261110",
@@ -3321,5 +3320,6 @@
     "https://onnxruntime.ai/docs/get-started/with-python.html",
     "https://pypi.org/pypi/onnxruntime-gpu/1.24.4/json",
     "https://docs.nvidia.com/deploy/cuda-compatibility/minor-version-compatibility.html"
-  ]
+  ],
+  "publication_redaction": "Unrelated host workload process details are omitted. The private original inventory remains on gpuserver."
 }
