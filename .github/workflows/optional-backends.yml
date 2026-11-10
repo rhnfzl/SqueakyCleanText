@@ -29,6 +29,8 @@ on:
       - sct/corpus/**
       - tests/test_corpus*.py
       - sct/token_stores/**
+      - tests/test_sqlite_token_store.py
+      - tests/test_token_store_operations.py
       - tests/test_optional_profiles.py
       - evaluation/improvements/**
       - tests/test_processing_compatibility.py
@@ -113,6 +115,13 @@ jobs:
           SCT_OPTIONAL_PROFILE: ${{ matrix.profile }}
           HF_HUB_OFFLINE: "1"
         run: .venv/bin/python -m pytest tests/test_optional_profiles.py tests/test_processing_compatibility.py tests/test_baseline_measurement.py -v -s
+
+      - name: Exercise encrypted token-store operations
+        if: matrix.profile == 'token-store'
+        env:
+          SCT_OPTIONAL_PROFILE: token-store
+          HF_HUB_OFFLINE: "1"
+        run: .venv/bin/python -m pytest tests/test_sqlite_token_store.py tests/test_token_store_operations.py -v
 
       - name: Exercise complete native corpus workflow
         if: matrix.profile == 'corpus'
