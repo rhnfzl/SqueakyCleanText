@@ -1,0 +1,37 @@
+{
+  "features": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10
+  ],
+  "tasks": 17,
+  "dependency_graph": "acyclic",
+  "missing_paths": [],
+  "prerequisite_created_paths": [
+    {
+      "task": "D3",
+      "path": "examples/corpus/clean_select_dedup.py",
+      "created_by": "D2"
+    },
+    {
+      "task": "S2",
+      "path": "sct/token_stores/sqlite.py",
+      "created_by": "S1"
+    },
+    {
+      "task": "L2",
+      "path": "sct/unified.py",
+      "created_by": "C4"
+    }
+  ],
+  "local_artifact_links": "all exist",
+  "production_code_changed": false,
+  "runtime_checks": "not run: planning only"
+}

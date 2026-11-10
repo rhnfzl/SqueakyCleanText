@@ -58,6 +58,10 @@ sct-mcp = "sct.mcp_server:main"
 sct-report = "sct.report_cli:main"
 
 [project.optional-dependencies]
+secrets = ["datafog-core==1.0.0"]
+documents = ["docling==2.148.0"]
+token-store = ["cryptography==48.0.1"]
+corpus = ["datasketch>=1.6", "datatrove==0.10.1", "orjson>=3.10"]
 gpu = [
     "onnxruntime-gpu>=1.24.2",
 ]
@@ -141,6 +145,9 @@ sct = ["py.typed"]
 [tool.pytest.ini_options]
 timeout = 1200
 markers = ["needs_model: loads a real Hugging Face model"]
+
+[tool.coverage.report]
+precision = 2
 
 [tool.ruff]
 line-length = 127

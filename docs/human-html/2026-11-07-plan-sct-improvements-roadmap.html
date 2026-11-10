@@ -1,0 +1,331 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="artifact-kind" content="plan">
+  <meta name="artifact-audience" content="human">
+  <meta name="artifact-created" content="2026-11-07">
+  <meta name="artifact-source" content="local">
+  <meta name="artifact-read-time" content="5 min">
+  <!-- Gallery card text. Leave empty to auto-derive from the summary block; fill for a sharper one-liner. -->
+  <meta name="artifact-summary" content="All ten improvements in 17 staged changes; adaptive routing stays experimental until validated.">
+  <meta name="artifact-keywords" content="">
+  <title>SCT improvements roadmap</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Ctext y='13' font-size='13'%3E🗺️%3C/text%3E%3C/svg%3E">
+  <script>
+    (function(){try{var r=document.documentElement;r.classList.add('theme-js');var t=localStorage.getItem('hh-theme');if(t==='dark'||t==='light')r.dataset.theme=t;}catch(e){}})();
+  </script>
+  <style>
+:root {
+      color-scheme: light;                     /* base = light, renders on any engine; dark tokens live in the @media screen blocks appended after this constant */
+      /* surfaces: cool off-white, slight blue-grey hue bias (never pure grey/white) */
+      --bg: #f6f8fb; --surface: #ffffff; --surface-2: #f2f5f9; --surface-3: #e9eef4;
+      /* ink: navy-biased grey ramp (never pure black) */
+      --ink: #172033; --ink-2: #3c4657; --muted: #5a6577; --faint: #66707f;  /* --faint is text-safe AA (4.7:1 on --bg) */
+      /* structure */
+      --line: #dbe2ec; --line-strong: #c6cfdc;
+      /* brand accent (#226fb2) + tint */
+      --accent: #226fb2; --accent-2: #1b5e97; --accent-bg: #eef5fb; --accent-line: #b9d5ec;
+      /* severity: fg / tint-bg / tint-line triples (semantic color only) */
+      --crit: #c0342a; --crit-bg: #fbeae8; --crit-line: #f0c4be;
+      --high: #a84522; --high-bg: #fbeee6; --high-line: #f0cdba;  /* fg contrast-locked to tint (5.2:1) */
+      --warn: #845d06; --warn-bg: #f9f1d8; --warn-line: #e8d69a;  /* fg contrast-locked to tint (5.2:1) */
+      --good: #2d7a55; --good-bg: #e9f5ee; --good-line: #b6ddc6;
+      --info: #226fb2; --info-bg: #eef5fb; --info-line: #b9d5ec;
+      --neutral: #5a6577; --neutral-bg: #eef1f5; --neutral-line: #d7dde6;
+      /* legacy aliases: keep every existing selector below valid (safe incremental migration) */
+      --blue: var(--accent); --soft: var(--surface-2);
+      --orange: var(--high); --green: var(--good);
+      --rose-bg: var(--high-bg); --rose-line: var(--high);
+      --emerald-bg: var(--good-bg); --emerald-line: var(--good);
+      /* elevation */
+      --shadow-sm: 0 1px 2px rgba(23,32,51,.05);
+      --shadow: 0 1px 2px rgba(23,32,51,.05), 0 8px 24px rgba(23,32,51,.06);
+      /* radius */
+      --radius: 10px; --radius-sm: 6px; --radius-lg: 14px;
+      /* spacing scale */
+      --s-1:4px; --s-2:6px; --s-3:8px; --s-4:12px; --s-5:14px; --s-6:16px; --s-7:18px; --s-8:20px; --s-9:24px; --s-10:32px; --s-12:48px;
+      /* families: display serif for h1/numbers, sans body (NOT led by Inter), mono kickers */
+      --display: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, ui-serif, serif;
+      --sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", "Helvetica Neue", sans-serif;
+      --mono: ui-monospace, "SF Mono", "Cascadia Code", Menlo, Consolas, monospace;
+      /* fluid type scale: only the 3 biggest levels clamp; body & below fixed so copy never wobbles */
+      --fs-h1: clamp(2rem, 1.35rem + 2.6vw, 3.2rem);
+      --fs-h2: clamp(1.3rem, 1.15rem + .7vw, 1.6rem);
+      --fs-h3: 1.05rem; --fs-lede: clamp(1.05rem, 1rem + .35vw, 1.18rem);
+      --fs-body: 1rem; --fs-sm: .875rem; --fs-cap: .72rem;
+      --lh-body: 1.62; --ls-caps: .1em;
+      font-family: var(--sans);
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; color: var(--ink); background: var(--bg); font-family: var(--sans); line-height: var(--lh-body); accent-color: var(--accent); text-rendering: optimizeLegibility; -webkit-font-smoothing: antialiased; font-feature-settings: "kern", "liga"; }
+    main { width: min(1060px, calc(100vw - clamp(2rem, 8vw, 5rem))); margin: 0 auto; padding: clamp(28px,5vw,56px) 0 clamp(64px,10vw,96px); }
+    header { border-bottom: 1px solid var(--line); padding-bottom: var(--s-9); margin-bottom: var(--s-10); }
+    .eyebrow { font-family: var(--mono); color: var(--accent); font-size: var(--fs-cap); font-weight: 600; text-transform: uppercase; letter-spacing: .14em; }
+    h1 { margin: 10px 0 12px; font-family: var(--display); font-size: var(--fs-h1); font-weight: 800; line-height: 1.05; letter-spacing: -.02em; }
+    h2 { margin: 0 0 12px; font-size: var(--fs-h2); font-weight: 700; letter-spacing: -.01em; }
+    h3 { margin: 18px 0 8px; font-size: var(--fs-h3); font-weight: 600; color: var(--ink); }
+    h1, h2, h3 { text-wrap: balance; }
+    p { color: var(--ink-2); line-height: var(--lh-body); max-width: 72ch; text-wrap: pretty; }
+    li { max-width: 72ch; }
+    a { color: var(--accent); }
+    :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+    .lead-summary { background: var(--surface-2); border-left: 4px solid var(--accent); padding: 20px 22px; border-radius: var(--radius); margin: 16px 0 32px; box-shadow: var(--shadow-sm); }
+    .lead-summary h2 { color: var(--accent); margin-bottom: 12px; }
+    .lead-summary ul { margin: 0; padding-left: 20px; }
+    .lead-summary li { margin-bottom: 8px; color: var(--ink-2); line-height: 1.55; }
+    .lead-summary li strong { color: var(--accent); }
+    nav.toc { background: var(--surface-2); border: 1px solid var(--line); border-radius: var(--radius); padding: 14px 20px; margin: 16px 0 32px; }
+    nav.toc ol { margin: 8px 0 0; padding-left: 22px; columns: 2; column-gap: 24px; }
+    nav.toc li { margin-bottom: 4px; }
+    nav.toc a { color: var(--accent); text-decoration: none; }
+    nav.toc a:hover { text-decoration: underline; }
+    section.section { margin-top: clamp(32px,5vw,52px); }
+    section[id] { scroll-margin-top: var(--s-9); }
+    section:target > h2 { color: var(--accent-2); }
+    .grid-cols-2, .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: var(--s-6); }
+    .grid-3 { display: grid; grid-template-columns: repeat(3,1fr); gap: var(--s-6); }
+    /* grid items default to min-width:auto and will not shrink below a wide child (a long <pre> or code
+       line), pushing the page past a phone viewport. min-width:0 lets the child's overflow-x:auto scroll. */
+    .grid-cols-2 > *, .grid-2 > *, .grid-3 > *, .compare-before, .compare-after { min-width: 0; }
+    .compare-before { background: var(--high-bg); border-left: 4px solid var(--high); border-radius: var(--radius); padding: 16px; }
+    .compare-after { background: var(--good-bg); border-left: 4px solid var(--good); border-radius: var(--radius); padding: 16px; }
+    .compare-before > strong:first-child, .compare-after > strong:first-child { display: block; margin-bottom: 8px; font-family: var(--mono); font-size: var(--fs-cap); letter-spacing: .08em; text-transform: uppercase; }
+    .compare-before > strong:first-child { color: var(--high); }
+    .compare-after > strong:first-child { color: var(--good); }
+    table { width: 100%; border-collapse: collapse; border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; }
+    th, td { padding: 12px 14px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; font-variant-numeric: tabular-nums; }
+    th { background: var(--surface-2); color: var(--muted); font-family: var(--mono); font-size: var(--fs-cap); text-transform: uppercase; letter-spacing: .08em; }
+    tr:last-child td { border-bottom: 0; }
+    .table-scroll { overflow-x: auto; border-radius: var(--radius); }
+    .table-scroll table { display: table; }
+    code { background: var(--surface-2); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 2px 5px; font-family: var(--mono); font-size: .88em; overflow-wrap: anywhere; }
+    pre { background: #0f172a; color: #e2e8f0; border-radius: var(--radius); padding: 14px; overflow: auto; border: 1px solid var(--line); }
+    pre code { background: transparent; border: 0; color: inherit; }
+    .mermaid svg { max-width: 100%; height: auto; }
+    /* Mermaid node labels clip on the right when the page's kerning / ligatures / letter-spacing widen the
+       final SVG text past mermaid's own measurement. Neutralize those inside the diagram, and let a label
+       spill into the node's padding rather than be cut off. */
+    .mermaid text, .mermaid .nodeLabel, .mermaid .edgeLabel,
+    .mermaid foreignObject div, .mermaid foreignObject span, .mermaid foreignObject p {
+      font-feature-settings: normal; font-variant-ligatures: none; letter-spacing: normal; text-rendering: auto;
+    }
+    .mermaid foreignObject { overflow: visible; }
+    .mermaid:not([data-processed]) { font-family: var(--mono); font-size: var(--fs-sm); white-space: pre; overflow-x: auto; background: var(--surface-2); border: 1px dashed var(--line-strong); border-radius: var(--radius); padding: var(--s-6); color: var(--muted); }
+    /* shipped diagram: inline SVG in a scroll wrapper, mermaid/source kept in an adjacent <details>.
+       The wrapper's overflow-x contains a too-wide diagram to its own scrollbar instead of the page. */
+    figure.diagram { margin: var(--s-7) 0; }
+    .diagram-scroll { overflow-x: auto; }
+    .diagram-scroll svg { max-width: 100%; height: auto; display: block; margin: 0 auto; }
+    .diagram-src { margin-top: var(--s-4); }
+    .diagram-src summary { cursor: pointer; color: var(--muted); font-size: var(--fs-sm); }
+    .diagram-src pre { white-space: pre; overflow-x: auto; }
+    .needs-verification { display: inline-block; font-family: var(--mono); padding: 2px 8px; border-radius: var(--radius-sm); font-size: var(--fs-cap); font-weight: 700; background: var(--warn-bg); color: var(--warn); border: 1px solid var(--warn-line); }
+    /* responsive overrides for components live next to the component (in _EXTRA_SCAFFOLD_STYLE) */
+    @media (max-width: 820px) {
+      .grid-cols-2, .grid-2, .grid-3 { grid-template-columns: 1fr; }
+      nav.toc ol { columns: 1; }
+      table { display: block; overflow-x: auto; }
+    }
+    .theme-toggle { display:none; }
+    .theme-js .theme-toggle { position:fixed; top:16px; right:16px; z-index:100; width:40px; height:40px; padding:0; display:inline-flex; align-items:center; justify-content:center; font:inherit; font-size:18px; line-height:1; cursor:pointer; background:var(--surface-2, var(--soft)); color:var(--muted); border:1px solid var(--line); border-radius:999px; }
+    .theme-js .theme-toggle:hover { color:var(--ink); border-color:var(--line-strong, var(--line)); }
+    .theme-js .theme-toggle:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+    .theme-toggle::before { content:"\263E"; }
+    :root[data-theme="dark"] .theme-toggle::before { content:"\2600"; }
+    @media (prefers-color-scheme:dark){ :root:not([data-theme]) .theme-toggle::before{ content:"\2600"; } }
+    @media print { .theme-toggle { display:none; } }
+    @media screen {
+      :root[data-theme="dark"] {
+        color-scheme: dark;
+        --bg:#0f1522; --surface:#161e2e; --surface-2:#1c2536; --surface-3:#232e42;
+        --ink:#e8edf5; --ink-2:#c3ccdb; --muted:#96a2b5; --faint:#8593a8;
+        --line:#253145; --line-strong:#33415a;
+        --accent:#6aa8dd; --accent-2:#85bce6; --accent-bg:#152740; --accent-line:#2c4a6b;
+        --crit:#f19488; --crit-bg:#351d22; --crit-line:#6b3936;
+        --high:#eda06b; --high-bg:#33251a; --high-line:#6b4a30;
+        --warn:#d8b45c; --warn-bg:#312a16; --warn-line:#665626;
+        --good:#74c99b; --good-bg:#16301f; --good-line:#2e5c42;
+        --info:#6aa8dd; --info-bg:#152740; --info-line:#2c4a6b;
+        --neutral:#9aa6ba; --neutral-bg:#232c3c; --neutral-line:#3a465a;
+        --shadow-sm:0 1px 2px rgba(0,0,0,.35);
+        --shadow:0 4px 14px rgba(0,0,0,.45), 0 1px 3px rgba(0,0,0,.3);
+      }
+    }
+    @media screen and (prefers-color-scheme: dark) {
+      :root:not([data-theme]) {
+        color-scheme: dark;
+        --bg:#0f1522; --surface:#161e2e; --surface-2:#1c2536; --surface-3:#232e42;
+        --ink:#e8edf5; --ink-2:#c3ccdb; --muted:#96a2b5; --faint:#8593a8;
+        --line:#253145; --line-strong:#33415a;
+        --accent:#6aa8dd; --accent-2:#85bce6; --accent-bg:#152740; --accent-line:#2c4a6b;
+        --crit:#f19488; --crit-bg:#351d22; --crit-line:#6b3936;
+        --high:#eda06b; --high-bg:#33251a; --high-line:#6b4a30;
+        --warn:#d8b45c; --warn-bg:#312a16; --warn-line:#665626;
+        --good:#74c99b; --good-bg:#16301f; --good-line:#2e5c42;
+        --info:#6aa8dd; --info-bg:#152740; --info-line:#2c4a6b;
+        --neutral:#9aa6ba; --neutral-bg:#232c3c; --neutral-line:#3a465a;
+        --shadow-sm:0 1px 2px rgba(0,0,0,.35);
+        --shadow:0 4px 14px rgba(0,0,0,.45), 0 1px 3px rgba(0,0,0,.3);
+      }
+    }
+.meta-ribbon { display:flex; flex-wrap:wrap; gap:var(--s-4) var(--s-9); padding:var(--s-5) var(--s-7); margin:0 0 var(--s-9); background:var(--surface); border:1px solid var(--line); border-radius:var(--radius); box-shadow:var(--shadow-sm); font-size:var(--fs-sm); color:var(--muted); }
+    .meta-ribbon span { white-space:normal; overflow-wrap:anywhere; }
+    .meta-ribbon strong { color:var(--faint); font-family:var(--mono); font-size:var(--fs-cap); letter-spacing:.1em; text-transform:uppercase; font-weight:600; margin-right:var(--s-2); }
+    .read-map { background:var(--surface); border:1px solid var(--line); border-radius:var(--radius); padding:var(--s-5) var(--s-7); margin:0 0 var(--s-9); font-size:var(--fs-sm); color:var(--ink); box-shadow:var(--shadow-sm); }
+    .read-map div { margin:var(--s-1) 0; }
+    .read-map strong { color:var(--accent); font-family:var(--mono); font-size:var(--fs-cap); letter-spacing:.08em; text-transform:uppercase; margin-right:var(--s-2); }
+    .read-map a { color:var(--accent); }
+    .provenance { margin-top:var(--s-12); padding-top:var(--s-7); border-top:1px solid var(--line); font-size:var(--fs-sm); color:var(--faint); }
+    .provenance code { background:transparent; border:0; color:var(--ink); font-family:var(--mono); }
+    .provenance a { color:var(--accent); text-decoration:none; }
+    .callout { border:1px solid var(--line); border-left:4px solid var(--muted); background:var(--surface-2); border-radius:var(--radius); padding:var(--s-4) var(--s-6); margin:var(--s-6) 0; }
+    .callout > strong:first-child { display:block; margin-bottom:var(--s-1); font-family:var(--mono); font-size:var(--fs-cap); text-transform:uppercase; letter-spacing:.08em; }
+    .callout-note { border-left-color:var(--accent); background:var(--accent-bg); }
+    .callout-note > strong:first-child { color:var(--accent); }
+    .callout-note > strong:first-child::before { content:"📌 "; content:"📌 " / ""; }
+    .callout-tip { border-left-color:var(--good); background:var(--good-bg); }
+    .callout-tip > strong:first-child { color:var(--good); }
+    .callout-tip > strong:first-child::before { content:"💡 "; content:"💡 " / ""; }
+    .callout-warning { border-left-color:var(--warn); background:var(--warn-bg); }
+    .callout-warning > strong:first-child { color:var(--warn); }
+    .callout-warning > strong:first-child::before { content:"⚠️ "; content:"⚠️ " / ""; }
+    .callout-important { border-left-color:var(--crit); background:var(--crit-bg); }
+    .callout-important > strong:first-child { color:var(--crit); }
+    .callout-important > strong:first-child::before { content:"❗ "; content:"❗ " / ""; }
+    /* ---- collapsible (appendix lane) ---- */
+    details { background:var(--surface); border:1px solid var(--line); border-radius:var(--radius); padding:0 var(--s-6); margin:var(--s-6) 0; }
+    summary { cursor:pointer; padding:var(--s-4) 0; font-weight:600; color:var(--accent); }
+    summary:hover { color:var(--accent-2); }
+    details[open] > summary { border-bottom:1px solid var(--line); margin-bottom:var(--s-4); }
+    #layout-audit { position:fixed; left:0; right:0; bottom:0; z-index:9999; margin:0; padding:var(--s-3) var(--s-5); background:var(--warn-bg); color:var(--warn); border-top:1px solid var(--warn-line); font-size:var(--fs-sm); text-align:center; }
+    #layout-audit[hidden] { display:none; }
+    #layout-audit code { background:var(--surface); }
+    .confidence { display:inline-block; font-family:var(--mono); padding:2px 8px; border-radius:var(--radius-sm); font-size:var(--fs-cap); font-weight:700; border:1px solid transparent; }
+    .confidence-high { background:var(--good-bg); color:var(--good); border-color:var(--good-line); }
+    .confidence-medium { background:var(--accent-bg); color:var(--accent); border-color:var(--accent-line); }
+    .confidence-low { background:var(--warn-bg); color:var(--warn); border-color:var(--warn-line); }
+    /* components own their measure via grid tracks; the 72ch cap applies to open prose only */
+    .keycard p, .card p, .tile p, .metric p, .compare-before p, .compare-after p, .callout p { max-width:none; }
+    /* ---- KPI tiles (shared: incident .metrics/.metric inherit these) ---- */
+    .tiles, .metrics { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:var(--s-5); margin:var(--s-8) 0; }
+    .tile, .metric { position:relative; overflow:hidden; background:var(--surface); border:1px solid var(--line); border-radius:var(--radius); padding:var(--s-7) var(--s-7) var(--s-6); box-shadow:var(--shadow-sm); }
+    .tile::before { content:""; position:absolute; inset:0 auto 0 0; width:4px; background:var(--sv,var(--accent)); }
+    .tile .n, .metric strong { display:block; font-family:var(--display); font-size:clamp(1.8rem,4vw,2.4rem); font-weight:800; line-height:1; color:var(--sv,var(--ink)); font-variant-numeric:tabular-nums; }
+    .tile .k, .metric span { display:block; font-family:var(--mono); font-size:var(--fs-cap); letter-spacing:.12em; text-transform:uppercase; color:var(--muted); font-weight:600; margin-top:var(--s-3); }
+    .tile .d { font-size:.8rem; color:var(--faint); margin-top:var(--s-1); }
+    .tile.crit{--sv:var(--crit);} .tile.high{--sv:var(--high);} .tile.warn{--sv:var(--warn);} .tile.good{--sv:var(--good);} .tile.info{--sv:var(--accent);} .tile.neutral{--sv:var(--neutral);}
+    /* ---- stripe / accent cards ---- */
+    .card { background:var(--surface); border:1px solid var(--line); border-radius:var(--radius); padding:var(--s-7) var(--s-8); box-shadow:var(--shadow-sm); }
+    .card.tint-info { background:var(--info-bg); border-color:var(--info-line); }
+    .card.tint-good { background:var(--good-bg); border-color:var(--good-line); }
+    .card.tint-high { background:var(--high-bg); border-color:var(--high-line); }
+    .card.tint-crit { background:var(--crit-bg); border-color:var(--crit-line); }
+    .stripe { position:relative; padding-left:var(--s-7); }
+    .stripe::before { content:""; position:absolute; left:0; top:.35rem; bottom:.35rem; width:3px; border-radius:3px; background:var(--accent); }
+    .stripe.crit::before{background:var(--crit);} .stripe.high::before{background:var(--high);} .stripe.warn::before{background:var(--warn);} .stripe.good::before{background:var(--good);}
+    /* ---- keycard: big number + prose ---- */
+    .keycard { display:grid; grid-template-columns:auto minmax(0,1fr); gap:var(--s-8); align-items:center; margin:var(--s-9) 0; padding:var(--s-8) var(--s-9); background:var(--surface); border:1px solid var(--line-strong); border-left:4px solid var(--sv,var(--accent)); border-radius:var(--radius); box-shadow:var(--shadow); }
+    /* Robust to any child count. Two children happened to land correctly by auto-placement;
+       a THIRD wrapped back into column 1, whose `auto` width then grew to fit a paragraph of
+       prose and starved the 1fr column down to a one-word-per-line ribbon. Pin the hero to
+       column 1 for the full height and stack everything else in column 2, so adding a second
+       paragraph is not a silent layout break. */
+    .keycard > * { grid-column:2; min-width:0; }
+    .keycard > :first-child:is(.big,.kind,.sev,.chip) { grid-column:1; grid-row:1/-1; }
+    .keycard .big { font-family:var(--display); font-size:clamp(2.4rem,7vw,3.4rem); font-weight:800; line-height:.95; color:var(--sv,var(--accent)); font-variant-numeric:tabular-nums; }
+    .keycard .big small { display:block; margin-top:var(--s-2); font-family:var(--mono); font-size:var(--fs-sm); font-weight:600; letter-spacing:.04em; text-transform:uppercase; color:var(--muted); }
+    .keycard p b { color:var(--ink); }
+    .keycard.crit{--sv:var(--crit);} .keycard.high{--sv:var(--high);} .keycard.good{--sv:var(--good);} .keycard.info{--sv:var(--accent);}
+    /* ---- severity / status chips ---- */
+    .chip { display:inline-block; font-family:var(--mono); font-size:var(--fs-cap); font-weight:700; padding:2px 8px; border-radius:var(--radius-sm); letter-spacing:.04em; font-variant-numeric:tabular-nums; border:1px solid transparent; }
+    .chip.crit{color:var(--crit);background:var(--crit-bg);border-color:var(--crit-line);}
+    .chip.high{color:var(--high);background:var(--high-bg);border-color:var(--high-line);}
+    .chip.warn{color:var(--warn);background:var(--warn-bg);border-color:var(--warn-line);}
+    .chip.good{color:var(--good);background:var(--good-bg);border-color:var(--good-line);}
+    .chip.info{color:var(--accent);background:var(--accent-bg);border-color:var(--accent-line);}
+    .chip.neutral{color:var(--muted);background:var(--neutral-bg);border-color:var(--neutral-line);font-weight:600;}
+    /* ---- cross-links / chain caption / inline mono ---- */
+    .chain { font-family:var(--mono); font-size:.8rem; color:var(--accent); font-weight:600; margin-top:var(--s-4); }
+    .crosslink { font-weight:600; }
+    .crosslink::before { content:"→ "; color:var(--accent); }
+    code.m { font-family:var(--mono); color:var(--muted); background:var(--surface-2); padding:1px 6px; border-radius:var(--radius-sm); }
+    /* ---- opt-in sticky nav rail: author wraps {nav}{body} in <div class="railed"> ---- */
+    .railed { display:grid; grid-template-columns:220px minmax(0,1fr); gap:clamp(24px,4vw,48px); align-items:start; }
+    .railed nav.toc { position:sticky; top:24px; margin:0; }
+    .railed nav.toc ol { columns:1; }
+    @media (max-width:900px) { .railed { grid-template-columns:1fr; } .railed nav.toc { position:static; } }
+    /* component responsive overrides live HERE (after the base rules, in the later-injected _EXTRA) so they win the cascade */
+    @media (max-width:820px) {
+      .keycard { grid-template-columns:1fr; gap:var(--s-5); }
+      /* single column now, so release the explicit placement or it would conjure an
+         implicit second column and put the hero back beside the text */
+      .keycard > *, .keycard > :first-child:is(.big,.kind,.sev,.chip) { grid-column:1; grid-row:auto; }
+      .tiles, .metrics { grid-template-columns:1fr 1fr; }
+    }
+    @media (max-width:460px) { .tiles, .metrics { grid-template-columns:1fr; } }
+    /* ---- sparkline: area fill, faint grid, emphasized endpoint ---- */
+    .spark { color:var(--accent); overflow:visible; }
+    .spark .line { stroke:currentColor; stroke-width:2; fill:none; }
+    .spark .fill { fill:currentColor; opacity:.12; }
+    .spark .grid { stroke:var(--line); stroke-width:1; }
+    .spark .dot { fill:currentColor; }
+    .spark.good { color:var(--good); } .spark.warn { color:var(--warn); } .spark.crit { color:var(--crit); }
+    /* ---- bar rows / progress meter ---- */
+    .bars { display:grid; grid-template-columns:max-content 1fr max-content; gap:var(--s-2) var(--s-4); align-items:center; margin:var(--s-6) 0; }
+    .bars dt { font-family:var(--mono); font-size:var(--fs-sm); color:var(--muted); margin:0; }
+    /* min-width:0 + wrap: if a plain <dd> paragraph is fed to this progress grid by mistake,
+       it wraps and degrades instead of forcing a max-content column and blowing out the page
+       (a chip + description definition list belongs in .deflist, not .bars). */
+    .bars dd { margin:0; min-width:0; overflow-wrap:anywhere; }
+    .bars .val { font-variant-numeric:tabular-nums; font-size:var(--fs-sm); }
+    .bars .track, .progress { background:var(--surface-2); border-radius:999px; overflow:hidden; min-width:60px; margin:0; }
+    .bars .fill, .progress .fill { display:block; height:12px; border-radius:inherit; background:var(--sv,var(--accent)); width:var(--w,50%); }
+    .fill.crit { --sv:var(--crit); } .fill.high { --sv:var(--high); } .fill.warn { --sv:var(--warn); } .fill.good { --sv:var(--good); }
+    /* ---- definition list: chip/label + wrapping description (risks, key terms, glossary rows) ----
+       Use this, NOT .bars, for a <dl> of label + prose. .bars is a 3-col progress grid whose
+       max-content columns never wrap a long <dd>; .deflist is a 2-col grid whose 1fr description
+       column wraps and caps at a readable measure. Collapses to one column on narrow screens. */
+    .deflist { display:grid; grid-template-columns:max-content 1fr; gap:var(--s-4) var(--s-6); align-items:baseline; margin:var(--s-6) 0; }
+    .deflist dt { margin:0; }
+    .deflist dd { margin:0; color:var(--ink-2); max-width:72ch; min-width:0; overflow-wrap:anywhere; }
+    @media (max-width:560px){ .deflist{ grid-template-columns:1fr; gap:var(--s-2); } .deflist dd{ margin:0 0 var(--s-5); } }
+    /* ---- delta: direction glyph is AT-hidden; carry direction in the text (signed value) ---- */
+    .delta { font-family:var(--mono); font-size:var(--fs-sm); font-weight:700; font-variant-numeric:tabular-nums; }
+    .delta.good { color:var(--good); } .delta.bad { color:var(--crit); } .delta.flat { color:var(--muted); }
+    .delta.up::before { content:"▲ "; content:"▲ " / ""; }
+    .delta.down::before { content:"▼ "; content:"▼ " / ""; }
+    .delta.flat::before { content:"→ "; content:"→ " / ""; }
+    /* ---- opt-in button (prototype controls); never restyles bare <button> ---- */
+    .btn { font:inherit; padding:var(--s-2) var(--s-6); border:1px solid var(--accent-line); border-radius:var(--radius-sm); background:var(--accent-bg); color:var(--accent-2); font-weight:600; cursor:pointer; }
+    .btn:hover { background:var(--accent); color:#fff; }
+    /* print lives at the END of the later-injected constant so it wins every cascade tie */
+    @media print {
+      nav.toc, .read-map, #layout-audit { display: none; }
+      .railed { display: block; }
+      pre { background: var(--surface-2); color: var(--ink); border: 1px solid var(--line); }
+      section.section, table, figure, pre, .callout, .compare-before, .compare-after, .metric, .tile, .card, .keycard, .chip, .confidence, .timeline .event, details { break-inside: avoid; }
+      a[href^="http"]::after { content: " (" attr(href) ")"; font-size: .85em; color: var(--muted); }
+      .kind, .sev, .callout, .compare-before, .compare-after, .meta-ribbon, .needs-verification, .chip, .tile, .card, .keycard, .stripe, .confidence, .timeline .actor, .lead-summary, .spark, .bars, .progress, .delta { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      details:not([open])::details-content { content-visibility: visible; display: block; }
+    }
+  </style>
+
+</head>
+<body data-human-html-artifact="true">
+  <button class="theme-toggle" type="button" aria-label="Switch theme" title="Toggle light / dark"></button>
+
+  <main>
+<header><div class="meta-ribbon" data-meta-ribbon="true">Author: Codex · Owner: Rehan · Status: proposed · 2026-11-07 · SCT implementation</div><p class="eyebrow">SqueakyCleanText · Implementation proposal · 7 November 2026</p><h1>All ten improvements,<br>in reviewable stages</h1><p class="lede">SCT can gain broader processing tools while preserving how existing applications clean and protect text.</p><p>Prepared by Codex. Human review pending. Baseline: v0.8.3, commit <code>8afef61</code>. Implementation has not started.</p></header>
+<section id="lead-summary" data-owner="Codex" class="lead-summary" data-summary="true"><h2>The decision</h2><p>Codex recommends this sequence. Optional-provider compatibility remains uncertain until P0.</p><ul><li><strong>Recommendation:</strong> implement all ten through 17 separately reviewable changes.</li><li><strong>Start:</strong> capture compatibility evidence, then agree on one finding and detector contract.</li><li><strong>Default:</strong> existing processing stays unchanged. New behavior requires explicit configuration.</li><li><strong>Check before commitment:</strong> optional provider compatibility and routing benefits remain unproven. See <a href="#gates">acceptance gates</a>.</li></ul></section>
+<p class="read-map">Quick read: <a href="#lead-summary">recommendation</a> and <a href="#limits">limits</a>. Full read: <a href="#scope">coverage</a>, <a href="#order">dependencies</a>, then <a href="#handoff">task files</a>.</p><nav class="toc" aria-label="Contents"><a href="#scope">Ten improvements</a> · <a href="#order">Work order</a> · <a href="#gates">Acceptance gates</a> · <a href="#limits">Limits</a> · <a href="#handoff">Implementation files</a></nav>
+<section id="scope"><h2>What gets implemented</h2><p>Each row has an implementation owner and an acceptance requirement. Routing needs an experiment before any default change.</p><div class="table-scroll" tabindex="0" role="region" aria-label="Improvement coverage"><table><thead><tr><th>ID</th><th>Capability</th><th>Tasks</th><th>Release condition</th></tr></thead><tbody><tr><td>1</td><td>Finding, coordinate and policy contracts</td><td>C1, C2, C4</td><td>Opt-in capability; acceptance evidence required</td></tr><tr><td>2</td><td>Public detector protocol and registry</td><td>C2, C3</td><td>Opt-in capability; acceptance evidence required</td></tr><tr><td>3</td><td>Corpus deduplication and quality selection</td><td>D1, D2, D3</td><td>Opt-in capability; acceptance evidence required</td></tr><tr><td>4</td><td>Safe resume and private lineage</td><td>D2, D3</td><td>Opt-in capability; acceptance evidence required</td></tr><tr><td>5</td><td>Caller-declared field/schema context</td><td>C5</td><td>Opt-in capability; acceptance evidence required</td></tr><tr><td>6</td><td>Encrypted token-store reference</td><td>S1, S2</td><td>Opt-in capability; acceptance evidence required</td></tr><tr><td>7</td><td>Structure-preserving document extraction</td><td>E1</td><td>Opt-in capability; acceptance evidence required</td></tr><tr><td>8</td><td>Adaptive detector escalation</td><td>L2, L3</td><td>Experimental; measured promotion gate</td></tr><tr><td>9</td><td>Format-aware credential scanning</td><td>E2</td><td>Opt-in capability; acceptance evidence required</td></tr><tr><td>10</td><td>Language abstention and downstream policy</td><td>L1, L3</td><td>Opt-in capability; acceptance evidence required</td></tr></tbody></table></div></section>
+<section id="order"><h2>Work order</h2><ol><li><strong>Baseline:</strong> freeze current behavior and qualify optional dependencies (P0).</li><li><strong>Core:</strong> define findings and coordinates, expose detectors, apply policy once, then forward field context (C1-C5).</li><li><strong>Corpus and storage:</strong> implement selection, restartable jobs and encrypted token storage (D1-D3, S1-S2).</li><li><strong>Integrations and decisions:</strong> add document extraction, credential scanning, language abstention and routing evaluation (E1-E2, L1-L3).</li><li><strong>Combined acceptance:</strong> validate interactions and prepare reviewed release changes (R1).</li></ol><p>Corpus and storage can proceed independently after P0. Shared configuration and dependency files need serial integration.</p><details><summary>All 17 task dependencies</summary><div class="table-scroll" tabindex="0" role="region" aria-label="Task dependencies"><table><thead><tr><th>Task</th><th>Deliverable</th><th>Requires</th></tr></thead><tbody><tr><td>P0</td><td>Qualify dependencies and freeze compatibility evidence</td><td>None</td></tr><tr><td>C1</td><td>Add canonical findings and honest coordinate maps</td><td>P0</td></tr><tr><td>C2</td><td>Expose native regex and NER span analysis without replacement</td><td>C1</td></tr><tr><td>C3</td><td>Add explicit detector registration and worker-owned factories</td><td>C2</td></tr><tr><td>C4</td><td>Apply one unified policy and renderer across detector families</td><td>C3</td></tr><tr><td>C5</td><td>Carry caller schema through existing structured and framework adapters</td><td>C4</td></tr><tr><td>D1</td><td>Implement report-first quality selection and corpus duplicate decisions</td><td>P0</td></tr><tr><td>D2</td><td>Compose a complete DataTrove curation recipe with private run identity</td><td>D1</td></tr><tr><td>D3</td><td>Add safe resumption, failure quarantine and reference decontamination</td><td>D2</td></tr><tr><td>S1</td><td>Implement encrypted, scoped and expiring local token storage</td><td>P0</td></tr><tr><td>S2</td><td>Prove token-store concurrency, rotation and documented operational limits</td><td>S1</td></tr><tr><td>E1</td><td>Add offline structure-preserving Docling extraction and cleaning</td><td>C1, C4, C5, P0</td></tr><tr><td>E2</td><td>Add an optional format-aware credential detector</td><td>C3, C4, P0</td></tr><tr><td>L1</td><td>Add explicit low-confidence language abstention and fallback policy</td><td>P0</td></tr><tr><td>L2</td><td>Implement opt-in detector routing with safe fallback and trace identity</td><td>C3, C4, L1</td></tr><tr><td>L3</td><td>Calibrate, benchmark and gate adaptive promotion</td><td>L2</td></tr><tr><td>R1</td><td>Run cross-feature acceptance and prepare a reviewed staged release</td><td>C5, D3, S2, E1, E2, L3</td></tr></tbody></table></div></details><p>This is a scope plan, not a runtime or calendar estimate. Measure the first core change before committing to a delivery date.</p></section>
+<section id="gates"><h2>Acceptance gates</h2><ul><li><strong>Compatibility:</strong> current outputs, public imports, tuple results, batch order and replacement modes pass frozen checks.</li><li><strong>Privacy:</strong> default findings, errors, logs and manifests contain no raw sensitive values.</li><li><strong>Coordinates:</strong> Unicode and normalization tests distinguish exact, covering and unavailable source positions.</li><li><strong>Recovery:</strong> interrupted jobs replay safely; changed input or settings reject stale state.</li><li><strong>Integrations:</strong> real optional-provider smoke tests pass in project environments on supported Python versions.</li><li><strong>Routing:</strong> compare a fixed baseline on frozen data and hardware. Require fewer expensive calls, lower median latency and the declared no-added-exposure test before promotion.</li></ul><p>If routing fails its promotion gate, deliver the experimental implementation and the measured result. Keep always-run routing as the baseline.</p></section>
+<section id="limits" data-owner="Codex"><h2>Decisions that prevent misleading guarantees</h2><p>Codex proposes these limits. Exact source mapping remains uncertain for custom transforms.</p><ul><li>Arbitrary custom string transforms cannot always preserve exact original offsets. Mark unavailable mappings or reject them in strict mode.</li><li>PII-normalized deduplication can collapse different records. Default to reporting; require an explicit basis before removing output records.</li><li>Encrypted SQLite is a reference integration. Applications still own authorization, keys, backup retention and access control.</li><li>Expiry and logical deletion do not erase storage media, old backups or database journal files.</li><li>Document extraction protects cleaned text and structural output. It does not redact the original PDF or image.</li><li>Existing browser and bounded-streaming restrictions remain explicit. These features do not imply parity across every surface.</li></ul><h3>Release and rollback</h3><p>Merge opt-in milestones through reviewed PRs. Keep a legacy configuration for rollback. Publication and any default migration need a separate release decision.</p></section>
+<section id="handoff"><h2>Implementation files</h2><p><a href="../superpowers/plans/2026-11-07-sct-improvements.md">Master implementation plan</a> contains exact file paths, checks and handoff rules.</p><ul><li><a href="../superpowers/plans/2026-11-07-sct-improvements-core.md">Core task plan</a></li><li><a href="../superpowers/plans/2026-11-07-sct-improvements-corpus.md">Corpus task plan</a></li><li><a href="../superpowers/plans/2026-11-07-sct-improvements-token-store.md">Token Store task plan</a></li><li><a href="../superpowers/plans/2026-11-07-sct-improvements-adapters.md">Adapters task plan</a></li><li><a href="../superpowers/plans/2026-11-07-sct-improvements-decisions.md">Decisions task plan</a></li></ul><p><a href="../references/2026-11-07-sct-improvements-design.md">Shared interface specification</a> · <a href="2026-11-07-research-sct-pipeline-landscape-and-missing-capabilities.html">Research and source evidence</a></p><p>Recommended execution: a separate implementer and reviewer per workstream, with serial integration of shared interfaces. Review the plan before selecting an execution method.</p></section>
+<footer class="provenance" data-provenance="true"><p>Prepared by Codex from the current SCT source and the linked source-audited research. Rehan has not approved the proposed interfaces.</p><details><summary>Request and verification</summary><p>Request: “can all 10 improvements be implemeted can you plan that”</p><p>Planning checks cover feature coverage, dependency order, file paths and artifact layout. No production implementation, runtime benchmark or optional dependency qualification was performed for this plan.</p></details><script type="application/ld+json" id="provenance">{"@id": "sct-improvements-roadmap", "creator": "Codex", "dateCreated": "2026-11-07", "reviewer": "none; human review pending", "reviewState": "unreviewed", "author": "Codex", "owner": "Rehan", "status": "proposed", "created": "2026-11-07", "reviewed_by": [], "source": "SCT v0.8.3 source and linked research", "prompt": "Plan all ten improvements"}</script></footer>
+</main>
+<style>.table-scroll{overflow-x:auto;max-width:100%}td,th{vertical-align:top}code,a{overflow-wrap:anywhere}section{margin-bottom:36px}.toc a{display:inline-block;margin-bottom:8px}</style>
+</body></html>

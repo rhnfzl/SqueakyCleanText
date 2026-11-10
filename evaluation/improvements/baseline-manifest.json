@@ -1,0 +1,171 @@
+{
+  "source_identity": {
+    "git_revision": null,
+    "dirty_source": null,
+    "source_sha256": "5ead9e97e0c33997429761c48f0a2981d4655842cc2be9703a349e2d468735dc",
+    "declared_revision": "8afef61c74ea738a2c904374776dea34d9c1c39e"
+  },
+  "command": [
+    "measure_baseline.py"
+  ],
+  "measurement_environment": {
+    "OMP_NUM_THREADS": "2",
+    "OPENBLAS_NUM_THREADS": "2",
+    "HF_HUB_OFFLINE": "1",
+    "SCT_SOURCE_REVISION": "8afef61c74ea738a2c904374776dea34d9c1c39e"
+  },
+  "model": "protectai/bert-base-NER-onnx",
+  "revision": "84d28ab2bc28401b4353b26033eb043c8c8a0739",
+  "device": "cpu",
+  "sample_count": 3,
+  "runtime": {
+    "python": "3.14.4 (main, Apr  7 2026, 20:47:53) [Clang 22.1.1 ]",
+    "platform": "Linux-6.11.0-26-generic-x86_64-with-glibc2.39",
+    "providers": {
+      "onnxruntime": {
+        "version": "1.30.0",
+        "module_path": "/home/rehan/sct-improvements-20261107/.venv/lib/python3.14/site-packages/onnxruntime/__init__.py"
+      },
+      "tokenizers": {
+        "version": "0.23.2",
+        "module_path": "/home/rehan/sct-improvements-20261107/.venv/lib/python3.14/site-packages/tokenizers/__init__.py"
+      },
+      "numpy": {
+        "version": "2.5.3",
+        "module_path": "/home/rehan/sct-improvements-20261107/.venv/lib/python3.14/site-packages/numpy/__init__.py"
+      }
+    }
+  },
+  "sample_sha256": "f04652306e8932e9e63ebbd6b1c96e0318f9c9830a6197c24ae0470313881e4c",
+  "config_sha256": "4beac0ab60233b28f8cd17e742ceb2a455a1903a5ececab33f104e5f862ba1d6",
+  "true_positive": 4,
+  "predicted": 4,
+  "expected": 4,
+  "exact_span_precision": 1.0,
+  "exact_span_recall": 1.0,
+  "document_exposure": 0.0,
+  "median_ms": 13.182661961764097,
+  "p95_ms": 23.996270960196853,
+  "p95_method": "nearest rank; n=3",
+  "model_calls": 6,
+  "peak_rss_kib_linux": 618288,
+  "limits": "Three artificial English examples; not a representative quality or routing promotion gate.",
+  "baseline_reference": {
+    "git_revision": "8afef61c74ea738a2c904374776dea34d9c1c39e",
+    "verification": "Source content digest equals local git archive of this revision.",
+    "source_sha256": "5ead9e97e0c33997429761c48f0a2981d4655842cc2be9703a349e2d468735dc"
+  },
+  "schema_version": 1,
+  "qualification": [
+    {
+      "profile": "secrets",
+      "python": "3.12.3 (main, Aug 31 2026, 10:18:26) [GCC 13.3.0]",
+      "version": "1.0.0",
+      "module_path": "/home/rehan/sct-improvements-20261107/.venv-3.12-secrets/lib/python3.12/site-packages/datafog_core/__init__.py",
+      "python_matrix": "3.12",
+      "status": "passed",
+      "smoke_log_sha256": "247498f6827f4bf23527d2d7a3f483d558d3bdb8c5ee7e18b4464f357eb5b71d"
+    },
+    {
+      "profile": "documents",
+      "python": "3.12.3 (main, Aug 31 2026, 10:18:26) [GCC 13.3.0]",
+      "version": "2.148.0",
+      "module_path": "/home/rehan/sct-improvements-20261107/.venv-3.12-documents/lib/python3.12/site-packages/docling/__init__.py",
+      "python_matrix": "3.12",
+      "status": "passed",
+      "smoke_log_sha256": "56c096390b673e76ff7f829a7b92a579b7dca55700207189d0fabc203d0996c2"
+    },
+    {
+      "profile": "token-store",
+      "python": "3.12.3 (main, Aug 31 2026, 10:18:26) [GCC 13.3.0]",
+      "version": "48.0.1",
+      "module_path": "/home/rehan/sct-improvements-20261107/.venv-3.12-token-store/lib/python3.12/site-packages/cryptography/__init__.py",
+      "python_matrix": "3.12",
+      "status": "passed",
+      "smoke_log_sha256": "176e02da2fd0c973a7b0c01708f74b3492d12a65f10ccf4fad958f1780acc93b"
+    },
+    {
+      "profile": "corpus",
+      "python": "3.12.3 (main, Aug 31 2026, 10:18:26) [GCC 13.3.0]",
+      "version": "0.10.1",
+      "module_path": "/home/rehan/sct-improvements-20261107/.venv-3.12-corpus/lib/python3.12/site-packages/datatrove/__init__.py",
+      "python_matrix": "3.12",
+      "status": "passed",
+      "smoke_log_sha256": "e1bf10c8326790aec0165757b1e831b5a68f409a0cd85890739976cc178003f5"
+    },
+    {
+      "profile": "secrets",
+      "python": "3.13.3 (main, May 30 2025, 05:38:56) [Clang 20.1.4 ]",
+      "version": "1.0.0",
+      "module_path": "/home/rehan/sct-improvements-20261107/.venv-3.13-secrets/lib/python3.13/site-packages/datafog_core/__init__.py",
+      "python_matrix": "3.13",
+      "status": "passed",
+      "smoke_log_sha256": "03e94c27fdd1a71e764ed9bbe41b8defd2123cae06f314daf65ed12fcff6b80f"
+    },
+    {
+      "profile": "documents",
+      "python": "3.13.3 (main, May 30 2025, 05:38:56) [Clang 20.1.4 ]",
+      "version": "2.148.0",
+      "module_path": "/home/rehan/sct-improvements-20261107/.venv-3.13-documents/lib/python3.13/site-packages/docling/__init__.py",
+      "python_matrix": "3.13",
+      "status": "passed",
+      "smoke_log_sha256": "50f6279b581989536ec6037ad8e60c6979859c167fbcd35a466149a20f055a3f"
+    },
+    {
+      "profile": "token-store",
+      "python": "3.13.3 (main, May 30 2025, 05:38:56) [Clang 20.1.4 ]",
+      "version": "48.0.1",
+      "module_path": "/home/rehan/sct-improvements-20261107/.venv-3.13-token-store/lib/python3.13/site-packages/cryptography/__init__.py",
+      "python_matrix": "3.13",
+      "status": "passed",
+      "smoke_log_sha256": "4b5154888588b7b897992d747edb948759b4eda5552e4dff3d3ed91fdcff1d0a"
+    },
+    {
+      "profile": "corpus",
+      "python": "3.13.3 (main, May 30 2025, 05:38:56) [Clang 20.1.4 ]",
+      "version": "0.10.1",
+      "module_path": "/home/rehan/sct-improvements-20261107/.venv-3.13-corpus/lib/python3.13/site-packages/datatrove/__init__.py",
+      "python_matrix": "3.13",
+      "status": "passed",
+      "smoke_log_sha256": "cba648ff108112fe6ec7a667c0e26385524e95457e0b72c065e7cbb812ceaac4"
+    },
+    {
+      "profile": "secrets",
+      "python": "3.14.4 (main, Apr  7 2026, 20:47:53) [Clang 22.1.1 ]",
+      "version": "1.0.0",
+      "module_path": "/home/rehan/sct-improvements-20261107/.venv-3.14-secrets/lib/python3.14/site-packages/datafog_core/__init__.py",
+      "python_matrix": "3.14",
+      "status": "passed",
+      "smoke_log_sha256": "f78a9f5460a67f3eb9a1eadf2c5d49f7760763aaacfa2a5b968bab2b8b1850c5"
+    },
+    {
+      "profile": "documents",
+      "python": "3.14.4 (main, Apr  7 2026, 20:47:53) [Clang 22.1.1 ]",
+      "version": "2.148.0",
+      "module_path": "/home/rehan/sct-improvements-20261107/.venv-3.14-documents/lib/python3.14/site-packages/docling/__init__.py",
+      "python_matrix": "3.14",
+      "status": "passed",
+      "smoke_log_sha256": "5c8d040ca2748feb779df243e38e474f50165793fa5906a8e1b7f5c175eedff5"
+    },
+    {
+      "profile": "token-store",
+      "python": "3.14.4 (main, Apr  7 2026, 20:47:53) [Clang 22.1.1 ]",
+      "version": "48.0.1",
+      "module_path": "/home/rehan/sct-improvements-20261107/.venv-3.14-token-store/lib/python3.14/site-packages/cryptography/__init__.py",
+      "python_matrix": "3.14",
+      "status": "passed",
+      "smoke_log_sha256": "957fa58106088fc221b03a4dc1bb01394e856f9ecc0c820c5734c75170671619"
+    },
+    {
+      "profile": "corpus",
+      "python": "3.14.4 (main, Apr  7 2026, 20:47:53) [Clang 22.1.1 ]",
+      "version": "0.10.1",
+      "module_path": "/home/rehan/sct-improvements-20261107/.venv-3.14-corpus/lib/python3.14/site-packages/datatrove/__init__.py",
+      "python_matrix": "3.14",
+      "status": "passed",
+      "smoke_log_sha256": "8fd96bda6278bc1b0392e28583d9a1a6cb7264206ba83f61a80400464582cad2"
+    }
+  ],
+  "scope": "Three artificial English NER examples; provider smoke matrix checks offline Markdown, not PDF models",
+  "compatibility_fixture_sha256": "b61bca1a2ebf59a037b0137c30a80345ec7751521d0ebce8d370e773430c80df"
+}

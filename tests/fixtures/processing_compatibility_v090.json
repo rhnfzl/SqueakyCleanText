@@ -1,0 +1,77 @@
+{
+  "baseline_commit": "882342fd08c03718d21d22278814cfbfe4b883f3",
+  "baseline_version": "0.9.0",
+  "cases": [
+    {
+      "id": "default_contacts",
+      "input": "Mail ada@example.com on 2023-10-01.",
+      "output": [
+        "Mail <EMAIL> on <DATE>.",
+        null
+      ]
+    },
+    {
+      "id": "training_contacts",
+      "preset": "training",
+      "input": "Mail ada@example.com on 2023-10-01.",
+      "output": [
+        "Mail <EMAIL> on 2023-10-01.",
+        null
+      ]
+    },
+    {
+      "id": "synthetic_contacts",
+      "mode": "synthetic",
+      "input": "Mail ada@example.com on 2023-10-01.",
+      "output": [
+        "Mail carrollmichael@example.net on <DATE>.",
+        null
+      ]
+    },
+    {
+      "id": "reversible_contacts",
+      "mode": "reversible",
+      "input": "Mail ada@example.com on 2023-10-01.",
+      "output": [
+        "Mail <EMAIL_0> on <DATE_0>.",
+        null
+      ],
+      "restored": "Mail ada@example.com on 2023-10-01."
+    },
+    {
+      "id": "reversible_source_marker",
+      "mode": "reversible",
+      "input": "<EMAIL_0> ada@example.com",
+      "output": [
+        "<EMAIL_0> <EMAIL_1>",
+        null
+      ],
+      "restored": "<EMAIL_0> ada@example.com"
+    },
+    {
+      "id": "placeholder_source_marker",
+      "input": "<EMAIL_0> ada@example.com",
+      "output": [
+        "<EMAIL_0> <EMAIL>",
+        null
+      ]
+    },
+    {
+      "id": "blank",
+      "input": "",
+      "output": [
+        "",
+        ""
+      ]
+    },
+    {
+      "id": "custom_step",
+      "input": "Hello World",
+      "custom_step": true,
+      "output": [
+        "[CUSTOM] Hello World",
+        null
+      ]
+    }
+  ]
+}
