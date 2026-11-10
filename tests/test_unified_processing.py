@@ -494,3 +494,44 @@ def test_buffered_unified_streaming_keeps_supported_strict_mapping():
     stream.feed('example.com')
     assert stream.finish() == '<EMAIL>'
     assert cleaner.process('a@example.com').metadata['findings_v2'][0]['mapping_quality'] == 'exact'
+
+
+def test_private_document_renderer_exposes_value_free_output_associations():
+    text = '😀 Alice\nExample a@example.com'
+    cleaner = TextCleaner(config(detector_specs=(DetectorSpec('test'),)),
+        detector_registry=provider([('PERSON', 2, 15, .9)]))
+    document = cleaner._process_unified_document(text)
+    assert hasattr(document, 'rendered_edits'), 'private renderer associations are missing'
+    edit = document.rendered_edits[0]
+    assert document.result.lm_text[edit.start:edit.end] == '<PERSON>'
+    assert edit.source_projection.ranges[0].start == 2
+    assert edit.source_projection.ranges[0].end == 15
+    assert edit.source_projection.mapping_quality == 'exact'
+    assert edit.action == 'use_mode'
+    assert 'Alice' not in repr(document) + repr(edit)
+    assert 'rendered_edits' not in document.result.metadata
+
+
+def test_private_render_association_distinguishes_local_and_broad_covering():
+    local = TextCleaner(config(check_normalize_whitespace=True, detector_specs=(DetectorSpec('test'),)),
+        detector_registry=provider([('PERSON', 0, 13, .9)]))
+    document = local._process_unified_document('Alice\nExample')
+    edit = document.rendered_edits[0]
+    assert edit.source_projection.mapping_quality == 'covering'
+    assert edit.source_isolated
+    broad = TextCleaner(config(check_remove_emoji=True, detector_specs=(DetectorSpec('test'),)),
+        detector_registry=provider([('PERSON', 0, 5, .9)]))
+    document = broad._process_unified_document('Alice😀 tail')
+    edit = document.rendered_edits[0]
+    assert edit.source_projection.mapping_quality == 'covering'
+    assert not edit.source_isolated
+
+
+def test_private_render_isolation_preserves_disjoint_source_cover():
+    cleaner = TextCleaner(config(check_replace_html=True, replace_with_html='', check_normalize_whitespace=True,
+        detector_specs=(DetectorSpec('test'),)), detector_registry=provider([('PERSON', 2, 15, .9)]))
+    document = cleaner._process_unified_document('😀 Alice\n<b>Example</b>')
+    edit = document.rendered_edits[0]
+    assert edit.source_projection.mapping_quality == 'covering'
+    assert [(r.start, r.end) for r in edit.source_projection.ranges] == [(2, 8), (11, 18)]
+    assert edit.source_isolated

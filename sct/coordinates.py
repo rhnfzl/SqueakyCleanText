@@ -20,9 +20,10 @@ class Projection:
 class SourceMap:
     """Immutable edit history; private text is excluded from default output."""
 
-    __slots__ = ("_text", "_origins")
+    __slots__ = ("_text", "_origins", "_isolation_monotone")
     _text: str
     _origins: tuple[Projection, ...]
+    _isolation_monotone: bool | None
 
     def __init__(self, text: str, origins: tuple[Projection, ...]) -> None:
         if not isinstance(text, str) or len(text) != len(origins):
@@ -31,6 +32,7 @@ class SourceMap:
             raise ValueError("Provenance must be an immutable tuple of projections")
         object.__setattr__(self, "_text", text)
         object.__setattr__(self, "_origins", origins)
+        object.__setattr__(self, "_isolation_monotone", None)
 
     def __setattr__(self, name: str, value: object) -> None:
         raise AttributeError("SourceMap is immutable")
@@ -62,6 +64,27 @@ class SourceMap:
                 merged.append(item)
         quality: MappingQuality = "exact" if all(origin.mapping_quality == "exact" for origin in origins) else "covering"
         return Projection(tuple(merged), quality)
+
+    def _is_isolated(self, start: int, end: int) -> bool:
+        """Check source-cover isolation with one cached linear proof and constant-time queries."""
+        self._validate(start, end)
+        if self._isolation_monotone is None:
+            previous_start = previous_end = 0
+            monotone = True
+            for origin in self._origins:
+                if (origin.mapping_quality == "unavailable" or origin.ranges[0].start < previous_start
+                        or origin.ranges[-1].end < previous_end):
+                    monotone = False
+                    break
+                previous_start, previous_end = origin.ranges[0].start, origin.ranges[-1].end
+            object.__setattr__(self, "_isolation_monotone", monotone)
+        if not self._isolation_monotone:
+            return False
+        # Monotone covers bound every earlier/later origin, including disjoint source ranges.
+        first = self._origins[start].ranges[0].start
+        last = self._origins[end - 1].ranges[-1].end
+        return ((start == 0 or self._origins[start - 1].ranges[-1].end <= first)
+                and (end == len(self._origins) or self._origins[end].ranges[0].start >= last))
 
     def replace(self, start: int, end: int, replacement: str) -> SourceMap:
         self._validate(start, end, empty=True)

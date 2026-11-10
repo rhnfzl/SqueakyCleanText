@@ -1,0 +1,333 @@
+{
+  "schema_version": 1,
+  "scope": "Corrected frozen E1 English CPU document extraction, synthetic three-page PDF and private cross-element projection; final integrated acceptance pending",
+  "commit": "76f43a0c4bc7de03e8f6687633d48474cdcb4edc",
+  "changed_source_sha256": {
+    "sct/documents.py": "1250c8d780deb4e147767e630296d17bb84b1835fa565f9f9bcf37eeaa119c5a",
+    "sct/coordinates.py": "33d8b74559945bd8a12bd765b8313b4364a01ceb11460dfc4422e493846b7e72",
+    "sct/unified.py": "b9174f09e0b8937c07993af809fe5b170a42a2248a14e230c04b8422b56eb0e5",
+    "sct/__init__.py": "7f9edea4172762cc48f2897465742c2f5d9c46ebe87d8973f7dc857afca939b9",
+    "sct/integrations/docling.py": "6d1d26bf2fe3b2216261c2270ec2d67db6f5143c9d648d28effce3f1b31458d5",
+    "tests/test_coordinates.py": "3ff626e3297d5d1e13f28a3091cdea81d9d413d9b06f1bdc0c7952251d9f6524",
+    "tests/test_unified_processing.py": "a23cf60cc6c480bacaeecd47f3030c4333c84bf280e803a3515f0341bdbc976a",
+    "tests/test_docling_integration.py": "8f64cde5978ee48d4fdaca7fe80b633f0f4f8852eac374ecf5c564f7808db541",
+    "tests/fixtures/documents/pii-layout.pdf": "1816f4cc4e587ff08d7c5b7408cf9e21070f54276f3b3246d0b4d12ab3feb482",
+    "docs/DOCUMENTS.md": "bc4bcf3440148444f4e05560de70b24631c136238af6ec748ace1f86bd32756b",
+    "docs/INTEGRATIONS.md": "cfffaaeeb0f19d624fd1f3dcb21ac2a58e31dc621c0816a82898a7b8fc1aa57a",
+    "README.md": "d86f3ba0f9c8316962749a2a0f29597b73dfe516cac2341bb5e186e64f206b47",
+    "llms.txt": "700158329341d4b4bfa3460ccd257481c4ad92df0e458583dc5c3ef0b6a13d29",
+    "mkdocs.yml": "08b51c67653f45f6117955ac14622f6f4672a9a1435c49657ad004b791ab60b1",
+    ".coveragerc-documents": "e2ec4c4ea39b780f5f464ef5ac707b44227a9fa371158785c37f5d61d2e1b869",
+    ".coveragerc-integrations": "41f787687bbf163ceee9713c08ab52f4e872d518b61b860655521924234059b2",
+    ".github/workflows/optional-backends.yml": "81724699fec091477753207f40ec77b1bd84978ce859a2a0571051306345b442"
+  },
+  "commit_verification": "All 17 changed committed blobs match independently reviewed hashes; each native run binds the listed eight executable/core/test/fixture sources, not all 17 paths.",
+  "runs": [
+    {
+      "runtime": {
+        "executable": "/home/rehan/sct-improvements-e1-20261107/.venv-3.12-documents/bin/python",
+        "modules": {
+          "docling.datamodel.pipeline_options": {
+            "file": "/home/rehan/sct-improvements-e1-20261107/.venv-3.12-documents/lib/python3.12/site-packages/docling/datamodel/pipeline_options.py",
+            "sha256": "be4c4c16392e9395e0132de92de0fb19a618e8601d2882b26938b251fd62289f",
+            "version": "2.148.0"
+          },
+          "docling.document_converter": {
+            "file": "/home/rehan/sct-improvements-e1-20261107/.venv-3.12-documents/lib/python3.12/site-packages/docling/document_converter.py",
+            "sha256": "961374a1877313c5896c397efc88865f8d8c9e7a0840c76492bc520f3625fa2d",
+            "version": "2.148.0"
+          },
+          "docling.models.stages.ocr.rapid_ocr_model": {
+            "file": "/home/rehan/sct-improvements-e1-20261107/.venv-3.12-documents/lib/python3.12/site-packages/docling/models/stages/ocr/rapid_ocr_model.py",
+            "sha256": "9b032620f7dddd6ead14f3de478a1ed53ab93b61570cb05af4dc79fd83a44d73",
+            "version": "2.148.0"
+          },
+          "docling_core": {
+            "file": "/home/rehan/sct-improvements-e1-20261107/.venv-3.12-documents/lib/python3.12/site-packages/docling_core/__init__.py",
+            "sha256": "c1dea7ee1f34fdbd8589725734db3c76ee219f1e3290740be258445c13362951",
+            "version": "2.106.0"
+          },
+          "docling_ibm_models": {
+            "file": "/home/rehan/sct-improvements-e1-20261107/.venv-3.12-documents/lib/python3.12/site-packages/docling_ibm_models/__init__.py",
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "version": "4.0.4"
+          },
+          "numpy": {
+            "file": "/home/rehan/sct-improvements-e1-20261107/.venv-3.12-documents/lib/python3.12/site-packages/numpy/__init__.py",
+            "sha256": "09295a80660f17925ae23765ce8cbd7ff7ceae968d5f2f89349f1cb74c0b9e11",
+            "version": "2.5.3"
+          },
+          "onnxruntime": {
+            "file": "/home/rehan/sct-improvements-e1-20261107/.venv-3.12-documents/lib/python3.12/site-packages/onnxruntime/__init__.py",
+            "sha256": "c238c7f2c3660ad216cfe3f794f65adf81a08c99be0f7c8d854f1e4cab076d07",
+            "version": "1.30.0"
+          },
+          "rapidocr": {
+            "file": "/home/rehan/sct-improvements-e1-20261107/.venv-3.12-documents/lib/python3.12/site-packages/rapidocr/__init__.py",
+            "sha256": "4b018fa0a163353d7da9a18b7d0115675514368d1f7998aaf414e0e2daa92feb",
+            "version": "3.10.0"
+          },
+          "torch": {
+            "file": "/home/rehan/sct-improvements-e1-20261107/.venv-3.12-documents/lib/python3.12/site-packages/torch/__init__.py",
+            "sha256": "bd4a10ff16357ed78f45aaf4b46ce5b771fdc0e8549402206e324d0eb792c672",
+            "version": "2.14.0"
+          }
+        },
+        "prefix": "/home/rehan/sct-improvements-e1-20261107/.venv-3.12-documents",
+        "python": "3.12.3 (main, Aug 31 2026, 10:18:26) [GCC 13.3.0]",
+        "source_sha256": {
+          "sct/coordinates.py": "33d8b74559945bd8a12bd765b8313b4364a01ceb11460dfc4422e493846b7e72",
+          "sct/documents.py": "1250c8d780deb4e147767e630296d17bb84b1835fa565f9f9bcf37eeaa119c5a",
+          "sct/integrations/docling.py": "6d1d26bf2fe3b2216261c2270ec2d67db6f5143c9d648d28effce3f1b31458d5",
+          "sct/unified.py": "b9174f09e0b8937c07993af809fe5b170a42a2248a14e230c04b8422b56eb0e5",
+          "tests/fixtures/documents/pii-layout.pdf": "1816f4cc4e587ff08d7c5b7408cf9e21070f54276f3b3246d0b4d12ab3feb482",
+          "tests/test_coordinates.py": "3ff626e3297d5d1e13f28a3091cdea81d9d413d9b06f1bdc0c7952251d9f6524",
+          "tests/test_docling_integration.py": "8f64cde5978ee48d4fdaca7fe80b633f0f4f8852eac374ecf5c564f7808db541",
+          "tests/test_unified_processing.py": "a23cf60cc6c480bacaeecd47f3030c4333c84bf280e803a3515f0341bdbc976a"
+        }
+      },
+      "passed": 122,
+      "warnings": 12,
+      "docling_module_coverage": {
+        "covered": 102,
+        "statements": 115,
+        "percent": 88.7,
+        "minimum": 85
+      },
+      "runtime_evidence_sha256": "8b5a37a771f397b9bdc8f978af12ad71806aa20560435c4cbfe9f594f5524790",
+      "log_sha256": "fd1859140a00bb649d1ed1146e88c0bc8e39bc9458232e427c5103684c720f09"
+    },
+    {
+      "runtime": {
+        "executable": "/home/rehan/sct-improvements-e1-20261107/.venv-3.13-documents/bin/python",
+        "modules": {
+          "docling.datamodel.pipeline_options": {
+            "file": "/home/rehan/sct-improvements-e1-20261107/.venv-3.13-documents/lib/python3.13/site-packages/docling/datamodel/pipeline_options.py",
+            "sha256": "be4c4c16392e9395e0132de92de0fb19a618e8601d2882b26938b251fd62289f",
+            "version": "2.148.0"
+          },
+          "docling.document_converter": {
+            "file": "/home/rehan/sct-improvements-e1-20261107/.venv-3.13-documents/lib/python3.13/site-packages/docling/document_converter.py",
+            "sha256": "961374a1877313c5896c397efc88865f8d8c9e7a0840c76492bc520f3625fa2d",
+            "version": "2.148.0"
+          },
+          "docling.models.stages.ocr.rapid_ocr_model": {
+            "file": "/home/rehan/sct-improvements-e1-20261107/.venv-3.13-documents/lib/python3.13/site-packages/docling/models/stages/ocr/rapid_ocr_model.py",
+            "sha256": "9b032620f7dddd6ead14f3de478a1ed53ab93b61570cb05af4dc79fd83a44d73",
+            "version": "2.148.0"
+          },
+          "docling_core": {
+            "file": "/home/rehan/sct-improvements-e1-20261107/.venv-3.13-documents/lib/python3.13/site-packages/docling_core/__init__.py",
+            "sha256": "c1dea7ee1f34fdbd8589725734db3c76ee219f1e3290740be258445c13362951",
+            "version": "2.106.0"
+          },
+          "docling_ibm_models": {
+            "file": "/home/rehan/sct-improvements-e1-20261107/.venv-3.13-documents/lib/python3.13/site-packages/docling_ibm_models/__init__.py",
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "version": "4.0.4"
+          },
+          "numpy": {
+            "file": "/home/rehan/sct-improvements-e1-20261107/.venv-3.13-documents/lib/python3.13/site-packages/numpy/__init__.py",
+            "sha256": "09295a80660f17925ae23765ce8cbd7ff7ceae968d5f2f89349f1cb74c0b9e11",
+            "version": "2.5.3"
+          },
+          "onnxruntime": {
+            "file": "/home/rehan/sct-improvements-e1-20261107/.venv-3.13-documents/lib/python3.13/site-packages/onnxruntime/__init__.py",
+            "sha256": "c238c7f2c3660ad216cfe3f794f65adf81a08c99be0f7c8d854f1e4cab076d07",
+            "version": "1.30.0"
+          },
+          "rapidocr": {
+            "file": "/home/rehan/sct-improvements-e1-20261107/.venv-3.13-documents/lib/python3.13/site-packages/rapidocr/__init__.py",
+            "sha256": "4b018fa0a163353d7da9a18b7d0115675514368d1f7998aaf414e0e2daa92feb",
+            "version": "3.10.0"
+          },
+          "torch": {
+            "file": "/home/rehan/sct-improvements-e1-20261107/.venv-3.13-documents/lib/python3.13/site-packages/torch/__init__.py",
+            "sha256": "bd4a10ff16357ed78f45aaf4b46ce5b771fdc0e8549402206e324d0eb792c672",
+            "version": "2.14.0"
+          }
+        },
+        "prefix": "/home/rehan/sct-improvements-e1-20261107/.venv-3.13-documents",
+        "python": "3.13.3 (main, May 30 2025, 05:38:56) [Clang 20.1.4 ]",
+        "source_sha256": {
+          "sct/coordinates.py": "33d8b74559945bd8a12bd765b8313b4364a01ceb11460dfc4422e493846b7e72",
+          "sct/documents.py": "1250c8d780deb4e147767e630296d17bb84b1835fa565f9f9bcf37eeaa119c5a",
+          "sct/integrations/docling.py": "6d1d26bf2fe3b2216261c2270ec2d67db6f5143c9d648d28effce3f1b31458d5",
+          "sct/unified.py": "b9174f09e0b8937c07993af809fe5b170a42a2248a14e230c04b8422b56eb0e5",
+          "tests/fixtures/documents/pii-layout.pdf": "1816f4cc4e587ff08d7c5b7408cf9e21070f54276f3b3246d0b4d12ab3feb482",
+          "tests/test_coordinates.py": "3ff626e3297d5d1e13f28a3091cdea81d9d413d9b06f1bdc0c7952251d9f6524",
+          "tests/test_docling_integration.py": "8f64cde5978ee48d4fdaca7fe80b633f0f4f8852eac374ecf5c564f7808db541",
+          "tests/test_unified_processing.py": "a23cf60cc6c480bacaeecd47f3030c4333c84bf280e803a3515f0341bdbc976a"
+        }
+      },
+      "passed": 122,
+      "warnings": 12,
+      "docling_module_coverage": {
+        "covered": 102,
+        "statements": 115,
+        "percent": 88.7,
+        "minimum": 85
+      },
+      "runtime_evidence_sha256": "3c9d06da17aad9bf23ea8deebb028453e3b4b2f6e1ba37be57ee8cb7668cb137",
+      "log_sha256": "4e476793da8e9980ba62827ea23892b6ad84ec9e493fd05e716811557875dc16"
+    },
+    {
+      "runtime": {
+        "executable": "/home/rehan/sct-improvements-e1-20261107/.venv/bin/python",
+        "modules": {
+          "docling.datamodel.pipeline_options": {
+            "file": "/home/rehan/sct-improvements-e1-20261107/.venv/lib/python3.14/site-packages/docling/datamodel/pipeline_options.py",
+            "sha256": "be4c4c16392e9395e0132de92de0fb19a618e8601d2882b26938b251fd62289f",
+            "version": "2.148.0"
+          },
+          "docling.document_converter": {
+            "file": "/home/rehan/sct-improvements-e1-20261107/.venv/lib/python3.14/site-packages/docling/document_converter.py",
+            "sha256": "961374a1877313c5896c397efc88865f8d8c9e7a0840c76492bc520f3625fa2d",
+            "version": "2.148.0"
+          },
+          "docling.models.stages.ocr.rapid_ocr_model": {
+            "file": "/home/rehan/sct-improvements-e1-20261107/.venv/lib/python3.14/site-packages/docling/models/stages/ocr/rapid_ocr_model.py",
+            "sha256": "9b032620f7dddd6ead14f3de478a1ed53ab93b61570cb05af4dc79fd83a44d73",
+            "version": "2.148.0"
+          },
+          "docling_core": {
+            "file": "/home/rehan/sct-improvements-e1-20261107/.venv/lib/python3.14/site-packages/docling_core/__init__.py",
+            "sha256": "c1dea7ee1f34fdbd8589725734db3c76ee219f1e3290740be258445c13362951",
+            "version": "2.106.0"
+          },
+          "docling_ibm_models": {
+            "file": "/home/rehan/sct-improvements-e1-20261107/.venv/lib/python3.14/site-packages/docling_ibm_models/__init__.py",
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "version": "4.0.4"
+          },
+          "numpy": {
+            "file": "/home/rehan/sct-improvements-e1-20261107/.venv/lib/python3.14/site-packages/numpy/__init__.py",
+            "sha256": "09295a80660f17925ae23765ce8cbd7ff7ceae968d5f2f89349f1cb74c0b9e11",
+            "version": "2.5.3"
+          },
+          "onnxruntime": {
+            "file": "/home/rehan/sct-improvements-e1-20261107/.venv/lib/python3.14/site-packages/onnxruntime/__init__.py",
+            "sha256": "c238c7f2c3660ad216cfe3f794f65adf81a08c99be0f7c8d854f1e4cab076d07",
+            "version": "1.30.0"
+          },
+          "rapidocr": {
+            "file": "/home/rehan/sct-improvements-e1-20261107/.venv/lib/python3.14/site-packages/rapidocr/__init__.py",
+            "sha256": "4b018fa0a163353d7da9a18b7d0115675514368d1f7998aaf414e0e2daa92feb",
+            "version": "3.10.0"
+          },
+          "torch": {
+            "file": "/home/rehan/sct-improvements-e1-20261107/.venv/lib/python3.14/site-packages/torch/__init__.py",
+            "sha256": "bd4a10ff16357ed78f45aaf4b46ce5b771fdc0e8549402206e324d0eb792c672",
+            "version": "2.14.0"
+          }
+        },
+        "prefix": "/home/rehan/sct-improvements-e1-20261107/.venv",
+        "python": "3.14.4 (main, Apr  7 2026, 20:47:53) [Clang 22.1.1 ]",
+        "source_sha256": {
+          "sct/coordinates.py": "33d8b74559945bd8a12bd765b8313b4364a01ceb11460dfc4422e493846b7e72",
+          "sct/documents.py": "1250c8d780deb4e147767e630296d17bb84b1835fa565f9f9bcf37eeaa119c5a",
+          "sct/integrations/docling.py": "6d1d26bf2fe3b2216261c2270ec2d67db6f5143c9d648d28effce3f1b31458d5",
+          "sct/unified.py": "b9174f09e0b8937c07993af809fe5b170a42a2248a14e230c04b8422b56eb0e5",
+          "tests/fixtures/documents/pii-layout.pdf": "1816f4cc4e587ff08d7c5b7408cf9e21070f54276f3b3246d0b4d12ab3feb482",
+          "tests/test_coordinates.py": "3ff626e3297d5d1e13f28a3091cdea81d9d413d9b06f1bdc0c7952251d9f6524",
+          "tests/test_docling_integration.py": "8f64cde5978ee48d4fdaca7fe80b633f0f4f8852eac374ecf5c564f7808db541",
+          "tests/test_unified_processing.py": "a23cf60cc6c480bacaeecd47f3030c4333c84bf280e803a3515f0341bdbc976a"
+        }
+      },
+      "passed": 122,
+      "warnings": 12,
+      "docling_module_coverage": {
+        "covered": 102,
+        "statements": 115,
+        "percent": 88.7,
+        "minimum": 85
+      },
+      "runtime_evidence_sha256": "0abb7ad445a4a0de7f84dc235a262570619f9abd284eff76c90ae8a9e95b0466",
+      "log_sha256": "6561fcb9f22c7cba006b943a3b5adbf23dba608467847372f976ec5ef9c6004d"
+    }
+  ],
+  "assets_manifest": "e1-artifact-manifest.json",
+  "fixture_visual_review": {
+    "schema_version": 1,
+    "fixture": "tests/fixtures/documents/pii-layout.pdf",
+    "fixture_sha256": "1816f4cc4e587ff08d7c5b7408cf9e21070f54276f3b3246d0b4d12ab3feb482",
+    "page_count": 3,
+    "render_command": "pdftoppm -r 100 -png tests/fixtures/documents/pii-layout.pdf /private/tmp/sct-e1-pdf-review/page",
+    "renderer": "System Poppler, paths observed before use",
+    "rendered_pages": [
+      {
+        "path": "/private/tmp/sct-e1-pdf-review/page-1.png",
+        "sha256": "93477c25ac6cea3230f468bfcde6d5cee8f6e8310927cbb9d185a62b8e3b938b"
+      },
+      {
+        "path": "/private/tmp/sct-e1-pdf-review/page-2.png",
+        "sha256": "bc52f69f463c724b6aa9abdb2908d04492001720e5c9934f12316b2a1a4a4323"
+      },
+      {
+        "path": "/private/tmp/sct-e1-pdf-review/page-3.png",
+        "sha256": "7981eb693b99c15898bf4d82a75d810fc0488e117634174c777b0c1c29a2d2c7"
+      }
+    ],
+    "visual_observation": "All3pages inspected. Text/table/raster clear with no clipping; synthetic names cross element/page boundaries.",
+    "limits": [
+      "Rendering does not prove OCR or extraction; real installed Docling tests remain separate.",
+      "Read-only fixture inspection; no PDF source changes."
+    ]
+  },
+  "offline_controls": {
+    "network_attempts_after_explicit_asset_setup": 0,
+    "ocr_disabled_control": "Raster-only email absent; OCR-enabled extraction finds it",
+    "fresh_imports_log_sha256": "ba263d42660ca2025f89244ae910b0ebcc4afb095f53910eed565dd8f837d7c8"
+  },
+  "full_local": {
+    "passed": 3071,
+    "skipped": 28,
+    "failed_sandbox_stdout": 2,
+    "warnings": 96,
+    "coverage_percent": 94.37,
+    "covered": 6754,
+    "statements": 7157,
+    "prior_same_profile_percent": 95.31,
+    "delta_percentage_points": -0.94,
+    "minimum": 85,
+    "log_sha256": "f77aad1a79fd4775e514ac105ce99046f1c2022cd6081cf09423ac9ea120feb6",
+    "stdout_outside_sandbox": {
+      "source_commit": "76f43a0c4bc7de03e8f6687633d48474cdcb4edc",
+      "execution": "authorized bounded outside-sandbox rerun",
+      "command": "HF_HUB_OFFLINE=1 PYTEST_XDIST_AUTO_NUM_WORKERS=4 .venv/bin/python -m pytest tests/test_atomic_file.py::test_dev_stdout_redirected_to_a_file_is_written_through tests/test_atomic_file.py::test_dev_stdout_piped_is_written_through -q",
+      "exit_code": 0,
+      "passed": 2,
+      "duration_seconds": 0.24
+    }
+  },
+  "review": {
+    "result": "Approved after two Important corrections; corrected native/full gates reconciled by root",
+    "retained_minor": "Pinned Docling furniture API emits six deprecation warnings. No warnings suppressed.",
+    "warning_scope": "Native 12 warnings: six SDK/dependency warnings and six adapter furniture deprecations. Full core 96 existing corpus fork/legacy configuration warnings."
+  },
+  "evidence_bundle_sha256": {
+    "E1-report.md": "001e3e54df784df9ae74a7969775cc8b8f72a475d2f84c37631e95fcc40febde",
+    "artifacts/sct-artifacts.json": "1646d90fe991f5c767412e371d0d190da8c9f30eef2baa97b9dfbf3a719994a3",
+    "corrected-evidence.sha256": "227fd8d638674f7b24579e75b57be3a4ceb7f1c3de2e008428610c03be82451d",
+    "corrected-fresh-imports.log": "ba263d42660ca2025f89244ae910b0ebcc4afb095f53910eed565dd8f837d7c8",
+    "corrected-native-3.12.log": "fd1859140a00bb649d1ed1146e88c0bc8e39bc9458232e427c5103684c720f09",
+    "corrected-native-3.13.log": "4e476793da8e9980ba62827ea23892b6ad84ec9e493fd05e716811557875dc16",
+    "corrected-native-3.14.log": "6561fcb9f22c7cba006b943a3b5adbf23dba608467847372f976ec5ef9c6004d",
+    "corrected-runtime-3.12.json": "8b5a37a771f397b9bdc8f978af12ad71806aa20560435c4cbfe9f594f5524790",
+    "corrected-runtime-3.13.json": "3c9d06da17aad9bf23ea8deebb028453e3b4b2f6e1ba37be57ee8cb7668cb137",
+    "corrected-runtime-3.14.json": "0abb7ad445a4a0de7f84dc235a262570619f9abd284eff76c90ae8a9e95b0466",
+    "coverage-baseline-isolated-control.log": "ebf01676462ce77b13ba420ce8fbb0a81bd7ff8df62e04c46a95aea555b84ce8",
+    "coverage-existing-module-control.log": "63c8863594a2a32d1c92808c64877ed1861a761a1cb29e82ca7bd8c8479765f1",
+    "coverage-package-import-setup.log": "63c8863594a2a32d1c92808c64877ed1861a761a1cb29e82ca7bd8c8479765f1",
+    "frozen-source.sha256": "4c2c258660dee7e7eac62bdea166144ce86f7f7b8d561a6a3182253d725a53c1",
+    "full-local.log": "f77aad1a79fd4775e514ac105ce99046f1c2022cd6081cf09423ac9ea120feb6",
+    "source-commit.txt": "132d902e6d74e8c4e16254a251d8bb132353285916da6e0cbb3f6aa52f6b9c8f",
+    "stdout-rerun-result.json": "1f11400269952bedc98397bb15adfd6ca7f83b9af217e995bd695c7b7e465a5e"
+  },
+  "limits": [
+    "English CPU synthetic fixture qualification does not establish general OCR quality.",
+    "Original PDF and other binary files remain unredacted.",
+    "Ambiguous broad, opaque or nonmonotone cross-element projections fail explicitly.",
+    "The separate generic-adapter scope retains its 85% threshold; Docling has a required whole-module 85% gate on all three supported Python profiles."
+  ]
+}

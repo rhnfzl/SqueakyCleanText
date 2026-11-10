@@ -78,3 +78,24 @@ def test_invalid_transform_and_replacement_fail():
         mapping.transform(lambda text: None)
     with pytest.raises(ValueError):
         mapping.replace(0, 1, None)
+
+
+def test_private_isolation_accepts_local_cover_and_rejects_shared_stage_cover():
+    local = SourceMap.identity('😀Alice\nExample tail').replace(6, 7, ' ')
+    assert local.project(1, 14).mapping_quality == 'covering'
+    assert local._is_isolated(1, 14)
+    broad = SourceMap.identity('😀Alice tail').replace(0, 11, 'Alice tail')
+    assert broad.project(0, 5).mapping_quality == 'covering'
+    assert not broad._is_isolated(0, 5)
+    assert broad._is_isolated(0, 10)
+
+
+def test_private_isolation_rejects_opaque_and_nonmonotone_maps():
+    from sct.coordinates import Projection
+    from sct.findings import TextRange
+    opaque = SourceMap.identity('ab').transform(str.lower)
+    assert not opaque._is_isolated(0, 1)
+    nonmonotone = SourceMap('ab', (Projection((TextRange(1, 2),), 'covering'),
+                                  Projection((TextRange(0, 1),), 'covering')))
+    assert not nonmonotone._is_isolated(0, 1)
+    assert nonmonotone.project(0, 1).mapping_quality == 'covering'

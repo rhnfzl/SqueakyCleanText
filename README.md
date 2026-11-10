@@ -135,6 +135,7 @@ if __name__ == "__main__":
 
 | Where | Usage | Docs |
 |---|---|---|
+| PDF extraction | `extract_document` and `clean_document` | [DOCUMENTS](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/DOCUMENTS.md) |
 | LangChain | `SCTDocumentTransformer().transform_documents(docs)` | [INTEGRATIONS](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/INTEGRATIONS.md) |
 | Haystack | `pipe.add_component("sct", SCTDocumentCleaner())` | [INTEGRATIONS](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/INTEGRATIONS.md) |
 | Ray, Spark, Polars, DuckDB, dlt, Daft | `clean_columns(handle, batch)` | [RECIPES](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/RECIPES.md) |

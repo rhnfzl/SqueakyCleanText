@@ -1,5 +1,8 @@
 [run]
 source = sct/integrations
+# Docling is absent from the generic worker install. The documents provider-profile
+# matrix requires native PDF/OCR/table tests and entire-module coverage >=85%.
+omit = */sct/integrations/docling.py
 
 [report]
 precision = 2
