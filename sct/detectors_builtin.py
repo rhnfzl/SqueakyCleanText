@@ -1,23 +1,10 @@
 """Native detectors share legacy matching decisions without emitting replacements."""
 
-from dataclasses import dataclass
-
-from sct.config import TextCleanerConfig
+from sct.config import GLINER_BACKENDS, TOKEN_MODEL_BACKENDS, TextCleanerConfig
+from sct.detectors import DetectorCapabilities
 from sct.findings import Detection, DetectionContext
 from sct.utils import constants, contact, normtext
 from sct.utils.ner import GeneralNER
-
-
-@dataclass(frozen=True)
-class _Capabilities:
-    id: str
-    version: str = '1'
-    entity_types: tuple[str, ...] = ()
-    languages: tuple[str, ...] = ()
-    coordinate_system: str = 'unicode_codepoint'
-    supports_context: bool = False
-    supports_windowed: bool = False
-    network_access: bool = False
 
 
 class BuiltinRegexDetector:
@@ -39,7 +26,7 @@ class BuiltinRegexDetector:
         types += ['IP'] if cfg.check_replace_ips else []
         types += ['DATE'] if cfg.check_fuzzy_replace_dates else []
         types += [*(cfg.custom_deny_terms or {}), *(cfg.custom_patterns or {})]
-        self._capabilities = _Capabilities('builtin_regex', entity_types=tuple(dict.fromkeys(types)))
+        self._capabilities = DetectorCapabilities('builtin_regex', entity_types=tuple(dict.fromkeys(types)))
 
     @property
     def capabilities(self):
@@ -96,10 +83,23 @@ class BuiltinNERDetector:
     def __init__(self, ner: GeneralNER):
         self._ner = ner
         from sct.utils.ner_spans import ENTITY_TYPE_MAP
-        labels = (*ner.cfg.positional_tags, *(ner.cfg.gliner_label_map or {}).values())
-        self._capabilities = _Capabilities(
+        cfg = ner.cfg
+        labels = list(cfg.positional_tags) if cfg.ner_backend in TOKEN_MODEL_BACKENDS else []
+        if cfg.ner_backend in GLINER_BACKENDS:
+            labels.extend((cfg.gliner_label_map or {}).get(t, t.upper()) for t in cfg.gliner_labels)
+        if cfg.ner_backend == 'presidio_gliner':
+            labels.extend(ner._presidio_types.get(t, t) for t in ner._analyzer.get_supported_entities())
+        identities: list[tuple[str, str | None, str | None]] = []
+        models = cfg.torch_ner_models if 'torch' in cfg.ner_backend else cfg.ner_models
+        revisions = cfg.torch_ner_model_revisions if 'torch' in cfg.ner_backend else cfg.ner_model_revisions
+        if cfg.ner_backend in TOKEN_MODEL_BACKENDS:
+            identities.extend((model, (revisions or {}).get(key), None) for key, model in (models or {}).items())
+        if cfg.ner_backend in GLINER_BACKENDS and cfg.gliner_model:
+            identities.append((cfg.gliner_model, cfg.gliner_revision, None))
+        self._capabilities = DetectorCapabilities(
             'builtin_ner', entity_types=tuple(dict.fromkeys(ENTITY_TYPE_MAP.get(t, t) for t in labels)),
-            supports_windowed=True)
+            languages=tuple(sorted(cfg.supported_languages)),
+            model_identities=tuple(dict.fromkeys(identities)), supports_windowed=True)
 
     @property
     def capabilities(self):

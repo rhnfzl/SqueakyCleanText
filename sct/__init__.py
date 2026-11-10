@@ -1,6 +1,7 @@
 """SqueakyCleanText - Text cleaning and preprocessing pipeline for ML/NLP."""
 
 from sct.config import TextCleanerConfig, PII_LABELS, PII_LABEL_MAP
+from sct.detectors import Detector, DetectorCapabilities, DetectorRegistry, DetectorSpec, DetectorUnavailable
 from sct.privacy import (
     DetectedEntity,
     EntityFinding,
@@ -53,6 +54,7 @@ from sct.utils.process_result import ProcessResult
 
 __version__ = "0.9.0"
 __all__ = [
+    "Detector", "DetectorCapabilities", "DetectorRegistry", "DetectorSpec", "DetectorUnavailable",
     "TextCleaner", "TextCleanerConfig", "CustomPatternTimeout", "ModelLoadError", "PRESETS", "preset_config",
     "PII_LABELS", "PII_LABEL_MAP",
     "AnonymizationMap", "MapEntry", "ProcessResult",
