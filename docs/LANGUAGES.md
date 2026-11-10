@@ -19,6 +19,52 @@ Every language option takes the Lingua name (`'ENGLISH'`), ISO 639-1 (`'en'`) or
 (`'eng'`). `language='de'` pins one language, `language=('en', 'nl')` limits detection to a
 set; see [CONFIG.md](CONFIG.md#languages).
 
+## Abstain from uncertain detection
+
+Callers can return an unset language when language evidence is uncertain.
+This helps avoid a forced language choice, but thresholds cannot prove that a language is unsupported.
+Defaults remain `language_policy='legacy'` with both decision thresholds set to `None`.
+The existing confidence and margin warning settings only add warnings.
+
+```python
+cfg = TextCleanerConfig(
+    language_policy='abstain',
+    language_min_confidence=0.8,
+    language_min_margin=0.1,
+    unknown_language_action='multilingual',
+)
+```
+
+With this opt-in policy, confidence below 0.8 or margin below 0.1 returns `language=None`.
+Equality passes. A pinned language bypasses thresholds.
+Missing scores, ties and restricted-tuple fallback abstain under this policy, including when thresholds are `None`.
+A tuple restriction never returns a detected language outside that tuple.
+When no language-dependent feature is requested, detection stays disabled.
+Empty input keeps its existing empty-result contract.
+
+Abstention records `language_source='abstained'` and the `language_abstained` warning.
+Metadata and signals retain the confidence and add `language_margin` and a value-free `language_reason`.
+`LanguageDecision(language, confidence, margin, source, reason)` and
+`apply_language_policy(decision, cfg)` in `sct.language_policy` expose the pure decision layer.
+Scores remain evidence from the detector, including the existing six-decimal normalization.
+
+`unknown_language_action` applies to an unset language in either policy:
+
+- `'multilingual'`: use the configured built-in NER fallback route. Multilingual is a downstream route, not a detected language.
+- `'error'`: raise before text replacement or NER. No partially protected result is returned.
+- `'skip_ner'`: omit SCT's built-in NER, set `ner_skipped=True`, and add `ner_skipped_unknown_language` to warnings.
+
+Skipping NER can leave names and other model-only entities visible. Regex protection continues.
+Explicit external detector specs still run with `language=None`; SCT does not infer their detector family from labels or names.
+External detectors remain responsible for handling that language value or failing explicitly.
+These rules apply to single, batch and unified processing.
+Legacy module globals use the same names in uppercase.
+
+The 220 synthetic multilingual evaluation texts provide limited calibration evidence, not production acceptance.
+Under an English/Dutch/German/Spanish restriction, 80 texts belong to the configured set and 140 belong outside it.
+Restricted detection can confidently force outside-set texts into a configured language.
+No new default threshold is selected from this corpus.
+
 ## Detected languages (75)
 
 | Lingua name | ISO 639-1 | ISO 639-3 |

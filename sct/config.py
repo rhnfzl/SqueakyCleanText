@@ -423,8 +423,20 @@ class TextCleanerConfig:
     # Unified mode collects all selected findings before applying one policy and renderer.
     pii_processing: Literal["legacy", "unified"] = "legacy"
     source_mapping: Literal["best_effort", "require_source"] = "best_effort"
+    language_policy: Literal['legacy', 'abstain'] = 'legacy'
+    language_min_confidence: float | None = None
+    language_min_margin: float | None = None
+    unknown_language_action: Literal['multilingual', 'error', 'skip_ner'] = 'multilingual'
 
     def __post_init__(self):
+        if self.language_policy not in ('legacy', 'abstain'):
+            raise ValueError('language_policy must be legacy or abstain')
+        if self.unknown_language_action not in ('multilingual', 'error', 'skip_ner'):
+            raise ValueError('unknown_language_action must be multilingual, error or skip_ner')
+        for name in ('language_min_confidence', 'language_min_margin'):
+            value = getattr(self, name)
+            if value is not None and (type(value) not in (int, float) or not 0.0 <= value <= 1.0):
+                raise ValueError(f'{name} must be None or a finite number in [0, 1]')
         if self.pii_processing not in ("legacy", "unified"):
             raise ValueError("pii_processing must be legacy or unified")
         if self.source_mapping not in ("best_effort", "require_source"):

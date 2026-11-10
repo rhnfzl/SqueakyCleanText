@@ -221,3 +221,24 @@ def test_gliner_hindi_pin_runs(monkeypatch):
     result = TextCleaner(cfg=cfg).process(OTHER_SCRIPTS["HINDI"])
     assert result.language == "HINDI"
     assert result.metadata["warnings"] == []
+
+
+@pytest.mark.parametrize('processing', ['legacy', 'unified'])
+@pytest.mark.parametrize('action', ['multilingual', 'skip_ner'])
+def test_abstention_real_model_route(processing, action):
+    cleaner = TextCleaner(TextCleanerConfig(
+        pii_processing=processing, check_ner_process=True, allow_network_detectors=True,
+        ner_models=TEST_NER_MODELS, ner_model_revisions=TEST_NER_REVISIONS, ner_device='cpu',
+        language_policy='abstain', language_min_confidence=1., unknown_language_action=action,
+    ))
+    result = cleaner.process('John Smith works at Google. Send mail to alice@example.com.')
+    assert result.language is None and result.metadata['language_source'] == 'abstained'
+    assert 'alice@example.com' not in result.lm_text
+    assert 'language_abstained' in result.signals['warnings']
+    if action == 'multilingual':
+        assert 'John Smith' not in result.lm_text
+        assert 'ner_skipped' not in result.metadata
+    else:
+        assert 'John Smith' in result.lm_text
+        assert result.signals['ner_skipped'] is True
+        assert result.signals['models'] == []

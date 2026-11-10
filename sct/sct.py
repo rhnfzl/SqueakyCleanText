@@ -22,6 +22,7 @@ import regex
 
 from sct.config import GLICLASS_DEFAULT_MODEL, TextCleanerConfig
 from sct.detectors import DetectorRegistry
+from sct.language_policy import LanguageDecision, apply_language_policy
 from sct.privacy import EntityFinding, PrivacyPolicy, ProcessingMetrics, TokenStore
 from sct.utils import constants, contact, datetime, ner, normtext, resources, special, stopwords
 from sct.utils.anonymization_map import AnonymizationMap
@@ -67,6 +68,7 @@ class _DocumentState(NamedTuple):
     language_margin: float | None
     deferred: list | None  # (tag, value) in text order, for _swap_deferred
     warnings: set
+    language_reason: str
 
 
 def _entity_counts(findings) -> dict[str, dict[str, int]]:
@@ -447,6 +449,41 @@ class TextCleaner:
         return any([self.cfg.check_detect_language, self.cfg.check_ner_process,
                     self.cfg.check_remove_stopwords])
 
+    def _language_decision(self, text: str) -> LanguageDecision:
+        language, confidence, source, margin = self._detect_language(text)
+        decision = LanguageDecision(language, confidence, margin, source, source)
+        if source != 'none' or self._language_needed():
+            decision = apply_language_policy(decision, self.cfg)
+            if decision.language is None and self.cfg.unknown_language_action == 'error':
+                raise ValueError('Language is unknown; choose multilingual or skip_ner')
+        return decision
+
+    def _skip_ner(self, language: str | None) -> bool:
+        return language is None and self.cfg.unknown_language_action == 'skip_ner'
+
+    def _language_metadata(self, decision: LanguageDecision, *, ner_skipped: bool) -> ProcessMetadata:
+        metadata: ProcessMetadata = {}
+        if self.cfg.language_policy != 'legacy':
+            metadata['language_margin'] = decision.margin
+            metadata['language_reason'] = decision.reason
+        if ner_skipped:
+            metadata['ner_skipped'] = True
+        return metadata
+
+    def _language_warnings(self, source, confidence, margin, *, ner_skipped=False) -> set[str]:
+        codes = set()
+        if source == 'none' and self._language_needed():
+            codes.add('language_unknown')
+        if source == 'fallback':
+            codes.add('language_fallback')
+        if source == 'abstained':
+            codes.add('language_abstained')
+        if ner_skipped:
+            codes.add('ner_skipped_unknown_language')
+        if self._language_low_confidence(source, confidence, margin):
+            codes.add('language_low_confidence')
+        return codes
+
     def _language_low_confidence(self, source, confidence, margin) -> bool:
         """Whether a detected language gets the language_low_confidence warning."""
         return source == 'detected' and (
@@ -471,7 +508,7 @@ class TextCleaner:
 
         # NER processing; always detailed (same detection) so entity counts are known.
         findings: tuple[EntityFinding, ...] = ()
-        if self.GeneralNER is not None:
+        if self.GeneralNER is not None and not self._skip_ner(state.language):
             detailed = self.GeneralNER.ner_process_detailed(
                 current_text,
                 language=state.language,
@@ -523,7 +560,9 @@ class TextCleaner:
             doc_classes = self._gliclass.classify(text)
 
         # Detect language (pure function, thread-safe)
-        language, language_confidence, language_source, language_margin = self._detect_language(text)
+        decision = self._language_decision(text)
+        language, language_confidence, language_source, language_margin = (
+            decision.language, decision.confidence, decision.source, decision.margin)
         self._document_context.language = language  # _replace_fuzzy_dates reads it
 
         # Reset per-document synthetic consistency cache (thread-safe via threading.local);
@@ -554,19 +593,16 @@ class TextCleaner:
             text=current_text, language=language, anon_map=anon_map, doc_classes=doc_classes, started_at=started_at,
             regex_counts=regex_counts, language_confidence=language_confidence, language_source=language_source,
             source_chars=len(text), source_markers=source_markers, language_margin=language_margin,
-            deferred=deferred_order, warnings=doc_warnings)
+            deferred=deferred_order, warnings=doc_warnings, language_reason=decision.reason)
 
     def _document_warnings(self, state: _DocumentState, models) -> set:
         """The warning codes of a processed document; *models* are the NER models it ran."""
         warnings = set(state.warnings)
-        if state.language_source == 'none' and self._language_needed():
-            warnings.add('language_unknown')
-        if state.language_source == 'fallback':
-            warnings.add('language_fallback')
-        if self._language_low_confidence(state.language_source, state.language_confidence, state.language_margin):
-            warnings.add('language_low_confidence')
+        skipped = self.GeneralNER is not None and self._skip_ner(state.language)
+        warnings.update(self._language_warnings(state.language_source, state.language_confidence,
+                                               state.language_margin, ner_skipped=skipped))
         general_ner = self.GeneralNER
-        if general_ner is None:
+        if general_ner is None or skipped:
             return warnings
         if general_ner.uses_fallback_models(state.language):
             warnings.add('ner_fallback_models')
@@ -603,8 +639,8 @@ class TextCleaner:
         # Value-free counts of concealed entities are always present; metadata['findings'], on opt-in
         # below, also lists what the policy exempted.
         entity_counts = _entity_counts(f for f in findings if f.action not in _EXEMPT_ACTIONS)
-        ner_on = self.GeneralNER is not None
-        models = self.GeneralNER.models_for(language) if self.GeneralNER is not None else []
+        ner_on = self.GeneralNER is not None and not self._skip_ner(language)
+        models = self.GeneralNER.models_for(language) if self.GeneralNER is not None and ner_on else []
         metadata: ProcessMetadata = {
             'source_chars': state.source_chars,
             'regex_counts': state.regex_counts,
@@ -617,6 +653,9 @@ class TextCleaner:
                 'models': models,
             },
         }
+        metadata.update(self._language_metadata(LanguageDecision(language, state.language_confidence,
+            state.language_margin, state.language_source, state.language_reason),
+            ner_skipped=self.GeneralNER is not None and not ner_on))
         if anon_map is not None:
             if self._token_store is not None:
                 metadata['anon_map_reference'] = self._token_store.save(anon_map)
@@ -714,16 +753,20 @@ class TextCleaner:
             staged = run(before_ner)
             states = [state for state, _ in staged]
 
+            active = [i for i, state in enumerate(states) if not self._skip_ner(state.language)]
             ner_results = self.GeneralNER.ner_process_batch_detailed(
-                [state.text for state in states],
-                [state.language for state in states],
-                anon_maps=[state.anon_map for state in states],
-                synthetic_caches=[cache for _, cache in staged],
+                [states[i].text for i in active],
+                [states[i].language for i in active],
+                anon_maps=[states[i].anon_map for i in active],
+                synthetic_caches=[staged[i][1] for i in active],
                 max_workers=workers,
-                source_markers=[state.source_markers for state in states],
-            )
-            for (i, _), state, ner_result in zip(to_process, states, ner_results, strict=True):
-                results[i] = self._after_ner(state, ner_result.text, ner_result.findings)
+                source_markers=[states[i].source_markers for i in active],
+            ) if active else []
+            processed = dict(zip(active, ner_results, strict=True))
+            for index, ((i, _), state) in enumerate(zip(to_process, states, strict=True)):
+                ner_result = processed.get(index)
+                results[i] = self._after_ner(state, ner_result.text if ner_result else state.text,
+                                             ner_result.findings if ner_result else ())
         else:
             # Each text goes through the full pipeline independently.
             for (i, _), result in zip(to_process, run(self._process_single_isolated), strict=True):

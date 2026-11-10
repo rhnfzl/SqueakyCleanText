@@ -1,0 +1,353 @@
+{
+  "schema_version": 1,
+  "scope": "Frozen opt-in language abstention, built-in execution policy, actual Lingua/native ONNX targeted routes; final integrated acceptance pending",
+  "commit": "dab6d4cd07aab473ed6a4f510f7e9be8d1227b09",
+  "changed_source_sha256": {
+    "sct/language_policy.py": "e5c60565ad19a50c605ad57f46d5c33f7737affeed8cf972b5396c80070b4a28",
+    "tests/test_language_policy.py": "0ac6299cfe26ed4678c5d3e9beca2c654c5a5946709bbf3a1d233aa00e9309e9",
+    "sct/sct.py": "0f9d1eabd067e5c03481f6681d452f751e350cd3d80d2f29bc5d40130c80b406",
+    "sct/config.py": "ee9fbd9cbdd613c3f35a30effcffab5acf8c983ed58e3dd9ef58e632bb45ec4c",
+    "sct/signals.py": "6ef22ea0261a6206748613befa672a4900330bfac2349df8e31ba34fe5471626",
+    "sct/utils/process_result.py": "a886ecfb2d8241f7754362c1195e556e7f835f873ee9f52809adf7e8f934e29d",
+    "sct/unified.py": "a2e3da1c05cfb556eaf1960060907f7cc0914c3986fb75995a477668b6465ed7",
+    "docs/LANGUAGES.md": "6b7d0e435876915f7a33a25a6334092cf9ad33f68434974aa30380c8b41890d2",
+    "docs/CONFIG.md": "986e939a03b729aba967e4bc3edad0dce5d28ec109a2b3fa6deaf3f15b7fe3d9",
+    "tests/test_language_all.py": "209cd50fe9f7b40f5e5fd1da2c63637a62b8589d2c607480669f940cab31816b"
+  },
+  "before_after_full_source_equal": true,
+  "committed_byte_verification": "All ten committed blobs match independent fix1 reviewed snapshot, before/after full gate, three runtime and final metric manifests.",
+  "runs": [
+    {
+      "runtime": {
+        "runtime": "3.12.3 (main, Aug 31 2026, 10:18:26) [GCC 13.3.0]",
+        "executable": "/home/rehan/sct-improvements-l1-20261107/py312/.venv/bin/python",
+        "lingua_version": "2.2.0",
+        "lingua_path": "/home/rehan/sct-improvements-l1-20261107/py312/.venv/lib/python3.12/site-packages/lingua/__init__.py",
+        "lingua_files": {
+          "/home/rehan/sct-improvements-l1-20261107/py312/.venv/lib/python3.12/site-packages/lingua/lingua.cpython-312-x86_64-linux-gnu.so": "efba918968c1c55e3677ad6c06577ecad2122d3a2eb060df74058cd4de0fbfac",
+          "/home/rehan/sct-improvements-l1-20261107/py312/.venv/lib/python3.12/site-packages/lingua/__init__.py": "d6341b4300102cc3c0ed8fffb2a768d7921ca2ca5177cefc023654b9493bf4e1"
+        },
+        "source_files": {
+          "sct/language_policy.py": "e5c60565ad19a50c605ad57f46d5c33f7737affeed8cf972b5396c80070b4a28",
+          "tests/test_language_policy.py": "0ac6299cfe26ed4678c5d3e9beca2c654c5a5946709bbf3a1d233aa00e9309e9",
+          "sct/sct.py": "0f9d1eabd067e5c03481f6681d452f751e350cd3d80d2f29bc5d40130c80b406",
+          "sct/config.py": "ee9fbd9cbdd613c3f35a30effcffab5acf8c983ed58e3dd9ef58e632bb45ec4c",
+          "sct/signals.py": "6ef22ea0261a6206748613befa672a4900330bfac2349df8e31ba34fe5471626",
+          "sct/utils/process_result.py": "a886ecfb2d8241f7754362c1195e556e7f835f873ee9f52809adf7e8f934e29d",
+          "sct/unified.py": "a2e3da1c05cfb556eaf1960060907f7cc0914c3986fb75995a477668b6465ed7",
+          "docs/LANGUAGES.md": "6b7d0e435876915f7a33a25a6334092cf9ad33f68434974aa30380c8b41890d2",
+          "docs/CONFIG.md": "986e939a03b729aba967e4bc3edad0dce5d28ec109a2b3fa6deaf3f15b7fe3d9",
+          "tests/test_language_all.py": "209cd50fe9f7b40f5e5fd1da2c63637a62b8589d2c607480669f940cab31816b"
+        }
+      },
+      "passed": 148,
+      "skipped": 0,
+      "warnings": 0,
+      "runtime_sha256": "bce6a1f7ed36832988a96566d1d8b2b1711135b9e58463f5caf2dc1851c0e174",
+      "log_sha256": "108d313cebbd80a8e7d8511c62c8e4c48e6922f50e6500f511601780b3d690d6"
+    },
+    {
+      "runtime": {
+        "runtime": "3.13.3 (main, May 30 2025, 05:38:56) [Clang 20.1.4 ]",
+        "executable": "/home/rehan/sct-improvements-l1-20261107/py313/.venv/bin/python",
+        "lingua_version": "2.2.0",
+        "lingua_path": "/home/rehan/sct-improvements-l1-20261107/py313/.venv/lib/python3.13/site-packages/lingua/__init__.py",
+        "lingua_files": {
+          "/home/rehan/sct-improvements-l1-20261107/py313/.venv/lib/python3.13/site-packages/lingua/__init__.py": "d6341b4300102cc3c0ed8fffb2a768d7921ca2ca5177cefc023654b9493bf4e1",
+          "/home/rehan/sct-improvements-l1-20261107/py313/.venv/lib/python3.13/site-packages/lingua/lingua.cpython-313-x86_64-linux-gnu.so": "d2230e8615fa7166b04a6789daae83e36850262670c00267351fe65094941f2d"
+        },
+        "source_files": {
+          "sct/language_policy.py": "e5c60565ad19a50c605ad57f46d5c33f7737affeed8cf972b5396c80070b4a28",
+          "tests/test_language_policy.py": "0ac6299cfe26ed4678c5d3e9beca2c654c5a5946709bbf3a1d233aa00e9309e9",
+          "sct/sct.py": "0f9d1eabd067e5c03481f6681d452f751e350cd3d80d2f29bc5d40130c80b406",
+          "sct/config.py": "ee9fbd9cbdd613c3f35a30effcffab5acf8c983ed58e3dd9ef58e632bb45ec4c",
+          "sct/signals.py": "6ef22ea0261a6206748613befa672a4900330bfac2349df8e31ba34fe5471626",
+          "sct/utils/process_result.py": "a886ecfb2d8241f7754362c1195e556e7f835f873ee9f52809adf7e8f934e29d",
+          "sct/unified.py": "a2e3da1c05cfb556eaf1960060907f7cc0914c3986fb75995a477668b6465ed7",
+          "docs/LANGUAGES.md": "6b7d0e435876915f7a33a25a6334092cf9ad33f68434974aa30380c8b41890d2",
+          "docs/CONFIG.md": "986e939a03b729aba967e4bc3edad0dce5d28ec109a2b3fa6deaf3f15b7fe3d9",
+          "tests/test_language_all.py": "209cd50fe9f7b40f5e5fd1da2c63637a62b8589d2c607480669f940cab31816b"
+        }
+      },
+      "passed": 148,
+      "skipped": 0,
+      "warnings": 0,
+      "runtime_sha256": "7d9729dc78cedba7b20e8da1d28aea267766c188d7e0b51f2c4dda21f1c1feb6",
+      "log_sha256": "7a47f6188eefa7fc3e91087dc30b73a9691ba5692a5aff3002ffd2ca848d4b41"
+    },
+    {
+      "runtime": {
+        "runtime": "3.14.4 (main, Apr  7 2026, 20:47:53) [Clang 22.1.1 ]",
+        "executable": "/home/rehan/sct-improvements-l1-20261107/.venv/bin/python",
+        "lingua_version": "2.2.0",
+        "lingua_path": "/home/rehan/sct-improvements-l1-20261107/.venv/lib/python3.14/site-packages/lingua/__init__.py",
+        "lingua_files": {
+          "/home/rehan/sct-improvements-l1-20261107/.venv/lib/python3.14/site-packages/lingua/__init__.py": "d6341b4300102cc3c0ed8fffb2a768d7921ca2ca5177cefc023654b9493bf4e1",
+          "/home/rehan/sct-improvements-l1-20261107/.venv/lib/python3.14/site-packages/lingua/lingua.cpython-314-x86_64-linux-gnu.so": "16b597f26ecda0530f6d3743e3bc02cb2f198f969883233a93eb592a1953fd42"
+        },
+        "source_files": {
+          "sct/language_policy.py": "e5c60565ad19a50c605ad57f46d5c33f7737affeed8cf972b5396c80070b4a28",
+          "tests/test_language_policy.py": "0ac6299cfe26ed4678c5d3e9beca2c654c5a5946709bbf3a1d233aa00e9309e9",
+          "sct/sct.py": "0f9d1eabd067e5c03481f6681d452f751e350cd3d80d2f29bc5d40130c80b406",
+          "sct/config.py": "ee9fbd9cbdd613c3f35a30effcffab5acf8c983ed58e3dd9ef58e632bb45ec4c",
+          "sct/signals.py": "6ef22ea0261a6206748613befa672a4900330bfac2349df8e31ba34fe5471626",
+          "sct/utils/process_result.py": "a886ecfb2d8241f7754362c1195e556e7f835f873ee9f52809adf7e8f934e29d",
+          "sct/unified.py": "a2e3da1c05cfb556eaf1960060907f7cc0914c3986fb75995a477668b6465ed7",
+          "docs/LANGUAGES.md": "6b7d0e435876915f7a33a25a6334092cf9ad33f68434974aa30380c8b41890d2",
+          "docs/CONFIG.md": "986e939a03b729aba967e4bc3edad0dce5d28ec109a2b3fa6deaf3f15b7fe3d9",
+          "tests/test_language_all.py": "209cd50fe9f7b40f5e5fd1da2c63637a62b8589d2c607480669f940cab31816b"
+        }
+      },
+      "passed": 148,
+      "skipped": 0,
+      "warnings": 0,
+      "runtime_sha256": "09a9f3b612c5d2f711838d0018827ee8a83cb67648b59ed536f13ab8d884b584",
+      "log_sha256": "bde44ee69873f1f1d715e0b9057457df786afac1bf989e4a5af4bed0624945ae"
+    }
+  ],
+  "local_runtime": {
+    "python": "3.14.3 (main, Mar  3 2026, 15:46:55) [Clang 21.1.4 ]",
+    "executable": "/Users/rehan-8v/projects/personal/SqueakyCleanText-pipeline-research/.venv/bin/python",
+    "platform": "macOS-27.2-arm64-arm-64bit-Mach-O",
+    "lingua_version": "2.2.0",
+    "lingua_path": "/Users/rehan-8v/projects/personal/SqueakyCleanText-pipeline-research/.venv/lib/python3.14/site-packages/lingua/__init__.py",
+    "lingua_files": {
+      "/Users/rehan-8v/projects/personal/SqueakyCleanText-pipeline-research/.venv/lib/python3.14/site-packages/lingua/__init__.py": "d6341b4300102cc3c0ed8fffb2a768d7921ca2ca5177cefc023654b9493bf4e1",
+      "/Users/rehan-8v/projects/personal/SqueakyCleanText-pipeline-research/.venv/lib/python3.14/site-packages/lingua/lingua.cpython-314-darwin.so": "6ea86217a201dcb97b0c780d9199e94518dd6f895f8932725c89082ed8f66c68"
+    },
+    "onnxruntime_version": "1.30.0",
+    "onnxruntime_path": "/Users/rehan-8v/projects/personal/SqueakyCleanText-pipeline-research/.venv/lib/python3.14/site-packages/onnxruntime/__init__.py",
+    "model_fixture_sha256": "206464d3e36eb38cbe758bcd09470e21b1aae9f3d031fafd0af8b91555c0f005"
+  },
+  "full_local": {
+    "command": "HF_HUB_OFFLINE=1 OMP_NUM_THREADS=2 OPENBLAS_NUM_THREADS=2 VECLIB_MAXIMUM_THREADS=2 .venv/bin/python -m pytest tests/ --cov=sct --cov-report=xml --cov-fail-under=85 -v -rs",
+    "actual_handle": 48924,
+    "exit_code": 1,
+    "passed": 3141,
+    "skipped": 28,
+    "failed": 2,
+    "duration_seconds": 309.83,
+    "warnings": 96,
+    "warning_categories": {
+      "multiprocess_multithreaded_fork_DeprecationWarning": 95,
+      "ner_models_list_DeprecationWarning": 1
+    },
+    "baseline_warnings": 96,
+    "warning_delta": 0,
+    "failed_tests": [
+      "tests/test_atomic_file.py::test_dev_stdout_redirected_to_a_file_is_written_through",
+      "tests/test_atomic_file.py::test_dev_stdout_piped_is_written_through"
+    ],
+    "failure_reason": "sandbox PermissionError opening /dev/stdout; final frozen split rerun passes both"
+  },
+  "stdout_split": {
+    "exit_code": 0,
+    "passed": 2,
+    "duration_seconds": 0.8,
+    "authorization": "existing bounded two-test outside-sandbox authorization"
+  },
+  "coverage": {
+    "covered": 6887,
+    "total": 7290,
+    "percent": 94.4718792866941,
+    "minimum": 85,
+    "baseline_covered": 6800,
+    "baseline_total": 7203,
+    "baseline_percent": 94.40510898236846,
+    "delta_percentage_points": 0.06677030432564734
+  },
+  "checks": {
+    "ruff": "sct tests scripts: passed",
+    "mypy": "pinned 2.4.1 against project .venv/bin/python: 62 source files passed",
+    "mkdocs": "--strict: passed in 1.61s",
+    "uv": "0.10.9 lock --check: passed; temporary export parsed TOML equals tracked pylock, generated command comment differs",
+    "hosted_ci_executed": false
+  },
+  "review": {
+    "initial": "Important unified skip factory issue",
+    "fix_round": 1,
+    "final": "approved; no new findings",
+    "source_manifest_sha256": "743921f452bfb53848fcd128e42278b107574503b29fe0f1e9659eab8624e460"
+  },
+  "standalone_provenance_diagnostic": {
+    "source": "local standalone ONNX import during runtime provenance collection, separate from test-suite warnings",
+    "warning_text": "[W:onnxruntime:Default, telemetry.cc:800 operator()] Failed to persist telemetry device ID; using an in-memory identifier",
+    "scope": "sandbox telemetry ID persistence",
+    "provider_record": "runtime-local.json"
+  },
+  "metrics": {
+    "corpus": "evaluation/multilingual_pii.jsonl",
+    "corpus_sha256": "d946043dc567a8246657f7cbb443aa773d038c5ca1c7fc6f44e68981bd2540c1",
+    "sample_count": 220,
+    "sample_ids_sha256": "440898ebc2f1ee5d52c0c21a7555a5801cea7ec4dad53106a21cbd0f34bcb6a0",
+    "sample_ids_hash_encoding": "UTF-8 compact JSON array in corpus order",
+    "synthetic": true,
+    "restriction": [
+      "ENGLISH",
+      "DUTCH",
+      "GERMAN",
+      "SPANISH"
+    ],
+    "known_samples": 80,
+    "outside_restriction_samples": 140,
+    "outside_definition": "outside the configured four-language restriction, not unknown to Lingua overall",
+    "raw_detect_evidence_unchanged": true,
+    "no_new_default": true,
+    "profiles": {
+      "legacy": {
+        "known_total": 80,
+        "known_correct": 78,
+        "known_answered": 80,
+        "outside_total": 140,
+        "outside_false_answers": 140,
+        "known_overall_accuracy_percent": 97.5,
+        "known_coverage_percent": 100.0,
+        "known_conditional_accuracy_percent": 97.5,
+        "outside_false_answer_percent": 100.0,
+        "delta_vs_legacy_percentage_points": {
+          "known_overall_accuracy_percent": 0.0,
+          "known_coverage_percent": 0.0,
+          "known_conditional_accuracy_percent": 0.0,
+          "outside_false_answer_percent": 0.0
+        }
+      },
+      "abstain_no_threshold": {
+        "known_total": 80,
+        "known_correct": 78,
+        "known_answered": 80,
+        "outside_total": 140,
+        "outside_false_answers": 7,
+        "known_overall_accuracy_percent": 97.5,
+        "known_coverage_percent": 100.0,
+        "known_conditional_accuracy_percent": 97.5,
+        "outside_false_answer_percent": 5.0,
+        "delta_vs_legacy_percentage_points": {
+          "known_overall_accuracy_percent": 0.0,
+          "known_coverage_percent": 0.0,
+          "known_conditional_accuracy_percent": 0.0,
+          "outside_false_answer_percent": -95.0
+        }
+      },
+      "abstain_0.8_0.1": {
+        "known_total": 80,
+        "known_correct": 71,
+        "known_answered": 71,
+        "outside_total": 140,
+        "outside_false_answers": 0,
+        "known_overall_accuracy_percent": 88.75,
+        "known_coverage_percent": 88.75,
+        "known_conditional_accuracy_percent": 100.0,
+        "outside_false_answer_percent": 0.0,
+        "delta_vs_legacy_percentage_points": {
+          "known_overall_accuracy_percent": -8.75,
+          "known_coverage_percent": -11.25,
+          "known_conditional_accuracy_percent": 2.5,
+          "outside_false_answer_percent": -100.0
+        }
+      }
+    },
+    "baseline_record_sha256": "a99c817d93b73aeab2b4f7df3d6f66a8d9d48ad72c16f8511d5e19be33af137e",
+    "final_after_record_sha256": "faa361d5677183756f95eca4b82b88243d57756fdf1d3aa4d1aa2e36a4799d64",
+    "root_verification": "All 220 raw detector evidence rows match the pre-L1 legacy baseline; same sample order and corpus hash.",
+    "interpretation": "Outside means outside the configured four-language restriction, not inherently unknown to Lingua. Thresholds trade known-language coverage for fewer observed outside-set answers on these synthetic samples."
+  },
+  "evidence_manifest_sha256": "bb5772ddabde55866b4f8f58141bb219a729c8a7e72d19edf848d635f366f513",
+  "evidence_files": {
+    "after.json": {
+      "sha256": "faa361d5677183756f95eca4b82b88243d57756fdf1d3aa4d1aa2e36a4799d64",
+      "bytes": 162863
+    },
+    "baseline.json": {
+      "sha256": "a99c817d93b73aeab2b4f7df3d6f66a8d9d48ad72c16f8511d5e19be33af137e",
+      "bytes": 39385
+    },
+    "coverage.xml": {
+      "sha256": "4390a97a29e108c1d4cea63324e03485691ae3b5892a115cd6d3f0c8a6d59fa2",
+      "bytes": 270992
+    },
+    "docs.log": {
+      "sha256": "66ae610fe71f59f5c0e0967b599076d5ad49b4c56cc5316aa483075315fecf08",
+      "bytes": 727
+    },
+    "focused.log": {
+      "sha256": "9ad1ef6c83419abf325b01656f0a3dd9de2e47d6c871a55c4d65e09f111af263",
+      "bytes": 261
+    },
+    "full.log": {
+      "sha256": "442b26af9c816acb4721cc61ffddff882754de65632983e2174b996464b4e912",
+      "bytes": 779170
+    },
+    "historical-full.log": {
+      "sha256": "7df500e664f3d292e00ff24d2133f91ddca874a942e86d5feaf5fe74bdd580fc",
+      "bytes": 778491
+    },
+    "initial-red.log": {
+      "sha256": "2d2ab074d523ee88065d3c79545b4e6414b9d1ffbce6f52fa2c73be669ec2581",
+      "bytes": 28244
+    },
+    "local-provenance-diagnostic.log": {
+      "sha256": "620b9dcf91562756e8d48a8056e93f7e65254db70226d342575d08111bdf722d",
+      "bytes": 197
+    },
+    "review-fix1.diff": {
+      "sha256": "57b5fa90e8601ef5b63e4e9dd17c1ec30a9b1d8eda29fc6d7a7508693b740a99",
+      "bytes": 7200
+    },
+    "review-red.log": {
+      "sha256": "45bdc289a64a8e72d1be17fdf4eb602607424ff9ccde08325743833738265072",
+      "bytes": 5187
+    },
+    "runtime-312.json": {
+      "sha256": "bce6a1f7ed36832988a96566d1d8b2b1711135b9e58463f5caf2dc1851c0e174",
+      "bytes": 1675
+    },
+    "runtime-313.json": {
+      "sha256": "7d9729dc78cedba7b20e8da1d28aea267766c188d7e0b51f2c4dda21f1c1feb6",
+      "bytes": 1678
+    },
+    "runtime-314.json": {
+      "sha256": "09a9f3b612c5d2f711838d0018827ee8a83cb67648b59ed536f13ab8d884b584",
+      "bytes": 1654
+    },
+    "runtime-local.json": {
+      "sha256": "7e350849d3aa02559d0d409d97c3a0fe43d53bf09380ef4de4c6ba2ea3c0f6a8",
+      "bytes": 1118
+    },
+    "source-after.json": {
+      "sha256": "743921f452bfb53848fcd128e42278b107574503b29fe0f1e9659eab8624e460",
+      "bytes": 1020
+    },
+    "source-before.json": {
+      "sha256": "743921f452bfb53848fcd128e42278b107574503b29fe0f1e9659eab8624e460",
+      "bytes": 1020
+    },
+    "source-frozen.json": {
+      "sha256": "743921f452bfb53848fcd128e42278b107574503b29fe0f1e9659eab8624e460",
+      "bytes": 1020
+    },
+    "stdout.log": {
+      "sha256": "7c3178f0eacce0030ee95f7f98a44083255d44c3206e826585cc9bcd4b8c4092",
+      "bytes": 98
+    },
+    "tests-312.log": {
+      "sha256": "108d313cebbd80a8e7d8511c62c8e4c48e6922f50e6500f511601780b3d690d6",
+      "bytes": 261
+    },
+    "tests-313.log": {
+      "sha256": "7a47f6188eefa7fc3e91087dc30b73a9691ba5692a5aff3002ffd2ca848d4b41",
+      "bytes": 261
+    },
+    "tests-314.log": {
+      "sha256": "bde44ee69873f1f1d715e0b9057457df786afac1bf989e4a5af4bed0624945ae",
+      "bytes": 261
+    }
+  },
+  "limits": [
+    "Synthetic samples do not establish production calibration or unknown-language guarantees.",
+    "skip_ner omits SCT built-in NER; external detector specs continue with language=None.",
+    "Full three-Python project suites, adaptive routing, push, PR and release were not run.",
+    "Skipping built-in NER can leave model-only sensitive entities visible; regex and explicit external detectors still run.",
+    "Canonical builtin_ner skips before construction; app-owned aliases may execute their factory before actual-type filtering.",
+    "No production unknown-language guarantee or new default threshold is established."
+  ]
+}
