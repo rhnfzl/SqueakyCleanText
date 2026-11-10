@@ -58,7 +58,7 @@ Skipping NER can leave names and other model-only entities visible. Regex protec
 Explicit external detector specs still run with `language=None`; SCT does not infer their detector family from labels or names.
 External detectors remain responsible for handling that language value or failing explicitly.
 These rules apply to single, batch and unified processing.
-Legacy module globals use the same names in uppercase.
+Set these fields explicitly through `TextCleanerConfig`.
 
 The 220 synthetic multilingual evaluation texts provide limited calibration evidence, not production acceptance.
 Under an English/Dutch/German/Spanish restriction, 80 texts belong to the configured set and 140 belong outside it.

@@ -222,6 +222,10 @@ Source mappings use Unicode code-point offsets and report `exact`, `covering` or
 
 `include_entities=True` explicitly adds sensitive `findings_v2_values`, linked by `finding_index` to canonical findings. This includes values whose output was redacted. Keep this audit payload and reversible maps out of logs. They are absent by default, apart from the map explicitly requested through reversible mode.
 
+Custom callbacks need migration review. Legacy callbacks run after regex replacement and before NER.
+Unified callbacks run before all detection, so callbacks that depend on `<EMAIL>` or other rendered markers receive different input.
+See [configuration and rollback](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/CONFIG.md#unified-processing-and-migration).
+
 ## Caller-declared fields (opt-in)
 
 Declare exact fields when a record needs protection beyond text detection. SCT does not infer meaning from field names.
@@ -290,13 +294,33 @@ Language detection covers 75 languages. Full NER models cover English, Dutch, Ge
 
 - **Safe defaults, every choice configurable.** Each behaviour is a config field; nothing is forced.
 - **No guarantee that all PII is found.** Models miss entities, mostly organisations and non-Latin scripts. Review output before you publish it.
-- **Free text, not tables.** For tables with known PII columns, drop or hash those columns first.
+- **Declared fields need explicit rules.** Use a caller-owned schema to protect known PII fields; unselected fields remain unchanged.
 - **Reversible maps are personal data.** Anyone with the map can restore the values. Store maps apart from the cleaned data, with access control.
 - **Synthetic data is not anonymisation.** Fake values keep the data useful; they do not make it anonymous in a legal sense.
-- **Offsets are post-regex.** Finding offsets point into the text after the regex step, not into the raw input.
+- **Offsets name their text stage.** Legacy findings use post-regex positions. Unified findings use canonical positions and explicit source mapping quality.
 <!-- --8<-- [end:limits] -->
 
 Detailed known limits of 0.9.0: [docs/limits.md](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/limits.md).
+
+## Opt-in document and corpus workflows
+
+Users can combine extraction, unified detection, encrypted references and corpus selection without changing legacy defaults.
+Document and framework adapters use non-reversible output; direct text processing can return encrypted map references.
+The original documents and private corpus checkpoints remain caller-owned sensitive data.
+
+| Capability | Entry point and limit |
+|---|---|
+| Encrypted references | `EncryptedSQLiteTokenStore` from `sct.token_stores`; keys and authorization remain application-owned |
+| Corpus selection | `analyse_records` and `select_records` from `sct.corpus`; report-only by default, explicit basis required for removal |
+| Native replay | `curate_resumable`; identity/checksum validation and private checkpoints, without exactly-once guarantees |
+| PDF extraction | `extract_document` and `clean_document`; prepared local Docling assets, extracted-text protection only |
+| Credential formats | Optional `secrets` detector; four syntactic categories, not credential validity |
+| Language uncertainty | `language_policy='abstain'`; explicit thresholds and unknown-language action |
+| Detector routing | `routing_policy='always_run'` stays default; calibrated cascade remains experimental |
+
+Combined release acceptance is still pending. Per-feature evidence and remaining gates are recorded in `evaluation/improvements/ACCEPTANCE.md`.
+Real Torch quality scoring has functional evidence, but the synthetic gibberish control scored highest.
+This does not establish quality-filter accuracy. No default switch or release publication is included.
 
 ## Documentation
 

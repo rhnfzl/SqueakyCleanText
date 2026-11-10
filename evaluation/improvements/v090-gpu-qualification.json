@@ -1,0 +1,3325 @@
+{
+  "schema_version": 1,
+  "status": "passed",
+  "summary": "GPU-backed detector inference, trained quality parity and resumable dataset processing passed on gpuserver.",
+  "tested_at": "2026-11-10T12:28:06.468346+00:00",
+  "source_commit": "6da7cbcc67ce74fa7626c9d7d0f7db8c9f607836",
+  "source_tree": "0f23a2bb533df78532cebcc7d5a92e1ee2fd9407",
+  "source_archive_sha256": "b4ca3b91ddb32ec32ab71531c7609a9926636ce489feb6ebd9aae6990aa6e347",
+  "source_files_verified": 64,
+  "profile": {
+    "host": "gpuserver",
+    "device": "NVIDIA GeForce RTX 4090",
+    "physical_gpu": 3,
+    "device_uuid": "GPU-5a285e5a-6883-d8af-9928-81d2ab04a33e",
+    "driver": "560.35.05",
+    "python": "3.12.3",
+    "torch": "2.14.0+cu126",
+    "onnxruntime_gpu": "1.24.4",
+    "gpu_environment": {
+      "CUDA_VISIBLE_DEVICES": "GPU-5a285e5a-6883-d8af-9928-81d2ab04a33e",
+      "LD_LIBRARY_PATH": "/home/rehan/sct-gpu-supported-20261110/.venv/lib/python3.12/site-packages/nvidia/cublas/lib:/home/rehan/sct-gpu-supported-20261110/.venv/lib/python3.12/site-packages/nvidia/cuda_cupti/lib:/home/rehan/sct-gpu-supported-20261110/.venv/lib/python3.12/site-packages/nvidia/cuda_nvrtc/lib:/home/rehan/sct-gpu-supported-20261110/.venv/lib/python3.12/site-packages/nvidia/cuda_runtime/lib:/home/rehan/sct-gpu-supported-20261110/.venv/lib/python3.12/site-packages/nvidia/cudnn/lib:/home/rehan/sct-gpu-supported-20261110/.venv/lib/python3.12/site-packages/nvidia/cufft/lib:/home/rehan/sct-gpu-supported-20261110/.venv/lib/python3.12/site-packages/nvidia/cufile/lib:/home/rehan/sct-gpu-supported-20261110/.venv/lib/python3.12/site-packages/nvidia/curand/lib:/home/rehan/sct-gpu-supported-20261110/.venv/lib/python3.12/site-packages/nvidia/cusolver/lib:/home/rehan/sct-gpu-supported-20261110/.venv/lib/python3.12/site-packages/nvidia/cusparse/lib:/home/rehan/sct-gpu-supported-20261110/.venv/lib/python3.12/site-packages/nvidia/cusparselt/lib:/home/rehan/sct-gpu-supported-20261110/.venv/lib/python3.12/site-packages/nvidia/nccl/lib:/home/rehan/sct-gpu-supported-20261110/.venv/lib/python3.12/site-packages/nvidia/nvjitlink/lib:/home/rehan/sct-gpu-supported-20261110/.venv/lib/python3.12/site-packages/nvidia/nvshmem/lib:/home/rehan/sct-gpu-supported-20261110/.venv/lib/python3.12/site-packages/nvidia/nvtx/lib:/home/rehan/sct-gpu-supported-20261110/.venv/lib/python3.12/site-packages/torch/lib",
+      "OMP_NUM_THREADS": "2",
+      "HF_HUB_OFFLINE": "1"
+    },
+    "runtime_smoke": {
+      "python": "3.12.3 (main, Aug 31 2026, 10:18:26) [GCC 13.3.0]",
+      "executable": "/home/rehan/sct-gpu-supported-20261110/.venv/bin/python",
+      "torch": "2.14.0+cu126",
+      "torch_file": "/home/rehan/sct-gpu-supported-20261110/.venv/lib/python3.12/site-packages/torch/__init__.py",
+      "cuda_build": "12.6",
+      "gpu": "NVIDIA GeForce RTX 4090",
+      "onnxruntime": "1.24.4",
+      "ort_file": "/home/rehan/sct-gpu-supported-20261110/.venv/lib/python3.12/site-packages/onnxruntime/__init__.py",
+      "providers": [
+        "CUDAExecutionProvider",
+        "CPUExecutionProvider"
+      ],
+      "cuda_node_events": 1,
+      "profile": "/home/rehan/sct-gpu-supported-20261110/runtime-smoke_2026-11-10_12-26-15.json",
+      "torch_cuda_matmul": true
+    },
+    "installation": "Fresh isolated project venv. Torch 2.14.0+cu126 and onnxruntime-gpu 1.24.4 satisfy the declared GPU version ranges. GPU ORT replaces the overlapping CPU onnxruntime distribution, so this is a managed GPU profile, not an unmodified resolver install. Existing environments and the host driver remain unchanged."
+  },
+  "providers": {
+    "onnx": {
+      "provider": "onnx",
+      "status": "passed",
+      "executable": "/home/rehan/sct-gpu-supported-20261110/.venv/bin/python",
+      "python": "3.12.3 (main, Aug 31 2026, 10:18:26) [GCC 13.3.0]",
+      "cpu_affinity": [
+        50,
+        51,
+        52,
+        53,
+        54,
+        55,
+        56,
+        57
+      ],
+      "artifacts": {
+        "onnx": {
+          "repo": "protectai/bert-base-NER-onnx",
+          "revision": "84d28ab2bc28401b4353b26033eb043c8c8a0739",
+          "snapshot": "/home/rehan/.cache/huggingface/hub/models--protectai--bert-base-NER-onnx/snapshots/84d28ab2bc28401b4353b26033eb043c8c8a0739",
+          "files": {
+            "config.json": "e3cc09261a1c73bda961e030563585b2be563bef339a78e11c802c3377b98d66",
+            "model.onnx": "e2165e300f6e0016c1f295bcdee36e084371e1f4f3564cd7e47cb833b58a75b7",
+            "tokenizer.json": "cb26b43c98e8266ae3e99c2a583cf8315d73b33a17e6b20b4df7ff1f22392d34",
+            "tokenizer_config.json": "e4225b51da958444892048db70287fa3a0be55c8f95ab24c22d79b01bd58e4e9"
+          }
+        }
+      },
+      "source_sha256": {
+        "sct/__init__.py": "d6e5aca8eb5cbdbe0781bde805abe658ae869ec35d60b2a42f3af44b9cb9cd01",
+        "sct/adapters.py": "6c14afecf1b1d995e68c866d4a6333349d5c430edaebc1d0201d37daec08ca34",
+        "sct/browser.py": "552541e368fc5403f02294363816917d05bb2b837b6e3f66c30a3ed126c2a8bb",
+        "sct/cli.py": "b25622f4d030bebcb53e8fa4fd59b0e55805c48c5ad36fe852c90b4ef9f6abaa",
+        "sct/config.py": "15ff66b60385383b73d70d873afd7e39c3ddf8a770329ecaf9e67fb45f518710",
+        "sct/coordinates.py": "33d8b74559945bd8a12bd765b8313b4364a01ceb11460dfc4422e493846b7e72",
+        "sct/corpus/__init__.py": "b3589ddd7ab3c2a9fbf62fb3d0d4e932486e610fe308166ea76ddf5a2671124a",
+        "sct/corpus/datatrove.py": "901f069dd09ea1a9aee082b1fcfc6f4016eff720e68b7879942a9ef6cecf9eda",
+        "sct/corpus/manifest.py": "b5dbfaee581fe9f0c38808ebc128c439ea17225b48eb5f8e30ef6236c65aba7f",
+        "sct/corpus/runner.py": "32448b24b82755300dbf91c8e05e378fb4b97d2c343b443a29eb7b0ea72312e4",
+        "sct/corpus/selection.py": "9f11d71de2889607c7a403f26725c35a326909e4f72a849bd2649eb08d4809a4",
+        "sct/corpus/types.py": "c78dd1c36e09e2b2a2c160594b2a529d6e8f04001a7577a391c295fedac1bf1f",
+        "sct/detectors.py": "3892d4886bcdb4be869c763d0db82b240e09521320155d7c98b49c8c3f629456",
+        "sct/detectors_builtin.py": "68ed494896dadc4eb7f70b40ce9f5516063c2378cc0bdd04e79018ace18dd241",
+        "sct/detectors_datafog.py": "eb0601c49a3e8ad093d3cdfbced9a50901a37c0b1876514ac86912981d1ed5d7",
+        "sct/documents.py": "1250c8d780deb4e147767e630296d17bb84b1835fa565f9f9bcf37eeaa119c5a",
+        "sct/evaluation.py": "0744ddaccf6a6f9f26c1b05ac14165d0e140d0dd2cc386d5b8cce914a7f02e27",
+        "sct/findings.py": "c5298b9205f66c63d361096f73189646ecb70e47a5245ec9589493f430a209d2",
+        "sct/integrations/__init__.py": "86572a797863d690fc17eacfeb6baab82b5c2146606d20cc9852abb9fd59e851",
+        "sct/integrations/_runtime.py": "dd1c97c8649338177560b8d872ab8298822dfe072d691b36242cec84e48e6fb7",
+        "sct/integrations/datatrove.py": "60ebe86941848bbc3ce6ba37162fcc286ec9fd3af033381818714b9a0a680205",
+        "sct/integrations/docling.py": "6d1d26bf2fe3b2216261c2270ec2d67db6f5143c9d648d28effce3f1b31458d5",
+        "sct/integrations/haystack.py": "496863210cad7e4048c25aaf24bf4bd40ccdc94f876bcd085716778887cecfed",
+        "sct/integrations/hf.py": "4728d816cf9ac67790960a21b9cd4c33e83cc6ced4259a4cd8295db6654792ec",
+        "sct/integrations/langchain.py": "c3c9ba429153c0acbb38d912851cc89f60a24660b53a307ce8f9e229b300c8b3",
+        "sct/language_policy.py": "e5c60565ad19a50c605ad57f46d5c33f7737affeed8cf972b5396c80070b4a28",
+        "sct/mcp_server.py": "f9aae6e48c3b46f1dcc938196a3f0b150d2f2f716ca2b6399dc4186363cc62f7",
+        "sct/model_benchmark.py": "14c667e194880b7a60e95704605e07cfe4244224aa53724f196fbe2a4cffc3d1",
+        "sct/model_candidates.py": "e800be7bed0b7b256bd4d880f1b3d8027b7e8e92215386778971348cc7adee46",
+        "sct/ocr.py": "1ccb8453e01bf6a0946455b7db2503f966a7a0b602c883b1833f5f745071c6cc",
+        "sct/policy_v2.py": "e25e1f44c4ff7be6beb9bbf3c47a9bcc01dd5c731b053fdc15eff93bebde70b3",
+        "sct/presets.py": "be2446dafbfc8705e05fdea1663de99f6187cca1dfb600f56b8491808aa1db1a",
+        "sct/privacy.py": "b0b7c78d52e5746b841a5f87255180094fab2d08634e0f8bb724ba52e6853d5a",
+        "sct/report_cli.py": "c95d9c4ef190d377b5f2cf80f9848d9177c5cf0135fca291890b49cfdd076320",
+        "sct/risk.py": "55ed1510197fe3361b127fef3c16ac8a7f2d8a0a393668ccce7507a326783bb9",
+        "sct/routing.py": "19ced2813aa8220ab7f08bddd032b384d5ccadf6d9e49f86546b7cd3642f28fc",
+        "sct/schema.py": "6821237c10f3b7a438cee08afdb94b0ce6b7ee6a71ccae639efe899338719584",
+        "sct/score.py": "b7a6548572e29147b85116e2efceeae8b9b30fe2ffd5af9b49bedcbb3fd0e4fc",
+        "sct/sct.py": "92296797236108707be03be9e6e2f242dea4802fdab93f5aafa4e198629c01f8",
+        "sct/signals.py": "6ef22ea0261a6206748613befa672a4900330bfac2349df8e31ba34fe5471626",
+        "sct/streaming.py": "c442a2fb06eea1aa0a4f98e962ecffbf09f4cbc41bd2369f504d8e3084a08a75",
+        "sct/token_stores/__init__.py": "4f8caf8bd1fc12c5ee812a62b0e1e6d35e2d88df613105436fc3ea8c3e86946c",
+        "sct/token_stores/sqlite.py": "bdaedeecfccbc4ef628a93e00ff5ae0dda6f17207dc84628512e00735be7118b",
+        "sct/unified.py": "f844242f43ae099fdc08ecdbbf7e34932c94e609a67ae2ef2131b68fae55e714",
+        "sct/utils/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "sct/utils/anonymization_map.py": "2925f2580dd2666c0a5a71348a0539a1cf84ae305de28f0223a0ffe275803b04",
+        "sct/utils/atomic_file.py": "99f67a1ffb1db33eb229d0d7ac178dff4b669666ad42433888fa007890085d5a",
+        "sct/utils/constants.py": "20966a48e158141a055ab3127c0b99954580a0bd784428fc6be4145ae773dd6a",
+        "sct/utils/contact.py": "627e5ffd3e2a1212f73094b28d9ddf9ca72432225363eff47889e60b998ef2ba",
+        "sct/utils/datetime.py": "420babdfdbff4259a4774faf3cd6dfe33603882606214ab5a8e80869b34b4f30",
+        "sct/utils/gliclass_adapter.py": "d9f054dc7a1831634cbeb1510f18ccfbc80cb7d2595319d492a820a63b1ba8be",
+        "sct/utils/gliner_adapter.py": "99c366d8859637df255d237f9516f2e666b74b5eecfe2f12cb843d39c436c972",
+        "sct/utils/markers.py": "79b03874a953c587e8c530b52ecebe69e29d39b88a8918c7bb26e70c2b9a1856",
+        "sct/utils/ner.py": "dba9b9cdae78b0a6f619741ff26fdcee80e5574e0a95ad88266595f6772f7f35",
+        "sct/utils/ner_chunking.py": "b60046f3b86bbc9e0e0c3273fb7e8c8d62a22f8a8a2b61c7b1155869cbbd0bb1",
+        "sct/utils/ner_spans.py": "d3934998a8f76ae8de354be9cd4a95da9aed324496e7975d3fd552f043685e57",
+        "sct/utils/normtext.py": "538569ee5a14d411c99a63808c0bc144959711d770372128f95d70c1771e63c2",
+        "sct/utils/onnx_pipeline.py": "8214e7ebd532890541d63346986d4557c38b0176bae60b4708b3645b4db71d60",
+        "sct/utils/process_result.py": "b36f7cbdbe79292cefaa4991cedb8408bf4f0c4ac627a450226ab4ffec595562",
+        "sct/utils/resources.py": "18058b215ffdd9d390966ff7485447f03fe8d54968821b4d7902342ee804ed13",
+        "sct/utils/special.py": "705aa6e13607a229f30dfa69c061656aac7d1b3accbc1611c2b6b0caecf36a97",
+        "sct/utils/stopwords.py": "e36784c680695cf4dd1f00a33a379e525d98bae964c39d525e2837792bf9996c",
+        "sct/utils/synthetic.py": "1f3a659abc9d3e1e79d606904e7b58cacde7fedf8229a5fad1072f3403fb4775",
+        "sct/utils/torch_pipeline.py": "b70053c797d8d694dd9f497491e88fe342abdb687fa2e35668d7091a347f34c7"
+      },
+      "probe_sha256": "02fbf7494ea9395a8ddb457488818ef41c1a33f64a95965942c2ba9cc7bda843",
+      "runtime": {
+        "torch": {
+          "version": "2.14.0+cu126",
+          "path": "/home/rehan/sct-gpu-supported-20261110/.venv/lib/python3.12/site-packages/torch/__init__.py"
+        },
+        "transformers": {
+          "version": "5.16.1",
+          "path": "/home/rehan/sct-gpu-supported-20261110/.venv/lib/python3.12/site-packages/transformers/__init__.py"
+        },
+        "onnxruntime-gpu": {
+          "version": "1.24.4",
+          "path": "/home/rehan/sct-gpu-supported-20261110/.venv/lib/python3.12/site-packages/onnxruntime/__init__.py"
+        },
+        "gliner": {
+          "version": "0.2.29",
+          "path": "/home/rehan/sct-gpu-supported-20261110/.venv/lib/python3.12/site-packages/gliner/__init__.py"
+        },
+        "gliner2": {
+          "version": "1.3.2",
+          "path": "/home/rehan/sct-gpu-supported-20261110/.venv/lib/python3.12/site-packages/gliner2/__init__.py"
+        },
+        "gliclass": {
+          "version": "0.1.20",
+          "path": "/home/rehan/sct-gpu-supported-20261110/.venv/lib/python3.12/site-packages/gliclass/__init__.py"
+        },
+        "presidio-analyzer": {
+          "version": "2.2.362",
+          "path": "/home/rehan/sct-gpu-supported-20261110/.venv/lib/python3.12/site-packages/presidio_analyzer/__init__.py"
+        },
+        "spacy": {
+          "version": "3.8.16",
+          "path": "/home/rehan/sct-gpu-supported-20261110/.venv/lib/python3.12/site-packages/spacy/__init__.py"
+        }
+      },
+      "scope": "Synthetic functional inference, not accuracy or production qualification",
+      "canonical_findings": [
+        {
+          "entity_type": "PERSON",
+          "start": 2,
+          "end": 12,
+          "detector_id": "builtin_ner",
+          "score": 0.9994437396526337,
+          "coordinate_space": "canonical",
+          "source_ranges": [],
+          "mapping_quality": "unavailable"
+        },
+        {
+          "entity_type": "ORGANISATION",
+          "start": 23,
+          "end": 32,
+          "detector_id": "builtin_ner",
+          "score": 0.9987457990646362,
+          "coordinate_space": "canonical",
+          "source_ranges": [],
+          "mapping_quality": "unavailable"
+        },
+        {
+          "entity_type": "LOCATION",
+          "start": 36,
+          "end": 42,
+          "detector_id": "builtin_ner",
+          "score": 0.9995730519294739,
+          "coordinate_space": "canonical",
+          "source_ranges": [],
+          "mapping_quality": "unavailable"
+        }
+      ],
+      "unified_findings": [
+        {
+          "entity_type": "EMAIL",
+          "start": 50,
+          "end": 72,
+          "detector_id": "builtin_regex",
+          "score": null,
+          "coordinate_space": "canonical",
+          "source_ranges": [
+            {
+              "start": 50,
+              "end": 72
+            }
+          ],
+          "mapping_quality": "exact",
+          "action": "use_mode",
+          "reason": "unknown-score-protected",
+          "builtin_regex_origin": true
+        },
+        {
+          "entity_type": "PERSON",
+          "start": 2,
+          "end": 12,
+          "detector_id": "builtin_ner",
+          "score": 0.9994437396526337,
+          "coordinate_space": "canonical",
+          "source_ranges": [
+            {
+              "start": 2,
+              "end": 12
+            }
+          ],
+          "mapping_quality": "exact",
+          "action": "use_mode",
+          "reason": "policy-rule",
+          "builtin_regex_origin": false
+        },
+        {
+          "entity_type": "ORGANISATION",
+          "start": 23,
+          "end": 32,
+          "detector_id": "builtin_ner",
+          "score": 0.9987457990646362,
+          "coordinate_space": "canonical",
+          "source_ranges": [
+            {
+              "start": 23,
+              "end": 32
+            }
+          ],
+          "mapping_quality": "exact",
+          "action": "use_mode",
+          "reason": "policy-rule",
+          "builtin_regex_origin": false
+        },
+        {
+          "entity_type": "LOCATION",
+          "start": 36,
+          "end": 42,
+          "detector_id": "builtin_ner",
+          "score": 0.9995730519294739,
+          "coordinate_space": "canonical",
+          "source_ranges": [
+            {
+              "start": 36,
+              "end": 42
+            }
+          ],
+          "mapping_quality": "exact",
+          "action": "use_mode",
+          "reason": "policy-rule",
+          "builtin_regex_origin": false
+        }
+      ],
+      "person_protected": true,
+      "contact_protected": true,
+      "provenance": {
+        "ENGLISH": {
+          "key": "ENGLISH",
+          "id": "protectai/bert-base-NER-onnx",
+          "revision": "84d28ab2bc28401b4353b26033eb043c8c8a0739",
+          "provider": "CUDAExecutionProvider"
+        },
+        "MULTILINGUAL": {
+          "key": "MULTILINGUAL",
+          "id": "protectai/bert-base-NER-onnx",
+          "revision": "84d28ab2bc28401b4353b26033eb043c8c8a0739",
+          "provider": "CUDAExecutionProvider"
+        }
+      },
+      "gpu_execution": {
+        "visible_device": "GPU-5a285e5a-6883-d8af-9928-81d2ab04a33e",
+        "device_name": "NVIDIA GeForce RTX 4090",
+        "cuda_build": "12.6",
+        "torch_cuda_forwards": {},
+        "torch_cuda_kernels": 1444,
+        "trace_sha256": "41cf6f9a9726bed5733806a2e6416fb7b3ba112bb7ae6b43dc2ccdd44dcdc775",
+        "onnx_profiles": [
+          {
+            "path": "/home/rehan/sct-gpu-supported-20261110/gpu-results/ort-onnx_2026-11-10_12-26-33.json",
+            "sha256": "544e2ddec2f39f5857572975be735d8edd1403b88335ef5713f63a75a14f3c13",
+            "providers": [
+              "CUDAExecutionProvider",
+              "CPUExecutionProvider"
+            ],
+            "cuda_node_events": 1404
+          }
+        ],
+        "torch_peak_allocated": 0,
+        "torch_peak_reserved": 0
+      },
+      "network_attempts": 0,
+      "onnx_session_runs": 4,
+      "torch_module_forward_counts": {}
+    },
+    "torch": {
+      "provider": "torch",
+      "status": "passed",
+      "executable": "/home/rehan/sct-gpu-supported-20261110/.venv/bin/python",
+      "python": "3.12.3 (main, Aug 31 2026, 10:18:26) [GCC 13.3.0]",
+      "cpu_affinity": [
+        50,
+        51,
+        52,
+        53,
+        54,
+        55,
+        56,
+        57
+      ],
+      "artifacts": {
+        "torch": {
+          "repo": "dslim/bert-base-NER",
+          "revision": "d1a3e8f13f8c3566299d95fcfc9a8d2382a9affc",
+          "snapshot": "/home/rehan/.cache/huggingface/hub/models--dslim--bert-base-NER/snapshots/d1a3e8f13f8c3566299d95fcfc9a8d2382a9affc",
+          "files": {
+            "added_tokens.json": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+            "config.json": "a5dc77a0d60dadf5645103017f3c7b8ece4ef1b450bc1ea68e17da1d3ae7e515",
+            "model.safetensors": "b04492186cfb45a64908487a17a9f8d6ddec3a403ef39db5bca688f0fa702a34",
+            "special_tokens_map.json": "303df45a03609e4ead04bc3dc1536d0ab19b5358db685b6f3da123d05ec200e3",
+            "tokenizer_config.json": "4c052d60b505817149a29e88c5292d7779ddecfadbfc6208729e61403ec558ba",
+            "vocab.txt": "eeaa9875b23b04b4c54ef759d03db9d1ba1554838f8fb26c5d96fa551df93d02"
+          }
+        }
+      },
+      "source_sha256": {
+        "sct/__init__.py": "d6e5aca8eb5cbdbe0781bde805abe658ae869ec35d60b2a42f3af44b9cb9cd01",
+        "sct/adapters.py": "6c14afecf1b1d995e68c866d4a6333349d5c430edaebc1d0201d37daec08ca34",
+        "sct/browser.py": "552541e368fc5403f02294363816917d05bb2b837b6e3f66c30a3ed126c2a8bb",
+        "sct/cli.py": "b25622f4d030bebcb53e8fa4fd59b0e55805c48c5ad36fe852c90b4ef9f6abaa",
+        "sct/config.py": "15ff66b60385383b73d70d873afd7e39c3ddf8a770329ecaf9e67fb45f518710",
+        "sct/coordinates.py": "33d8b74559945bd8a12bd765b8313b4364a01ceb11460dfc4422e493846b7e72",
+        "sct/corpus/__init__.py": "b3589ddd7ab3c2a9fbf62fb3d0d4e932486e610fe308166ea76ddf5a2671124a",
+        "sct/corpus/datatrove.py": "901f069dd09ea1a9aee082b1fcfc6f4016eff720e68b7879942a9ef6cecf9eda",
+        "sct/corpus/manifest.py": "b5dbfaee581fe9f0c38808ebc128c439ea17225b48eb5f8e30ef6236c65aba7f",
+        "sct/corpus/runner.py": "32448b24b82755300dbf91c8e05e378fb4b97d2c343b443a29eb7b0ea72312e4",
+        "sct/corpus/selection.py": "9f11d71de2889607c7a403f26725c35a326909e4f72a849bd2649eb08d4809a4",
+        "sct/corpus/types.py": "c78dd1c36e09e2b2a2c160594b2a529d6e8f04001a7577a391c295fedac1bf1f",
+        "sct/detectors.py": "3892d4886bcdb4be869c763d0db82b240e09521320155d7c98b49c8c3f629456",
+        "sct/detectors_builtin.py": "68ed494896dadc4eb7f70b40ce9f5516063c2378cc0bdd04e79018ace18dd241",
+        "sct/detectors_datafog.py": "eb0601c49a3e8ad093d3cdfbced9a50901a37c0b1876514ac86912981d1ed5d7",
+        "sct/documents.py": "1250c8d780deb4e147767e630296d17bb84b1835fa565f9f9bcf37eeaa119c5a",
+        "sct/evaluation.py": "0744ddaccf6a6f9f26c1b05ac14165d0e140d0dd2cc386d5b8cce914a7f02e27",
+        "sct/findings.py": "c5298b9205f66c63d361096f73189646ecb70e47a5245ec9589493f430a209d2",
+        "sct/integrations/__init__.py": "86572a797863d690fc17eacfeb6baab82b5c2146606d20cc9852abb9fd59e851",
+        "sct/integrations/_runtime.py": "dd1c97c8649338177560b8d872ab8298822dfe072d691b36242cec84e48e6fb7",
+        "sct/integrations/datatrove.py": "60ebe86941848bbc3ce6ba37162fcc286ec9fd3af033381818714b9a0a680205",
+        "sct/integrations/docling.py": "6d1d26bf2fe3b2216261c2270ec2d67db6f5143c9d648d28effce3f1b31458d5",
+        "sct/integrations/haystack.py": "496863210cad7e4048c25aaf24bf4bd40ccdc94f876bcd085716778887cecfed",
+        "sct/integrations/hf.py": "4728d816cf9ac67790960a21b9cd4c33e83cc6ced4259a4cd8295db6654792ec",
+        "sct/integrations/langchain.py": "c3c9ba429153c0acbb38d912851cc89f60a24660b53a307ce8f9e229b300c8b3",
+        "sct/language_policy.py": "e5c60565ad19a50c605ad57f46d5c33f7737affeed8cf972b5396c80070b4a28",
+        "sct/mcp_server.py": "f9aae6e48c3b46f1dcc938196a3f0b150d2f2f716ca2b6399dc4186363cc62f7",
+        "sct/model_benchmark.py": "14c667e194880b7a60e95704605e07cfe4244224aa53724f196fbe2a4cffc3d1",
+        "sct/model_candidates.py": "e800be7bed0b7b256bd4d880f1b3d8027b7e8e92215386778971348cc7adee46",
+        "sct/ocr.py": "1ccb8453e01bf6a0946455b7db2503f966a7a0b602c883b1833f5f745071c6cc",
+        "sct/policy_v2.py": "e25e1f44c4ff7be6beb9bbf3c47a9bcc01dd5c731b053fdc15eff93bebde70b3",
+        "sct/presets.py": "be2446dafbfc8705e05fdea1663de99f6187cca1dfb600f56b8491808aa1db1a",
+        "sct/privacy.py": "b0b7c78d52e5746b841a5f87255180094fab2d08634e0f8bb724ba52e6853d5a",
+        "sct/report_cli.py": "c95d9c4ef190d377b5f2cf80f9848d9177c5cf0135fca291890b49cfdd076320",
+        "sct/risk.py": "55ed1510197fe3361b127fef3c16ac8a7f2d8a0a393668ccce7507a326783bb9",
+        "sct/routing.py": "19ced2813aa8220ab7f08bddd032b384d5ccadf6d9e49f86546b7cd3642f28fc",
+        "sct/schema.py": "6821237c10f3b7a438cee08afdb94b0ce6b7ee6a71ccae639efe899338719584",
+        "sct/score.py": "b7a6548572e29147b85116e2efceeae8b9b30fe2ffd5af9b49bedcbb3fd0e4fc",
+        "sct/sct.py": "92296797236108707be03be9e6e2f242dea4802fdab93f5aafa4e198629c01f8",
+        "sct/signals.py": "6ef22ea0261a6206748613befa672a4900330bfac2349df8e31ba34fe5471626",
+        "sct/streaming.py": "c442a2fb06eea1aa0a4f98e962ecffbf09f4cbc41bd2369f504d8e3084a08a75",
+        "sct/token_stores/__init__.py": "4f8caf8bd1fc12c5ee812a62b0e1e6d35e2d88df613105436fc3ea8c3e86946c",
+        "sct/token_stores/sqlite.py": "bdaedeecfccbc4ef628a93e00ff5ae0dda6f17207dc84628512e00735be7118b",
+        "sct/unified.py": "f844242f43ae099fdc08ecdbbf7e34932c94e609a67ae2ef2131b68fae55e714",
+        "sct/utils/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "sct/utils/anonymization_map.py": "2925f2580dd2666c0a5a71348a0539a1cf84ae305de28f0223a0ffe275803b04",
+        "sct/utils/atomic_file.py": "99f67a1ffb1db33eb229d0d7ac178dff4b669666ad42433888fa007890085d5a",
+        "sct/utils/constants.py": "20966a48e158141a055ab3127c0b99954580a0bd784428fc6be4145ae773dd6a",
+        "sct/utils/contact.py": "627e5ffd3e2a1212f73094b28d9ddf9ca72432225363eff47889e60b998ef2ba",
+        "sct/utils/datetime.py": "420babdfdbff4259a4774faf3cd6dfe33603882606214ab5a8e80869b34b4f30",
+        "sct/utils/gliclass_adapter.py": "d9f054dc7a1831634cbeb1510f18ccfbc80cb7d2595319d492a820a63b1ba8be",
+        "sct/utils/gliner_adapter.py": "99c366d8859637df255d237f9516f2e666b74b5eecfe2f12cb843d39c436c972",
+        "sct/utils/markers.py": "79b03874a953c587e8c530b52ecebe69e29d39b88a8918c7bb26e70c2b9a1856",
+        "sct/utils/ner.py": "dba9b9cdae78b0a6f619741ff26fdcee80e5574e0a95ad88266595f6772f7f35",
+        "sct/utils/ner_chunking.py": "b60046f3b86bbc9e0e0c3273fb7e8c8d62a22f8a8a2b61c7b1155869cbbd0bb1",
+        "sct/utils/ner_spans.py": "d3934998a8f76ae8de354be9cd4a95da9aed324496e7975d3fd552f043685e57",
+        "sct/utils/normtext.py": "538569ee5a14d411c99a63808c0bc144959711d770372128f95d70c1771e63c2",
+        "sct/utils/onnx_pipeline.py": "8214e7ebd532890541d63346986d4557c38b0176bae60b4708b3645b4db71d60",
+        "sct/utils/process_result.py": "b36f7cbdbe79292cefaa4991cedb8408bf4f0c4ac627a450226ab4ffec595562",
+        "sct/utils/resources.py": "18058b215ffdd9d390966ff7485447f03fe8d54968821b4d7902342ee804ed13",
+        "sct/utils/special.py": "705aa6e13607a229f30dfa69c061656aac7d1b3accbc1611c2b6b0caecf36a97",
+        "sct/utils/stopwords.py": "e36784c680695cf4dd1f00a33a379e525d98bae964c39d525e2837792bf9996c",
+        "sct/utils/synthetic.py": "1f3a659abc9d3e1e79d606904e7b58cacde7fedf8229a5fad1072f3403fb4775",
+        "sct/utils/torch_pipeline.py": "b70053c797d8d694dd9f497491e88fe342abdb687fa2e35668d7091a347f34c7"
+      },
+      "probe_sha256": "02fbf7494ea9395a8ddb457488818ef41c1a33f64a95965942c2ba9cc7bda843",
+      "runtime": {
+        "torch": {
+          "version": "2.14.0+cu126",
+          "path": "/home/rehan/sct-gpu-supported-20261110/.venv/lib/python3.12/site-packages/torch/__init__.py"
+        },
+        "transformers": {
+          "version": "5.16.1",
+          "path": "/home/rehan/sct-gpu-supported-20261110/.venv/lib/python3.12/site-packages/transformers/__init__.py"
+        },
+        "onnxruntime-gpu": {
+          "version": "1.24.4",
+          "path": "/home/rehan/sct-gpu-supported-20261110/.venv/lib/python3.12/site-packages/onnxruntime/__init__.py"
+        },
+        "gliner": {
+          "version": "0.2.29",
+          "path": "/home/rehan/sct-gpu-supported-20261110/.venv/lib/python3.12/site-packages/gliner/__init__.py"
+        },
+        "gliner2": {
+          "version": "1.3.2",
+          "path": "/home/rehan/sct-gpu-supported-20261110/.venv/lib/python3.12/site-packages/gliner2/__init__.py"
+        },
+        "gliclass": {
+          "version": "0.1.20",
+          "path": "/home/rehan/sct-gpu-supported-20261110/.venv/lib/python3.12/site-packages/gliclass/__init__.py"
+        },
+        "presidio-analyzer": {
+          "version": "2.2.362",
+          "path": "/home/rehan/sct-gpu-supported-20261110/.venv/lib/python3.12/site-packages/presidio_analyzer/__init__.py"
+        },
+        "spacy": {
+          "version": "3.8.16",
+          "path": "/home/rehan/sct-gpu-supported-20261110/.venv/lib/python3.12/site-packages/spacy/__init__.py"
+        }
+      },
+      "scope": "Synthetic functional inference, not accuracy or production qualification",
+      "canonical_findings": [
+        {
+          "entity_type": "PERSON",
+          "start": 2,
+          "end": 12,
+          "detector_id": "builtin_ner",
+          "score": 0.9994438886642456,
+          "coordinate_space": "canonical",
+          "source_ranges": [],
+          "mapping_quality": "unavailable"
+        },
+        {
+          "entity_type": "ORGANISATION",
+          "start": 23,
+          "end": 32,
+          "detector_id": "builtin_ner",
+          "score": 0.9987456798553467,
+          "coordinate_space": "canonical",
+          "source_ranges": [],
+          "mapping_quality": "unavailable"
+        },
+        {
+          "entity_type": "LOCATION",
+          "start": 36,
+          "end": 42,
+          "detector_id": "builtin_ner",
+          "score": 0.9995731711387634,
+          "coordinate_space": "canonical",
+          "source_ranges": [],
+          "mapping_quality": "unavailable"
+        }
+      ],
+      "unified_findings": [
+        {
+          "entity_type": "EMAIL",
+          "start": 50,
+          "end": 72,
+          "detector_id": "builtin_regex",
+          "score": null,
+          "coordinate_space": "canonical",
+          "source_ranges": [
+            {
+              "start": 50,
+              "end": 72
+            }
+          ],
+          "mapping_quality": "exact",
+          "action": "use_mode",
+          "reason": "unknown-score-protected",
+          "builtin_regex_origin": true
+        },
+        {
+          "entity_type": "PERSON",
+          "start": 2,
+          "end": 12,
+          "detector_id": "builtin_ner",
+          "score": 0.9994438886642456,
+          "coordinate_space": "canonical",
+          "source_ranges": [
+            {
+              "start": 2,
+              "end": 12
+            }
+          ],
+          "mapping_quality": "exact",
+          "action": "use_mode",
+          "reason": "policy-rule",
+          "builtin_regex_origin": false
+        },
+        {
+          "entity_type": "ORGANISATION",
+          "start": 23,
+          "end": 32,
+          "detector_id": "builtin_ner",
+          "score": 0.9987456798553467,
+          "coordinate_space": "canonical",
+          "source_ranges": [
+            {
+              "start": 23,
+              "end": 32
+            }
+          ],
+          "mapping_quality": "exact",
+          "action": "use_mode",
+          "reason": "policy-rule",
+          "builtin_regex_origin": false
+        },
+        {
+          "entity_type": "LOCATION",
+          "start": 36,
+          "end": 42,
+          "detector_id": "builtin_ner",
+          "score": 0.9995731711387634,
+          "coordinate_space": "canonical",
+          "source_ranges": [
+            {
+              "start": 36,
+              "end": 42
+            }
+          ],
+          "mapping_quality": "exact",
+          "action": "use_mode",
+          "reason": "policy-rule",
+          "builtin_regex_origin": false
+        }
+      ],
+      "person_protected": true,
+      "contact_protected": true,
+      "provenance": {
+        "ENGLISH": {
+          "key": "ENGLISH",
+          "id": "/home/rehan/.cache/huggingface/hub/models--dslim--bert-base-NER/snapshots/d1a3e8f13f8c3566299d95fcfc9a8d2382a9affc",
+          "revision": "d1a3e8f13f8c3566299d95fcfc9a8d2382a9affc",
+          "provider": "cuda:0"
+        },
+        "MULTILINGUAL": {
+          "key": "MULTILINGUAL",
+          "id": "/home/rehan/.cache/huggingface/hub/models--dslim--bert-base-NER/snapshots/d1a3e8f13f8c3566299d95fcfc9a8d2382a9affc",
+          "revision": "d1a3e8f13f8c3566299d95fcfc9a8d2382a9affc",
+          "provider": "cuda:0"
+        }
+      },
+      "gpu_execution": {
+        "visible_device": "GPU-5a285e5a-6883-d8af-9928-81d2ab04a33e",
+        "device_name": "NVIDIA GeForce RTX 4090",
+        "cuda_build": "12.6",
+        "torch_cuda_forwards": {
+          "torch.nn.modules.sparse.Embedding": 12,
+          "torch.nn.modules.normalization.LayerNorm": 100,
+          "torch.nn.modules.dropout.Dropout": 104,
+          "transformers.models.bert.modeling_bert.BertEmbeddings": 4,
+          "torch.nn.modules.linear.Linear": 292,
+          "transformers.models.bert.modeling_bert.BertSelfAttention": 48,
+          "transformers.models.bert.modeling_bert.BertSelfOutput": 48,
+          "transformers.models.bert.modeling_bert.BertAttention": 48,
+          "transformers.activations.GELUActivation": 48,
+          "transformers.models.bert.modeling_bert.BertIntermediate": 48,
+          "transformers.models.bert.modeling_bert.BertOutput": 48,
+          "transformers.models.bert.modeling_bert.BertLayer": 48,
+          "transformers.models.bert.modeling_bert.BertEncoder": 4,
+          "transformers.models.bert.modeling_bert.BertModel": 4,
+          "transformers.models.bert.modeling_bert.BertForTokenClassification": 4
+        },
+        "torch_cuda_kernels": 1000,
+        "trace_sha256": "4e1763199661fe6b8d10d32d2c74ec07fb1a9fe36c3830ef27035ec3e16b4f9e",
+        "onnx_profiles": [],
+        "torch_peak_allocated": 440772608,
+        "torch_peak_reserved": 490733568
+      },
+      "network_attempts": 0,
+      "onnx_session_runs": 0,
+      "torch_module_forward_counts": {
+        "torch.nn.modules.sparse.Embedding": 12,
+        "torch.nn.modules.normalization.LayerNorm": 100,
+        "torch.nn.modules.dropout.Dropout": 104,
+        "transformers.models.bert.modeling_bert.BertEmbeddings": 4,
+        "torch.nn.modules.linear.Linear": 292,
+        "transformers.models.bert.modeling_bert.BertSelfAttention": 48,
+        "transformers.models.bert.modeling_bert.BertSelfOutput": 48,
+        "transformers.models.bert.modeling_bert.BertAttention": 48,
+        "transformers.activations.GELUActivation": 48,
+        "transformers.models.bert.modeling_bert.BertIntermediate": 48,
+        "transformers.models.bert.modeling_bert.BertOutput": 48,
+        "transformers.models.bert.modeling_bert.BertLayer": 48,
+        "transformers.models.bert.modeling_bert.BertEncoder": 4,
+        "transformers.models.bert.modeling_bert.BertModel": 4,
+        "transformers.models.bert.modeling_bert.BertForTokenClassification": 4
+      }
+    },
+    "gliner": {
+      "provider": "gliner",
+      "status": "passed",
+      "executable": "/home/rehan/sct-gpu-supported-20261110/.venv/bin/python",
+      "python": "3.12.3 (main, Aug 31 2026, 10:18:26) [GCC 13.3.0]",
+      "cpu_affinity": [
+        50,
+        51,
+        52,
+        53,
+        54,
+        55,
+        56,
+        57
+      ],
+      "artifacts": {
+        "gliner": {
+          "repo": "urchade/gliner_small-v2.1",
+          "revision": "4e091416cf7c3481db542c2a3d26156916f3a47f",
+          "snapshot": "/home/rehan/.cache/huggingface/hub/models--urchade--gliner_small-v2.1/snapshots/4e091416cf7c3481db542c2a3d26156916f3a47f",
+          "files": {
+            ".gitattributes": "11ad7efa24975ee4b0c3c3a38ed18737f0658a5f75a0a96787b576a78a023361",
+            "README.md": "5f665c0a6a0e7431ecf0ff59555a418e27601c4c3e8bc1616087a25490294a30",
+            "gliner_config.json": "eb963bd7182a1eaed4d170a87348ab62de6fc4eb30cfa7130c80846fee43d0ac",
+            "pytorch_model.bin": "1d4e83e4e4ae4ae0a4fbc81a32ee6de480fb341650d73e808088bb2800312de4"
+          }
+        },
+        "gliner_parent": {
+          "repo": "microsoft/deberta-v3-small",
+          "revision": "a36c739020e01763fe789b4b85e2df55d6180012",
+          "snapshot": "/home/rehan/.cache/huggingface/hub/models--microsoft--deberta-v3-small/snapshots/a36c739020e01763fe789b4b85e2df55d6180012",
+          "files": {
+            "config.json": "b0bb1caf90a50aa67d1085130508dfbf8646ac5a11928305e280b07a36e100ae",
+            "spm.model": "c679fbf93643d19aab7ee10c0b99e460bdbc02fedf34b92b05af343b4af586fd",
+            "tokenizer_config.json": "3f3978e0c036f2c2588cac34a6047cbb0af0b0dc1814254e291028529805496d"
+          }
+        }
+      },
+      "source_sha256": {
+        "sct/__init__.py": "d6e5aca8eb5cbdbe0781bde805abe658ae869ec35d60b2a42f3af44b9cb9cd01",
+        "sct/adapters.py": "6c14afecf1b1d995e68c866d4a6333349d5c430edaebc1d0201d37daec08ca34",
+        "sct/browser.py": "552541e368fc5403f02294363816917d05bb2b837b6e3f66c30a3ed126c2a8bb",
+        "sct/cli.py": "b25622f4d030bebcb53e8fa4fd59b0e55805c48c5ad36fe852c90b4ef9f6abaa",
+        "sct/config.py": "15ff66b60385383b73d70d873afd7e39c3ddf8a770329ecaf9e67fb45f518710",
+        "sct/coordinates.py": "33d8b74559945bd8a12bd765b8313b4364a01ceb11460dfc4422e493846b7e72",
+        "sct/corpus/__init__.py": "b3589ddd7ab3c2a9fbf62fb3d0d4e932486e610fe308166ea76ddf5a2671124a",
+        "sct/corpus/datatrove.py": "901f069dd09ea1a9aee082b1fcfc6f4016eff720e68b7879942a9ef6cecf9eda",
+        "sct/corpus/manifest.py": "b5dbfaee581fe9f0c38808ebc128c439ea17225b48eb5f8e30ef6236c65aba7f",
+        "sct/corpus/runner.py": "32448b24b82755300dbf91c8e05e378fb4b97d2c343b443a29eb7b0ea72312e4",
+        "sct/corpus/selection.py": "9f11d71de2889607c7a403f26725c35a326909e4f72a849bd2649eb08d4809a4",
+        "sct/corpus/types.py": "c78dd1c36e09e2b2a2c160594b2a529d6e8f04001a7577a391c295fedac1bf1f",
+        "sct/detectors.py": "3892d4886bcdb4be869c763d0db82b240e09521320155d7c98b49c8c3f629456",
+        "sct/detectors_builtin.py": "68ed494896dadc4eb7f70b40ce9f5516063c2378cc0bdd04e79018ace18dd241",
+        "sct/detectors_datafog.py": "eb0601c49a3e8ad093d3cdfbced9a50901a37c0b1876514ac86912981d1ed5d7",
+        "sct/documents.py": "1250c8d780deb4e147767e630296d17bb84b1835fa565f9f9bcf37eeaa119c5a",
+        "sct/evaluation.py": "0744ddaccf6a6f9f26c1b05ac14165d0e140d0dd2cc386d5b8cce914a7f02e27",
+        "sct/findings.py": "c5298b9205f66c63d361096f73189646ecb70e47a5245ec9589493f430a209d2",
+        "sct/integrations/__init__.py": "86572a797863d690fc17eacfeb6baab82b5c2146606d20cc9852abb9fd59e851",
+        "sct/integrations/_runtime.py": "dd1c97c8649338177560b8d872ab8298822dfe072d691b36242cec84e48e6fb7",
+        "sct/integrations/datatrove.py": "60ebe86941848bbc3ce6ba37162fcc286ec9fd3af033381818714b9a0a680205",
+        "sct/integrations/docling.py": "6d1d26bf2fe3b2216261c2270ec2d67db6f5143c9d648d28effce3f1b31458d5",
+        "sct/integrations/haystack.py": "496863210cad7e4048c25aaf24bf4bd40ccdc94f876bcd085716778887cecfed",
+        "sct/integrations/hf.py": "4728d816cf9ac67790960a21b9cd4c33e83cc6ced4259a4cd8295db6654792ec",
+        "sct/integrations/langchain.py": "c3c9ba429153c0acbb38d912851cc89f60a24660b53a307ce8f9e229b300c8b3",
+        "sct/language_policy.py": "e5c60565ad19a50c605ad57f46d5c33f7737affeed8cf972b5396c80070b4a28",
+        "sct/mcp_server.py": "f9aae6e48c3b46f1dcc938196a3f0b150d2f2f716ca2b6399dc4186363cc62f7",
+        "sct/model_benchmark.py": "14c667e194880b7a60e95704605e07cfe4244224aa53724f196fbe2a4cffc3d1",
+        "sct/model_candidates.py": "e800be7bed0b7b256bd4d880f1b3d8027b7e8e92215386778971348cc7adee46",
+        "sct/ocr.py": "1ccb8453e01bf6a0946455b7db2503f966a7a0b602c883b1833f5f745071c6cc",
+        "sct/policy_v2.py": "e25e1f44c4ff7be6beb9bbf3c47a9bcc01dd5c731b053fdc15eff93bebde70b3",
+        "sct/presets.py": "be2446dafbfc8705e05fdea1663de99f6187cca1dfb600f56b8491808aa1db1a",
+        "sct/privacy.py": "b0b7c78d52e5746b841a5f87255180094fab2d08634e0f8bb724ba52e6853d5a",
+        "sct/report_cli.py": "c95d9c4ef190d377b5f2cf80f9848d9177c5cf0135fca291890b49cfdd076320",
+        "sct/risk.py": "55ed1510197fe3361b127fef3c16ac8a7f2d8a0a393668ccce7507a326783bb9",
+        "sct/routing.py": "19ced2813aa8220ab7f08bddd032b384d5ccadf6d9e49f86546b7cd3642f28fc",
+        "sct/schema.py": "6821237c10f3b7a438cee08afdb94b0ce6b7ee6a71ccae639efe899338719584",
+        "sct/score.py": "b7a6548572e29147b85116e2efceeae8b9b30fe2ffd5af9b49bedcbb3fd0e4fc",
+        "sct/sct.py": "92296797236108707be03be9e6e2f242dea4802fdab93f5aafa4e198629c01f8",
+        "sct/signals.py": "6ef22ea0261a6206748613befa672a4900330bfac2349df8e31ba34fe5471626",
+        "sct/streaming.py": "c442a2fb06eea1aa0a4f98e962ecffbf09f4cbc41bd2369f504d8e3084a08a75",
+        "sct/token_stores/__init__.py": "4f8caf8bd1fc12c5ee812a62b0e1e6d35e2d88df613105436fc3ea8c3e86946c",
+        "sct/token_stores/sqlite.py": "bdaedeecfccbc4ef628a93e00ff5ae0dda6f17207dc84628512e00735be7118b",
+        "sct/unified.py": "f844242f43ae099fdc08ecdbbf7e34932c94e609a67ae2ef2131b68fae55e714",
+        "sct/utils/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "sct/utils/anonymization_map.py": "2925f2580dd2666c0a5a71348a0539a1cf84ae305de28f0223a0ffe275803b04",
+        "sct/utils/atomic_file.py": "99f67a1ffb1db33eb229d0d7ac178dff4b669666ad42433888fa007890085d5a",
+        "sct/utils/constants.py": "20966a48e158141a055ab3127c0b99954580a0bd784428fc6be4145ae773dd6a",
+        "sct/utils/contact.py": "627e5ffd3e2a1212f73094b28d9ddf9ca72432225363eff47889e60b998ef2ba",
+        "sct/utils/datetime.py": "420babdfdbff4259a4774faf3cd6dfe33603882606214ab5a8e80869b34b4f30",
+        "sct/utils/gliclass_adapter.py": "d9f054dc7a1831634cbeb1510f18ccfbc80cb7d2595319d492a820a63b1ba8be",
+        "sct/utils/gliner_adapter.py": "99c366d8859637df255d237f9516f2e666b74b5eecfe2f12cb843d39c436c972",
+        "sct/utils/markers.py": "79b03874a953c587e8c530b52ecebe69e29d39b88a8918c7bb26e70c2b9a1856",
+        "sct/utils/ner.py": "dba9b9cdae78b0a6f619741ff26fdcee80e5574e0a95ad88266595f6772f7f35",
+        "sct/utils/ner_chunking.py": "b60046f3b86bbc9e0e0c3273fb7e8c8d62a22f8a8a2b61c7b1155869cbbd0bb1",
+        "sct/utils/ner_spans.py": "d3934998a8f76ae8de354be9cd4a95da9aed324496e7975d3fd552f043685e57",
+        "sct/utils/normtext.py": "538569ee5a14d411c99a63808c0bc144959711d770372128f95d70c1771e63c2",
+        "sct/utils/onnx_pipeline.py": "8214e7ebd532890541d63346986d4557c38b0176bae60b4708b3645b4db71d60",
+        "sct/utils/process_result.py": "b36f7cbdbe79292cefaa4991cedb8408bf4f0c4ac627a450226ab4ffec595562",
+        "sct/utils/resources.py": "18058b215ffdd9d390966ff7485447f03fe8d54968821b4d7902342ee804ed13",
+        "sct/utils/special.py": "705aa6e13607a229f30dfa69c061656aac7d1b3accbc1611c2b6b0caecf36a97",
+        "sct/utils/stopwords.py": "e36784c680695cf4dd1f00a33a379e525d98bae964c39d525e2837792bf9996c",
+        "sct/utils/synthetic.py": "1f3a659abc9d3e1e79d606904e7b58cacde7fedf8229a5fad1072f3403fb4775",
+        "sct/utils/torch_pipeline.py": "b70053c797d8d694dd9f497491e88fe342abdb687fa2e35668d7091a347f34c7"
+      },
+      "probe_sha256": "02fbf7494ea9395a8ddb457488818ef41c1a33f64a95965942c2ba9cc7bda843",
+      "runtime": {
+        "torch": {
+          "version": "2.14.0+cu126",
+          "path": "/home/rehan/sct-gpu-supported-20261110/.venv/lib/python3.12/site-packages/torch/__init__.py"
+        },
+        "transformers": {
+          "version": "5.16.1",
+          "path": "/home/rehan/sct-gpu-supported-20261110/.venv/lib/python3.12/site-packages/transformers/__init__.py"
+        },
+        "onnxruntime-gpu": {
+          "version": "1.24.4",
+          "path": "/home/rehan/sct-gpu-supported-20261110/.venv/lib/python3.12/site-packages/onnxruntime/__init__.py"
+        },
+        "gliner": {
+          "version": "0.2.29",
+          "path": "/home/rehan/sct-gpu-supported-20261110/.venv/lib/python3.12/site-packages/gliner/__init__.py"
+        },
+        "gliner2": {
+          "version": "1.3.2",
+          "path": "/home/rehan/sct-gpu-supported-20261110/.venv/lib/python3.12/site-packages/gliner2/__init__.py"
+        },
+        "gliclass": {
+          "version": "0.1.20",
+          "path": "/home/rehan/sct-gpu-supported-20261110/.venv/lib/python3.12/site-packages/gliclass/__init__.py"
+        },
+        "presidio-analyzer": {
+          "version": "2.2.362",
+          "path": "/home/rehan/sct-gpu-supported-20261110/.venv/lib/python3.12/site-packages/presidio_analyzer/__init__.py"
+        },
+        "spacy": {
+          "version": "3.8.16",
+          "path": "/home/rehan/sct-gpu-supported-20261110/.venv/lib/python3.12/site-packages/spacy/__init__.py"
+        }
+      },
+      "scope": "Synthetic functional inference, not accuracy or production qualification",
+      "canonical_findings": [
+        {
+          "entity_type": "PERSON",
+          "start": 2,
+          "end": 12,
+          "detector_id": "builtin_ner",
+          "score": 0.9914593696594238,
+          "coordinate_space": "canonical",
+          "source_ranges": [],
+          "mapping_quality": "unavailable"
+        },
+        {
+          "entity_type": "ORGANIZATION",
+          "start": 23,
+          "end": 32,
+          "detector_id": "builtin_ner",
+          "score": 0.9694362878799438,
+          "coordinate_space": "canonical",
+          "source_ranges": [],
+          "mapping_quality": "unavailable"
+        },
+        {
+          "entity_type": "LOCATION",
+          "start": 36,
+          "end": 42,
+          "detector_id": "builtin_ner",
+          "score": 0.9557245969772339,
+          "coordinate_space": "canonical",
+          "source_ranges": [],
+          "mapping_quality": "unavailable"
+        },
+        {
+          "entity_type": "PERSON",
+          "start": 50,
+          "end": 60,
+          "detector_id": "builtin_ner",
+          "score": 0.7015060186386108,
+          "coordinate_space": "canonical",
+          "source_ranges": [],
+          "mapping_quality": "unavailable"
+        },
+        {
+          "entity_type": "ORGANIZATION",
+          "start": 61,
+          "end": 72,
+          "detector_id": "builtin_ner",
+          "score": 0.6534674763679504,
+          "coordinate_space": "canonical",
+          "source_ranges": [],
+          "mapping_quality": "unavailable"
+        }
+      ],
+      "unified_findings": [
+        {
+          "entity_type": "EMAIL",
+          "start": 50,
+          "end": 72,
+          "detector_id": "builtin_regex",
+          "score": null,
+          "coordinate_space": "canonical",
+          "source_ranges": [
+            {
+              "start": 50,
+              "end": 72
+            }
+          ],
+          "mapping_quality": "exact",
+          "action": "use_mode",
+          "reason": "unknown-score-protected",
+          "builtin_regex_origin": true
+        },
+        {
+          "entity_type": "PERSON",
+          "start": 2,
+          "end": 12,
+          "detector_id": "builtin_ner",
+          "score": 0.9914593696594238,
+          "coordinate_space": "canonical",
+          "source_ranges": [
+            {
+              "start": 2,
+              "end": 12
+            }
+          ],
+          "mapping_quality": "exact",
+          "action": "use_mode",
+          "reason": "policy-rule",
+          "builtin_regex_origin": false
+        },
+        {
+          "entity_type": "ORGANIZATION",
+          "start": 23,
+          "end": 32,
+          "detector_id": "builtin_ner",
+          "score": 0.9694362878799438,
+          "coordinate_space": "canonical",
+          "source_ranges": [
+            {
+              "start": 23,
+              "end": 32
+            }
+          ],
+          "mapping_quality": "exact",
+          "action": "use_mode",
+          "reason": "policy-rule",
+          "builtin_regex_origin": false
+        },
+        {
+          "entity_type": "LOCATION",
+          "start": 36,
+          "end": 42,
+          "detector_id": "builtin_ner",
+          "score": 0.9557245969772339,
+          "coordinate_space": "canonical",
+          "source_ranges": [
+            {
+              "start": 36,
+              "end": 42
+            }
+          ],
+          "mapping_quality": "exact",
+          "action": "use_mode",
+          "reason": "policy-rule",
+          "builtin_regex_origin": false
+        },
+        {
+          "entity_type": "PERSON",
+          "start": 50,
+          "end": 60,
+          "detector_id": "builtin_ner",
+          "score": 0.7015060186386108,
+          "coordinate_space": "canonical",
+          "source_ranges": [
+            {
+              "start": 50,
+              "end": 60
+            }
+          ],
+          "mapping_quality": "exact",
+          "action": "use_mode",
+          "reason": "policy-rule",
+          "builtin_regex_origin": false
+        },
+        {
+          "entity_type": "ORGANIZATION",
+          "start": 61,
+          "end": 72,
+          "detector_id": "builtin_ner",
+          "score": 0.6534674763679504,
+          "coordinate_space": "canonical",
+          "source_ranges": [
+            {
+              "start": 61,
+              "end": 72
+            }
+          ],
+          "mapping_quality": "exact",
+          "action": "use_mode",
+          "reason": "policy-rule",
+          "builtin_regex_origin": false
+        }
+      ],
+      "person_protected": true,
+      "contact_protected": true,
+      "provenance": {
+        "GLINER": {
+          "key": "GLINER",
+          "id": "/home/rehan/.cache/huggingface/hub/models--urchade--gliner_small-v2.1/snapshots/4e091416cf7c3481db542c2a3d26156916f3a47f",
+          "revision": "4e091416cf7c3481db542c2a3d26156916f3a47f",
+          "provider": "cuda:0"
+        }
+      },
+      "gpu_execution": {
+        "visible_device": "GPU-5a285e5a-6883-d8af-9928-81d2ab04a33e",
+        "device_name": "NVIDIA GeForce RTX 4090",
+        "cuda_build": "12.6",
+        "torch_cuda_forwards": {
+          "torch.nn.modules.sparse.Embedding": 2,
+          "torch.nn.modules.normalization.LayerNorm": 28,
+          "torch.nn.modules.dropout.Dropout": 58,
+          "transformers.models.deberta_v2.modeling_deberta_v2.DebertaV2Embeddings": 2,
+          "torch.nn.modules.linear.Linear": 114,
+          "transformers.models.deberta_v2.modeling_deberta_v2.DisentangledSelfAttention": 12,
+          "transformers.models.deberta_v2.modeling_deberta_v2.DebertaV2SelfOutput": 12,
+          "transformers.models.deberta_v2.modeling_deberta_v2.DebertaV2Attention": 12,
+          "transformers.activations.GELUActivation": 12,
+          "transformers.models.deberta_v2.modeling_deberta_v2.DebertaV2Intermediate": 12,
+          "transformers.models.deberta_v2.modeling_deberta_v2.DebertaV2Output": 12,
+          "transformers.models.deberta_v2.modeling_deberta_v2.DebertaV2Layer": 12,
+          "transformers.models.deberta_v2.modeling_deberta_v2.DebertaV2Encoder": 2,
+          "transformers.models.deberta_v2.modeling_deberta_v2.DebertaV2Model": 2,
+          "gliner.modeling.encoder.Transformer": 2,
+          "gliner.modeling.encoder.Encoder": 2,
+          "torch.nn.modules.rnn.LSTM": 2,
+          "gliner.modeling.layers.LstmSeq2SeqEncoder": 2,
+          "torch.nn.modules.linear.Identity": 4,
+          "gliner.modeling.context_encoders.IdentityContextEncoder": 2,
+          "torch.nn.modules.activation.ReLU": 8,
+          "torch.nn.modules.container.Sequential": 8,
+          "gliner.modeling.span_rep.SpanMarkerV0": 2,
+          "gliner.modeling.span_rep.SpanRepLayer": 2,
+          "gliner.modeling.base.UniEncoderSpanModel": 2
+        },
+        "torch_cuda_kernels": 937,
+        "trace_sha256": "542c434c036943224324ea249eb67ad0113cce55bad574eac266e4a9b6f5f1ff",
+        "onnx_profiles": [],
+        "torch_peak_allocated": 644699136,
+        "torch_peak_reserved": 675282944
+      },
+      "network_attempts": 0,
+      "onnx_session_runs": 0,
+      "torch_module_forward_counts": {
+        "torch.nn.modules.sparse.Embedding": 2,
+        "torch.nn.modules.normalization.LayerNorm": 28,
+        "torch.nn.modules.dropout.Dropout": 58,
+        "transformers.models.deberta_v2.modeling_deberta_v2.DebertaV2Embeddings": 2,
+        "torch.nn.modules.linear.Linear": 114,
+        "transformers.models.deberta_v2.modeling_deberta_v2.DisentangledSelfAttention": 12,
+        "transformers.models.deberta_v2.modeling_deberta_v2.DebertaV2SelfOutput": 12,
+        "transformers.models.deberta_v2.modeling_deberta_v2.DebertaV2Attention": 12,
+        "transformers.activations.GELUActivation": 12,
+        "transformers.models.deberta_v2.modeling_deberta_v2.DebertaV2Intermediate": 12,
+        "transformers.models.deberta_v2.modeling_deberta_v2.DebertaV2Output": 12,
+        "transformers.models.deberta_v2.modeling_deberta_v2.DebertaV2Layer": 12,
+        "transformers.models.deberta_v2.modeling_deberta_v2.DebertaV2Encoder": 2,
+        "transformers.models.deberta_v2.modeling_deberta_v2.DebertaV2Model": 2,
+        "gliner.modeling.encoder.Transformer": 2,
+        "gliner.modeling.encoder.Encoder": 2,
+        "torch.nn.modules.rnn.LSTM": 2,
+        "gliner.modeling.layers.LstmSeq2SeqEncoder": 2,
+        "torch.nn.modules.linear.Identity": 4,
+        "gliner.modeling.context_encoders.IdentityContextEncoder": 2,
+        "torch.nn.modules.activation.ReLU": 8,
+        "torch.nn.modules.container.Sequential": 8,
+        "gliner.modeling.span_rep.SpanMarkerV0": 2,
+        "gliner.modeling.span_rep.SpanRepLayer": 2,
+        "gliner.modeling.base.UniEncoderSpanModel": 2
+      }
+    },
+    "ensemble_onnx": {
+      "provider": "ensemble_onnx",
+      "status": "passed",
+      "executable": "/home/rehan/sct-gpu-supported-20261110/.venv/bin/python",
+      "python": "3.12.3 (main, Aug 31 2026, 10:18:26) [GCC 13.3.0]",
+      "cpu_affinity": [
+        50,
+        51,
+        52,
+        53,
+        54,
+        55,
+        56,
+        57
+      ],
+      "artifacts": {
+        "onnx": {
+          "repo": "protectai/bert-base-NER-onnx",
+          "revision": "84d28ab2bc28401b4353b26033eb043c8c8a0739",
+          "snapshot": "/home/rehan/.cache/huggingface/hub/models--protectai--bert-base-NER-onnx/snapshots/84d28ab2bc28401b4353b26033eb043c8c8a0739",
+          "files": {
+            "config.json": "e3cc09261a1c73bda961e030563585b2be563bef339a78e11c802c3377b98d66",
+            "model.onnx": "e2165e300f6e0016c1f295bcdee36e084371e1f4f3564cd7e47cb833b58a75b7",
+            "tokenizer.json": "cb26b43c98e8266ae3e99c2a583cf8315d73b33a17e6b20b4df7ff1f22392d34",
+            "tokenizer_config.json": "e4225b51da958444892048db70287fa3a0be55c8f95ab24c22d79b01bd58e4e9"
+          }
+        },
+        "gliner": {
+          "repo": "urchade/gliner_small-v2.1",
+          "revision": "4e091416cf7c3481db542c2a3d26156916f3a47f",
+          "snapshot": "/home/rehan/.cache/huggingface/hub/models--urchade--gliner_small-v2.1/snapshots/4e091416cf7c3481db542c2a3d26156916f3a47f",
+          "files": {
+            ".gitattributes": "11ad7efa24975ee4b0c3c3a38ed18737f0658a5f75a0a96787b576a78a023361",
+            "README.md": "5f665c0a6a0e7431ecf0ff59555a418e27601c4c3e8bc1616087a25490294a30",
+            "gliner_config.json": "eb963bd7182a1eaed4d170a87348ab62de6fc4eb30cfa7130c80846fee43d0ac",
+            "pytorch_model.bin": "1d4e83e4e4ae4ae0a4fbc81a32ee6de480fb341650d73e808088bb2800312de4"
+          }
+        },
+        "gliner_parent": {
+          "repo": "microsoft/deberta-v3-small",
+          "revision": "a36c739020e01763fe789b4b85e2df55d6180012",
+          "snapshot": "/home/rehan/.cache/huggingface/hub/models--microsoft--deberta-v3-small/snapshots/a36c739020e01763fe789b4b85e2df55d6180012",
+          "files": {
+            "config.json": "b0bb1caf90a50aa67d1085130508dfbf8646ac5a11928305e280b07a36e100ae",
+            "spm.model": "c679fbf93643d19aab7ee10c0b99e460bdbc02fedf34b92b05af343b4af586fd",
+            "tokenizer_config.json": "3f3978e0c036f2c2588cac34a6047cbb0af0b0dc1814254e291028529805496d"
+          }
+        }
+      },
+      "source_sha256": {
+        "sct/__init__.py": "d6e5aca8eb5cbdbe0781bde805abe658ae869ec35d60b2a42f3af44b9cb9cd01",
+        "sct/adapters.py": "6c14afecf1b1d995e68c866d4a6333349d5c430edaebc1d0201d37daec08ca34",
+        "sct/browser.py": "552541e368fc5403f02294363816917d05bb2b837b6e3f66c30a3ed126c2a8bb",
+        "sct/cli.py": "b25622f4d030bebcb53e8fa4fd59b0e55805c48c5ad36fe852c90b4ef9f6abaa",
+        "sct/config.py": "15ff66b60385383b73d70d873afd7e39c3ddf8a770329ecaf9e67fb45f518710",
+        "sct/coordinates.py": "33d8b74559945bd8a12bd765b8313b4364a01ceb11460dfc4422e493846b7e72",
+        "sct/corpus/__init__.py": "b3589ddd7ab3c2a9fbf62fb3d0d4e932486e610fe308166ea76ddf5a2671124a",
+        "sct/corpus/datatrove.py": "901f069dd09ea1a9aee082b1fcfc6f4016eff720e68b7879942a9ef6cecf9eda",
+        "sct/corpus/manifest.py": "b5dbfaee581fe9f0c38808ebc128c439ea17225b48eb5f8e30ef6236c65aba7f",
+        "sct/corpus/runner.py": "32448b24b82755300dbf91c8e05e378fb4b97d2c343b443a29eb7b0ea72312e4",
+        "sct/corpus/selection.py": "9f11d71de2889607c7a403f26725c35a326909e4f72a849bd2649eb08d4809a4",
+        "sct/corpus/types.py": "c78dd1c36e09e2b2a2c160594b2a529d6e8f04001a7577a391c295fedac1bf1f",
+        "sct/detectors.py": "3892d4886bcdb4be869c763d0db82b240e09521320155d7c98b49c8c3f629456",
+        "sct/detectors_builtin.py": "68ed494896dadc4eb7f70b40ce9f5516063c2378cc0bdd04e79018ace18dd241",
+        "sct/detectors_datafog.py": "eb0601c49a3e8ad093d3cdfbced9a50901a37c0b1876514ac86912981d1ed5d7",
+        "sct/documents.py": "1250c8d780deb4e147767e630296d17bb84b1835fa565f9f9bcf37eeaa119c5a",
+        "sct/evaluation.py": "0744ddaccf6a6f9f26c1b05ac14165d0e140d0dd2cc386d5b8cce914a7f02e27",
+        "sct/findings.py": "c5298b9205f66c63d361096f73189646ecb70e47a5245ec9589493f430a209d2",
+        "sct/integrations/__init__.py": "86572a797863d690fc17eacfeb6baab82b5c2146606d20cc9852abb9fd59e851",
+        "sct/integrations/_runtime.py": "dd1c97c8649338177560b8d872ab8298822dfe072d691b36242cec84e48e6fb7",
+        "sct/integrations/datatrove.py": "60ebe86941848bbc3ce6ba37162fcc286ec9fd3af033381818714b9a0a680205",
+        "sct/integrations/docling.py": "6d1d26bf2fe3b2216261c2270ec2d67db6f5143c9d648d28effce3f1b31458d5",
+        "sct/integrations/haystack.py": "496863210cad7e4048c25aaf24bf4bd40ccdc94f876bcd085716778887cecfed",
+        "sct/integrations/hf.py": "4728d816cf9ac67790960a21b9cd4c33e83cc6ced4259a4cd8295db6654792ec",
+        "sct/integrations/langchain.py": "c3c9ba429153c0acbb38d912851cc89f60a24660b53a307ce8f9e229b300c8b3",
+        "sct/language_policy.py": "e5c60565ad19a50c605ad57f46d5c33f7737affeed8cf972b5396c80070b4a28",
+        "sct/mcp_server.py": "f9aae6e48c3b46f1dcc938196a3f0b150d2f2f716ca2b6399dc4186363cc62f7",
+        "sct/model_benchmark.py": "14c667e194880b7a60e95704605e07cfe4244224aa53724f196fbe2a4cffc3d1",
+        "sct/model_candidates.py": "e800be7bed0b7b256bd4d880f1b3d8027b7e8e92215386778971348cc7adee46",
+        "sct/ocr.py": "1ccb8453e01bf6a0946455b7db2503f966a7a0b602c883b1833f5f745071c6cc",
+        "sct/policy_v2.py": "e25e1f44c4ff7be6beb9bbf3c47a9bcc01dd5c731b053fdc15eff93bebde70b3",
+        "sct/presets.py": "be2446dafbfc8705e05fdea1663de99f6187cca1dfb600f56b8491808aa1db1a",
+        "sct/privacy.py": "b0b7c78d52e5746b841a5f87255180094fab2d08634e0f8bb724ba52e6853d5a",
+        "sct/report_cli.py": "c95d9c4ef190d377b5f2cf80f9848d9177c5cf0135fca291890b49cfdd076320",
+        "sct/risk.py": "55ed1510197fe3361b127fef3c16ac8a7f2d8a0a393668ccce7507a326783bb9",
+        "sct/routing.py": "19ced2813aa8220ab7f08bddd032b384d5ccadf6d9e49f86546b7cd3642f28fc",
+        "sct/schema.py": "6821237c10f3b7a438cee08afdb94b0ce6b7ee6a71ccae639efe899338719584",
+        "sct/score.py": "b7a6548572e29147b85116e2efceeae8b9b30fe2ffd5af9b49bedcbb3fd0e4fc",
+        "sct/sct.py": "92296797236108707be03be9e6e2f242dea4802fdab93f5aafa4e198629c01f8",
+        "sct/signals.py": "6ef22ea0261a6206748613befa672a4900330bfac2349df8e31ba34fe5471626",
+        "sct/streaming.py": "c442a2fb06eea1aa0a4f98e962ecffbf09f4cbc41bd2369f504d8e3084a08a75",
+        "sct/token_stores/__init__.py": "4f8caf8bd1fc12c5ee812a62b0e1e6d35e2d88df613105436fc3ea8c3e86946c",
+        "sct/token_stores/sqlite.py": "bdaedeecfccbc4ef628a93e00ff5ae0dda6f17207dc84628512e00735be7118b",
+        "sct/unified.py": "f844242f43ae099fdc08ecdbbf7e34932c94e609a67ae2ef2131b68fae55e714",
+        "sct/utils/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "sct/utils/anonymization_map.py": "2925f2580dd2666c0a5a71348a0539a1cf84ae305de28f0223a0ffe275803b04",
+        "sct/utils/atomic_file.py": "99f67a1ffb1db33eb229d0d7ac178dff4b669666ad42433888fa007890085d5a",
+        "sct/utils/constants.py": "20966a48e158141a055ab3127c0b99954580a0bd784428fc6be4145ae773dd6a",
+        "sct/utils/contact.py": "627e5ffd3e2a1212f73094b28d9ddf9ca72432225363eff47889e60b998ef2ba",
+        "sct/utils/datetime.py": "420babdfdbff4259a4774faf3cd6dfe33603882606214ab5a8e80869b34b4f30",
+        "sct/utils/gliclass_adapter.py": "d9f054dc7a1831634cbeb1510f18ccfbc80cb7d2595319d492a820a63b1ba8be",
+        "sct/utils/gliner_adapter.py": "99c366d8859637df255d237f9516f2e666b74b5eecfe2f12cb843d39c436c972",
+        "sct/utils/markers.py": "79b03874a953c587e8c530b52ecebe69e29d39b88a8918c7bb26e70c2b9a1856",
+        "sct/utils/ner.py": "dba9b9cdae78b0a6f619741ff26fdcee80e5574e0a95ad88266595f6772f7f35",
+        "sct/utils/ner_chunking.py": "b60046f3b86bbc9e0e0c3273fb7e8c8d62a22f8a8a2b61c7b1155869cbbd0bb1",
+        "sct/utils/ner_spans.py": "d3934998a8f76ae8de354be9cd4a95da9aed324496e7975d3fd552f043685e57",
+        "sct/utils/normtext.py": "538569ee5a14d411c99a63808c0bc144959711d770372128f95d70c1771e63c2",
+        "sct/utils/onnx_pipeline.py": "8214e7ebd532890541d63346986d4557c38b0176bae60b4708b3645b4db71d60",
+        "sct/utils/process_result.py": "b36f7cbdbe79292cefaa4991cedb8408bf4f0c4ac627a450226ab4ffec595562",
+        "sct/utils/resources.py": "18058b215ffdd9d390966ff7485447f03fe8d54968821b4d7902342ee804ed13",
+        "sct/utils/special.py": "705aa6e13607a229f30dfa69c061656aac7d1b3accbc1611c2b6b0caecf36a97",
+        "sct/utils/stopwords.py": "e36784c680695cf4dd1f00a33a379e525d98bae964c39d525e2837792bf9996c",
+        "sct/utils/synthetic.py": "1f3a659abc9d3e1e79d606904e7b58cacde7fedf8229a5fad1072f3403fb4775",
+        "sct/utils/torch_pipeline.py": "b70053c797d8d694dd9f497491e88fe342abdb687fa2e35668d7091a347f34c7"
+      },
+      "probe_sha256": "02fbf7494ea9395a8ddb457488818ef41c1a33f64a95965942c2ba9cc7bda843",
+      "runtime": {
+        "torch": {
+          "version": "2.14.0+cu126",
+          "path": "/home/rehan/sct-gpu-supported-20261110/.venv/lib/python3.12/site-packages/torch/__init__.py"
+        },
+        "transformers": {
+          "version": "5.16.1",
+          "path": "/home/rehan/sct-gpu-supported-20261110/.venv/lib/python3.12/site-packages/transformers/__init__.py"
+        },
+        "onnxruntime-gpu": {
+          "version": "1.24.4",
+          "path": "/home/rehan/sct-gpu-supported-20261110/.venv/lib/python3.12/site-packages/onnxruntime/__init__.py"
+        },
+        "gliner": {
+          "version": "0.2.29",
+          "path": "/home/rehan/sct-gpu-supported-20261110/.venv/lib/python3.12/site-packages/gliner/__init__.py"
+        },
+        "gliner2": {
+          "version": "1.3.2",
+          "path": "/home/rehan/sct-gpu-supported-20261110/.venv/lib/python3.12/site-packages/gliner2/__init__.py"
+        },
+        "gliclass": {
+          "version": "0.1.20",
+          "path": "/home/rehan/sct-gpu-supported-20261110/.venv/lib/python3.12/site-packages/gliclass/__init__.py"
+        },
+        "presidio-analyzer": {
+          "version": "2.2.362",
+          "path": "/home/rehan/sct-gpu-supported-20261110/.venv/lib/python3.12/site-packages/presidio_analyzer/__init__.py"
+        },
+        "spacy": {
+          "version": "3.8.16",
+          "path": "/home/rehan/sct-gpu-supported-20261110/.venv/lib/python3.12/site-packages/spacy/__init__.py"
+        }
+      },
+      "scope": "Synthetic functional inference, not accuracy or production qualification",
+      "canonical_findings": [
+        {
+          "entity_type": "PERSON",
+          "start": 2,
+          "end": 12,
+          "detector_id": "builtin_ner",
+          "score": 0.9994437396526337,
+          "coordinate_space": "canonical",
+          "source_ranges": [],
+          "mapping_quality": "unavailable"
+        },
+        {
+          "entity_type": "ORGANISATION",
+          "start": 23,
+          "end": 32,
+          "detector_id": "builtin_ner",
+          "score": 0.9987457990646362,
+          "coordinate_space": "canonical",
+          "source_ranges": [],
+          "mapping_quality": "unavailable"
+        },
+        {
+          "entity_type": "LOCATION",
+          "start": 36,
+          "end": 42,
+          "detector_id": "builtin_ner",
+          "score": 0.9995730519294739,
+          "coordinate_space": "canonical",
+          "source_ranges": [],
+          "mapping_quality": "unavailable"
+        },
+        {
+          "entity_type": "PERSON",
+          "start": 50,
+          "end": 60,
+          "detector_id": "builtin_ner",
+          "score": 0.7015060186386108,
+          "coordinate_space": "canonical",
+          "source_ranges": [],
+          "mapping_quality": "unavailable"
+        },
+        {
+          "entity_type": "ORGANISATION",
+          "start": 61,
+          "end": 72,
+          "detector_id": "builtin_ner",
+          "score": 0.6534674763679504,
+          "coordinate_space": "canonical",
+          "source_ranges": [],
+          "mapping_quality": "unavailable"
+        }
+      ],
+      "unified_findings": [
+        {
+          "entity_type": "EMAIL",
+          "start": 50,
+          "end": 72,
+          "detector_id": "builtin_regex",
+          "score": null,
+          "coordinate_space": "canonical",
+          "source_ranges": [
+            {
+              "start": 50,
+              "end": 72
+            }
+          ],
+          "mapping_quality": "exact",
+          "action": "use_mode",
+          "reason": "unknown-score-protected",
+          "builtin_regex_origin": true
+        },
+        {
+          "entity_type": "PERSON",
+          "start": 2,
+          "end": 12,
+          "detector_id": "builtin_ner",
+          "score": 0.9994437396526337,
+          "coordinate_space": "canonical",
+          "source_ranges": [
+            {
+              "start": 2,
+              "end": 12
+            }
+          ],
+          "mapping_quality": "exact",
+          "action": "use_mode",
+          "reason": "policy-rule",
+          "builtin_regex_origin": false
+        },
+        {
+          "entity_type": "ORGANISATION",
+          "start": 23,
+          "end": 32,
+          "detector_id": "builtin_ner",
+          "score": 0.9987457990646362,
+          "coordinate_space": "canonical",
+          "source_ranges": [
+            {
+              "start": 23,
+              "end": 32
+            }
+          ],
+          "mapping_quality": "exact",
+          "action": "use_mode",
+          "reason": "policy-rule",
+          "builtin_regex_origin": false
+        },
+        {
+          "entity_type": "LOCATION",
+          "start": 36,
+          "end": 42,
+          "detector_id": "builtin_ner",
+          "score": 0.9995730519294739,
+          "coordinate_space": "canonical",
+          "source_ranges": [
+            {
+              "start": 36,
+              "end": 42
+            }
+          ],
+          "mapping_quality": "exact",
+          "action": "use_mode",
+          "reason": "policy-rule",
+          "builtin_regex_origin": false
+        },
+        {
+          "entity_type": "PERSON",
+          "start": 50,
+          "end": 60,
+          "detector_id": "builtin_ner",
+          "score": 0.7015060186386108,
+          "coordinate_space": "canonical",
+          "source_ranges": [
+            {
+              "start": 50,
+              "end": 60
+            }
+          ],
+          "mapping_quality": "exact",
+          "action": "use_mode",
+          "reason": "policy-rule",
+          "builtin_regex_origin": false
+        },
+        {
+          "entity_type": "ORGANISATION",
+          "start": 61,
+          "end": 72,
+          "detector_id": "builtin_ner",
+          "score": 0.6534674763679504,
+          "coordinate_space": "canonical",
+          "source_ranges": [
+            {
+              "start": 61,
+              "end": 72
+            }
+          ],
+          "mapping_quality": "exact",
+          "action": "use_mode",
+          "reason": "policy-rule",
+          "builtin_regex_origin": false
+        }
+      ],
+      "person_protected": true,
+      "contact_protected": true,
+      "provenance": {
+        "ENGLISH": {
+          "key": "ENGLISH",
+          "id": "protectai/bert-base-NER-onnx",
+          "revision": "84d28ab2bc28401b4353b26033eb043c8c8a0739",
+          "provider": "CUDAExecutionProvider"
+        },
+        "MULTILINGUAL": {
+          "key": "MULTILINGUAL",
+          "id": "protectai/bert-base-NER-onnx",
+          "revision": "84d28ab2bc28401b4353b26033eb043c8c8a0739",
+          "provider": "CUDAExecutionProvider"
+        },
+        "GLINER": {
+          "key": "GLINER",
+          "id": "/home/rehan/.cache/huggingface/hub/models--urchade--gliner_small-v2.1/snapshots/4e091416cf7c3481db542c2a3d26156916f3a47f",
+          "revision": "4e091416cf7c3481db542c2a3d26156916f3a47f",
+          "provider": "cuda:0"
+        }
+      },
+      "gpu_execution": {
+        "visible_device": "GPU-5a285e5a-6883-d8af-9928-81d2ab04a33e",
+        "device_name": "NVIDIA GeForce RTX 4090",
+        "cuda_build": "12.6",
+        "torch_cuda_forwards": {
+          "torch.nn.modules.sparse.Embedding": 2,
+          "torch.nn.modules.normalization.LayerNorm": 28,
+          "torch.nn.modules.dropout.Dropout": 58,
+          "transformers.models.deberta_v2.modeling_deberta_v2.DebertaV2Embeddings": 2,
+          "torch.nn.modules.linear.Linear": 114,
+          "transformers.models.deberta_v2.modeling_deberta_v2.DisentangledSelfAttention": 12,
+          "transformers.models.deberta_v2.modeling_deberta_v2.DebertaV2SelfOutput": 12,
+          "transformers.models.deberta_v2.modeling_deberta_v2.DebertaV2Attention": 12,
+          "transformers.activations.GELUActivation": 12,
+          "transformers.models.deberta_v2.modeling_deberta_v2.DebertaV2Intermediate": 12,
+          "transformers.models.deberta_v2.modeling_deberta_v2.DebertaV2Output": 12,
+          "transformers.models.deberta_v2.modeling_deberta_v2.DebertaV2Layer": 12,
+          "transformers.models.deberta_v2.modeling_deberta_v2.DebertaV2Encoder": 2,
+          "transformers.models.deberta_v2.modeling_deberta_v2.DebertaV2Model": 2,
+          "gliner.modeling.encoder.Transformer": 2,
+          "gliner.modeling.encoder.Encoder": 2,
+          "torch.nn.modules.rnn.LSTM": 2,
+          "gliner.modeling.layers.LstmSeq2SeqEncoder": 2,
+          "torch.nn.modules.linear.Identity": 4,
+          "gliner.modeling.context_encoders.IdentityContextEncoder": 2,
+          "torch.nn.modules.activation.ReLU": 8,
+          "torch.nn.modules.container.Sequential": 8,
+          "gliner.modeling.span_rep.SpanMarkerV0": 2,
+          "gliner.modeling.span_rep.SpanRepLayer": 2,
+          "gliner.modeling.base.UniEncoderSpanModel": 2
+        },
+        "torch_cuda_kernels": 2381,
+        "trace_sha256": "ef7d60c15a7a124106fc938b7b77aff1ca13e8ac4c1ecee87f391be768c12ee8",
+        "onnx_profiles": [
+          {
+            "path": "/home/rehan/sct-gpu-supported-20261110/gpu-results/ort-ensemble_onnx_2026-11-10_12-26-51.json",
+            "sha256": "f32b7de8de772001bb32be2603a6738f254d18a1f42d10e83de5ad33855c7636",
+            "providers": [
+              "CUDAExecutionProvider",
+              "CPUExecutionProvider"
+            ],
+            "cuda_node_events": 1404
+          }
+        ],
+        "torch_peak_allocated": 644699136,
+        "torch_peak_reserved": 675282944
+      },
+      "network_attempts": 0,
+      "onnx_session_runs": 4,
+      "torch_module_forward_counts": {
+        "torch.nn.modules.sparse.Embedding": 2,
+        "torch.nn.modules.normalization.LayerNorm": 28,
+        "torch.nn.modules.dropout.Dropout": 58,
+        "transformers.models.deberta_v2.modeling_deberta_v2.DebertaV2Embeddings": 2,
+        "torch.nn.modules.linear.Linear": 114,
+        "transformers.models.deberta_v2.modeling_deberta_v2.DisentangledSelfAttention": 12,
+        "transformers.models.deberta_v2.modeling_deberta_v2.DebertaV2SelfOutput": 12,
+        "transformers.models.deberta_v2.modeling_deberta_v2.DebertaV2Attention": 12,
+        "transformers.activations.GELUActivation": 12,
+        "transformers.models.deberta_v2.modeling_deberta_v2.DebertaV2Intermediate": 12,
+        "transformers.models.deberta_v2.modeling_deberta_v2.DebertaV2Output": 12,
+        "transformers.models.deberta_v2.modeling_deberta_v2.DebertaV2Layer": 12,
+        "transformers.models.deberta_v2.modeling_deberta_v2.DebertaV2Encoder": 2,
+        "transformers.models.deberta_v2.modeling_deberta_v2.DebertaV2Model": 2,
+        "gliner.modeling.encoder.Transformer": 2,
+        "gliner.modeling.encoder.Encoder": 2,
+        "torch.nn.modules.rnn.LSTM": 2,
+        "gliner.modeling.layers.LstmSeq2SeqEncoder": 2,
+        "torch.nn.modules.linear.Identity": 4,
+        "gliner.modeling.context_encoders.IdentityContextEncoder": 2,
+        "torch.nn.modules.activation.ReLU": 8,
+        "torch.nn.modules.container.Sequential": 8,
+        "gliner.modeling.span_rep.SpanMarkerV0": 2,
+        "gliner.modeling.span_rep.SpanRepLayer": 2,
+        "gliner.modeling.base.UniEncoderSpanModel": 2
+      }
+    },
+    "ensemble_torch": {
+      "provider": "ensemble_torch",
+      "status": "passed",
+      "executable": "/home/rehan/sct-gpu-supported-20261110/.venv/bin/python",
+      "python": "3.12.3 (main, Aug 31 2026, 10:18:26) [GCC 13.3.0]",
+      "cpu_affinity": [
+        50,
+        51,
+        52,
+        53,
+        54,
+        55,
+        56,
+        57
+      ],
+      "artifacts": {
+        "torch": {
+          "repo": "dslim/bert-base-NER",
+          "revision": "d1a3e8f13f8c3566299d95fcfc9a8d2382a9affc",
+          "snapshot": "/home/rehan/.cache/huggingface/hub/models--dslim--bert-base-NER/snapshots/d1a3e8f13f8c3566299d95fcfc9a8d2382a9affc",
+          "files": {
+            "added_tokens.json": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+            "config.json": "a5dc77a0d60dadf5645103017f3c7b8ece4ef1b450bc1ea68e17da1d3ae7e515",
+            "model.safetensors": "b04492186cfb45a64908487a17a9f8d6ddec3a403ef39db5bca688f0fa702a34",
+            "special_tokens_map.json": "303df45a03609e4ead04bc3dc1536d0ab19b5358db685b6f3da123d05ec200e3",
+            "tokenizer_config.json": "4c052d60b505817149a29e88c5292d7779ddecfadbfc6208729e61403ec558ba",
+            "vocab.txt": "eeaa9875b23b04b4c54ef759d03db9d1ba1554838f8fb26c5d96fa551df93d02"
+          }
+        },
+        "gliner": {
+          "repo": "urchade/gliner_small-v2.1",
+          "revision": "4e091416cf7c3481db542c2a3d26156916f3a47f",
+          "snapshot": "/home/rehan/.cache/huggingface/hub/models--urchade--gliner_small-v2.1/snapshots/4e091416cf7c3481db542c2a3d26156916f3a47f",
+          "files": {
+            ".gitattributes": "11ad7efa24975ee4b0c3c3a38ed18737f0658a5f75a0a96787b576a78a023361",
+            "README.md": "5f665c0a6a0e7431ecf0ff59555a418e27601c4c3e8bc1616087a25490294a30",
+            "gliner_config.json": "eb963bd7182a1eaed4d170a87348ab62de6fc4eb30cfa7130c80846fee43d0ac",
+            "pytorch_model.bin": "1d4e83e4e4ae4ae0a4fbc81a32ee6de480fb341650d73e808088bb2800312de4"
+          }
+        },
+        "gliner_parent": {
+          "repo": "microsoft/deberta-v3-small",
+          "revision": "a36c739020e01763fe789b4b85e2df55d6180012",
+          "snapshot": "/home/rehan/.cache/huggingface/hub/models--microsoft--deberta-v3-small/snapshots/a36c739020e01763fe789b4b85e2df55d6180012",
+          "files": {
+            "config.json": "b0bb1caf90a50aa67d1085130508dfbf8646ac5a11928305e280b07a36e100ae",
+            "spm.model": "c679fbf93643d19aab7ee10c0b99e460bdbc02fedf34b92b05af343b4af586fd",
+            "tokenizer_config.json": "3f3978e0c036f2c2588cac34a6047cbb0af0b0dc1814254e291028529805496d"
+          }
+        }
+      },
+      "source_sha256": {
+        "sct/__init__.py": "d6e5aca8eb5cbdbe0781bde805abe658ae869ec35d60b2a42f3af44b9cb9cd01",
+        "sct/adapters.py": "6c14afecf1b1d995e68c866d4a6333349d5c430edaebc1d0201d37daec08ca34",
+        "sct/browser.py": "552541e368fc5403f02294363816917d05bb2b837b6e3f66c30a3ed126c2a8bb",
+        "sct/cli.py": "b25622f4d030bebcb53e8fa4fd59b0e55805c48c5ad36fe852c90b4ef9f6abaa",
+        "sct/config.py": "15ff66b60385383b73d70d873afd7e39c3ddf8a770329ecaf9e67fb45f518710",
+        "sct/coordinates.py": "33d8b74559945bd8a12bd765b8313b4364a01ceb11460dfc4422e493846b7e72",
+        "sct/corpus/__init__.py": "b3589ddd7ab3c2a9fbf62fb3d0d4e932486e610fe308166ea76ddf5a2671124a",
+        "sct/corpus/datatrove.py": "901f069dd09ea1a9aee082b1fcfc6f4016eff720e68b7879942a9ef6cecf9eda",
+        "sct/corpus/manifest.py": "b5dbfaee581fe9f0c38808ebc128c439ea17225b48eb5f8e30ef6236c65aba7f",
+        "sct/corpus/runner.py": "32448b24b82755300dbf91c8e05e378fb4b97d2c343b443a29eb7b0ea72312e4",
+        "sct/corpus/selection.py": "9f11d71de2889607c7a403f26725c35a326909e4f72a849bd2649eb08d4809a4",
+        "sct/corpus/types.py": "c78dd1c36e09e2b2a2c160594b2a529d6e8f04001a7577a391c295fedac1bf1f",
+        "sct/detectors.py": "3892d4886bcdb4be869c763d0db82b240e09521320155d7c98b49c8c3f629456",
+        "sct/detectors_builtin.py": "68ed494896dadc4eb7f70b40ce9f5516063c2378cc0bdd04e79018ace18dd241",
+        "sct/detectors_datafog.py": "eb0601c49a3e8ad093d3cdfbced9a50901a37c0b1876514ac86912981d1ed5d7",
+        "sct/documents.py": "1250c8d780deb4e147767e630296d17bb84b1835fa565f9f9bcf37eeaa119c5a",
+        "sct/evaluation.py": "0744ddaccf6a6f9f26c1b05ac14165d0e140d0dd2cc386d5b8cce914a7f02e27",
+        "sct/findings.py": "c5298b9205f66c63d361096f73189646ecb70e47a5245ec9589493f430a209d2",
+        "sct/integrations/__init__.py": "86572a797863d690fc17eacfeb6baab82b5c2146606d20cc9852abb9fd59e851",
+        "sct/integrations/_runtime.py": "dd1c97c8649338177560b8d872ab8298822dfe072d691b36242cec84e48e6fb7",
+        "sct/integrations/datatrove.py": "60ebe86941848bbc3ce6ba37162fcc286ec9fd3af033381818714b9a0a680205",
+        "sct/integrations/docling.py": "6d1d26bf2fe3b2216261c2270ec2d67db6f5143c9d648d28effce3f1b31458d5",
+        "sct/integrations/haystack.py": "496863210cad7e4048c25aaf24bf4bd40ccdc94f876bcd085716778887cecfed",
+        "sct/integrations/hf.py": "4728d816cf9ac67790960a21b9cd4c33e83cc6ced4259a4cd8295db6654792ec",
+        "sct/integrations/langchain.py": "c3c9ba429153c0acbb38d912851cc89f60a24660b53a307ce8f9e229b300c8b3",
+        "sct/language_policy.py": "e5c60565ad19a50c605ad57f46d5c33f7737affeed8cf972b5396c80070b4a28",
+        "sct/mcp_server.py": "f9aae6e48c3b46f1dcc938196a3f0b150d2f2f716ca2b6399dc4186363cc62f7",
+        "sct/model_benchmark.py": "14c667e194880b7a60e95704605e07cfe4244224aa53724f196fbe2a4cffc3d1",
+        "sct/model_candidates.py": "e800be7bed0b7b256bd4d880f1b3d8027b7e8e92215386778971348cc7adee46",
+        "sct/ocr.py": "1ccb8453e01bf6a0946455b7db2503f966a7a0b602c883b1833f5f745071c6cc",
+        "sct/policy_v2.py": "e25e1f44c4ff7be6beb9bbf3c47a9bcc01dd5c731b053fdc15eff93bebde70b3",
+        "sct/presets.py": "be2446dafbfc8705e05fdea1663de99f6187cca1dfb600f56b8491808aa1db1a",
+        "sct/privacy.py": "b0b7c78d52e5746b841a5f87255180094fab2d08634e0f8bb724ba52e6853d5a",
+        "sct/report_cli.py": "c95d9c4ef190d377b5f2cf80f9848d9177c5cf0135fca291890b49cfdd076320",
+        "sct/risk.py": "55ed1510197fe3361b127fef3c16ac8a7f2d8a0a393668ccce7507a326783bb9",
+        "sct/routing.py": "19ced2813aa8220ab7f08bddd032b384d5ccadf6d9e49f86546b7cd3642f28fc",
+        "sct/schema.py": "6821237c10f3b7a438cee08afdb94b0ce6b7ee6a71ccae639efe899338719584",
+        "sct/score.py": "b7a6548572e29147b85116e2efceeae8b9b30fe2ffd5af9b49bedcbb3fd0e4fc",
+        "sct/sct.py": "92296797236108707be03be9e6e2f242dea4802fdab93f5aafa4e198629c01f8",
+        "sct/signals.py": "6ef22ea0261a6206748613befa672a4900330bfac2349df8e31ba34fe5471626",
+        "sct/streaming.py": "c442a2fb06eea1aa0a4f98e962ecffbf09f4cbc41bd2369f504d8e3084a08a75",
+        "sct/token_stores/__init__.py": "4f8caf8bd1fc12c5ee812a62b0e1e6d35e2d88df613105436fc3ea8c3e86946c",
+        "sct/token_stores/sqlite.py": "bdaedeecfccbc4ef628a93e00ff5ae0dda6f17207dc84628512e00735be7118b",
+        "sct/unified.py": "f844242f43ae099fdc08ecdbbf7e34932c94e609a67ae2ef2131b68fae55e714",
+        "sct/utils/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "sct/utils/anonymization_map.py": "2925f2580dd2666c0a5a71348a0539a1cf84ae305de28f0223a0ffe275803b04",
+        "sct/utils/atomic_file.py": "99f67a1ffb1db33eb229d0d7ac178dff4b669666ad42433888fa007890085d5a",
+        "sct/utils/constants.py": "20966a48e158141a055ab3127c0b99954580a0bd784428fc6be4145ae773dd6a",
+        "sct/utils/contact.py": "627e5ffd3e2a1212f73094b28d9ddf9ca72432225363eff47889e60b998ef2ba",
+        "sct/utils/datetime.py": "420babdfdbff4259a4774faf3cd6dfe33603882606214ab5a8e80869b34b4f30",
+        "sct/utils/gliclass_adapter.py": "d9f054dc7a1831634cbeb1510f18ccfbc80cb7d2595319d492a820a63b1ba8be",
+        "sct/utils/gliner_adapter.py": "99c366d8859637df255d237f9516f2e666b74b5eecfe2f12cb843d39c436c972",
+        "sct/utils/markers.py": "79b03874a953c587e8c530b52ecebe69e29d39b88a8918c7bb26e70c2b9a1856",
+        "sct/utils/ner.py": "dba9b9cdae78b0a6f619741ff26fdcee80e5574e0a95ad88266595f6772f7f35",
+        "sct/utils/ner_chunking.py": "b60046f3b86bbc9e0e0c3273fb7e8c8d62a22f8a8a2b61c7b1155869cbbd0bb1",
+        "sct/utils/ner_spans.py": "d3934998a8f76ae8de354be9cd4a95da9aed324496e7975d3fd552f043685e57",
+        "sct/utils/normtext.py": "538569ee5a14d411c99a63808c0bc144959711d770372128f95d70c1771e63c2",
+        "sct/utils/onnx_pipeline.py": "8214e7ebd532890541d63346986d4557c38b0176bae60b4708b3645b4db71d60",
+        "sct/utils/process_result.py": "b36f7cbdbe79292cefaa4991cedb8408bf4f0c4ac627a450226ab4ffec595562",
+        "sct/utils/resources.py": "18058b215ffdd9d390966ff7485447f03fe8d54968821b4d7902342ee804ed13",
+        "sct/utils/special.py": "705aa6e13607a229f30dfa69c061656aac7d1b3accbc1611c2b6b0caecf36a97",
+        "sct/utils/stopwords.py": "e36784c680695cf4dd1f00a33a379e525d98bae964c39d525e2837792bf9996c",
+        "sct/utils/synthetic.py": "1f3a659abc9d3e1e79d606904e7b58cacde7fedf8229a5fad1072f3403fb4775",
+        "sct/utils/torch_pipeline.py": "b70053c797d8d694dd9f497491e88fe342abdb687fa2e35668d7091a347f34c7"
+      },
+      "probe_sha256": "02fbf7494ea9395a8ddb457488818ef41c1a33f64a95965942c2ba9cc7bda843",
+      "runtime": {
+        "torch": {
+          "version": "2.14.0+cu126",
+          "path": "/home/rehan/sct-gpu-supported-20261110/.venv/lib/python3.12/site-packages/torch/__init__.py"
+        },
+        "transformers": {
+          "version": "5.16.1",
+          "path": "/home/rehan/sct-gpu-supported-20261110/.venv/lib/python3.12/site-packages/transformers/__init__.py"
+        },
+        "onnxruntime-gpu": {
+          "version": "1.24.4",
+          "path": "/home/rehan/sct-gpu-supported-20261110/.venv/lib/python3.12/site-packages/onnxruntime/__init__.py"
+        },
+        "gliner": {
+          "version": "0.2.29",
+          "path": "/home/rehan/sct-gpu-supported-20261110/.venv/lib/python3.12/site-packages/gliner/__init__.py"
+        },
+        "gliner2": {
+          "version": "1.3.2",
+          "path": "/home/rehan/sct-gpu-supported-20261110/.venv/lib/python3.12/site-packages/gliner2/__init__.py"
+        },
+        "gliclass": {
+          "version": "0.1.20",
+          "path": "/home/rehan/sct-gpu-supported-20261110/.venv/lib/python3.12/site-packages/gliclass/__init__.py"
+        },
+        "presidio-analyzer": {
+          "version": "2.2.362",
+          "path": "/home/rehan/sct-gpu-supported-20261110/.venv/lib/python3.12/site-packages/presidio_analyzer/__init__.py"
+        },
+        "spacy": {
+          "version": "3.8.16",
+          "path": "/home/rehan/sct-gpu-supported-20261110/.venv/lib/python3.12/site-packages/spacy/__init__.py"
+        }
+      },
+      "scope": "Synthetic functional inference, not accuracy or production qualification",
+      "canonical_findings": [
+        {
+          "entity_type": "PERSON",
+          "start": 2,
+          "end": 12,
+          "detector_id": "builtin_ner",
+          "score": 0.9994438886642456,
+          "coordinate_space": "canonical",
+          "source_ranges": [],
+          "mapping_quality": "unavailable"
+        },
+        {
+          "entity_type": "ORGANISATION",
+          "start": 23,
+          "end": 32,
+          "detector_id": "builtin_ner",
+          "score": 0.9987456798553467,
+          "coordinate_space": "canonical",
+          "source_ranges": [],
+          "mapping_quality": "unavailable"
+        },
+        {
+          "entity_type": "LOCATION",
+          "start": 36,
+          "end": 42,
+          "detector_id": "builtin_ner",
+          "score": 0.9995731711387634,
+          "coordinate_space": "canonical",
+          "source_ranges": [],
+          "mapping_quality": "unavailable"
+        },
+        {
+          "entity_type": "PERSON",
+          "start": 50,
+          "end": 60,
+          "detector_id": "builtin_ner",
+          "score": 0.7015060186386108,
+          "coordinate_space": "canonical",
+          "source_ranges": [],
+          "mapping_quality": "unavailable"
+        },
+        {
+          "entity_type": "ORGANISATION",
+          "start": 61,
+          "end": 72,
+          "detector_id": "builtin_ner",
+          "score": 0.6534674763679504,
+          "coordinate_space": "canonical",
+          "source_ranges": [],
+          "mapping_quality": "unavailable"
+        }
+      ],
+      "unified_findings": [
+        {
+          "entity_type": "EMAIL",
+          "start": 50,
+          "end": 72,
+          "detector_id": "builtin_regex",
+          "score": null,
+          "coordinate_space": "canonical",
+          "source_ranges": [
+            {
+              "start": 50,
+              "end": 72
+            }
+          ],
+          "mapping_quality": "exact",
+          "action": "use_mode",
+          "reason": "unknown-score-protected",
+          "builtin_regex_origin": true
+        },
+        {
+          "entity_type": "PERSON",
+          "start": 2,
+          "end": 12,
+          "detector_id": "builtin_ner",
+          "score": 0.9994438886642456,
+          "coordinate_space": "canonical",
+          "source_ranges": [
+            {
+              "start": 2,
+              "end": 12
+            }
+          ],
+          "mapping_quality": "exact",
+          "action": "use_mode",
+          "reason": "policy-rule",
+          "builtin_regex_origin": false
+        },
+        {
+          "entity_type": "ORGANISATION",
+          "start": 23,
+          "end": 32,
+          "detector_id": "builtin_ner",
+          "score": 0.9987456798553467,
+          "coordinate_space": "canonical",
+          "source_ranges": [
+            {
+              "start": 23,
+              "end": 32
+            }
+          ],
+          "mapping_quality": "exact",
+          "action": "use_mode",
+          "reason": "policy-rule",
+          "builtin_regex_origin": false
+        },
+        {
+          "entity_type": "LOCATION",
+          "start": 36,
+          "end": 42,
+          "detector_id": "builtin_ner",
+          "score": 0.9995731711387634,
+          "coordinate_space": "canonical",
+          "source_ranges": [
+            {
+              "start": 36,
+              "end": 42
+            }
+          ],
+          "mapping_quality": "exact",
+          "action": "use_mode",
+          "reason": "policy-rule",
+          "builtin_regex_origin": false
+        },
+        {
+          "entity_type": "PERSON",
+          "start": 50,
+          "end": 60,
+          "detector_id": "builtin_ner",
+          "score": 0.7015060186386108,
+          "coordinate_space": "canonical",
+          "source_ranges": [
+            {
+              "start": 50,
+              "end": 60
+            }
+          ],
+          "mapping_quality": "exact",
+          "action": "use_mode",
+          "reason": "policy-rule",
+          "builtin_regex_origin": false
+        },
+        {
+          "entity_type": "ORGANISATION",
+          "start": 61,
+          "end": 72,
+          "detector_id": "builtin_ner",
+          "score": 0.6534674763679504,
+          "coordinate_space": "canonical",
+          "source_ranges": [
+            {
+              "start": 61,
+              "end": 72
+            }
+          ],
+          "mapping_quality": "exact",
+          "action": "use_mode",
+          "reason": "policy-rule",
+          "builtin_regex_origin": false
+        }
+      ],
+      "person_protected": true,
+      "contact_protected": true,
+      "provenance": {
+        "ENGLISH": {
+          "key": "ENGLISH",
+          "id": "/home/rehan/.cache/huggingface/hub/models--dslim--bert-base-NER/snapshots/d1a3e8f13f8c3566299d95fcfc9a8d2382a9affc",
+          "revision": "d1a3e8f13f8c3566299d95fcfc9a8d2382a9affc",
+          "provider": "cuda:0"
+        },
+        "MULTILINGUAL": {
+          "key": "MULTILINGUAL",
+          "id": "/home/rehan/.cache/huggingface/hub/models--dslim--bert-base-NER/snapshots/d1a3e8f13f8c3566299d95fcfc9a8d2382a9affc",
+          "revision": "d1a3e8f13f8c3566299d95fcfc9a8d2382a9affc",
+          "provider": "cuda:0"
+        },
+        "GLINER": {
+          "key": "GLINER",
+          "id": "/home/rehan/.cache/huggingface/hub/models--urchade--gliner_small-v2.1/snapshots/4e091416cf7c3481db542c2a3d26156916f3a47f",
+          "revision": "4e091416cf7c3481db542c2a3d26156916f3a47f",
+          "provider": "cuda:0"
+        }
+      },
+      "gpu_execution": {
+        "visible_device": "GPU-5a285e5a-6883-d8af-9928-81d2ab04a33e",
+        "device_name": "NVIDIA GeForce RTX 4090",
+        "cuda_build": "12.6",
+        "torch_cuda_forwards": {
+          "torch.nn.modules.sparse.Embedding": 14,
+          "torch.nn.modules.normalization.LayerNorm": 128,
+          "torch.nn.modules.dropout.Dropout": 162,
+          "transformers.models.bert.modeling_bert.BertEmbeddings": 4,
+          "torch.nn.modules.linear.Linear": 406,
+          "transformers.models.bert.modeling_bert.BertSelfAttention": 48,
+          "transformers.models.bert.modeling_bert.BertSelfOutput": 48,
+          "transformers.models.bert.modeling_bert.BertAttention": 48,
+          "transformers.activations.GELUActivation": 60,
+          "transformers.models.bert.modeling_bert.BertIntermediate": 48,
+          "transformers.models.bert.modeling_bert.BertOutput": 48,
+          "transformers.models.bert.modeling_bert.BertLayer": 48,
+          "transformers.models.bert.modeling_bert.BertEncoder": 4,
+          "transformers.models.bert.modeling_bert.BertModel": 4,
+          "transformers.models.bert.modeling_bert.BertForTokenClassification": 4,
+          "transformers.models.deberta_v2.modeling_deberta_v2.DebertaV2Embeddings": 2,
+          "transformers.models.deberta_v2.modeling_deberta_v2.DisentangledSelfAttention": 12,
+          "transformers.models.deberta_v2.modeling_deberta_v2.DebertaV2SelfOutput": 12,
+          "transformers.models.deberta_v2.modeling_deberta_v2.DebertaV2Attention": 12,
+          "transformers.models.deberta_v2.modeling_deberta_v2.DebertaV2Intermediate": 12,
+          "transformers.models.deberta_v2.modeling_deberta_v2.DebertaV2Output": 12,
+          "transformers.models.deberta_v2.modeling_deberta_v2.DebertaV2Layer": 12,
+          "transformers.models.deberta_v2.modeling_deberta_v2.DebertaV2Encoder": 2,
+          "transformers.models.deberta_v2.modeling_deberta_v2.DebertaV2Model": 2,
+          "gliner.modeling.encoder.Transformer": 2,
+          "gliner.modeling.encoder.Encoder": 2,
+          "torch.nn.modules.rnn.LSTM": 2,
+          "gliner.modeling.layers.LstmSeq2SeqEncoder": 2,
+          "torch.nn.modules.linear.Identity": 4,
+          "gliner.modeling.context_encoders.IdentityContextEncoder": 2,
+          "torch.nn.modules.activation.ReLU": 8,
+          "torch.nn.modules.container.Sequential": 8,
+          "gliner.modeling.span_rep.SpanMarkerV0": 2,
+          "gliner.modeling.span_rep.SpanRepLayer": 2,
+          "gliner.modeling.base.UniEncoderSpanModel": 2
+        },
+        "torch_cuda_kernels": 1937,
+        "trace_sha256": "b51e846da20c801b1bc3d988cf4c96416a4241a4f37255462722975722065456",
+        "onnx_profiles": [],
+        "torch_peak_allocated": 1076138496,
+        "torch_peak_reserved": 1142947840
+      },
+      "network_attempts": 0,
+      "onnx_session_runs": 0,
+      "torch_module_forward_counts": {
+        "torch.nn.modules.sparse.Embedding": 14,
+        "torch.nn.modules.normalization.LayerNorm": 128,
+        "torch.nn.modules.dropout.Dropout": 162,
+        "transformers.models.bert.modeling_bert.BertEmbeddings": 4,
+        "torch.nn.modules.linear.Linear": 406,
+        "transformers.models.bert.modeling_bert.BertSelfAttention": 48,
+        "transformers.models.bert.modeling_bert.BertSelfOutput": 48,
+        "transformers.models.bert.modeling_bert.BertAttention": 48,
+        "transformers.activations.GELUActivation": 60,
+        "transformers.models.bert.modeling_bert.BertIntermediate": 48,
+        "transformers.models.bert.modeling_bert.BertOutput": 48,
+        "transformers.models.bert.modeling_bert.BertLayer": 48,
+        "transformers.models.bert.modeling_bert.BertEncoder": 4,
+        "transformers.models.bert.modeling_bert.BertModel": 4,
+        "transformers.models.bert.modeling_bert.BertForTokenClassification": 4,
+        "transformers.models.deberta_v2.modeling_deberta_v2.DebertaV2Embeddings": 2,
+        "transformers.models.deberta_v2.modeling_deberta_v2.DisentangledSelfAttention": 12,
+        "transformers.models.deberta_v2.modeling_deberta_v2.DebertaV2SelfOutput": 12,
+        "transformers.models.deberta_v2.modeling_deberta_v2.DebertaV2Attention": 12,
+        "transformers.models.deberta_v2.modeling_deberta_v2.DebertaV2Intermediate": 12,
+        "transformers.models.deberta_v2.modeling_deberta_v2.DebertaV2Output": 12,
+        "transformers.models.deberta_v2.modeling_deberta_v2.DebertaV2Layer": 12,
+        "transformers.models.deberta_v2.modeling_deberta_v2.DebertaV2Encoder": 2,
+        "transformers.models.deberta_v2.modeling_deberta_v2.DebertaV2Model": 2,
+        "gliner.modeling.encoder.Transformer": 2,
+        "gliner.modeling.encoder.Encoder": 2,
+        "torch.nn.modules.rnn.LSTM": 2,
+        "gliner.modeling.layers.LstmSeq2SeqEncoder": 2,
+        "torch.nn.modules.linear.Identity": 4,
+        "gliner.modeling.context_encoders.IdentityContextEncoder": 2,
+        "torch.nn.modules.activation.ReLU": 8,
+        "torch.nn.modules.container.Sequential": 8,
+        "gliner.modeling.span_rep.SpanMarkerV0": 2,
+        "gliner.modeling.span_rep.SpanRepLayer": 2,
+        "gliner.modeling.base.UniEncoderSpanModel": 2
+      }
+    },
+    "presidio_gliner": {
+      "provider": "presidio_gliner",
+      "status": "passed",
+      "executable": "/home/rehan/sct-gpu-supported-20261110/.venv/bin/python",
+      "python": "3.12.3 (main, Aug 31 2026, 10:18:26) [GCC 13.3.0]",
+      "cpu_affinity": [
+        50,
+        51,
+        52,
+        53,
+        54,
+        55,
+        56,
+        57
+      ],
+      "artifacts": {
+        "gliner": {
+          "repo": "urchade/gliner_small-v2.1",
+          "revision": "4e091416cf7c3481db542c2a3d26156916f3a47f",
+          "snapshot": "/home/rehan/.cache/huggingface/hub/models--urchade--gliner_small-v2.1/snapshots/4e091416cf7c3481db542c2a3d26156916f3a47f",
+          "files": {
+            ".gitattributes": "11ad7efa24975ee4b0c3c3a38ed18737f0658a5f75a0a96787b576a78a023361",
+            "README.md": "5f665c0a6a0e7431ecf0ff59555a418e27601c4c3e8bc1616087a25490294a30",
+            "gliner_config.json": "eb963bd7182a1eaed4d170a87348ab62de6fc4eb30cfa7130c80846fee43d0ac",
+            "pytorch_model.bin": "1d4e83e4e4ae4ae0a4fbc81a32ee6de480fb341650d73e808088bb2800312de4"
+          }
+        },
+        "gliner_parent": {
+          "repo": "microsoft/deberta-v3-small",
+          "revision": "a36c739020e01763fe789b4b85e2df55d6180012",
+          "snapshot": "/home/rehan/.cache/huggingface/hub/models--microsoft--deberta-v3-small/snapshots/a36c739020e01763fe789b4b85e2df55d6180012",
+          "files": {
+            "config.json": "b0bb1caf90a50aa67d1085130508dfbf8646ac5a11928305e280b07a36e100ae",
+            "spm.model": "c679fbf93643d19aab7ee10c0b99e460bdbc02fedf34b92b05af343b4af586fd",
+            "tokenizer_config.json": "3f3978e0c036f2c2588cac34a6047cbb0af0b0dc1814254e291028529805496d"
+          }
+        },
+        "spacy": {
+          "repo": "en_core_web_lg",
+          "revision": "3.8.0",
+          "snapshot": "/home/rehan/sct-gpu-supported-20261110/.venv/lib/python3.12/site-packages/en_core_web_lg",
+          "files": {
+            "__init__.py": "c8eb57079c03fc4157c227f641781fbcb3e9d11439abe1bf0b72e4c0fa78a38d",
+            "en_core_web_lg-3.8.0/LICENSE": "3933c176979b68bc6d0bcc902c7d6c130f1d127f476f17ba5cdba8d99cfd0012",
+            "en_core_web_lg-3.8.0/LICENSES_SOURCES": "ea21333cecd2593c1fea842e9362bedf7b556abfb97cd08ce0650f2228b2eb58",
+            "en_core_web_lg-3.8.0/README.md": "94c1d6fda01b7184dc68399cf7911624d34bbd5d3414596eaf7245d7ced1b2d0",
+            "en_core_web_lg-3.8.0/accuracy.json": "5249e798eee58b0d5d20ac1022d77ca16149a8e1233ea9ed144771d492c959c3",
+            "en_core_web_lg-3.8.0/attribute_ruler/patterns": "f8b97f7ebef9b8536bba5f0fc1e73af6183563e96e2325bcbb021b8c6dbc6683",
+            "en_core_web_lg-3.8.0/config.cfg": "24b1b17065a74a6a3f999dd9c722f5532dc6bb5994b6a7ba5aa4f2ce09d434cc",
+            "en_core_web_lg-3.8.0/lemmatizer/lookups/lookups.bin": "eb64f40c0f8396d1762730c0ddf4dad2a52d138f5a389f71a1a1d088173b7737",
+            "en_core_web_lg-3.8.0/meta.json": "d9e57747ff70912e91b6dd05268d8880cb5c5c224789a7f996fb4537e4d12ee4",
+            "en_core_web_lg-3.8.0/ner/cfg": "a7172edadafba9f472e9ac0f2660eec04b6405e471be9e20267b79c67288d22d",
+            "en_core_web_lg-3.8.0/ner/model": "e0cb90b0eeb6a08e159d55e5f45103c45ee4f9177735d3cd0c1b9a4f97af6a02",
+            "en_core_web_lg-3.8.0/ner/moves": "d82b13473ebd33e0396004dd22f00c71fe3c1251742bf1f7c4554f23fd3b0af4",
+            "en_core_web_lg-3.8.0/parser/cfg": "e2a240ef01f95e58f5dd4c9d6e90d61f597b8d998966570d3009dd81e8879780",
+            "en_core_web_lg-3.8.0/parser/model": "adbf43164ed1e7e67f882cdf23283cfd768c0c0ba432fff6ef52a8ce1f7b7634",
+            "en_core_web_lg-3.8.0/parser/moves": "ec41318c32eb7f9e4d8f050b2e8466ee67954d2d3455c1aec73abf46c82dd67f",
+            "en_core_web_lg-3.8.0/senter/cfg": "2a4db4a729b6469da1f87d71cc7cd3ed2a73360cc85326821e850836c4671103",
+            "en_core_web_lg-3.8.0/senter/model": "55b7cb0a145ff82082a5036a39c8a8741b3e80f692435725f46019b9a0da01f9",
+            "en_core_web_lg-3.8.0/tagger/cfg": "d484c3d9391f37bf9c727aa2eb4c477a24cb103020f95e52dc37842818b50118",
+            "en_core_web_lg-3.8.0/tagger/model": "0626a4af15ead7b95c82f83109a77ac8abb74ed9027497f727606c25b2a5b0ad",
+            "en_core_web_lg-3.8.0/tok2vec/cfg": "f8a5a26e3056eb6fb06deeb3dbccfd88ae74900200c98c70b5966bbb7ec9d4de",
+            "en_core_web_lg-3.8.0/tok2vec/model": "af68f93539570b27bcf32bdaa881f28b0b4f94ca0e697dd2a912de76897f9f40",
+            "en_core_web_lg-3.8.0/tokenizer": "b014e8bba4958b120af2d0c1c63eabb7c00379f2bacaf10df7c5325efd2ea467",
+            "en_core_web_lg-3.8.0/vocab/key2row": "c8163b927a234a675074bb38ce62c17a57182998dc83fb9275d35500559a582a",
+            "en_core_web_lg-3.8.0/vocab/lookups.bin": "fce9c883c56165f29573cc938c2a1c9d417ac61bd8f56b671dd5f7996de70682",
+            "en_core_web_lg-3.8.0/vocab/strings.json": "efd814b36290d2513b683c924571d9e3b25bf6c60bb89c13cb8c3436d2cb6cfa",
+            "en_core_web_lg-3.8.0/vocab/vectors": "dd82f972c4fca3d440c505cdd94c88efdded56457cc86851d584b751f7dea673",
+            "en_core_web_lg-3.8.0/vocab/vectors.cfg": "ff4359091952c8cd16f1f0482f5770fb82d1707368d5cca3c46aa501f552e3c5",
+            "meta.json": "d9e57747ff70912e91b6dd05268d8880cb5c5c224789a7f996fb4537e4d12ee4"
+          },
+          "source": "https://github.com/explosion/spacy-models/releases/download/en_core_web_lg-3.8.0/en_core_web_lg-3.8.0-py3-none-any.whl"
+        }
+      },
+      "source_sha256": {
+        "sct/__init__.py": "d6e5aca8eb5cbdbe0781bde805abe658ae869ec35d60b2a42f3af44b9cb9cd01",
+        "sct/adapters.py": "6c14afecf1b1d995e68c866d4a6333349d5c430edaebc1d0201d37daec08ca34",
+        "sct/browser.py": "552541e368fc5403f02294363816917d05bb2b837b6e3f66c30a3ed126c2a8bb",
+        "sct/cli.py": "b25622f4d030bebcb53e8fa4fd59b0e55805c48c5ad36fe852c90b4ef9f6abaa",
+        "sct/config.py": "15ff66b60385383b73d70d873afd7e39c3ddf8a770329ecaf9e67fb45f518710",
+        "sct/coordinates.py": "33d8b74559945bd8a12bd765b8313b4364a01ceb11460dfc4422e493846b7e72",
+        "sct/corpus/__init__.py": "b3589ddd7ab3c2a9fbf62fb3d0d4e932486e610fe308166ea76ddf5a2671124a",
+        "sct/corpus/datatrove.py": "901f069dd09ea1a9aee082b1fcfc6f4016eff720e68b7879942a9ef6cecf9eda",
+        "sct/corpus/manifest.py": "b5dbfaee581fe9f0c38808ebc128c439ea17225b48eb5f8e30ef6236c65aba7f",
+        "sct/corpus/runner.py": "32448b24b82755300dbf91c8e05e378fb4b97d2c343b443a29eb7b0ea72312e4",
+        "sct/corpus/selection.py": "9f11d71de2889607c7a403f26725c35a326909e4f72a849bd2649eb08d4809a4",
+        "sct/corpus/types.py": "c78dd1c36e09e2b2a2c160594b2a529d6e8f04001a7577a391c295fedac1bf1f",
+        "sct/detectors.py": "3892d4886bcdb4be869c763d0db82b240e09521320155d7c98b49c8c3f629456",
+        "sct/detectors_builtin.py": "68ed494896dadc4eb7f70b40ce9f5516063c2378cc0bdd04e79018ace18dd241",
+        "sct/detectors_datafog.py": "eb0601c49a3e8ad093d3cdfbced9a50901a37c0b1876514ac86912981d1ed5d7",
+        "sct/documents.py": "1250c8d780deb4e147767e630296d17bb84b1835fa565f9f9bcf37eeaa119c5a",
+        "sct/evaluation.py": "0744ddaccf6a6f9f26c1b05ac14165d0e140d0dd2cc386d5b8cce914a7f02e27",
+        "sct/findings.py": "c5298b9205f66c63d361096f73189646ecb70e47a5245ec9589493f430a209d2",
+        "sct/integrations/__init__.py": "86572a797863d690fc17eacfeb6baab82b5c2146606d20cc9852abb9fd59e851",
+        "sct/integrations/_runtime.py": "dd1c97c8649338177560b8d872ab8298822dfe072d691b36242cec84e48e6fb7",
+        "sct/integrations/datatrove.py": "60ebe86941848bbc3ce6ba37162fcc286ec9fd3af033381818714b9a0a680205",
+        "sct/integrations/docling.py": "6d1d26bf2fe3b2216261c2270ec2d67db6f5143c9d648d28effce3f1b31458d5",
+        "sct/integrations/haystack.py": "496863210cad7e4048c25aaf24bf4bd40ccdc94f876bcd085716778887cecfed",
+        "sct/integrations/hf.py": "4728d816cf9ac67790960a21b9cd4c33e83cc6ced4259a4cd8295db6654792ec",
+        "sct/integrations/langchain.py": "c3c9ba429153c0acbb38d912851cc89f60a24660b53a307ce8f9e229b300c8b3",
+        "sct/language_policy.py": "e5c60565ad19a50c605ad57f46d5c33f7737affeed8cf972b5396c80070b4a28",
+        "sct/mcp_server.py": "f9aae6e48c3b46f1dcc938196a3f0b150d2f2f716ca2b6399dc4186363cc62f7",
+        "sct/model_benchmark.py": "14c667e194880b7a60e95704605e07cfe4244224aa53724f196fbe2a4cffc3d1",
+        "sct/model_candidates.py": "e800be7bed0b7b256bd4d880f1b3d8027b7e8e92215386778971348cc7adee46",
+        "sct/ocr.py": "1ccb8453e01bf6a0946455b7db2503f966a7a0b602c883b1833f5f745071c6cc",
+        "sct/policy_v2.py": "e25e1f44c4ff7be6beb9bbf3c47a9bcc01dd5c731b053fdc15eff93bebde70b3",
+        "sct/presets.py": "be2446dafbfc8705e05fdea1663de99f6187cca1dfb600f56b8491808aa1db1a",
+        "sct/privacy.py": "b0b7c78d52e5746b841a5f87255180094fab2d08634e0f8bb724ba52e6853d5a",
+        "sct/report_cli.py": "c95d9c4ef190d377b5f2cf80f9848d9177c5cf0135fca291890b49cfdd076320",
+        "sct/risk.py": "55ed1510197fe3361b127fef3c16ac8a7f2d8a0a393668ccce7507a326783bb9",
+        "sct/routing.py": "19ced2813aa8220ab7f08bddd032b384d5ccadf6d9e49f86546b7cd3642f28fc",
+        "sct/schema.py": "6821237c10f3b7a438cee08afdb94b0ce6b7ee6a71ccae639efe899338719584",
+        "sct/score.py": "b7a6548572e29147b85116e2efceeae8b9b30fe2ffd5af9b49bedcbb3fd0e4fc",
+        "sct/sct.py": "92296797236108707be03be9e6e2f242dea4802fdab93f5aafa4e198629c01f8",
+        "sct/signals.py": "6ef22ea0261a6206748613befa672a4900330bfac2349df8e31ba34fe5471626",
+        "sct/streaming.py": "c442a2fb06eea1aa0a4f98e962ecffbf09f4cbc41bd2369f504d8e3084a08a75",
+        "sct/token_stores/__init__.py": "4f8caf8bd1fc12c5ee812a62b0e1e6d35e2d88df613105436fc3ea8c3e86946c",
+        "sct/token_stores/sqlite.py": "bdaedeecfccbc4ef628a93e00ff5ae0dda6f17207dc84628512e00735be7118b",
+        "sct/unified.py": "f844242f43ae099fdc08ecdbbf7e34932c94e609a67ae2ef2131b68fae55e714",
+        "sct/utils/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "sct/utils/anonymization_map.py": "2925f2580dd2666c0a5a71348a0539a1cf84ae305de28f0223a0ffe275803b04",
+        "sct/utils/atomic_file.py": "99f67a1ffb1db33eb229d0d7ac178dff4b669666ad42433888fa007890085d5a",
+        "sct/utils/constants.py": "20966a48e158141a055ab3127c0b99954580a0bd784428fc6be4145ae773dd6a",
+        "sct/utils/contact.py": "627e5ffd3e2a1212f73094b28d9ddf9ca72432225363eff47889e60b998ef2ba",
+        "sct/utils/datetime.py": "420babdfdbff4259a4774faf3cd6dfe33603882606214ab5a8e80869b34b4f30",
+        "sct/utils/gliclass_adapter.py": "d9f054dc7a1831634cbeb1510f18ccfbc80cb7d2595319d492a820a63b1ba8be",
+        "sct/utils/gliner_adapter.py": "99c366d8859637df255d237f9516f2e666b74b5eecfe2f12cb843d39c436c972",
+        "sct/utils/markers.py": "79b03874a953c587e8c530b52ecebe69e29d39b88a8918c7bb26e70c2b9a1856",
+        "sct/utils/ner.py": "dba9b9cdae78b0a6f619741ff26fdcee80e5574e0a95ad88266595f6772f7f35",
+        "sct/utils/ner_chunking.py": "b60046f3b86bbc9e0e0c3273fb7e8c8d62a22f8a8a2b61c7b1155869cbbd0bb1",
+        "sct/utils/ner_spans.py": "d3934998a8f76ae8de354be9cd4a95da9aed324496e7975d3fd552f043685e57",
+        "sct/utils/normtext.py": "538569ee5a14d411c99a63808c0bc144959711d770372128f95d70c1771e63c2",
+        "sct/utils/onnx_pipeline.py": "8214e7ebd532890541d63346986d4557c38b0176bae60b4708b3645b4db71d60",
+        "sct/utils/process_result.py": "b36f7cbdbe79292cefaa4991cedb8408bf4f0c4ac627a450226ab4ffec595562",
+        "sct/utils/resources.py": "18058b215ffdd9d390966ff7485447f03fe8d54968821b4d7902342ee804ed13",
+        "sct/utils/special.py": "705aa6e13607a229f30dfa69c061656aac7d1b3accbc1611c2b6b0caecf36a97",
+        "sct/utils/stopwords.py": "e36784c680695cf4dd1f00a33a379e525d98bae964c39d525e2837792bf9996c",
+        "sct/utils/synthetic.py": "1f3a659abc9d3e1e79d606904e7b58cacde7fedf8229a5fad1072f3403fb4775",
+        "sct/utils/torch_pipeline.py": "b70053c797d8d694dd9f497491e88fe342abdb687fa2e35668d7091a347f34c7"
+      },
+      "probe_sha256": "02fbf7494ea9395a8ddb457488818ef41c1a33f64a95965942c2ba9cc7bda843",
+      "runtime": {
+        "torch": {
+          "version": "2.14.0+cu126",
+          "path": "/home/rehan/sct-gpu-supported-20261110/.venv/lib/python3.12/site-packages/torch/__init__.py"
+        },
+        "transformers": {
+          "version": "5.16.1",
+          "path": "/home/rehan/sct-gpu-supported-20261110/.venv/lib/python3.12/site-packages/transformers/__init__.py"
+        },
+        "onnxruntime-gpu": {
+          "version": "1.24.4",
+          "path": "/home/rehan/sct-gpu-supported-20261110/.venv/lib/python3.12/site-packages/onnxruntime/__init__.py"
+        },
+        "gliner": {
+          "version": "0.2.29",
+          "path": "/home/rehan/sct-gpu-supported-20261110/.venv/lib/python3.12/site-packages/gliner/__init__.py"
+        },
+        "gliner2": {
+          "version": "1.3.2",
+          "path": "/home/rehan/sct-gpu-supported-20261110/.venv/lib/python3.12/site-packages/gliner2/__init__.py"
+        },
+        "gliclass": {
+          "version": "0.1.20",
+          "path": "/home/rehan/sct-gpu-supported-20261110/.venv/lib/python3.12/site-packages/gliclass/__init__.py"
+        },
+        "presidio-analyzer": {
+          "version": "2.2.362",
+          "path": "/home/rehan/sct-gpu-supported-20261110/.venv/lib/python3.12/site-packages/presidio_analyzer/__init__.py"
+        },
+        "spacy": {
+          "version": "3.8.16",
+          "path": "/home/rehan/sct-gpu-supported-20261110/.venv/lib/python3.12/site-packages/spacy/__init__.py"
+        }
+      },
+      "scope": "Synthetic functional inference, not accuracy or production qualification",
+      "canonical_findings": [
+        {
+          "entity_type": "EMAIL_ADDRESS",
+          "start": 50,
+          "end": 72,
+          "detector_id": "builtin_ner",
+          "score": 1.0,
+          "coordinate_space": "canonical",
+          "source_ranges": [],
+          "mapping_quality": "unavailable"
+        },
+        {
+          "entity_type": "PERSON",
+          "start": 2,
+          "end": 12,
+          "detector_id": "builtin_ner",
+          "score": 0.9746540784835815,
+          "coordinate_space": "canonical",
+          "source_ranges": [],
+          "mapping_quality": "unavailable"
+        },
+        {
+          "entity_type": "LOCATION",
+          "start": 36,
+          "end": 42,
+          "detector_id": "builtin_ner",
+          "score": 0.9416006207466125,
+          "coordinate_space": "canonical",
+          "source_ranges": [],
+          "mapping_quality": "unavailable"
+        },
+        {
+          "entity_type": "ORGANIZATION",
+          "start": 23,
+          "end": 32,
+          "detector_id": "builtin_ner",
+          "score": 0.9318411350250244,
+          "coordinate_space": "canonical",
+          "source_ranges": [],
+          "mapping_quality": "unavailable"
+        },
+        {
+          "entity_type": "PERSON",
+          "start": 50,
+          "end": 60,
+          "detector_id": "builtin_ner",
+          "score": 0.9131149649620056,
+          "coordinate_space": "canonical",
+          "source_ranges": [],
+          "mapping_quality": "unavailable"
+        },
+        {
+          "entity_type": "ORGANIZATION",
+          "start": 61,
+          "end": 72,
+          "detector_id": "builtin_ner",
+          "score": 0.5939616560935974,
+          "coordinate_space": "canonical",
+          "source_ranges": [],
+          "mapping_quality": "unavailable"
+        },
+        {
+          "entity_type": "URL",
+          "start": 50,
+          "end": 57,
+          "detector_id": "builtin_ner",
+          "score": 0.5,
+          "coordinate_space": "canonical",
+          "source_ranges": [],
+          "mapping_quality": "unavailable"
+        },
+        {
+          "entity_type": "URL",
+          "start": 61,
+          "end": 72,
+          "detector_id": "builtin_ner",
+          "score": 0.5,
+          "coordinate_space": "canonical",
+          "source_ranges": [],
+          "mapping_quality": "unavailable"
+        }
+      ],
+      "unified_findings": [
+        {
+          "entity_type": "EMAIL",
+          "start": 50,
+          "end": 72,
+          "detector_id": "builtin_regex",
+          "score": null,
+          "coordinate_space": "canonical",
+          "source_ranges": [
+            {
+              "start": 50,
+              "end": 72
+            }
+          ],
+          "mapping_quality": "exact",
+          "action": "use_mode",
+          "reason": "unknown-score-protected",
+          "builtin_regex_origin": true
+        },
+        {
+          "entity_type": "EMAIL_ADDRESS",
+          "start": 50,
+          "end": 72,
+          "detector_id": "builtin_ner",
+          "score": 1.0,
+          "coordinate_space": "canonical",
+          "source_ranges": [
+            {
+              "start": 50,
+              "end": 72
+            }
+          ],
+          "mapping_quality": "exact",
+          "action": "use_mode",
+          "reason": "policy-rule",
+          "builtin_regex_origin": false
+        },
+        {
+          "entity_type": "PERSON",
+          "start": 2,
+          "end": 12,
+          "detector_id": "builtin_ner",
+          "score": 0.9746540784835815,
+          "coordinate_space": "canonical",
+          "source_ranges": [
+            {
+              "start": 2,
+              "end": 12
+            }
+          ],
+          "mapping_quality": "exact",
+          "action": "use_mode",
+          "reason": "policy-rule",
+          "builtin_regex_origin": false
+        },
+        {
+          "entity_type": "LOCATION",
+          "start": 36,
+          "end": 42,
+          "detector_id": "builtin_ner",
+          "score": 0.9416006207466125,
+          "coordinate_space": "canonical",
+          "source_ranges": [
+            {
+              "start": 36,
+              "end": 42
+            }
+          ],
+          "mapping_quality": "exact",
+          "action": "use_mode",
+          "reason": "policy-rule",
+          "builtin_regex_origin": false
+        },
+        {
+          "entity_type": "ORGANIZATION",
+          "start": 23,
+          "end": 32,
+          "detector_id": "builtin_ner",
+          "score": 0.9318411350250244,
+          "coordinate_space": "canonical",
+          "source_ranges": [
+            {
+              "start": 23,
+              "end": 32
+            }
+          ],
+          "mapping_quality": "exact",
+          "action": "use_mode",
+          "reason": "policy-rule",
+          "builtin_regex_origin": false
+        },
+        {
+          "entity_type": "PERSON",
+          "start": 50,
+          "end": 60,
+          "detector_id": "builtin_ner",
+          "score": 0.9131149649620056,
+          "coordinate_space": "canonical",
+          "source_ranges": [
+            {
+              "start": 50,
+              "end": 60
+            }
+          ],
+          "mapping_quality": "exact",
+          "action": "use_mode",
+          "reason": "policy-rule",
+          "builtin_regex_origin": false
+        },
+        {
+          "entity_type": "ORGANIZATION",
+          "start": 61,
+          "end": 72,
+          "detector_id": "builtin_ner",
+          "score": 0.5939616560935974,
+          "coordinate_space": "canonical",
+          "source_ranges": [
+            {
+              "start": 61,
+              "end": 72
+            }
+          ],
+          "mapping_quality": "exact",
+          "action": "use_mode",
+          "reason": "policy-rule",
+          "builtin_regex_origin": false
+        },
+        {
+          "entity_type": "URL",
+          "start": 50,
+          "end": 57,
+          "detector_id": "builtin_ner",
+          "score": 0.5,
+          "coordinate_space": "canonical",
+          "source_ranges": [
+            {
+              "start": 50,
+              "end": 57
+            }
+          ],
+          "mapping_quality": "exact",
+          "action": "use_mode",
+          "reason": "policy-rule",
+          "builtin_regex_origin": false
+        },
+        {
+          "entity_type": "URL",
+          "start": 61,
+          "end": 72,
+          "detector_id": "builtin_ner",
+          "score": 0.5,
+          "coordinate_space": "canonical",
+          "source_ranges": [
+            {
+              "start": 61,
+              "end": 72
+            }
+          ],
+          "mapping_quality": "exact",
+          "action": "use_mode",
+          "reason": "policy-rule",
+          "builtin_regex_origin": false
+        }
+      ],
+      "person_protected": true,
+      "contact_protected": true,
+      "provenance": {
+        "GLINER": {
+          "key": "GLINER",
+          "id": "/home/rehan/.cache/huggingface/hub/models--urchade--gliner_small-v2.1/snapshots/4e091416cf7c3481db542c2a3d26156916f3a47f",
+          "revision": "4e091416cf7c3481db542c2a3d26156916f3a47f",
+          "provider": "cuda:0"
+        }
+      },
+      "nlp_runtime": {
+        "version": "3.8.0",
+        "path": "/home/rehan/sct-gpu-supported-20261110/.venv/lib/python3.12/site-packages/en_core_web_lg/__init__.py",
+        "recognizers": [
+          "CreditCardRecognizer",
+          "CryptoRecognizer",
+          "DateRecognizer",
+          "EmailRecognizer",
+          "GLiNERRecognizer",
+          "IbanRecognizer",
+          "IpRecognizer",
+          "MacAddressRecognizer",
+          "MedicalLicenseRecognizer",
+          "NhsRecognizer",
+          "PhoneRecognizer",
+          "SpacyRecognizer",
+          "UrlRecognizer",
+          "UsBankRecognizer",
+          "UsItinRecognizer",
+          "UsLicenseRecognizer",
+          "UsPassportRecognizer",
+          "UsSsnRecognizer"
+        ]
+      },
+      "gpu_execution": {
+        "visible_device": "GPU-5a285e5a-6883-d8af-9928-81d2ab04a33e",
+        "device_name": "NVIDIA GeForce RTX 4090",
+        "cuda_build": "12.6",
+        "torch_cuda_forwards": {
+          "torch.nn.modules.sparse.Embedding": 2,
+          "torch.nn.modules.normalization.LayerNorm": 28,
+          "torch.nn.modules.dropout.Dropout": 58,
+          "transformers.models.deberta_v2.modeling_deberta_v2.DebertaV2Embeddings": 2,
+          "torch.nn.modules.linear.Linear": 114,
+          "transformers.models.deberta_v2.modeling_deberta_v2.DisentangledSelfAttention": 12,
+          "transformers.models.deberta_v2.modeling_deberta_v2.DebertaV2SelfOutput": 12,
+          "transformers.models.deberta_v2.modeling_deberta_v2.DebertaV2Attention": 12,
+          "transformers.activations.GELUActivation": 12,
+          "transformers.models.deberta_v2.modeling_deberta_v2.DebertaV2Intermediate": 12,
+          "transformers.models.deberta_v2.modeling_deberta_v2.DebertaV2Output": 12,
+          "transformers.models.deberta_v2.modeling_deberta_v2.DebertaV2Layer": 12,
+          "transformers.models.deberta_v2.modeling_deberta_v2.DebertaV2Encoder": 2,
+          "transformers.models.deberta_v2.modeling_deberta_v2.DebertaV2Model": 2,
+          "gliner.modeling.encoder.Transformer": 2,
+          "gliner.modeling.encoder.Encoder": 2,
+          "torch.nn.modules.rnn.LSTM": 2,
+          "gliner.modeling.layers.LstmSeq2SeqEncoder": 2,
+          "torch.nn.modules.linear.Identity": 4,
+          "gliner.modeling.context_encoders.IdentityContextEncoder": 2,
+          "torch.nn.modules.activation.ReLU": 8,
+          "torch.nn.modules.container.Sequential": 8,
+          "gliner.modeling.span_rep.SpanMarkerV0": 2,
+          "gliner.modeling.span_rep.SpanRepLayer": 2,
+          "gliner.modeling.base.UniEncoderSpanModel": 2
+        },
+        "torch_cuda_kernels": 889,
+        "trace_sha256": "693a7113d78ce71512018bd4329aa0a05701ddc79509f973294877d58e96f105",
+        "onnx_profiles": [],
+        "torch_peak_allocated": 644901888,
+        "torch_peak_reserved": 679477248
+      },
+      "network_attempts": 0,
+      "onnx_session_runs": 0,
+      "torch_module_forward_counts": {
+        "torch.nn.modules.sparse.Embedding": 2,
+        "torch.nn.modules.normalization.LayerNorm": 28,
+        "torch.nn.modules.dropout.Dropout": 58,
+        "transformers.models.deberta_v2.modeling_deberta_v2.DebertaV2Embeddings": 2,
+        "torch.nn.modules.linear.Linear": 114,
+        "transformers.models.deberta_v2.modeling_deberta_v2.DisentangledSelfAttention": 12,
+        "transformers.models.deberta_v2.modeling_deberta_v2.DebertaV2SelfOutput": 12,
+        "transformers.models.deberta_v2.modeling_deberta_v2.DebertaV2Attention": 12,
+        "transformers.activations.GELUActivation": 12,
+        "transformers.models.deberta_v2.modeling_deberta_v2.DebertaV2Intermediate": 12,
+        "transformers.models.deberta_v2.modeling_deberta_v2.DebertaV2Output": 12,
+        "transformers.models.deberta_v2.modeling_deberta_v2.DebertaV2Layer": 12,
+        "transformers.models.deberta_v2.modeling_deberta_v2.DebertaV2Encoder": 2,
+        "transformers.models.deberta_v2.modeling_deberta_v2.DebertaV2Model": 2,
+        "gliner.modeling.encoder.Transformer": 2,
+        "gliner.modeling.encoder.Encoder": 2,
+        "torch.nn.modules.rnn.LSTM": 2,
+        "gliner.modeling.layers.LstmSeq2SeqEncoder": 2,
+        "torch.nn.modules.linear.Identity": 4,
+        "gliner.modeling.context_encoders.IdentityContextEncoder": 2,
+        "torch.nn.modules.activation.ReLU": 8,
+        "torch.nn.modules.container.Sequential": 8,
+        "gliner.modeling.span_rep.SpanMarkerV0": 2,
+        "gliner.modeling.span_rep.SpanRepLayer": 2,
+        "gliner.modeling.base.UniEncoderSpanModel": 2
+      }
+    },
+    "gliner2": {
+      "provider": "gliner2",
+      "status": "passed",
+      "executable": "/home/rehan/sct-gpu-supported-20261110/.venv/bin/python",
+      "python": "3.12.3 (main, Aug 31 2026, 10:18:26) [GCC 13.3.0]",
+      "cpu_affinity": [
+        50,
+        51,
+        52,
+        53,
+        54,
+        55,
+        56,
+        57
+      ],
+      "artifacts": {
+        "gliner2": {
+          "repo": "fastino/gliner2-privacy-filter-PII-multi",
+          "revision": "1cb4166094dc58fa8d836429f060d6c95f62b495",
+          "snapshot": "/home/rehan/sct-improvements-v090-20261109/r1-native-model-cache/models--fastino--gliner2-privacy-filter-PII-multi/snapshots/1cb4166094dc58fa8d836429f060d6c95f62b495",
+          "files": {
+            ".gitattributes": "dafa49854ba72d92b718d62b7d25268eeef47aefd84333603d07f2b3ece164d8",
+            "GLiNER2-PII-HF-Banner.png": "6e1034da832b2a485db7ee5f0a83faa6f7531092961ac315c6a1ba478d71c300",
+            "README.md": "e932bd007f5b386ecf88f28058c6a96ef001c4fc8ba8175f10671db2539f51a1",
+            "SKILL.md": "c88242139bdbde7194b1c05bfc77cd5a9ef2d975040a15708211a09700296e32",
+            "config.json": "164f17362bcf9d114067d3465e7374bfdd79ce6b605acb745de5a49dabb9595c",
+            "encoder_config/config.json": "f27dd63cc43a248d2566f0b6ad7a115db353676ce0561dcbca45bac766464c1a",
+            "model.safetensors": "0280f6f39f6012da50b6640bad438d9b7e763a1b0102094115d1b710c4dd79b6",
+            "tokenizer.json": "f6df10ec83bea993035b2dd7c39345a3d4fcf23421c2adb6cb4ffc1e6d1bc4b5",
+            "tokenizer_config.json": "233beed1f1095cccfc7907cde31a8d90a0c6aa4fdfaf6493f8e55fd162e81ae6"
+          }
+        }
+      },
+      "source_sha256": {
+        "sct/__init__.py": "d6e5aca8eb5cbdbe0781bde805abe658ae869ec35d60b2a42f3af44b9cb9cd01",
+        "sct/adapters.py": "6c14afecf1b1d995e68c866d4a6333349d5c430edaebc1d0201d37daec08ca34",
+        "sct/browser.py": "552541e368fc5403f02294363816917d05bb2b837b6e3f66c30a3ed126c2a8bb",
+        "sct/cli.py": "b25622f4d030bebcb53e8fa4fd59b0e55805c48c5ad36fe852c90b4ef9f6abaa",
+        "sct/config.py": "15ff66b60385383b73d70d873afd7e39c3ddf8a770329ecaf9e67fb45f518710",
+        "sct/coordinates.py": "33d8b74559945bd8a12bd765b8313b4364a01ceb11460dfc4422e493846b7e72",
+        "sct/corpus/__init__.py": "b3589ddd7ab3c2a9fbf62fb3d0d4e932486e610fe308166ea76ddf5a2671124a",
+        "sct/corpus/datatrove.py": "901f069dd09ea1a9aee082b1fcfc6f4016eff720e68b7879942a9ef6cecf9eda",
+        "sct/corpus/manifest.py": "b5dbfaee581fe9f0c38808ebc128c439ea17225b48eb5f8e30ef6236c65aba7f",
+        "sct/corpus/runner.py": "32448b24b82755300dbf91c8e05e378fb4b97d2c343b443a29eb7b0ea72312e4",
+        "sct/corpus/selection.py": "9f11d71de2889607c7a403f26725c35a326909e4f72a849bd2649eb08d4809a4",
+        "sct/corpus/types.py": "c78dd1c36e09e2b2a2c160594b2a529d6e8f04001a7577a391c295fedac1bf1f",
+        "sct/detectors.py": "3892d4886bcdb4be869c763d0db82b240e09521320155d7c98b49c8c3f629456",
+        "sct/detectors_builtin.py": "68ed494896dadc4eb7f70b40ce9f5516063c2378cc0bdd04e79018ace18dd241",
+        "sct/detectors_datafog.py": "eb0601c49a3e8ad093d3cdfbced9a50901a37c0b1876514ac86912981d1ed5d7",
+        "sct/documents.py": "1250c8d780deb4e147767e630296d17bb84b1835fa565f9f9bcf37eeaa119c5a",
+        "sct/evaluation.py": "0744ddaccf6a6f9f26c1b05ac14165d0e140d0dd2cc386d5b8cce914a7f02e27",
+        "sct/findings.py": "c5298b9205f66c63d361096f73189646ecb70e47a5245ec9589493f430a209d2",
+        "sct/integrations/__init__.py": "86572a797863d690fc17eacfeb6baab82b5c2146606d20cc9852abb9fd59e851",
+        "sct/integrations/_runtime.py": "dd1c97c8649338177560b8d872ab8298822dfe072d691b36242cec84e48e6fb7",
+        "sct/integrations/datatrove.py": "60ebe86941848bbc3ce6ba37162fcc286ec9fd3af033381818714b9a0a680205",
+        "sct/integrations/docling.py": "6d1d26bf2fe3b2216261c2270ec2d67db6f5143c9d648d28effce3f1b31458d5",
+        "sct/integrations/haystack.py": "496863210cad7e4048c25aaf24bf4bd40ccdc94f876bcd085716778887cecfed",
+        "sct/integrations/hf.py": "4728d816cf9ac67790960a21b9cd4c33e83cc6ced4259a4cd8295db6654792ec",
+        "sct/integrations/langchain.py": "c3c9ba429153c0acbb38d912851cc89f60a24660b53a307ce8f9e229b300c8b3",
+        "sct/language_policy.py": "e5c60565ad19a50c605ad57f46d5c33f7737affeed8cf972b5396c80070b4a28",
+        "sct/mcp_server.py": "f9aae6e48c3b46f1dcc938196a3f0b150d2f2f716ca2b6399dc4186363cc62f7",
+        "sct/model_benchmark.py": "14c667e194880b7a60e95704605e07cfe4244224aa53724f196fbe2a4cffc3d1",
+        "sct/model_candidates.py": "e800be7bed0b7b256bd4d880f1b3d8027b7e8e92215386778971348cc7adee46",
+        "sct/ocr.py": "1ccb8453e01bf6a0946455b7db2503f966a7a0b602c883b1833f5f745071c6cc",
+        "sct/policy_v2.py": "e25e1f44c4ff7be6beb9bbf3c47a9bcc01dd5c731b053fdc15eff93bebde70b3",
+        "sct/presets.py": "be2446dafbfc8705e05fdea1663de99f6187cca1dfb600f56b8491808aa1db1a",
+        "sct/privacy.py": "b0b7c78d52e5746b841a5f87255180094fab2d08634e0f8bb724ba52e6853d5a",
+        "sct/report_cli.py": "c95d9c4ef190d377b5f2cf80f9848d9177c5cf0135fca291890b49cfdd076320",
+        "sct/risk.py": "55ed1510197fe3361b127fef3c16ac8a7f2d8a0a393668ccce7507a326783bb9",
+        "sct/routing.py": "19ced2813aa8220ab7f08bddd032b384d5ccadf6d9e49f86546b7cd3642f28fc",
+        "sct/schema.py": "6821237c10f3b7a438cee08afdb94b0ce6b7ee6a71ccae639efe899338719584",
+        "sct/score.py": "b7a6548572e29147b85116e2efceeae8b9b30fe2ffd5af9b49bedcbb3fd0e4fc",
+        "sct/sct.py": "92296797236108707be03be9e6e2f242dea4802fdab93f5aafa4e198629c01f8",
+        "sct/signals.py": "6ef22ea0261a6206748613befa672a4900330bfac2349df8e31ba34fe5471626",
+        "sct/streaming.py": "c442a2fb06eea1aa0a4f98e962ecffbf09f4cbc41bd2369f504d8e3084a08a75",
+        "sct/token_stores/__init__.py": "4f8caf8bd1fc12c5ee812a62b0e1e6d35e2d88df613105436fc3ea8c3e86946c",
+        "sct/token_stores/sqlite.py": "bdaedeecfccbc4ef628a93e00ff5ae0dda6f17207dc84628512e00735be7118b",
+        "sct/unified.py": "f844242f43ae099fdc08ecdbbf7e34932c94e609a67ae2ef2131b68fae55e714",
+        "sct/utils/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "sct/utils/anonymization_map.py": "2925f2580dd2666c0a5a71348a0539a1cf84ae305de28f0223a0ffe275803b04",
+        "sct/utils/atomic_file.py": "99f67a1ffb1db33eb229d0d7ac178dff4b669666ad42433888fa007890085d5a",
+        "sct/utils/constants.py": "20966a48e158141a055ab3127c0b99954580a0bd784428fc6be4145ae773dd6a",
+        "sct/utils/contact.py": "627e5ffd3e2a1212f73094b28d9ddf9ca72432225363eff47889e60b998ef2ba",
+        "sct/utils/datetime.py": "420babdfdbff4259a4774faf3cd6dfe33603882606214ab5a8e80869b34b4f30",
+        "sct/utils/gliclass_adapter.py": "d9f054dc7a1831634cbeb1510f18ccfbc80cb7d2595319d492a820a63b1ba8be",
+        "sct/utils/gliner_adapter.py": "99c366d8859637df255d237f9516f2e666b74b5eecfe2f12cb843d39c436c972",
+        "sct/utils/markers.py": "79b03874a953c587e8c530b52ecebe69e29d39b88a8918c7bb26e70c2b9a1856",
+        "sct/utils/ner.py": "dba9b9cdae78b0a6f619741ff26fdcee80e5574e0a95ad88266595f6772f7f35",
+        "sct/utils/ner_chunking.py": "b60046f3b86bbc9e0e0c3273fb7e8c8d62a22f8a8a2b61c7b1155869cbbd0bb1",
+        "sct/utils/ner_spans.py": "d3934998a8f76ae8de354be9cd4a95da9aed324496e7975d3fd552f043685e57",
+        "sct/utils/normtext.py": "538569ee5a14d411c99a63808c0bc144959711d770372128f95d70c1771e63c2",
+        "sct/utils/onnx_pipeline.py": "8214e7ebd532890541d63346986d4557c38b0176bae60b4708b3645b4db71d60",
+        "sct/utils/process_result.py": "b36f7cbdbe79292cefaa4991cedb8408bf4f0c4ac627a450226ab4ffec595562",
+        "sct/utils/resources.py": "18058b215ffdd9d390966ff7485447f03fe8d54968821b4d7902342ee804ed13",
+        "sct/utils/special.py": "705aa6e13607a229f30dfa69c061656aac7d1b3accbc1611c2b6b0caecf36a97",
+        "sct/utils/stopwords.py": "e36784c680695cf4dd1f00a33a379e525d98bae964c39d525e2837792bf9996c",
+        "sct/utils/synthetic.py": "1f3a659abc9d3e1e79d606904e7b58cacde7fedf8229a5fad1072f3403fb4775",
+        "sct/utils/torch_pipeline.py": "b70053c797d8d694dd9f497491e88fe342abdb687fa2e35668d7091a347f34c7"
+      },
+      "probe_sha256": "02fbf7494ea9395a8ddb457488818ef41c1a33f64a95965942c2ba9cc7bda843",
+      "runtime": {
+        "torch": {
+          "version": "2.14.0+cu126",
+          "path": "/home/rehan/sct-gpu-supported-20261110/.venv/lib/python3.12/site-packages/torch/__init__.py"
+        },
+        "transformers": {
+          "version": "5.16.1",
+          "path": "/home/rehan/sct-gpu-supported-20261110/.venv/lib/python3.12/site-packages/transformers/__init__.py"
+        },
+        "onnxruntime-gpu": {
+          "version": "1.24.4",
+          "path": "/home/rehan/sct-gpu-supported-20261110/.venv/lib/python3.12/site-packages/onnxruntime/__init__.py"
+        },
+        "gliner": {
+          "version": "0.2.29",
+          "path": "/home/rehan/sct-gpu-supported-20261110/.venv/lib/python3.12/site-packages/gliner/__init__.py"
+        },
+        "gliner2": {
+          "version": "1.3.2",
+          "path": "/home/rehan/sct-gpu-supported-20261110/.venv/lib/python3.12/site-packages/gliner2/__init__.py"
+        },
+        "gliclass": {
+          "version": "0.1.20",
+          "path": "/home/rehan/sct-gpu-supported-20261110/.venv/lib/python3.12/site-packages/gliclass/__init__.py"
+        },
+        "presidio-analyzer": {
+          "version": "2.2.362",
+          "path": "/home/rehan/sct-gpu-supported-20261110/.venv/lib/python3.12/site-packages/presidio_analyzer/__init__.py"
+        },
+        "spacy": {
+          "version": "3.8.16",
+          "path": "/home/rehan/sct-gpu-supported-20261110/.venv/lib/python3.12/site-packages/spacy/__init__.py"
+        }
+      },
+      "scope": "Synthetic functional inference, not accuracy or production qualification",
+      "canonical_findings": [
+        {
+          "entity_type": "PERSON",
+          "start": 2,
+          "end": 12,
+          "detector_id": "builtin_ner",
+          "score": 1.0,
+          "coordinate_space": "canonical",
+          "source_ranges": [],
+          "mapping_quality": "unavailable"
+        },
+        {
+          "entity_type": "ORGANIZATION",
+          "start": 23,
+          "end": 32,
+          "detector_id": "builtin_ner",
+          "score": 1.0,
+          "coordinate_space": "canonical",
+          "source_ranges": [],
+          "mapping_quality": "unavailable"
+        },
+        {
+          "entity_type": "LOCATION",
+          "start": 36,
+          "end": 42,
+          "detector_id": "builtin_ner",
+          "score": 1.0,
+          "coordinate_space": "canonical",
+          "source_ranges": [],
+          "mapping_quality": "unavailable"
+        }
+      ],
+      "unified_findings": [
+        {
+          "entity_type": "EMAIL",
+          "start": 50,
+          "end": 72,
+          "detector_id": "builtin_regex",
+          "score": null,
+          "coordinate_space": "canonical",
+          "source_ranges": [
+            {
+              "start": 50,
+              "end": 72
+            }
+          ],
+          "mapping_quality": "exact",
+          "action": "use_mode",
+          "reason": "unknown-score-protected",
+          "builtin_regex_origin": true
+        },
+        {
+          "entity_type": "PERSON",
+          "start": 2,
+          "end": 12,
+          "detector_id": "builtin_ner",
+          "score": 1.0,
+          "coordinate_space": "canonical",
+          "source_ranges": [
+            {
+              "start": 2,
+              "end": 12
+            }
+          ],
+          "mapping_quality": "exact",
+          "action": "use_mode",
+          "reason": "policy-rule",
+          "builtin_regex_origin": false
+        },
+        {
+          "entity_type": "ORGANIZATION",
+          "start": 23,
+          "end": 32,
+          "detector_id": "builtin_ner",
+          "score": 1.0,
+          "coordinate_space": "canonical",
+          "source_ranges": [
+            {
+              "start": 23,
+              "end": 32
+            }
+          ],
+          "mapping_quality": "exact",
+          "action": "use_mode",
+          "reason": "policy-rule",
+          "builtin_regex_origin": false
+        },
+        {
+          "entity_type": "LOCATION",
+          "start": 36,
+          "end": 42,
+          "detector_id": "builtin_ner",
+          "score": 1.0,
+          "coordinate_space": "canonical",
+          "source_ranges": [
+            {
+              "start": 36,
+              "end": 42
+            }
+          ],
+          "mapping_quality": "exact",
+          "action": "use_mode",
+          "reason": "policy-rule",
+          "builtin_regex_origin": false
+        }
+      ],
+      "person_protected": true,
+      "contact_protected": true,
+      "provenance": {
+        "GLINER": {
+          "key": "GLINER",
+          "id": "fastino/gliner2-privacy-filter-PII-multi",
+          "revision": "1cb4166094dc58fa8d836429f060d6c95f62b495",
+          "provider": "cuda:0"
+        }
+      },
+      "gpu_execution": {
+        "visible_device": "GPU-5a285e5a-6883-d8af-9928-81d2ab04a33e",
+        "device_name": "NVIDIA GeForce RTX 4090",
+        "cuda_build": "12.6",
+        "torch_cuda_forwards": {
+          "torch.nn.modules.sparse.Embedding": 4,
+          "torch.nn.modules.normalization.LayerNorm": 52,
+          "torch.nn.modules.dropout.Dropout": 104,
+          "transformers.models.deberta_v2.modeling_deberta_v2.DebertaV2Embeddings": 2,
+          "torch.nn.modules.linear.Linear": 212,
+          "transformers.models.deberta_v2.modeling_deberta_v2.DisentangledSelfAttention": 24,
+          "transformers.models.deberta_v2.modeling_deberta_v2.DebertaV2SelfOutput": 24,
+          "transformers.models.deberta_v2.modeling_deberta_v2.DebertaV2Attention": 24,
+          "transformers.activations.GELUActivation": 24,
+          "transformers.models.deberta_v2.modeling_deberta_v2.DebertaV2Intermediate": 24,
+          "transformers.models.deberta_v2.modeling_deberta_v2.DebertaV2Output": 24,
+          "transformers.models.deberta_v2.modeling_deberta_v2.DebertaV2Layer": 24,
+          "transformers.models.deberta_v2.modeling_deberta_v2.DebertaV2Encoder": 2,
+          "transformers.models.deberta_v2.modeling_deberta_v2.DebertaV2Model": 2,
+          "torch.nn.modules.activation.ReLU": 10,
+          "torch.nn.modules.container.Sequential": 10,
+          "gliner2.layers.SpanMarkerV0": 2,
+          "gliner2.layers.SpanRepLayer": 2,
+          "gliner2.layers.CompileSafeGRU": 2,
+          "gliner2.layers.CountLSTM": 2
+        },
+        "torch_cuda_kernels": 1252,
+        "trace_sha256": "81480de9a3d40ac322cef5468d67ced7b94d2fe1c6b3056c3b3be3c94e5802b1",
+        "onnx_profiles": [],
+        "torch_peak_allocated": 1247779840,
+        "torch_peak_reserved": 1293942784
+      },
+      "network_attempts": 0,
+      "onnx_session_runs": 0,
+      "torch_module_forward_counts": {
+        "torch.nn.modules.sparse.Embedding": 4,
+        "torch.nn.modules.normalization.LayerNorm": 52,
+        "torch.nn.modules.dropout.Dropout": 104,
+        "transformers.models.deberta_v2.modeling_deberta_v2.DebertaV2Embeddings": 2,
+        "torch.nn.modules.linear.Linear": 212,
+        "transformers.models.deberta_v2.modeling_deberta_v2.DisentangledSelfAttention": 24,
+        "transformers.models.deberta_v2.modeling_deberta_v2.DebertaV2SelfOutput": 24,
+        "transformers.models.deberta_v2.modeling_deberta_v2.DebertaV2Attention": 24,
+        "transformers.activations.GELUActivation": 24,
+        "transformers.models.deberta_v2.modeling_deberta_v2.DebertaV2Intermediate": 24,
+        "transformers.models.deberta_v2.modeling_deberta_v2.DebertaV2Output": 24,
+        "transformers.models.deberta_v2.modeling_deberta_v2.DebertaV2Layer": 24,
+        "transformers.models.deberta_v2.modeling_deberta_v2.DebertaV2Encoder": 2,
+        "transformers.models.deberta_v2.modeling_deberta_v2.DebertaV2Model": 2,
+        "torch.nn.modules.activation.ReLU": 10,
+        "torch.nn.modules.container.Sequential": 10,
+        "gliner2.layers.SpanMarkerV0": 2,
+        "gliner2.layers.SpanRepLayer": 2,
+        "gliner2.layers.CompileSafeGRU": 2,
+        "gliner2.layers.CountLSTM": 2
+      }
+    },
+    "classify": {
+      "provider": "classify",
+      "status": "passed",
+      "executable": "/home/rehan/sct-gpu-supported-20261110/.venv/bin/python",
+      "python": "3.12.3 (main, Aug 31 2026, 10:18:26) [GCC 13.3.0]",
+      "cpu_affinity": [
+        50,
+        51,
+        52,
+        53,
+        54,
+        55,
+        56,
+        57
+      ],
+      "artifacts": {
+        "classify": {
+          "repo": "knowledgator/gliclass-edge-v3.0",
+          "revision": "df03993a2ed98e5e4a0d2dd7efbbd105abe874cf",
+          "snapshot": "/home/rehan/.cache/huggingface/hub/models--knowledgator--gliclass-edge-v3.0/snapshots/df03993a2ed98e5e4a0d2dd7efbbd105abe874cf",
+          "files": {
+            "config.json": "82c73012fe4ce7f286e5615e17e53360f6f18129bc6d912719e0656e040d9deb",
+            "model.safetensors": "ed2600439be991eaab06d831b259e99057a69242acf3a26a61b053695b1b979c",
+            "special_tokens_map.json": "ea97ecdbcc73713039d8d64dbb05e3689495c96657fbd9a18f5bed381be81049",
+            "tokenizer.json": "7c1979be5ac04a6681dbfbb98a2b01b176883a298f2a7240c93048b244118a01",
+            "tokenizer_config.json": "998e030cf9cefbf6e58cbc5b9b2218e8052eb31449c2d08a2f21f60addb79787"
+          }
+        }
+      },
+      "source_sha256": {
+        "sct/__init__.py": "d6e5aca8eb5cbdbe0781bde805abe658ae869ec35d60b2a42f3af44b9cb9cd01",
+        "sct/adapters.py": "6c14afecf1b1d995e68c866d4a6333349d5c430edaebc1d0201d37daec08ca34",
+        "sct/browser.py": "552541e368fc5403f02294363816917d05bb2b837b6e3f66c30a3ed126c2a8bb",
+        "sct/cli.py": "b25622f4d030bebcb53e8fa4fd59b0e55805c48c5ad36fe852c90b4ef9f6abaa",
+        "sct/config.py": "15ff66b60385383b73d70d873afd7e39c3ddf8a770329ecaf9e67fb45f518710",
+        "sct/coordinates.py": "33d8b74559945bd8a12bd765b8313b4364a01ceb11460dfc4422e493846b7e72",
+        "sct/corpus/__init__.py": "b3589ddd7ab3c2a9fbf62fb3d0d4e932486e610fe308166ea76ddf5a2671124a",
+        "sct/corpus/datatrove.py": "901f069dd09ea1a9aee082b1fcfc6f4016eff720e68b7879942a9ef6cecf9eda",
+        "sct/corpus/manifest.py": "b5dbfaee581fe9f0c38808ebc128c439ea17225b48eb5f8e30ef6236c65aba7f",
+        "sct/corpus/runner.py": "32448b24b82755300dbf91c8e05e378fb4b97d2c343b443a29eb7b0ea72312e4",
+        "sct/corpus/selection.py": "9f11d71de2889607c7a403f26725c35a326909e4f72a849bd2649eb08d4809a4",
+        "sct/corpus/types.py": "c78dd1c36e09e2b2a2c160594b2a529d6e8f04001a7577a391c295fedac1bf1f",
+        "sct/detectors.py": "3892d4886bcdb4be869c763d0db82b240e09521320155d7c98b49c8c3f629456",
+        "sct/detectors_builtin.py": "68ed494896dadc4eb7f70b40ce9f5516063c2378cc0bdd04e79018ace18dd241",
+        "sct/detectors_datafog.py": "eb0601c49a3e8ad093d3cdfbced9a50901a37c0b1876514ac86912981d1ed5d7",
+        "sct/documents.py": "1250c8d780deb4e147767e630296d17bb84b1835fa565f9f9bcf37eeaa119c5a",
+        "sct/evaluation.py": "0744ddaccf6a6f9f26c1b05ac14165d0e140d0dd2cc386d5b8cce914a7f02e27",
+        "sct/findings.py": "c5298b9205f66c63d361096f73189646ecb70e47a5245ec9589493f430a209d2",
+        "sct/integrations/__init__.py": "86572a797863d690fc17eacfeb6baab82b5c2146606d20cc9852abb9fd59e851",
+        "sct/integrations/_runtime.py": "dd1c97c8649338177560b8d872ab8298822dfe072d691b36242cec84e48e6fb7",
+        "sct/integrations/datatrove.py": "60ebe86941848bbc3ce6ba37162fcc286ec9fd3af033381818714b9a0a680205",
+        "sct/integrations/docling.py": "6d1d26bf2fe3b2216261c2270ec2d67db6f5143c9d648d28effce3f1b31458d5",
+        "sct/integrations/haystack.py": "496863210cad7e4048c25aaf24bf4bd40ccdc94f876bcd085716778887cecfed",
+        "sct/integrations/hf.py": "4728d816cf9ac67790960a21b9cd4c33e83cc6ced4259a4cd8295db6654792ec",
+        "sct/integrations/langchain.py": "c3c9ba429153c0acbb38d912851cc89f60a24660b53a307ce8f9e229b300c8b3",
+        "sct/language_policy.py": "e5c60565ad19a50c605ad57f46d5c33f7737affeed8cf972b5396c80070b4a28",
+        "sct/mcp_server.py": "f9aae6e48c3b46f1dcc938196a3f0b150d2f2f716ca2b6399dc4186363cc62f7",
+        "sct/model_benchmark.py": "14c667e194880b7a60e95704605e07cfe4244224aa53724f196fbe2a4cffc3d1",
+        "sct/model_candidates.py": "e800be7bed0b7b256bd4d880f1b3d8027b7e8e92215386778971348cc7adee46",
+        "sct/ocr.py": "1ccb8453e01bf6a0946455b7db2503f966a7a0b602c883b1833f5f745071c6cc",
+        "sct/policy_v2.py": "e25e1f44c4ff7be6beb9bbf3c47a9bcc01dd5c731b053fdc15eff93bebde70b3",
+        "sct/presets.py": "be2446dafbfc8705e05fdea1663de99f6187cca1dfb600f56b8491808aa1db1a",
+        "sct/privacy.py": "b0b7c78d52e5746b841a5f87255180094fab2d08634e0f8bb724ba52e6853d5a",
+        "sct/report_cli.py": "c95d9c4ef190d377b5f2cf80f9848d9177c5cf0135fca291890b49cfdd076320",
+        "sct/risk.py": "55ed1510197fe3361b127fef3c16ac8a7f2d8a0a393668ccce7507a326783bb9",
+        "sct/routing.py": "19ced2813aa8220ab7f08bddd032b384d5ccadf6d9e49f86546b7cd3642f28fc",
+        "sct/schema.py": "6821237c10f3b7a438cee08afdb94b0ce6b7ee6a71ccae639efe899338719584",
+        "sct/score.py": "b7a6548572e29147b85116e2efceeae8b9b30fe2ffd5af9b49bedcbb3fd0e4fc",
+        "sct/sct.py": "92296797236108707be03be9e6e2f242dea4802fdab93f5aafa4e198629c01f8",
+        "sct/signals.py": "6ef22ea0261a6206748613befa672a4900330bfac2349df8e31ba34fe5471626",
+        "sct/streaming.py": "c442a2fb06eea1aa0a4f98e962ecffbf09f4cbc41bd2369f504d8e3084a08a75",
+        "sct/token_stores/__init__.py": "4f8caf8bd1fc12c5ee812a62b0e1e6d35e2d88df613105436fc3ea8c3e86946c",
+        "sct/token_stores/sqlite.py": "bdaedeecfccbc4ef628a93e00ff5ae0dda6f17207dc84628512e00735be7118b",
+        "sct/unified.py": "f844242f43ae099fdc08ecdbbf7e34932c94e609a67ae2ef2131b68fae55e714",
+        "sct/utils/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "sct/utils/anonymization_map.py": "2925f2580dd2666c0a5a71348a0539a1cf84ae305de28f0223a0ffe275803b04",
+        "sct/utils/atomic_file.py": "99f67a1ffb1db33eb229d0d7ac178dff4b669666ad42433888fa007890085d5a",
+        "sct/utils/constants.py": "20966a48e158141a055ab3127c0b99954580a0bd784428fc6be4145ae773dd6a",
+        "sct/utils/contact.py": "627e5ffd3e2a1212f73094b28d9ddf9ca72432225363eff47889e60b998ef2ba",
+        "sct/utils/datetime.py": "420babdfdbff4259a4774faf3cd6dfe33603882606214ab5a8e80869b34b4f30",
+        "sct/utils/gliclass_adapter.py": "d9f054dc7a1831634cbeb1510f18ccfbc80cb7d2595319d492a820a63b1ba8be",
+        "sct/utils/gliner_adapter.py": "99c366d8859637df255d237f9516f2e666b74b5eecfe2f12cb843d39c436c972",
+        "sct/utils/markers.py": "79b03874a953c587e8c530b52ecebe69e29d39b88a8918c7bb26e70c2b9a1856",
+        "sct/utils/ner.py": "dba9b9cdae78b0a6f619741ff26fdcee80e5574e0a95ad88266595f6772f7f35",
+        "sct/utils/ner_chunking.py": "b60046f3b86bbc9e0e0c3273fb7e8c8d62a22f8a8a2b61c7b1155869cbbd0bb1",
+        "sct/utils/ner_spans.py": "d3934998a8f76ae8de354be9cd4a95da9aed324496e7975d3fd552f043685e57",
+        "sct/utils/normtext.py": "538569ee5a14d411c99a63808c0bc144959711d770372128f95d70c1771e63c2",
+        "sct/utils/onnx_pipeline.py": "8214e7ebd532890541d63346986d4557c38b0176bae60b4708b3645b4db71d60",
+        "sct/utils/process_result.py": "b36f7cbdbe79292cefaa4991cedb8408bf4f0c4ac627a450226ab4ffec595562",
+        "sct/utils/resources.py": "18058b215ffdd9d390966ff7485447f03fe8d54968821b4d7902342ee804ed13",
+        "sct/utils/special.py": "705aa6e13607a229f30dfa69c061656aac7d1b3accbc1611c2b6b0caecf36a97",
+        "sct/utils/stopwords.py": "e36784c680695cf4dd1f00a33a379e525d98bae964c39d525e2837792bf9996c",
+        "sct/utils/synthetic.py": "1f3a659abc9d3e1e79d606904e7b58cacde7fedf8229a5fad1072f3403fb4775",
+        "sct/utils/torch_pipeline.py": "b70053c797d8d694dd9f497491e88fe342abdb687fa2e35668d7091a347f34c7"
+      },
+      "probe_sha256": "02fbf7494ea9395a8ddb457488818ef41c1a33f64a95965942c2ba9cc7bda843",
+      "runtime": {
+        "torch": {
+          "version": "2.14.0+cu126",
+          "path": "/home/rehan/sct-gpu-supported-20261110/.venv/lib/python3.12/site-packages/torch/__init__.py"
+        },
+        "transformers": {
+          "version": "5.16.1",
+          "path": "/home/rehan/sct-gpu-supported-20261110/.venv/lib/python3.12/site-packages/transformers/__init__.py"
+        },
+        "onnxruntime-gpu": {
+          "version": "1.24.4",
+          "path": "/home/rehan/sct-gpu-supported-20261110/.venv/lib/python3.12/site-packages/onnxruntime/__init__.py"
+        },
+        "gliner": {
+          "version": "0.2.29",
+          "path": "/home/rehan/sct-gpu-supported-20261110/.venv/lib/python3.12/site-packages/gliner/__init__.py"
+        },
+        "gliner2": {
+          "version": "1.3.2",
+          "path": "/home/rehan/sct-gpu-supported-20261110/.venv/lib/python3.12/site-packages/gliner2/__init__.py"
+        },
+        "gliclass": {
+          "version": "0.1.20",
+          "path": "/home/rehan/sct-gpu-supported-20261110/.venv/lib/python3.12/site-packages/gliclass/__init__.py"
+        },
+        "presidio-analyzer": {
+          "version": "2.2.362",
+          "path": "/home/rehan/sct-gpu-supported-20261110/.venv/lib/python3.12/site-packages/presidio_analyzer/__init__.py"
+        },
+        "spacy": {
+          "version": "3.8.16",
+          "path": "/home/rehan/sct-gpu-supported-20261110/.venv/lib/python3.12/site-packages/spacy/__init__.py"
+        }
+      },
+      "scope": "Synthetic functional inference, not accuracy or production qualification",
+      "classes": [
+        {
+          "label": "science",
+          "score": 0.5860253572463989
+        }
+      ],
+      "contact_protected": true,
+      "gpu_execution": {
+        "visible_device": "GPU-5a285e5a-6883-d8af-9928-81d2ab04a33e",
+        "device_name": "NVIDIA GeForce RTX 4090",
+        "cuda_build": "12.6",
+        "torch_cuda_forwards": {
+          "torch.nn.modules.sparse.Embedding": 1,
+          "torch.nn.modules.normalization.LayerNorm": 21,
+          "torch.nn.modules.dropout.Dropout": 14,
+          "transformers.models.modernbert.modeling_modernbert.ModernBertEmbeddings": 1,
+          "transformers.models.modernbert.modeling_modernbert.ModernBertRotaryEmbedding": 2,
+          "torch.nn.modules.linear.Identity": 11,
+          "torch.nn.modules.linear.Linear": 47,
+          "transformers.models.modernbert.modeling_modernbert.ModernBertAttention": 10,
+          "transformers.activations.GELUActivation": 12,
+          "transformers.models.modernbert.modeling_modernbert.ModernBertMLP": 10,
+          "transformers.models.modernbert.modeling_modernbert.ModernBertEncoderLayer": 10,
+          "transformers.models.modernbert.modeling_modernbert.ModernBertModel": 1,
+          "gliclass.poolings.FirstTokenPooling1D": 1,
+          "gliclass.layers.FeaturesProjector": 2,
+          "torch.nn.modules.activation.ReLU": 2,
+          "torch.nn.modules.container.Sequential": 1,
+          "gliclass.scorers.MLPScorer": 1,
+          "gliclass.model.GLiClassUniEncoder": 1,
+          "gliclass.model.GLiClassModel": 1
+        },
+        "torch_cuda_kernels": 322,
+        "trace_sha256": "aebf1a38b30f352c2d3aa263c8f373bab1d1a03897b1126542aa75bda89ab79a",
+        "onnx_profiles": [],
+        "torch_peak_allocated": 140072960,
+        "torch_peak_reserved": 161480704
+      },
+      "network_attempts": 0,
+      "onnx_session_runs": 0,
+      "torch_module_forward_counts": {
+        "torch.nn.modules.sparse.Embedding": 1,
+        "torch.nn.modules.normalization.LayerNorm": 21,
+        "torch.nn.modules.dropout.Dropout": 14,
+        "transformers.models.modernbert.modeling_modernbert.ModernBertEmbeddings": 1,
+        "transformers.models.modernbert.modeling_modernbert.ModernBertRotaryEmbedding": 2,
+        "torch.nn.modules.linear.Identity": 11,
+        "torch.nn.modules.linear.Linear": 47,
+        "transformers.models.modernbert.modeling_modernbert.ModernBertAttention": 10,
+        "transformers.activations.GELUActivation": 12,
+        "transformers.models.modernbert.modeling_modernbert.ModernBertMLP": 10,
+        "transformers.models.modernbert.modeling_modernbert.ModernBertEncoderLayer": 10,
+        "transformers.models.modernbert.modeling_modernbert.ModernBertModel": 1,
+        "gliclass.poolings.FirstTokenPooling1D": 1,
+        "gliclass.layers.FeaturesProjector": 2,
+        "torch.nn.modules.activation.ReLU": 2,
+        "torch.nn.modules.container.Sequential": 1,
+        "gliclass.scorers.MLPScorer": 1,
+        "gliclass.model.GLiClassUniEncoder": 1,
+        "gliclass.model.GLiClassModel": 1
+      }
+    }
+  },
+  "quality": {
+    "status": "passed",
+    "torch_gpu": [
+      [
+        1.0
+      ],
+      [
+        1.0,
+        0.9999973773956299,
+        1.0
+      ],
+      [
+        1.0,
+        1.0
+      ],
+      [
+        0.9995785355567932,
+        0.8099353909492493
+      ]
+    ],
+    "onnx_gpu": [
+      [
+        1.0
+      ],
+      [
+        1.0,
+        0.9999973773956299,
+        1.0
+      ],
+      [
+        1.0,
+        1.0
+      ],
+      [
+        0.9995785355567932,
+        0.8099371194839478
+      ]
+    ],
+    "cpu_reference": [
+      [
+        1.0
+      ],
+      [
+        1.0,
+        0.9999973773956299,
+        1.0
+      ],
+      [
+        1.0,
+        1.0
+      ],
+      [
+        0.9995785355567932,
+        0.8099353909492493
+      ]
+    ],
+    "max_absolute_error": 1.7285346984863281e-06,
+    "tolerance": {
+      "rtol": 0.0001,
+      "atol": 1e-05
+    },
+    "minimum_reference": 0.8099353909492493,
+    "cuda_torch_kernels": 1164,
+    "onnx_cuda_node_events": 5148,
+    "quality_selection_records": 8,
+    "source_export_model_sha256": "0288133a7eb0209bfb501d1d5dfdcf7763acd727fec744b3443f40241fddeeaa",
+    "torch_trace_sha256": "96c9a9249f8dd7eb48d423968eee2eda9b8d3deb105d9b6edb34434b7cab3eb5",
+    "onnx_trace_sha256": "d6bd3f2bffa8d251c52fde9768361a49f082e630056c3a0a9b310faafda47c75",
+    "torch": "2.14.0+cu126",
+    "onnxruntime_gpu": "1.24.4",
+    "python": "3.12.3 (main, Aug 31 2026, 10:18:26) [GCC 13.3.0]",
+    "executable": "/home/rehan/sct-gpu-supported-20261110/.venv/bin/python"
+  },
+  "corpus": {
+    "status": "passed",
+    "counts": {
+      "input": 2,
+      "kept": 2,
+      "rejected": 0
+    },
+    "gpu_session_runs": 4,
+    "cuda_node_events": 1404,
+    "resume_reused_gpu_stage": true,
+    "completed_rerun_reused_gpu_stage": true,
+    "caller_input_unchanged": true,
+    "published_outputs_unchanged": true,
+    "person_and_contact_protected": true,
+    "profiles": [
+      {
+        "path": "/home/rehan/sct-gpu-supported-20261110/corpus-ort_2026-11-10_12-27-41.json",
+        "sha256": "c6402817bb84d7cc2c8ebd0b98115dc624baa40744999b5e1c32844280972836",
+        "cuda_nodes": 1404
+      }
+    ],
+    "python": "3.12.3 (main, Aug 31 2026, 10:18:26) [GCC 13.3.0]",
+    "executable": "/home/rehan/sct-gpu-supported-20261110/.venv/bin/python",
+    "onnxruntime_gpu": "1.24.4"
+  },
+  "evidence_inventory": {
+    "created": "2026-11-10T12:28:06.468346+00:00",
+    "source_sha256": {
+      "sct/__init__.py": "d6e5aca8eb5cbdbe0781bde805abe658ae869ec35d60b2a42f3af44b9cb9cd01",
+      "sct/adapters.py": "6c14afecf1b1d995e68c866d4a6333349d5c430edaebc1d0201d37daec08ca34",
+      "sct/browser.py": "552541e368fc5403f02294363816917d05bb2b837b6e3f66c30a3ed126c2a8bb",
+      "sct/cli.py": "b25622f4d030bebcb53e8fa4fd59b0e55805c48c5ad36fe852c90b4ef9f6abaa",
+      "sct/config.py": "15ff66b60385383b73d70d873afd7e39c3ddf8a770329ecaf9e67fb45f518710",
+      "sct/coordinates.py": "33d8b74559945bd8a12bd765b8313b4364a01ceb11460dfc4422e493846b7e72",
+      "sct/corpus/__init__.py": "b3589ddd7ab3c2a9fbf62fb3d0d4e932486e610fe308166ea76ddf5a2671124a",
+      "sct/corpus/datatrove.py": "901f069dd09ea1a9aee082b1fcfc6f4016eff720e68b7879942a9ef6cecf9eda",
+      "sct/corpus/manifest.py": "b5dbfaee581fe9f0c38808ebc128c439ea17225b48eb5f8e30ef6236c65aba7f",
+      "sct/corpus/runner.py": "32448b24b82755300dbf91c8e05e378fb4b97d2c343b443a29eb7b0ea72312e4",
+      "sct/corpus/selection.py": "9f11d71de2889607c7a403f26725c35a326909e4f72a849bd2649eb08d4809a4",
+      "sct/corpus/types.py": "c78dd1c36e09e2b2a2c160594b2a529d6e8f04001a7577a391c295fedac1bf1f",
+      "sct/detectors.py": "3892d4886bcdb4be869c763d0db82b240e09521320155d7c98b49c8c3f629456",
+      "sct/detectors_builtin.py": "68ed494896dadc4eb7f70b40ce9f5516063c2378cc0bdd04e79018ace18dd241",
+      "sct/detectors_datafog.py": "eb0601c49a3e8ad093d3cdfbced9a50901a37c0b1876514ac86912981d1ed5d7",
+      "sct/documents.py": "1250c8d780deb4e147767e630296d17bb84b1835fa565f9f9bcf37eeaa119c5a",
+      "sct/evaluation.py": "0744ddaccf6a6f9f26c1b05ac14165d0e140d0dd2cc386d5b8cce914a7f02e27",
+      "sct/findings.py": "c5298b9205f66c63d361096f73189646ecb70e47a5245ec9589493f430a209d2",
+      "sct/integrations/__init__.py": "86572a797863d690fc17eacfeb6baab82b5c2146606d20cc9852abb9fd59e851",
+      "sct/integrations/_runtime.py": "dd1c97c8649338177560b8d872ab8298822dfe072d691b36242cec84e48e6fb7",
+      "sct/integrations/datatrove.py": "60ebe86941848bbc3ce6ba37162fcc286ec9fd3af033381818714b9a0a680205",
+      "sct/integrations/docling.py": "6d1d26bf2fe3b2216261c2270ec2d67db6f5143c9d648d28effce3f1b31458d5",
+      "sct/integrations/haystack.py": "496863210cad7e4048c25aaf24bf4bd40ccdc94f876bcd085716778887cecfed",
+      "sct/integrations/hf.py": "4728d816cf9ac67790960a21b9cd4c33e83cc6ced4259a4cd8295db6654792ec",
+      "sct/integrations/langchain.py": "c3c9ba429153c0acbb38d912851cc89f60a24660b53a307ce8f9e229b300c8b3",
+      "sct/language_policy.py": "e5c60565ad19a50c605ad57f46d5c33f7737affeed8cf972b5396c80070b4a28",
+      "sct/mcp_server.py": "f9aae6e48c3b46f1dcc938196a3f0b150d2f2f716ca2b6399dc4186363cc62f7",
+      "sct/model_benchmark.py": "14c667e194880b7a60e95704605e07cfe4244224aa53724f196fbe2a4cffc3d1",
+      "sct/model_candidates.py": "e800be7bed0b7b256bd4d880f1b3d8027b7e8e92215386778971348cc7adee46",
+      "sct/ocr.py": "1ccb8453e01bf6a0946455b7db2503f966a7a0b602c883b1833f5f745071c6cc",
+      "sct/policy_v2.py": "e25e1f44c4ff7be6beb9bbf3c47a9bcc01dd5c731b053fdc15eff93bebde70b3",
+      "sct/presets.py": "be2446dafbfc8705e05fdea1663de99f6187cca1dfb600f56b8491808aa1db1a",
+      "sct/privacy.py": "b0b7c78d52e5746b841a5f87255180094fab2d08634e0f8bb724ba52e6853d5a",
+      "sct/report_cli.py": "c95d9c4ef190d377b5f2cf80f9848d9177c5cf0135fca291890b49cfdd076320",
+      "sct/risk.py": "55ed1510197fe3361b127fef3c16ac8a7f2d8a0a393668ccce7507a326783bb9",
+      "sct/routing.py": "19ced2813aa8220ab7f08bddd032b384d5ccadf6d9e49f86546b7cd3642f28fc",
+      "sct/schema.py": "6821237c10f3b7a438cee08afdb94b0ce6b7ee6a71ccae639efe899338719584",
+      "sct/score.py": "b7a6548572e29147b85116e2efceeae8b9b30fe2ffd5af9b49bedcbb3fd0e4fc",
+      "sct/sct.py": "92296797236108707be03be9e6e2f242dea4802fdab93f5aafa4e198629c01f8",
+      "sct/signals.py": "6ef22ea0261a6206748613befa672a4900330bfac2349df8e31ba34fe5471626",
+      "sct/streaming.py": "c442a2fb06eea1aa0a4f98e962ecffbf09f4cbc41bd2369f504d8e3084a08a75",
+      "sct/token_stores/__init__.py": "4f8caf8bd1fc12c5ee812a62b0e1e6d35e2d88df613105436fc3ea8c3e86946c",
+      "sct/token_stores/sqlite.py": "bdaedeecfccbc4ef628a93e00ff5ae0dda6f17207dc84628512e00735be7118b",
+      "sct/unified.py": "f844242f43ae099fdc08ecdbbf7e34932c94e609a67ae2ef2131b68fae55e714",
+      "sct/utils/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "sct/utils/anonymization_map.py": "2925f2580dd2666c0a5a71348a0539a1cf84ae305de28f0223a0ffe275803b04",
+      "sct/utils/atomic_file.py": "99f67a1ffb1db33eb229d0d7ac178dff4b669666ad42433888fa007890085d5a",
+      "sct/utils/constants.py": "20966a48e158141a055ab3127c0b99954580a0bd784428fc6be4145ae773dd6a",
+      "sct/utils/contact.py": "627e5ffd3e2a1212f73094b28d9ddf9ca72432225363eff47889e60b998ef2ba",
+      "sct/utils/datetime.py": "420babdfdbff4259a4774faf3cd6dfe33603882606214ab5a8e80869b34b4f30",
+      "sct/utils/gliclass_adapter.py": "d9f054dc7a1831634cbeb1510f18ccfbc80cb7d2595319d492a820a63b1ba8be",
+      "sct/utils/gliner_adapter.py": "99c366d8859637df255d237f9516f2e666b74b5eecfe2f12cb843d39c436c972",
+      "sct/utils/markers.py": "79b03874a953c587e8c530b52ecebe69e29d39b88a8918c7bb26e70c2b9a1856",
+      "sct/utils/ner.py": "dba9b9cdae78b0a6f619741ff26fdcee80e5574e0a95ad88266595f6772f7f35",
+      "sct/utils/ner_chunking.py": "b60046f3b86bbc9e0e0c3273fb7e8c8d62a22f8a8a2b61c7b1155869cbbd0bb1",
+      "sct/utils/ner_spans.py": "d3934998a8f76ae8de354be9cd4a95da9aed324496e7975d3fd552f043685e57",
+      "sct/utils/normtext.py": "538569ee5a14d411c99a63808c0bc144959711d770372128f95d70c1771e63c2",
+      "sct/utils/onnx_pipeline.py": "8214e7ebd532890541d63346986d4557c38b0176bae60b4708b3645b4db71d60",
+      "sct/utils/process_result.py": "b36f7cbdbe79292cefaa4991cedb8408bf4f0c4ac627a450226ab4ffec595562",
+      "sct/utils/resources.py": "18058b215ffdd9d390966ff7485447f03fe8d54968821b4d7902342ee804ed13",
+      "sct/utils/special.py": "705aa6e13607a229f30dfa69c061656aac7d1b3accbc1611c2b6b0caecf36a97",
+      "sct/utils/stopwords.py": "e36784c680695cf4dd1f00a33a379e525d98bae964c39d525e2837792bf9996c",
+      "sct/utils/synthetic.py": "1f3a659abc9d3e1e79d606904e7b58cacde7fedf8229a5fad1072f3403fb4775",
+      "sct/utils/torch_pipeline.py": "b70053c797d8d694dd9f497491e88fe342abdb687fa2e35668d7091a347f34c7"
+    },
+    "files": {
+      "/home/rehan/sct-gpu-supported-20261110/bootstrap.py": {
+        "sha256": "783020fcf84b4add6fa88f0e5c13ca4441f9c636bdca2b6e676851080c201857",
+        "bytes": 1942
+      },
+      "/home/rehan/sct-gpu-supported-20261110/collect-evidence.py": {
+        "sha256": "380bb5e5d5483a7a2cb42a97d8be8cefef3fdd1ce8e8d9ae0d04ccc1b3af4332",
+        "bytes": 2063
+      },
+      "/home/rehan/sct-gpu-supported-20261110/corpus-ort_2026-11-10_12-27-41.json": {
+        "sha256": "c6402817bb84d7cc2c8ebd0b98115dc624baa40744999b5e1c32844280972836",
+        "bytes": 1018631
+      },
+      "/home/rehan/sct-gpu-supported-20261110/dependency-check.exit": {
+        "sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865",
+        "bytes": 2
+      },
+      "/home/rehan/sct-gpu-supported-20261110/dependency-check.log": {
+        "sha256": "7a7dd1c7cfda911244a94fb7f24a9f232a288522d53fe83ab58a3875bd027e85",
+        "bytes": 207
+      },
+      "/home/rehan/sct-gpu-supported-20261110/gpu-artifacts.json": {
+        "sha256": "1796a00a969aa153cc55f61954752d7cdc84fc0646d6cb30b2672698465e4bc8",
+        "bytes": 8078
+      },
+      "/home/rehan/sct-gpu-supported-20261110/gpu-corpus.json": {
+        "sha256": "4a2cedfb72f2e7a9b61b8b0e249ffbedcb15a762aba9572496984be458e407e7",
+        "bytes": 742
+      },
+      "/home/rehan/sct-gpu-supported-20261110/gpu-corpus.py": {
+        "sha256": "f8c56f0001732ce30f564cbada62cdadfb7d4f63153f296ada1f0e07256e152c",
+        "bytes": 4525
+      },
+      "/home/rehan/sct-gpu-supported-20261110/gpu-corpus.py.exit": {
+        "sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+        "bytes": 1
+      },
+      "/home/rehan/sct-gpu-supported-20261110/gpu-corpus.py.log": {
+        "sha256": "8a248902962cd588605eb22843f4d96014cdd29e53062c39cb92d77507c62472",
+        "bytes": 15657
+      },
+      "/home/rehan/sct-gpu-supported-20261110/gpu-environment.json": {
+        "sha256": "d31eb8895c297148628f5250f86778b3833f137cc67ecf05ba0b7505540b842d",
+        "bytes": 1631
+      },
+      "/home/rehan/sct-gpu-supported-20261110/gpu-freeze.txt": {
+        "sha256": "00660ea845765063ca2200fafd550a7ef9eebbd82432521710f1b41e34d216ab",
+        "bytes": 2574
+      },
+      "/home/rehan/sct-gpu-supported-20261110/gpu-quality.json": {
+        "sha256": "2cadf61369e5e8072533af79a67e7df90d0e62743498a4b8ef217b57c7cbf51b",
+        "bytes": 1362
+      },
+      "/home/rehan/sct-gpu-supported-20261110/gpu-quality.py": {
+        "sha256": "46de9538b66da8cd10dfb397f78c6a197f9c13ceed7ad56e8547d10b26e111e7",
+        "bytes": 6755
+      },
+      "/home/rehan/sct-gpu-supported-20261110/gpu-quality.py.exit": {
+        "sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+        "bytes": 1
+      },
+      "/home/rehan/sct-gpu-supported-20261110/gpu-quality.py.log": {
+        "sha256": "15aa77f27d8022cb6e044367047269265569755f7f24e3c3f76cfd4bfbc52935",
+        "bytes": 1643
+      },
+      "/home/rehan/sct-gpu-supported-20261110/gpu-results/classify.json": {
+        "sha256": "c347717ad092fdfcc7d6b2b0aa8d663b5513f315c4745963c45f2067fa87d254",
+        "bytes": 11603
+      },
+      "/home/rehan/sct-gpu-supported-20261110/gpu-results/classify.log": {
+        "sha256": "4804c2576b2b266f668b82b712413438ef999a40c88fb55f9e4ae4e3cea817b4",
+        "bytes": 1420
+      },
+      "/home/rehan/sct-gpu-supported-20261110/gpu-results/classify.torch-trace.json": {
+        "sha256": "aebf1a38b30f352c2d3aa263c8f373bab1d1a03897b1126542aa75bda89ab79a",
+        "bytes": 1620819
+      },
+      "/home/rehan/sct-gpu-supported-20261110/gpu-results/ensemble_onnx.json": {
+        "sha256": "9a09ea99e2543b8f6a6bb43641c0fa5c6d1abf2614dea17131dc97a85b92dc37",
+        "bytes": 18426
+      },
+      "/home/rehan/sct-gpu-supported-20261110/gpu-results/ensemble_onnx.log": {
+        "sha256": "ce484a557a244415044d1b194840750ace9c9b0a1b0ed5b8e467390b55e8fa49",
+        "bytes": 1005
+      },
+      "/home/rehan/sct-gpu-supported-20261110/gpu-results/ensemble_onnx.torch-trace.json": {
+        "sha256": "ef7d60c15a7a124106fc938b7b77aff1ca13e8ac4c1ecee87f391be768c12ee8",
+        "bytes": 7500077
+      },
+      "/home/rehan/sct-gpu-supported-20261110/gpu-results/ensemble_torch.json": {
+        "sha256": "8b14503683643c85662c866c9fac377a7f1870396363e3dc856b4c2f9c447112",
+        "bytes": 19717
+      },
+      "/home/rehan/sct-gpu-supported-20261110/gpu-results/ensemble_torch.log": {
+        "sha256": "e973f3f3caeeb615a4dfa45460648679dc3396217cd331421bc471040f9cc5ed",
+        "bytes": 793
+      },
+      "/home/rehan/sct-gpu-supported-20261110/gpu-results/ensemble_torch.torch-trace.json": {
+        "sha256": "b51e846da20c801b1bc3d988cf4c96416a4241a4f37255462722975722065456",
+        "bytes": 9072251
+      },
+      "/home/rehan/sct-gpu-supported-20261110/gpu-results/gliner.json": {
+        "sha256": "cd1e418abd3b7ef38aafe37f36b7393deaca62b1f6b32dbd65ad755f9e985cd4",
+        "bytes": 16987
+      },
+      "/home/rehan/sct-gpu-supported-20261110/gpu-results/gliner.log": {
+        "sha256": "9b2e5e9c0f63c0c0ba985f395b8e505b5e9bafda2919257850363746c2ca9d48",
+        "bytes": 1005
+      },
+      "/home/rehan/sct-gpu-supported-20261110/gpu-results/gliner.torch-trace.json": {
+        "sha256": "542c434c036943224324ea249eb67ad0113cce55bad574eac266e4a9b6f5f1ff",
+        "bytes": 4092232
+      },
+      "/home/rehan/sct-gpu-supported-20261110/gpu-results/gliner2.json": {
+        "sha256": "4b6bb221054cbd5746bc3c7b6604b6608896c90be7308539c2ddc6cef9000595",
+        "bytes": 14863
+      },
+      "/home/rehan/sct-gpu-supported-20261110/gpu-results/gliner2.log": {
+        "sha256": "19dcef5529e64bb4244054a17f1fc3fd1d1740a7bf88098f90055dce46c23377",
+        "bytes": 1488
+      },
+      "/home/rehan/sct-gpu-supported-20261110/gpu-results/gliner2.torch-trace.json": {
+        "sha256": "81480de9a3d40ac322cef5468d67ced7b94d2fe1c6b3056c3b3be3c94e5802b1",
+        "bytes": 6665621
+      },
+      "/home/rehan/sct-gpu-supported-20261110/gpu-results/onnx.json": {
+        "sha256": "5d449913f21a31e0b84d22ad62da2f5366e3f0e39788efa8863357f89a911290",
+        "bytes": 12489
+      },
+      "/home/rehan/sct-gpu-supported-20261110/gpu-results/onnx.log": {
+        "sha256": "7ad1907a7940b5b1627f8a56868adb618a06629fd078521cd55211e0c68f3f31",
+        "bytes": 426
+      },
+      "/home/rehan/sct-gpu-supported-20261110/gpu-results/onnx.torch-trace.json": {
+        "sha256": "41cf6f9a9726bed5733806a2e6416fb7b3ba112bb7ae6b43dc2ccdd44dcdc775",
+        "bytes": 3447777
+      },
+      "/home/rehan/sct-gpu-supported-20261110/gpu-results/ort-ensemble_onnx_2026-11-10_12-26-51.json": {
+        "sha256": "f32b7de8de772001bb32be2603a6738f254d18a1f42d10e83de5ad33855c7636",
+        "bytes": 1020216
+      },
+      "/home/rehan/sct-gpu-supported-20261110/gpu-results/ort-onnx_2026-11-10_12-26-33.json": {
+        "sha256": "544e2ddec2f39f5857572975be735d8edd1403b88335ef5713f63a75a14f3c13",
+        "bytes": 1018755
+      },
+      "/home/rehan/sct-gpu-supported-20261110/gpu-results/presidio_gliner.json": {
+        "sha256": "97a536944127c0b15d10df8ec52f82f35ddaab5ee081e215fffacb48d3ec0a2b",
+        "bytes": 23078
+      },
+      "/home/rehan/sct-gpu-supported-20261110/gpu-results/presidio_gliner.log": {
+        "sha256": "a99644881a766eaad5865235dd96e3bc236e3b3dc32a962783fdfb4567ec4e40",
+        "bytes": 1005
+      },
+      "/home/rehan/sct-gpu-supported-20261110/gpu-results/presidio_gliner.torch-trace.json": {
+        "sha256": "693a7113d78ce71512018bd4329aa0a05701ddc79509f973294877d58e96f105",
+        "bytes": 4723650
+      },
+      "/home/rehan/sct-gpu-supported-20261110/gpu-results/torch.json": {
+        "sha256": "c892c334c41278d9286201f875d38d32cb6c829a5242b2610d44b21a0aaace26",
+        "bytes": 14287
+      },
+      "/home/rehan/sct-gpu-supported-20261110/gpu-results/torch.log": {
+        "sha256": "0573e1fb5f103b9641ace1a081bda740993dc053c7bb39056b9655e4ed656bff",
+        "bytes": 574
+      },
+      "/home/rehan/sct-gpu-supported-20261110/gpu-results/torch.torch-trace.json": {
+        "sha256": "4e1763199661fe6b8d10d32d2c74ec07fb1a9fe36c3830ef27035ec3e16b4f9e",
+        "bytes": 4986757
+      },
+      "/home/rehan/sct-gpu-supported-20261110/launch-extra.py": {
+        "sha256": "8d64963c899b1e1cc15dcef688a2f600f18394622e7deebc2ee1a0bcb0d47528",
+        "bytes": 743
+      },
+      "/home/rehan/sct-gpu-supported-20261110/llms.txt": {
+        "sha256": "4cafb74b4063252e1c0af1a8053dd326e116fd8318f740bc7c758c0d31078d4e",
+        "bytes": 23428
+      },
+      "/home/rehan/sct-gpu-supported-20261110/quality-ort_2026-11-10_12-27-36.json": {
+        "sha256": "d6bd3f2bffa8d251c52fde9768361a49f082e630056c3a0a9b310faafda47c75",
+        "bytes": 4493297
+      },
+      "/home/rehan/sct-gpu-supported-20261110/quality-torch-trace.json": {
+        "sha256": "96c9a9249f8dd7eb48d423968eee2eda9b8d3deb105d9b6edb34434b7cab3eb5",
+        "bytes": 3672839
+      },
+      "/home/rehan/sct-gpu-supported-20261110/requirements-base.txt": {
+        "sha256": "0183902d28580106826a5c7b060747c0bb9a0866fdef26265d3eff0b7f6acb0a",
+        "bytes": 1840
+      },
+      "/home/rehan/sct-gpu-supported-20261110/run-gpu.py": {
+        "sha256": "2435db78d47aa13ca6e95680c01ec90d09a937ee21c7dcebdfd31911d785fdb1",
+        "bytes": 2366
+      },
+      "/home/rehan/sct-gpu-supported-20261110/runtime-smoke-corrected.log": {
+        "sha256": "30f94b4a9460b61f39a0d4791a0d30428b4a162d6c2ceddf1ebc85d584c4785c",
+        "bytes": 279
+      },
+      "/home/rehan/sct-gpu-supported-20261110/runtime-smoke.json": {
+        "sha256": "d1e9880132033d306b236746496589168aaf547c2efd171086b8ee541cd7baa9",
+        "bytes": 708
+      },
+      "/home/rehan/sct-gpu-supported-20261110/runtime-smoke.py": {
+        "sha256": "2faec46d7aa15178f5a21ee3c89ba96698bba318132f0b512d6018a0a238de87",
+        "bytes": 1895
+      },
+      "/home/rehan/sct-gpu-supported-20261110/runtime-smoke_2026-11-10_12-26-15.json": {
+        "sha256": "cea1cb438f6ba4a7b15015cea7b106cac238dc1963c01a83af96a35f51cf2b0b",
+        "bytes": 1188
+      },
+      "/home/rehan/sct-gpu-supported-20261110/scripts/qualify_gpu.py": {
+        "sha256": "02fbf7494ea9395a8ddb457488818ef41c1a33f64a95965942c2ba9cc7bda843",
+        "bytes": 11739
+      },
+      "/home/rehan/sct-gpu-supported-20261110/setup-0.exit": {
+        "sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+        "bytes": 1
+      },
+      "/home/rehan/sct-gpu-supported-20261110/setup-0.log": {
+        "sha256": "9cd1d91486e03836d272bea33fd85a509ef0056fc8632cdccbfe3b7eab511ef0",
+        "bytes": 137
+      },
+      "/home/rehan/sct-gpu-supported-20261110/setup-1.exit": {
+        "sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+        "bytes": 1
+      },
+      "/home/rehan/sct-gpu-supported-20261110/setup-1.log": {
+        "sha256": "9b4c4e0d418852c625e582d3173ad2e857ee8b38a62d1509911a508d67b56ab7",
+        "bytes": 2210
+      },
+      "/home/rehan/sct-gpu-supported-20261110/setup-2.exit": {
+        "sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+        "bytes": 1
+      },
+      "/home/rehan/sct-gpu-supported-20261110/setup-2.log": {
+        "sha256": "1c32f6d8003d470326378c141f21635a332aafc850e7442209fb74724ac015b8",
+        "bytes": 666
+      },
+      "/home/rehan/sct-gpu-supported-20261110/setup-3-corrected.log": {
+        "sha256": "c9e3036a85fce2ad0b26647f1e043ef3d8ecfe7a06cdc127254083de066d5cae",
+        "bytes": 387
+      },
+      "/home/rehan/sct-gpu-supported-20261110/setup-3.exit": {
+        "sha256": "6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b",
+        "bytes": 1
+      },
+      "/home/rehan/sct-gpu-supported-20261110/setup-3.log": {
+        "sha256": "94aae1a604ed8e329dcfd646554591ee8775a6d5fa76b239a12bb8ae2adc84ba",
+        "bytes": 230
+      },
+      "/home/rehan/sct-gpu-supported-20261110/setup-4.log": {
+        "sha256": "23e545c4081a8182e5f5508fe794285013a1cbf0c4450cd62551bf4de716dfc6",
+        "bytes": 386
+      },
+      "/home/rehan/sct-improvements-r1-models-20261107/model-artifacts.json": {
+        "sha256": "000e182f79d894a848f685d60dcb9c86ffeedc5c15a4e4c3cd8252ee31e4d2c0",
+        "bytes": 3119
+      }
+    },
+    "gpu_after": "0, GPU-65a53008-60d3-05ac-97c1-be5b94f4f44c, NVIDIA GeForce RTX 4090, 560.35.05, 24564 MiB, 16925 MiB, 0 %\n1, GPU-7ff6f815-c49c-b4b4-adf1-51ad379d72b9, NVIDIA GeForce RTX 4090, 560.35.05, 24564 MiB, 19107 MiB, 0 %\n2, GPU-ff4f4d00-872a-c859-0233-c9c87831b2cb, NVIDIA GeForce RTX 4090, 560.35.05, 24564 MiB, 18919 MiB, 0 %\n3, GPU-5a285e5a-6883-d8af-9928-81d2ab04a33e, NVIDIA GeForce RTX 4090, 560.35.05, 24564 MiB, 16442 MiB, 0 %\n"
+  },
+  "frozen_qa_bundle": {
+    "path": "v090-gpu-evidence.tar.gz",
+    "sha256": "cd6ebf49218c75901e9881131c10e08424c1bf1b41e6a55b77327be9e3e3a4fa",
+    "bytes": 58321
+  },
+  "earlier_exploratory_profile": {
+    "path": "/home/rehan/sct-gpu-merge-20261110",
+    "onnxruntime_gpu": "1.20.0",
+    "conclusion": "Genuine CUDA execution, but below the declared GPU minimum. The supported-range profile repeats every probe and supplies the final evidence."
+  },
+  "failed_attempts": {
+    "exploratory_profile": {
+      "quality": "Two cleanup attempts retained the 8.125 MiB cuBLAS workspace. Explicitly clearing that workspace made the original allocation assertion pass at zero bytes. Numerical parity had passed in both attempts.",
+      "corpus": "Two fail-closed detector initializations occurred before the harness explicitly enabled allow_network_detectors. A later attempt passed functional assertions but failed JSON serialization of immutable counts. The final fresh run repeats all assertions with dict(counts).",
+      "runtime": "Initial ORT CUDA initialization rejected CPU fallback because shared cuDNN libraries were not on the isolated library path. Adding this venv NVIDIA library directories made the CUDA node assertion pass."
+    },
+    "supported_range_setup": "Exact GPU version 1.24.2 is not published on PyPI. Installing 1.24.4 satisfies >=1.24.2. All final functional probes pass on 1.24.4.",
+    "dependency_metadata_check": "uv pip check exits 1 only because CPU onnxruntime is absent. GPU onnxruntime-gpu 1.24.4 intentionally supplies the same import namespace. See dependency-check.log and .exit in the frozen bundle. This does not prove an unmodified resolver install."
+  },
+  "scope_limits": [
+    "One tested GPU, driver, Python minor and dependency profile. The prior three-minor CPU qualification remains separate.",
+    "GPU-backed execution is proven by real CUDA traces and forwards. Some graph operations and Presidio spaCy processing remain on CPU.",
+    "This is functional and numerical validation on synthetic controls, not detection accuracy, GPU throughput, memory capacity, or production qualification.",
+    "Python TCP connections are rejected during inference and Hugging Face offline mode is enabled. This is not host-wide network isolation.",
+    "GPU corpus verification uses one worker. Parallel GPU workers and GPU routing latency or calibration were not tested.",
+    "Large raw traces remain on gpuserver with hashes in the inventory. The repository bundle retains scripts, compact outputs, dependency freeze and attempt logs.",
+    "The package metadata still requests the overlapping CPU onnxruntime distribution. GPU validation deliberately installs only the GPU distribution; the metadata check reports this single missing-distribution requirement."
+  ],
+  "dependency_guidance_sources": [
+    "https://pytorch.org/get-started/previous-versions/",
+    "https://onnxruntime.ai/docs/execution-providers/CUDA-ExecutionProvider.html",
+    "https://onnxruntime.ai/docs/get-started/with-python.html",
+    "https://pypi.org/pypi/onnxruntime-gpu/1.24.4/json",
+    "https://docs.nvidia.com/deploy/cuda-compatibility/minor-version-compatibility.html"
+  ],
+  "publication_redaction": "Unrelated host workload process details are omitted. The private original inventory remains on gpuserver."
+}

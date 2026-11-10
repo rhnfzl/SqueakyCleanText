@@ -1,0 +1,195 @@
+{
+  "schema_version": 1,
+  "scope": "R1 preparation: actual non-ONNX GLiNER and caller-provided trained Torch quality scorer integration on Python3.14 only; NOT completed R1 acceptance",
+  "source_commit": "b23250791ea9c6a4286a8ec9b648b6126ed75d87",
+  "remote_root": "/home/rehan/sct-improvements-r1-models-20261107",
+  "runtime": {
+    "python": "3.14.4 (main, Apr  7 2026, 20:47:53) [Clang 22.1.1 ]",
+    "executable": "/home/rehan/sct-improvements-r1-models-20261107/.venv/bin/python",
+    "prefix": "/home/rehan/sct-improvements-r1-models-20261107/.venv",
+    "providers": {
+      "torch": {
+        "version": "2.14.0",
+        "file": "/home/rehan/sct-improvements-r1-models-20261107/.venv/lib/python3.14/site-packages/torch/__init__.py"
+      },
+      "gliner": {
+        "version": "0.2.29",
+        "file": "/home/rehan/sct-improvements-r1-models-20261107/.venv/lib/python3.14/site-packages/gliner/__init__.py"
+      },
+      "onnx": {
+        "version": "1.23.2",
+        "file": "/home/rehan/sct-improvements-r1-models-20261107/.venv/lib/python3.14/site-packages/onnx/__init__.py"
+      },
+      "onnxruntime": {
+        "version": "1.30.0",
+        "file": "/home/rehan/sct-improvements-r1-models-20261107/.venv/lib/python3.14/site-packages/onnxruntime/__init__.py"
+      },
+      "transformers": {
+        "version": "5.16.1",
+        "file": "/home/rehan/sct-improvements-r1-models-20261107/.venv/lib/python3.14/site-packages/transformers/__init__.py"
+      },
+      "tokenizers": {
+        "version": "0.23.2",
+        "file": "/home/rehan/sct-improvements-r1-models-20261107/.venv/lib/python3.14/site-packages/tokenizers/__init__.py"
+      }
+    },
+    "onnxscript_available": false
+  },
+  "artifacts": {
+    "gliner": {
+      "repo": "knowledgator/gliner-pii-base-v1.0",
+      "revision": "61726e0ad791dcab3e29339bbec3ad42ded65641",
+      "snapshot": "/home/rehan/sct-improvements-r1-models-20261107/hf-cache/models--knowledgator--gliner-pii-base-v1.0/snapshots/61726e0ad791dcab3e29339bbec3ad42ded65641",
+      "files": {
+        "README.md": "f715f1ad8ff24c0f6f1b2745684a587dfe7390f8a1f0621deec57243b34a8b5a",
+        "added_tokens.json": "c358eb74586ab438484d8acf4534f67283b33041bc5ffee6b20a4a075cdc3cd6",
+        "gliner_config.json": "e33d3da38e0d369fa7574668d3798ca6c7d2b23cba7d628507112eeb426aaccb",
+        "pytorch_model.bin": "da21d12e61e3da22cb93d2663b8593e752c440479a68a647b061447bcd8f9e42",
+        "special_tokens_map.json": "b2f1b2f15f29a6b6d9d6ea4eca1675d2c231a71477f151d48f79cc83a625ba21",
+        "spm.model": "c679fbf93643d19aab7ee10c0b99e460bdbc02fedf34b92b05af343b4af586fd",
+        "tokenizer.json": "ee028763434d18611c1c36356ea1d050e90a9fa94ede57fac48b39f85f818ad1",
+        "tokenizer_config.json": "3ec8a90d8758fbc56d50831990c3a3a65660f020c5b06534adf43b04091ffa9e"
+      }
+    },
+    "quality_head": {
+      "repo": "epfml/FineWeb2-HQ-Plus-Classifier",
+      "revision": "bf13b1ac9448e874d0eb545891a58524d3f9afd1",
+      "snapshot": "/home/rehan/sct-improvements-r1-models-20261107/hf-cache/models--epfml--FineWeb2-HQ-Plus-Classifier/snapshots/bf13b1ac9448e874d0eb545891a58524d3f9afd1",
+      "files": {
+        "README.md": "7dd0ce0ec18b037a4836a7c6a1daf48db774056e631a93bcb759d6db14c50846",
+        "model.pt": "6187350cc5061af8bb3726ada717e6f1a6fa48be2a4221519d0752390315bfad"
+      }
+    },
+    "quality_backbone": {
+      "repo": "FacebookAI/xlm-roberta-base",
+      "revision": "e73636d4f797dec63c3081bb6ed5c7b0bb3f2089",
+      "snapshot": "/home/rehan/sct-improvements-r1-models-20261107/hf-cache/models--FacebookAI--xlm-roberta-base/snapshots/e73636d4f797dec63c3081bb6ed5c7b0bb3f2089",
+      "files": {
+        "README.md": "bec9f2cd81f7396a64ee474145117d81139906443a21480cbe4993c97cb499aa",
+        "config.json": "d66ed8cd4f2a93b358c245e50736fa389ed4f35c0bae7aad0b32abb20c62b579",
+        "model.safetensors": "6fd4797bc397c3b8b55d6bb5740366b57e6a3ce91c04c77f22aafc0c128e6feb",
+        "sentencepiece.bpe.model": "cfc8146abe2a0488e9e2a0c56de7952f7c11ab059eca145a0a727afce0db2865",
+        "tokenizer.json": "a898ea75433890f6610f4e470b8ebeb0c21dce5c8dd61f892eb09eb5919d2e2c",
+        "tokenizer_config.json": "994f46754c5bf4014f1aa92d34b1374319c3a6b3f702105cd5b742beaecd18ce"
+      }
+    },
+    "gliner_tokenizer_parent": {
+      "repo": "microsoft/deberta-v3-small",
+      "revision": "a36c739020e01763fe789b4b85e2df55d6180012",
+      "snapshot": "/home/rehan/sct-improvements-r1-models-20261107/hf-cache/models--microsoft--deberta-v3-small/snapshots/a36c739020e01763fe789b4b85e2df55d6180012",
+      "files": {
+        "config.json": "b0bb1caf90a50aa67d1085130508dfbf8646ac5a11928305e280b07a36e100ae",
+        "spm.model": "c679fbf93643d19aab7ee10c0b99e460bdbc02fedf34b92b05af343b4af586fd",
+        "tokenizer_config.json": "3f3978e0c036f2c2588cac34a6047cbb0af0b0dc1814254e291028529805496d"
+      },
+      "scope": "Explicit base tokenizer/config bootstrap, no base weights"
+    }
+  },
+  "gliner": {
+    "source_commit": "b23250791ea9c6a4286a8ec9b648b6126ed75d87",
+    "executable": "/home/rehan/sct-improvements-r1-models-20261107/.venv/bin/python",
+    "cpu_affinity": [
+      4,
+      5
+    ],
+    "gliner_version": "0.2.29",
+    "configured_model": "/home/rehan/sct-improvements-r1-models-20261107/hf-cache/models--knowledgator--gliner-pii-base-v1.0/snapshots/61726e0ad791dcab3e29339bbec3ad42ded65641",
+    "model_revision": "61726e0ad791dcab3e29339bbec3ad42ded65641",
+    "status": "passed",
+    "stage": "inference",
+    "profile": "explicit local pretrained snapshot; CPU; network blocked",
+    "torch_forward_calls": 2,
+    "canonical_findings": 4,
+    "canonical_types": [
+      "EMAIL",
+      "LOCATION",
+      "ORGANIZATION",
+      "PERSON"
+    ],
+    "person_value_absent": true,
+    "email_value_absent": true,
+    "score_types": [
+      "float"
+    ],
+    "network_attempts": 0,
+    "source_sha256": {
+      "sct/utils/gliner_adapter.py": "8a645bb391dd0139a4b3e83c0341e4c39084d7f0477a8d1bf24e6130d346fecd",
+      "sct/utils/ner.py": "1d95fbcb18adfa9d11765c9e7d71e3d99b8fcd646d9f8abd3b27de4782325c0b",
+      "sct/detectors_builtin.py": "68ed494896dadc4eb7f70b40ce9f5516063c2378cc0bdd04e79018ace18dd241",
+      "sct/config.py": "a86d0e15831dc358f0973a2dbf1528b33aa11372ec2113ef29c8bad94cf22a53",
+      "sct/score.py": "05b3312ab5e5b67f80382b9163652351695bc7670d1d6972f163de746f53f3b0",
+      "scripts/export_quality_head.py": "78f1e3d0cdf045c8216ac62370860763e30542e7e174fa74d4be6807db40a7c6"
+    }
+  },
+  "quality_torch": {
+    "source_commit": "b23250791ea9c6a4286a8ec9b648b6126ed75d87",
+    "executable": "/home/rehan/sct-improvements-r1-models-20261107/.venv/bin/python",
+    "cpu_affinity": [
+      4,
+      5
+    ],
+    "status": "passed",
+    "stage": "corpus quality selection",
+    "head_revision": "bf13b1ac9448e874d0eb545891a58524d3f9afd1",
+    "backbone_revision": "e73636d4f797dec63c3081bb6ed5c7b0bb3f2089",
+    "scope": "Real Torch quality-scorer/corpus integration; ONNX export and parity remain unqualified",
+    "scores": {
+      "q-0": 0.9995785355567932,
+      "q-1": 0.9999796152114868,
+      "q-2": 0.8099340796470642
+    },
+    "quality_threshold": 0.5,
+    "kept": 3,
+    "rejected": 0,
+    "decisions_match_actual_scores": true,
+    "original_input_hashes": [
+      "2ba00ea2703915cddae71853562a63f29ff524d5606b59ce40a84d3b6868e2a2",
+      "edd0db9e1bd1c3a57e8db7af8f63959a9751c88e07ef1e497862bba45e460dd6",
+      "8f7ed405fb94c04a51ecbce4073d808a8fb87d0ad1cbb2d0f75235fa98f518d2"
+    ],
+    "torch_forward_calls": 3,
+    "network_attempts": 0,
+    "source_sha256": {
+      "sct/corpus/selection.py": "9f11d71de2889607c7a403f26725c35a326909e4f72a849bd2649eb08d4809a4",
+      "sct/corpus/types.py": "c78dd1c36e09e2b2a2c160594b2a529d6e8f04001a7577a391c295fedac1bf1f",
+      "sct/score.py": "05b3312ab5e5b67f80382b9163652351695bc7670d1d6972f163de746f53f3b0",
+      "scripts/export_quality_head.py": "78f1e3d0cdf045c8216ac62370860763e30542e7e174fa74d4be6807db40a7c6"
+    }
+  },
+  "quality_interpretation": "Functional finite-score/original-input/selection integration only. The gibberish control scores highest and all three pass the predeclared 0.5 threshold. No semantic accuracy, effective quality filtering or new default is established. No tuning follows these observations.",
+  "export_dependency_preflight": {
+    "status": "failed",
+    "exception_type": "ModuleNotFoundError",
+    "message": "No module named 'onnxscript'",
+    "note": "Isolated actual exporter dependency preflight; real quality export remains unqualified"
+  },
+  "source_verification": "All recorded SCT/exporter source hashes match the committed source blobs; SDK paths resolve inside the qualification project own venv. Models explicitly bootstrapped before network-blocked inference.",
+  "probe_corrections": "Two probe-only API errors (_ner vs GeneralNER, text vs lm_text) were corrected from source before successful qualification. They were not product defects or successful evidence.",
+  "model_loading_scope": "Offline Hub-ID construction probes failed; the successful profile uses the explicit local pretrained snapshot, plus explicitly pinned tokenizer-parent cache. No general Hub-ID offline compatibility claim.",
+  "observed_tool_exits": {
+    "gliner_native_32395": 0,
+    "quality_torch_14996": 0
+  },
+  "evidence_file_sha256": {
+    "bootstrap-inspection.json": "c91909036845921e86b1a900dfecd52479e058c1a209937abd5f4fe31c0289df",
+    "export-dependency-probe.json": "d4028a25ca32c0ef02f9ba1a8de55cf630d1e800d043dfa3227788358eb6301c",
+    "gliner-native-result-fixed.log": "56275e4c3818e5c129fcf4eec2eb2df958c391722010cd8daa13b11cbae0eea7",
+    "gliner-native-result.json": "1a83f0ab1cc340227521efa56d9c076f13d52b1468b7652a897a95559668ff24",
+    "model-artifacts.json": "000e182f79d894a848f685d60dcb9c86ffeedc5c15a4e4c3cd8252ee31e4d2c0",
+    "probe-gliner-native.py": "493f58d1e5e146d958bec7572cc37b95ffc408ebf76989be814d311417c232ad",
+    "probe-quality-torch.py": "51a79b1fc63fa3e4120a6aa03d6a6df0f37572061fa351afd280a3dba50f4487",
+    "quality-torch-result.json": "b5d1e79f20d8ab9b66d42627558b6abf12abcb319aad6e4eb4f3b168097f5a06",
+    "quality-torch-result.log": "3d501a876387026ca5fcfabb68d8cb6fa624b1d5d9d382ee347848930660f427"
+  },
+  "remaining": [
+    "Actual trained ONNX quality export and Torch/ONNX numerical parity after fixing the optional exporter dependency/profile.",
+    "Python3.12/3.13 non-ONNX and trained-quality execution, plus final supported runtime/provider acceptance.",
+    "Combined feature tests, strict docs/packaging/locks, full project checks and independent whole-branch review.",
+    "Benchmark source/data/output validation and staged PR-head checks."
+  ],
+  "limits": [
+    "The model inputs are small synthetic controls; no representative quality or privacy result.",
+    "No production code changed for these probes.",
+    "No release, push or PR was performed."
+  ]
+}

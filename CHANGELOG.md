@@ -1,5 +1,37 @@
 # Changelog
 
+## Unreleased
+
+Users can opt into one privacy policy across format matches and model findings.
+Caller-declared fields add explicit protection without guessing field meanings.
+Encrypted local references keep reversible maps separate from cleaned output.
+Document extraction and corpus selection add private, resumable data workflows.
+Credential-format scanning and language abstention are optional.
+Detector routing remains experimental; existing full execution stays the default.
+Combined release acceptance and trained ONNX quality parity remain pending.
+Breaking changes: none to default behavior; unified callback ordering differs when explicitly enabled.
+
+### Added
+
+- Unified detection, policy and rendering with value-free findings and explicit Unicode source mapping quality.
+- Application-owned detector registries, caller context, field schemas and versioned framework summaries.
+- Encrypted SQLite token references with expiry, rotation and logical purge operations.
+- Report-first corpus selection, explicit deduplication bases, native DataTrove recipes, caller reference checks and checkpoint replay.
+- Optional offline Docling PDF extraction with local verified artifacts and structural projection of cleaned text.
+- Optional datafog-core credential-format scanning for API keys, Bearer tokens, JWTs and private keys.
+- Opt-in language abstention and experimental calibrated detector routing with explicit fallback behavior.
+- Cross-feature tests for encrypted references, field protection, extraction, corpus selection, replay and public error traces.
+
+### Compatibility and limits
+
+- Legacy processing, language selection, replacement modes and three-value result unpacking stay unchanged by default.
+- Unified callbacks run before all detection. Legacy callbacks still run between regex replacement and NER.
+- Reversible framework/document output remains unsupported; direct text processing can use encrypted references.
+- PDF source files remain unredacted. Corpus staging and signatures need caller-managed private storage and retention.
+- Logical token deletion cannot erase journals, backups or storage media. Keys and authorization remain application-owned.
+- The trained Torch quality scorer passed functional controls, but gibberish scored highest. No quality-accuracy claim is established.
+- Optional provider and runtime evidence remains scoped to the recorded tests; configured CI jobs are not completed verification.
+
 ## 0.9.0 - 2026-11-09
 
 This cleanup preserves text output while simplifying configuration.

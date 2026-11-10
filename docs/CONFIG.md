@@ -74,6 +74,39 @@ EN/NL/DE/ES (others use English) and month names for 8 languages (EN NL DE ES FR
 
 ## Field reference
 
+### Unified processing and migration
+
+Users can opt into shared detection without changing existing callers.
+All new processing, language and routing defaults preserve the legacy path.
+
+| Field | Default | Contract |
+|---|---|---|
+| `pii_processing` | `'legacy'` | `'unified'` detects on canonical text and applies one policy before rendering |
+| `source_mapping` | `'best_effort'` | `'require_source'` rejects opaque callbacks; covering mappings remain explicitly uncertain |
+| `detector_specs` | `()` | Empty selects configured regex and native NER; nonempty replaces that complete selection |
+| `allow_network_detectors` | `False` | Unified mode rejects providers declaring network access without explicit permission |
+
+Set these fields explicitly through `TextCleanerConfig`.
+The registry, policy, key provider and token store remain injected runtime objects, outside serialized configuration.
+Pass data-only configuration through the adapter's supported serialization interface; do not serialize runtime dependencies.
+
+Custom callbacks run at different stages in the two processing modes.
+Legacy callbacks receive text after regex replacements and before NER.
+Unified callbacks receive canonical text before all PII detection.
+A callback replacing `<EMAIL>` therefore sees that marker in legacy mode, but sees the original address in unified mode.
+Review marker-dependent callbacks before migration. Use policy or replacement configuration for supported rendering changes.
+Opaque callbacks make source mapping unavailable, even if they return unchanged text.
+Document element projection rejects unavailable mappings.
+
+To restore legacy processing, set `pii_processing='legacy'`, clear detector and routing specs, and remove `unified_policy`, schemas and explicit contexts.
+To restore legacy language selection, set `language_policy='legacy'` and clear both language thresholds.
+To stop experimental routing while keeping its detector groups, set `routing_policy='always_run'` and clear `routing_calibration`.
+That runs both configured groups. Empty groups restore the default detector selection.
+Return corpus selection to `dedup_mode='report'` to keep all records; old outputs and private state remain caller-owned.
+Configuration rollback does not restore text that was irreversibly removed. Reprocess the retained input when necessary.
+
+### All cleaner fields
+
 The same fields with their docstrings, generated from the code: [TextCleanerConfig API page](https://rhnfzl.github.io/SqueakyCleanText/reference/config/).
 
 Immutable (frozen) dataclass. Create modified copies with `dataclasses.replace()`:
@@ -320,6 +353,10 @@ A version 1 artifact contains exactly these fields:
 ```
 
 This example describes the format, not a qualified calibration artifact.
+The saved `routing-calibrations-v1.json` experiment uses the historical 0.8.x configuration identity.
+It does not qualify this v0.9.0 port, whose configuration digest differs and rejects those calibrations.
+A current calibration needs a separately versioned experiment and an untouched test cohort.
+Do not change the historical artifact digest or rerun its consumed test cohort.
 Measure candidates on the fixed development grid and evaluate the selected candidate on untouched test data before use.
 Inconclusive or failed promotion evidence keeps the cascade experimental.
 Threshold equality passes; pinned languages bypass confidence and margin checks but must still appear in `languages`.

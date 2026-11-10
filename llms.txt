@@ -1,6 +1,6 @@
 # SqueakyCleanText
 
-> Production-ready text preprocessing and PII anonymization pipeline for Python 3.12+.
+> Text preprocessing and PII protection pipeline for Python 3.12+.
 > Removes noise (URLs, emails, phone numbers, stopwords), detects language automatically,
 > and runs ensemble NER (ONNX/PyTorch/GLiNER) for entity anonymization.
 > Published on PyPI as `squeakycleantext`.
@@ -50,6 +50,35 @@ lm_text, stat_text, lang = result  # backward-compatible 3-tuple unpacking
 - `sct.score.score_record(result)` / `score_records(results, texts, ScoreConfig(...))` — flat `sct_*` columns; Score B (quality, MinHash, `[score]` extra) off by default; `build_data_card` / `render_data_card`
 
 ## PII Evaluation
+
+Opt-in capability contract:
+
+- `TextCleaner(..., detector_registry=None, unified_policy=None)` adds application-owned detector factories and the separate unified policy.
+- `process(text, context=None)` uses a keyword-only DetectionContext; process_batch/aprocess_batch accept keyword-only contexts in input order.
+- `pii_processing='legacy'` stays default. Unified processing detects once on canonical text, applies policy, then renders once.
+- `Detection`, `DetectionContext`, `TextRange`, `DetectorSpec`, `DetectorRegistry`, `UnifiedPrivacyPolicy` and `HandlingRule` are exported from sct.
+- `FieldSchema` and `FieldRule` protect caller-declared fields through JSON, DataFrame, RAG and framework surfaces. No field-name guessing.
+- Unified findings_v2 are value-free. Canonical offsets are Unicode code points; source mapping is exact, covering or unavailable.
+- counts_v2 separates hits and replacements. coverage_v2 supplies bounds; uncertain pii_chars/pii_share stay None. Legacy counters stay separate.
+- include_entities=True adds sensitive findings_v2_values. Reversible output retains personal data in anon_map or an opaque anon_map_reference.
+- `EncryptedSQLiteTokenStore` from sct.token_stores needs the token-store extra and application-owned scope, keys, authorization and retention.
+- `extract_document`/`clean_document` protect extracted PDF text with prepared local Docling assets. Original binaries remain unchanged and sensitive.
+- `sct.corpus.analyse_records`/`select_records` use report-only defaults. Applying removal requires an explicit pre_pii or pii_normalized basis.
+- SCT candidate dedup confirms exact Jaccard similarity; native DataTrove uses approximate buckets. Their signatures are not interchangeable.
+- `sct.corpus.curate_resumable` validates identities/checksums and replays incomplete stages. No exactly-once or distributed-coordination claim.
+- The secrets extra adds four offline credential-format categories, not credential validation. Short Bearer false positives and inline Authorization misses remain known limits.
+- language_policy='legacy', thresholds=None and routing_policy='always_run' stay default. Abstention and calibrated_cascade require explicit opt-in.
+- A cascade without usable calibration or complete fast-stage capabilities runs the full stage. No routing optimization claim follows from implementation alone.
+- Legacy callbacks see regex markers before NER; unified callbacks run before all detection. Migrate marker-dependent callbacks explicitly.
+- Unified windowed streaming and browser manifests are unsupported. Adapters retain reversible restrictions; document output also rejects indexed mode.
+- clean_document has no context/schema parameter; use the extracted text with direct processing when caller context is needed.
+- Native corpus rejects active presidio_gliner: SCT does not forward its revision and the default analyzer can load separate NLP models.
+- The current trained Torch quality controls prove functional scores only. Gibberish scored highest; trained ONNX parity remains pending.
+- Combined release acceptance remains pending in evaluation/improvements/ACCEPTANCE.md. One provider's evidence does not qualify other providers.
+
+Rollback: select legacy processing, remove unified policies/contexts/schemas/specs, and restore legacy language policy with unset thresholds.
+For unified full execution, use always_run with the intended groups. Corpus report mode retains records.
+Reprocess retained inputs to restore irreversible changes; rollback does not remove private state or revoke map references.
 
 Use the evaluation harness before changing a default model:
 

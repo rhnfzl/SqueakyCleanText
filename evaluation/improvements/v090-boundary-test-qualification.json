@@ -1,0 +1,207 @@
+{
+  "schema_version": 1,
+  "qa_tree": "ffc64d8625d11f5c60661cd8f3fccd593e907c80",
+  "source_archive_sha256": "87e8d5bba8cdbd319033e999611905d64818097b25efd03a99185ebfbe63a4fd",
+  "new_test": {
+    "path": "tests/test_corpus_identity_boundaries.py",
+    "sha256": "6e28977a0596470a735041d9fbe3976b8c800926313d7f32e62729f5a0218c4a",
+    "cases": 24
+  },
+  "runtime_files_unchanged": 65,
+  "configuration_unchanged": true,
+  "coverage_threshold_unchanged": 85,
+  "review": {
+    "verdict": "approved; no Critical or Important findings",
+    "report_sha256": "f15e63197dc0647372713ae35418936954072d6ce45568561ab45e2c469bb3f2",
+    "scope": "Core orchestration after adapter preflight, not native input/config/checkpoint validity"
+  },
+  "projection_audit": {
+    "invalid_raw_line_union_preserved_but_rejected": true,
+    "source_bound_projection_sha256": "ad9e7738b86cf387926c0e93f029e7ac269dcce38750a9d052be3778466dd650",
+    "projection_used_for_acceptance": false
+  },
+  "native_fixture_profiles": {
+    "312": {
+      "passed": 24,
+      "scope": "Core boundary tests with SDKs installed. Native adapter substituted after preflight, not executed.",
+      "native_adapter_restored": true,
+      "package_files_unchanged": 65,
+      "runtime": {
+        "python": "3.12.3 (main, Aug 31 2026, 10:18:26) [GCC 13.3.0]",
+        "executable": "/home/rehan/sct-improvements-final-v090-20261109/.venv-integration312/bin/python",
+        "sct": "/home/rehan/sct-improvements-final-v090-20261109/sct/__init__.py",
+        "modules": {
+          "datasketch": {
+            "version": "2.0.0",
+            "path": "/home/rehan/sct-improvements-final-v090-20261109/.venv-integration312/lib/python3.12/site-packages/datasketch/__init__.py"
+          },
+          "datatrove": {
+            "version": "0.10.1",
+            "path": "/home/rehan/sct-improvements-final-v090-20261109/.venv-integration312/lib/python3.12/site-packages/datatrove/__init__.py"
+          },
+          "numpy": {
+            "version": "2.5.3",
+            "path": "/home/rehan/sct-improvements-final-v090-20261109/.venv-integration312/lib/python3.12/site-packages/numpy/__init__.py"
+          }
+        },
+        "test_sha256": "6e28977a0596470a735041d9fbe3976b8c800926313d7f32e62729f5a0218c4a",
+        "package_files_unchanged": 65,
+        "os_affinity": [
+          64,
+          65,
+          66,
+          67,
+          68,
+          69,
+          70,
+          71,
+          72,
+          73,
+          74,
+          75,
+          76,
+          77,
+          78,
+          79
+        ],
+        "scope": "Additional core tests with SDKs installed; native adapter is substituted, not executed.",
+        "passed": 24,
+        "native_adapter_restored": true,
+        "source_unchanged": true,
+        "network_allowed": false,
+        "native_sdk_execution": false
+      },
+      "evidence_sha256": {
+        "result.json": "6b191fc1b46b0f4271aedba4dce0a9305dc5f67b3791a406ecec8fe50f33b0dd",
+        "runtime.json": "a291f7e0706e7e1d8d4b72dbcc69757c808bf79ec807422944ce4c8439aa527b",
+        "tests.log": "2a74c205359acbffc64dee3344ceb2f7efc28a0b4d60ee7565650ec12538ab4e",
+        "exit": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+      }
+    },
+    "313": {
+      "passed": 24,
+      "scope": "Core boundary tests with SDKs installed. Native adapter substituted after preflight, not executed.",
+      "native_adapter_restored": true,
+      "package_files_unchanged": 65,
+      "runtime": {
+        "python": "3.13.3 (main, May 30 2025, 05:38:56) [Clang 20.1.4 ]",
+        "executable": "/home/rehan/sct-improvements-final-v090-20261109/.venv-integration313/bin/python",
+        "sct": "/home/rehan/sct-improvements-final-v090-20261109/sct/__init__.py",
+        "modules": {
+          "datasketch": {
+            "version": "2.0.0",
+            "path": "/home/rehan/sct-improvements-final-v090-20261109/.venv-integration313/lib/python3.13/site-packages/datasketch/__init__.py"
+          },
+          "datatrove": {
+            "version": "0.10.1",
+            "path": "/home/rehan/sct-improvements-final-v090-20261109/.venv-integration313/lib/python3.13/site-packages/datatrove/__init__.py"
+          },
+          "numpy": {
+            "version": "2.5.3",
+            "path": "/home/rehan/sct-improvements-final-v090-20261109/.venv-integration313/lib/python3.13/site-packages/numpy/__init__.py"
+          }
+        },
+        "test_sha256": "6e28977a0596470a735041d9fbe3976b8c800926313d7f32e62729f5a0218c4a",
+        "package_files_unchanged": 65,
+        "os_affinity": [
+          64,
+          65,
+          66,
+          67,
+          68,
+          69,
+          70,
+          71,
+          72,
+          73,
+          74,
+          75,
+          76,
+          77,
+          78,
+          79
+        ],
+        "scope": "Additional core tests with SDKs installed; native adapter is substituted, not executed.",
+        "passed": 24,
+        "native_adapter_restored": true,
+        "source_unchanged": true,
+        "network_allowed": false,
+        "native_sdk_execution": false
+      },
+      "evidence_sha256": {
+        "result.json": "1d0ae6f19877eb83f4956aa909906dfe9a74030e872ee55a654389dfab3e4b7f",
+        "runtime.json": "85fdf433fb648cc513159d5bfb678a66faa70abb4d4a044d8673262e0f9104cd",
+        "tests.log": "d109df9fc59fe49a3c0891a63662c575e97dde2643c58a704a839ef043023368",
+        "exit": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+      }
+    },
+    "314": {
+      "passed": 24,
+      "scope": "Core boundary tests with SDKs installed. Native adapter substituted after preflight, not executed.",
+      "native_adapter_restored": true,
+      "package_files_unchanged": 65,
+      "runtime": {
+        "python": "3.14.4 (main, Apr  7 2026, 20:47:53) [Clang 22.1.1 ]",
+        "executable": "/home/rehan/sct-improvements-final-v090-20261109/.venv-integration314/bin/python",
+        "sct": "/home/rehan/sct-improvements-final-v090-20261109/sct/__init__.py",
+        "modules": {
+          "datasketch": {
+            "version": "2.0.0",
+            "path": "/home/rehan/sct-improvements-final-v090-20261109/.venv-integration314/lib/python3.14/site-packages/datasketch/__init__.py"
+          },
+          "datatrove": {
+            "version": "0.10.1",
+            "path": "/home/rehan/sct-improvements-final-v090-20261109/.venv-integration314/lib/python3.14/site-packages/datatrove/__init__.py"
+          },
+          "numpy": {
+            "version": "2.5.3",
+            "path": "/home/rehan/sct-improvements-final-v090-20261109/.venv-integration314/lib/python3.14/site-packages/numpy/__init__.py"
+          }
+        },
+        "test_sha256": "6e28977a0596470a735041d9fbe3976b8c800926313d7f32e62729f5a0218c4a",
+        "package_files_unchanged": 65,
+        "os_affinity": [
+          64,
+          65,
+          66,
+          67,
+          68,
+          69,
+          70,
+          71,
+          72,
+          73,
+          74,
+          75,
+          76,
+          77,
+          78,
+          79
+        ],
+        "scope": "Additional core tests with SDKs installed; native adapter is substituted, not executed.",
+        "passed": 24,
+        "native_adapter_restored": true,
+        "source_unchanged": true,
+        "network_allowed": false,
+        "native_sdk_execution": false
+      },
+      "evidence_sha256": {
+        "result.json": "0b6533e26351ceaec51170121d820726915d05c91555c6bd7b9f1c194e34ba56",
+        "runtime.json": "ffdafa58284ab67c9d10220377531f0eaabb3d9ee1f0ee6893bbc052cc4ae673",
+        "tests.log": "0234a0e0fef0c92adc4a987a1c77bceb8252eb37e72c678b0b9c68c6c8834151",
+        "exit": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+      }
+    }
+  },
+  "full_prefix_qualification": {
+    "tasks": 17,
+    "requirements": 79,
+    "all_accepted": true,
+    "seal_sha256": "2d16c676727bf7a29d35bd8d1e8718e40bd9ca5cee697bc8d88ba4330b621589",
+    "gate": "Exact-tree full suites, static/source/pylock guards, integer coverage >=85%, unique absolute coverage files"
+  },
+  "limits": [
+    "Native SDK input/configuration/checkpoint behavior retains separate existing real-SDK evidence.",
+    "No model inference or held-out benchmark was replayed for this test-only change."
+  ]
+}

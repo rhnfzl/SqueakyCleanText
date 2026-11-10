@@ -29,6 +29,9 @@ on:
       - tests/test_*datafog*.py
       - tests/test_*secret*.py
       - tests/test_baseline_measurement.py
+      - tests/test_improvements_end_to_end.py
+      - tests/test_quality_export.py
+      - scripts/export_quality_head.py
       - sct/corpus/**
       - tests/test_corpus*.py
       - sct/token_stores/**
@@ -156,6 +159,76 @@ jobs:
         env:
           HF_HUB_OFFLINE: "1"
         run: .venv/bin/python -m pytest tests/test_corpus_*.py -v
+
+  combined-acceptance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.12", "3.13", "3.14"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: "0.10.9"
+      - run: uv sync --locked --extra dev --extra test --extra corpus --extra token-store
+      - name: Exercise combined privacy and replay contracts
+        env:
+          HF_HUB_OFFLINE: "1"
+          OMP_NUM_THREADS: "2"
+        run: .venv/bin/python -m pytest tests/test_improvements_end_to_end.py -v
+
+  quality-export:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.12", "3.13", "3.14"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: "0.10.9"
+      - run: uv sync --locked --extra dev --extra test --extra torch --extra quantize
+      - name: Prepare pinned trained quality artifacts
+        run: |
+          .venv/bin/python - <<'PY'
+          import hashlib
+          import json
+          from pathlib import Path
+          from huggingface_hub import snapshot_download
+          models = {
+              "quality_head": ("epfml/FineWeb2-HQ-Plus-Classifier", "bf13b1ac9448e874d0eb545891a58524d3f9afd1"),
+              "quality_backbone": ("FacebookAI/xlm-roberta-base", "e73636d4f797dec63c3081bb6ed5c7b0bb3f2089"),
+          }
+          artifacts = {}
+          for key, (repo, revision) in models.items():
+              snapshot = Path(snapshot_download(repo, revision=revision,
+                  allow_patterns=["*.json", "*.safetensors", "model.pt", "sentencepiece.bpe.model"]))
+              files = {}
+              for path in snapshot.rglob("*"):
+                  if path.is_file():
+                      with path.open("rb") as stream:
+                          files[str(path.relative_to(snapshot))] = hashlib.file_digest(stream, "sha256").hexdigest()
+              artifacts[key] = {"repo": repo, "revision": revision, "snapshot": str(snapshot), "files": files}
+          Path("quality-artifacts.json").write_text(json.dumps(artifacts))
+          PY
+      - name: Exercise trained offline export and Torch ONNX parity
+        env:
+          SCT_QUALITY_EXPORT_ARTIFACTS: quality-artifacts.json
+          HF_HUB_OFFLINE: "1"
+          TRANSFORMERS_OFFLINE: "1"
+          OMP_NUM_THREADS: "2"
+          MKL_NUM_THREADS: "2"
+        run: .venv/bin/python -m pytest tests/test_quality_export.py -v -s
 
   pinned-model-baseline:
     if: github.event_name == 'workflow_dispatch' && inputs.pinned_model_baseline

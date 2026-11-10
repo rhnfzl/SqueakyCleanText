@@ -72,6 +72,7 @@ def main() -> None:
                       "attention_mask": {0: "batch", 1: "seq"},
                       "score": {0: "batch"}},
         opset_version=args.opset,
+        dynamo=False,
     )
     tokenizer.backend_tokenizer.save(str(out / "tokenizer.json"))
     info = huggingface_hub.HfApi()

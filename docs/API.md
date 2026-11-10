@@ -2,11 +2,11 @@
 
 ## `TextCleaner`
 
-`TextCleaner(cfg=None, *, privacy_policy=None, token_store=None, include_entities=False, metrics_callback=None)`
+`TextCleaner(cfg=None, *, privacy_policy=None, token_store=None, include_entities=False, metrics_callback=None, detector_registry=None, unified_policy=None)`
 
 Pass a `TextCleanerConfig` to change behavior. Omitting `cfg` uses its defaults; module-level configuration globals are no longer supported.
 
-### `process(text: str) -> ProcessResult`
+### `process(text: str, *, context: DetectionContext | None = None) -> ProcessResult`
 
 Cleans one text. It runs `process_batch([text])` and returns its one result. A
 `ProcessResult` unpacks as a 3-tuple `(lm_text, stat_text, language)`:
@@ -14,7 +14,7 @@ Cleans one text. It runs `process_batch([text])` and returns its one result. A
   - Cleaned text formatted for statistical models (`None` if `check_statistical_model_processing` is `False`).
   - Detected language of the text. `None` when it is unknown, or when no step needs it: `check_detect_language`, `check_ner_process` and `check_remove_stopwords` all `False` and no `language` set. NER and stopword removal run detection even with `check_detect_language=False`.
 
-### `process_batch(texts: List[str], max_workers: Optional[int] = None) -> List[ProcessResult]`
+### `process_batch(texts, max_workers=None, *, contexts=None) -> list[ProcessResult]`
 
 Processes multiple texts using thread-parallel execution. Each result follows the same format as `process()`.
 `max_workers` is the maximum number of worker threads (default `os.cpu_count()`; it must be >= 1).
@@ -23,7 +23,10 @@ Empty or whitespace-only input returns `ProcessResult("", "", None)` with the `e
 and a non-string item or a non-empty plain `str` for `texts` raises `ValueError`. With NER on and `ner_batch_size > 1`, the steps before
 NER run per document in threads, then one NER call batches the chunks of all documents.
 
-### `aprocess_batch(texts: List[str], max_workers: Optional[int] = None) -> List[ProcessResult]`
+With unified processing, `contexts` contains one `DetectionContext` per input, in input order.
+An explicit context requires unified processing. The configuration and each context are immutable.
+
+### `aprocess_batch(texts, max_workers=None, *, contexts=None) -> list[ProcessResult]`
 
 Async version of `process_batch` for use with asyncio-based frameworks (FastAPI, aiohttp). Runs the batch in a thread-pool executor so it does not block the event loop:
 
@@ -66,6 +69,52 @@ A NER model that cannot load raises `sct.ModelLoadError`, on the first text that
 `ner_off`) and `models`. `sensitive` is `pii_count > 0`, so a replaced date, year, number,
 currency or HTML tag alone is not sensitive. It never holds entity text, so it is safe to log or store next to
 cleaned data. Score columns, `sct-report`, the adapters and the MCP server read it.
+
+These count and offset descriptions apply to legacy processing.
+Unified processing adds versioned metadata and signals described below.
+Caller-chosen identifiers and model names can still identify private work; restrict access when required.
+
+## Unified findings and caller context
+
+Users can apply one policy to format matches and model findings before any replacement.
+Set `pii_processing='unified'` and pass `unified_policy=UnifiedPrivacyPolicy(...)` to select this path.
+`PrivacyPolicy` remains the separate legacy NER policy; do not pass it to the unified path.
+
+`DetectionContext(document_id=None, path=(), declared_entity_types=(), schema_id=None)` carries caller-owned context.
+It does not infer field meanings. Direct processing forwards it to context-capable detectors.
+`FieldSchema(id, version, rules)` and `FieldRule(path, entity_types, mode='hint')` select explicit structured fields.
+`mode='protect_value'` protects the whole selected scalar; `hint` requires a context-capable detector.
+The JSON, DataFrame and RAG APIs accept `schema=` and `context=`; see [adapters](ADAPTERS.md).
+
+`Detection` and `findings_v2` contain canonical Unicode code-point positions, source ranges, detector identity and decisions.
+Positions are zero-based and end-exclusive. Source ranges refer to the supplied string, never PDF bytes.
+`mapping_quality` is `exact`, `covering` or `unavailable`.
+`counts_v2` separates detector hits from resolved replacements.
+`coverage_v2` reports coverage bounds; uncertain coverage leaves `pii_chars` and `pii_share` unset.
+`provenance_v2` records configured detector and policy identities.
+`include_entities=True` explicitly adds sensitive `findings_v2_values`.
+Reversible processing returns `anon_map`, or only `anon_map_reference` when a token store is supplied.
+The three-value result unpacking contract stays unchanged.
+
+Register external detectors through `DetectorRegistry.register(name, factory)` and select them with `DetectorSpec(name, options)`.
+Nonempty `detector_specs` replaces the complete default detector set.
+Factories and credentials belong to trusted application code. Requests cannot supply executable factory imports.
+See [configuration](CONFIG.md) for network permission, source mapping and experimental routing.
+
+## Document, corpus and token-store APIs
+
+| API | Result and boundary |
+|---|---|
+| `extract_document(path, provider=...)` | Validated `ExtractedDocument`; source files remain unchanged |
+| `clean_document(document, cleaner)` | Cleaned text and structural elements; unified placeholder or synthetic output only |
+| `analyse_records(..., cleaner=..., score_config=..., selection=..., scorer=None)` | Streaming analyses with private output references; scores receive original text |
+| `select_records(analyses, selection=...)` | Context-managed report; close it to release owned temporary text and shingles |
+| `curate_resumable(source, output, retention='caller_managed', ...)` | Private native checkpoints, checksum validation and replay; no exactly-once guarantee |
+| `EncryptedSQLiteTokenStore(path, scope=..., key_provider=..., ttl_seconds=..., ...)` | Encrypted reversible maps behind opaque references; application-owned authorization and keys |
+
+Corpus APIs live in `sct.corpus`; the encrypted store lives in `sct.token_stores`.
+Document APIs are also exported from `sct`.
+See [documents](DOCUMENTS.md), [corpus integrations](INTEGRATIONS.md) and [token-store operations](TOKEN_STORES.md) for their complete restrictions.
 
 ## Batch processing
 

@@ -1,0 +1,176 @@
+{
+  "schema_version": 1,
+  "status": "local preparatory gates complete; R1 acceptance incomplete",
+  "executable": "/Users/rehan-8v/projects/personal/SqueakyCleanText-pipeline-research/.venv/bin/python",
+  "python": "3.14.3 (main, Mar  3 2026, 15:46:55) [Clang 21.1.4 ]",
+  "source_freeze_sha256": "53aef82b3183157881b7e7806991719bbe2a0fad21d6fde7c0983fc15c5fc43c",
+  "source_sha256_after_gate": {
+    "tests/test_improvements_end_to_end.py": "186fa601222eb50439a5a61e58e5efafb49ab29c6306d735ea8c6009b322f605",
+    "tests/test_quality_export.py": "fbf78f1a712965e9d27c5e9032c04507f9693e1b56cc72b6b833fbae7f11a97d",
+    "scripts/export_quality_head.py": "78f1e3d0cdf045c8216ac62370860763e30542e7e174fa74d4be6807db40a7c6",
+    "evaluation/improvements/ACCEPTANCE.md": "29224e5e226a0fb957e31fc2c4230e212d6f40e14f05e44be2ec176bab253983",
+    "README.md": "b290b7c2b932440e8f190b36e647054b50403ce6861ac1d9ed9018de730de286",
+    "docs/API.md": "eb49e279b6fb3903b6f88a6f69c9b8761e86522a41d633b2ced03476882dcdfd",
+    "docs/CONFIG.md": "80551819b44247b85664274f3f4edb58cefd8ccbbbf2c137fbe0785d9a07eaa7",
+    "docs/PRIVACY.md": "87dec91bc2e15c0052a9b3d40fdbec86765665ca5966fe1e4c717e106ece598a",
+    "docs/INTEGRATIONS.md": "f8ae22c0f2dadd5a3a9bb8580b80f1025e6703536d4748f4f21c4e0191bf82d0",
+    "docs/INSTALL.md": "cae077f4df671d27b4fdf884d400985a7fec8428d39cd2c5251caaa7476f4620",
+    "llms.txt": "8961d71f31bad0a967b0af3923cca656fb16205f6480729d7a446294e41ef55d",
+    "CHANGELOG.md": "3a90b4c9f110c87d389be6124846eaecb6448aabe8a42febdcf16998d12ea411",
+    ".github/workflows/python-package.yml": "c773c2f56df57d1a43aceaf30a77e8b01341eaaf37b8769297993d17c910820b",
+    ".github/workflows/docs.yml": "0fc06bf0a148806b3654a4e573d3a05d7f4abd2ae6c346f8e583bdd81a7bf2bb",
+    ".github/workflows/optional-backends.yml": "51341faa73f9a6d05a47fc0b7c033a683fbc92c42d7a9a9a79a9da3a4162309b"
+  },
+  "only_post_gate_document_updates": [
+    "evaluation/improvements/ACCEPTANCE.md"
+  ],
+  "full_test": {
+    "session": 36776,
+    "exit_code": 1,
+    "passed": 3236,
+    "skipped": 31,
+    "warnings": 106,
+    "seconds": 337.16,
+    "failures": [
+      "tests/test_atomic_file.py::test_dev_stdout_redirected_to_a_file_is_written_through",
+      "tests/test_atomic_file.py::test_dev_stdout_piped_is_written_through"
+    ],
+    "command": ".venv/bin/python -m pytest tests/ --cov=sct --cov-report=term --cov-report=json:.superpowers/sdd/2026-11-07-sct-improvements/R1-coverage.json --cov-fail-under=85 -q"
+  },
+  "outside_stdout": {
+    "session": 15971,
+    "exit_code": 0,
+    "passed": 2,
+    "seconds": 0.42
+  },
+  "coverage": {
+    "covered": 7105,
+    "statements": 7515,
+    "percent": 94.54424484364604,
+    "baseline_covered": 7105,
+    "baseline_statements": 7515,
+    "delta_percentage_points": 0.0
+  },
+  "warnings": {
+    "fork": 105,
+    "legacy_ner_models_list": 1,
+    "new_native_replay_fork_occurrences": 10
+  },
+  "focused": {
+    "passed": 11,
+    "skipped": 1,
+    "warnings": 10,
+    "seconds": 3.16,
+    "evidence": "tool output; no persistent focused log",
+    "export_skip": "SCT_QUALITY_EXPORT_ARTIFACTS not supplied; no local heavy model installation"
+  },
+  "checks": {
+    "ruff": "passed: sct/ tests/ scripts/",
+    "mypy": "passed: 63 source files, pinned 2.4.1 with project interpreter",
+    "docs": "strict build passed; see post-gate log",
+    "locks": "258 packages; pylock payload bytes and parsed TOML identical; only generated command comment differs",
+    "build": "wheel and sdist pass",
+    "clean_wheel": "core dependencies installed in owned isolated venv; package/API smoke passed",
+    "package_inventory": "new modules present; scratch absent",
+    "workflow_yaml": "all three changed files parsed"
+  },
+  "evidence_sha256": {
+    "R1-source-freeze.json": "53aef82b3183157881b7e7806991719bbe2a0fad21d6fde7c0983fc15c5fc43c",
+    "R1-full-local.log": "b0aec041c1c0f95dab54d5ef05eb3fb6a6ded97193e9f924c6a699d2c8d1ba63",
+    "R1-coverage.json": "c8ddcd122ebefd99efa10bbf8f3fcecc247cd2d57917f749f9f675e533a375c4",
+    "R1-atomic-outside.log": "bab70b6bbd9479a9d94ec8ea0388e7542f0a09cdf670c0f5874e907f024ca6d0",
+    "R1-mypy.log": "0f5e2c0f274fe3238699ff97fc09737970ee01e440d6d8f78a8522bdc43ee59b",
+    "R1-build.log": "c3e245d2fbd33d15668f0b6e7de7b35810386d1d88bfc9dc0b6c10daccbc8589",
+    "R1-lock-result.json": "97e7af54a4c03b3359941721115a7da979a031af3f31755042f65194f140c831",
+    "R1-wheel-install.log": "754ece0f6b13e8a94af34ca811ff1154cd11930724f598b48d26122332043d05",
+    "R1-wheel-install-online.log": "d43101c65a2e4d783b0d8456e9d8c614f1fe4652000896b373476e5ab3a668a5",
+    "R1-wheel-result.json": "37ed31ef051152df0317ba3437ea928ec4d65ec6d134511298f2fd16f80c6505",
+    "R1-package-inventory.json": "59ae8d699e74837a49adc850ee76c729b4772e214827078278070e64e636596a",
+    "R1-docs.log": "5255c77ade8f9199051020a2555b1f202d5b01272353e28be6ffba5174fd5f07",
+    "R1-docs-post-gate.log": "326aa10973b4704805f4f05b227498e4a799deff31a0ebf2e5be6f2041d41622"
+  },
+  "remaining": [
+    "Actual trained exporter failing test, minimal production fix and trained ONNX/Torch parity",
+    "L3 held-out/consumption artifact retrieval and independent validation",
+    "Actual current six-backend GeneralNER.analyze/inference across Python3.12/3.13/3.14, plus GLiNER2 variant and GLiClass",
+    "Final installed provider/framework/Linux worker and package/runtime matrix",
+    "Final baseline quality comparisons, independent whole-branch review, staged packaging and actual CI heads"
+  ],
+  "published": false,
+  "committed": false,
+  "scope": "R1 local preparation only; genuine exporter fix, remaining native/runtime/quality qualification, L3 artifacts, final whole-branch review and PR-head CI are incomplete.",
+  "controller_validation": {
+    "all_13_evidence_hashes_match": true,
+    "all_15_current_owned_path_hashes_match": true,
+    "only_post_gate_change_is_empirical_acceptance_append": true,
+    "coverage_json_and_summary_agree": true,
+    "wheel_hash_verified": true,
+    "split_stdout_evidence_not_one_green_full_invocation": true,
+    "post_gate_acceptance_append_checked_against_logs": true
+  },
+  "clean_wheel": {
+    "status": "passed",
+    "executable": "/private/tmp/sct-r1-wheel-runtime-20261107/bin/python",
+    "prefix": "/private/tmp/sct-r1-wheel-runtime-20261107",
+    "version": "3.14.3 (main, Mar  3 2026, 15:46:55) [Clang 21.1.4 ]",
+    "sct_version": "0.8.3",
+    "wheel_sha256": "32d44078ceed5d7ae0cef120658d28600d8eba6bb11b62405c1398caf5154f77",
+    "runtime_paths": {
+      "sct": "/private/tmp/sct-r1-wheel-runtime-20261107/lib/python3.14/site-packages/sct/__init__.py",
+      "onnxruntime": "/private/tmp/sct-r1-wheel-runtime-20261107/lib/python3.14/site-packages/onnxruntime/__init__.py",
+      "tokenizers": "/private/tmp/sct-r1-wheel-runtime-20261107/lib/python3.14/site-packages/tokenizers/__init__.py",
+      "lingua": "/private/tmp/sct-r1-wheel-runtime-20261107/lib/python3.14/site-packages/lingua/__init__.py"
+    },
+    "resolved_versions": {
+      "presidio_anonymizer": "2.2.366",
+      "filelock": "4.2.9",
+      "packaging": "26.3",
+      "protobuf": "7.36.2",
+      "tokenizers": "0.23.3",
+      "ftfy": "6.3.1",
+      "wcwidth": "0.9.4",
+      "Unidecode": "1.4.0",
+      "onnxruntime": "1.31.1",
+      "click": "8.5.1",
+      "SqueakyCleanText": "0.8.3",
+      "numpy": "2.5.4",
+      "cryptography": "50.0.2",
+      "pycparser": "3.12",
+      "lingua-language-detector": "2.2.0",
+      "tqdm": "4.70.1",
+      "emoji": "2.16.0",
+      "stop-words": "2025.11.4",
+      "h11": "0.16.0",
+      "PyYAML": "6.0.3",
+      "httpcore2": "2.16.0",
+      "fsspec": "2026.9.0",
+      "truststore": "0.10.5",
+      "cffi": "2.1.1",
+      "httpx2": "2.16.0",
+      "regex": "2026.11.7",
+      "flatbuffers": "25.12.19",
+      "anyio": "4.16.0",
+      "typing_extensions": "4.16.0",
+      "hf-xet": "1.8.0",
+      "huggingface_hub": "2.4.0",
+      "idna": "3.20"
+    },
+    "checks": [
+      "isolated wheel import",
+      "unified regex output",
+      "versioned counts",
+      "three-value unpacking",
+      "caller field schema"
+    ],
+    "heavy_optional_modules_absent": true,
+    "model_inference": "not exercised; explicitly disabled",
+    "install_scope": "core dependency resolver, new owned venv, no extras"
+  },
+  "task_review": {
+    "scope": "frozen local patch only",
+    "spec_compliance": "incomplete for R1",
+    "code_quality": "approved; no Critical, Important or new actionable Minor finding",
+    "report_sha256": "fdab9be607a8d2ef8968fb23d32a7020e61fb405137d20d7a0bff1843284fe29",
+    "final_whole_branch_review": false
+  }
+}

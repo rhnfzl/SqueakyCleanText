@@ -1,0 +1,53 @@
+{
+  "source_identity": {
+    "git_revision": "cb32a08b027fd6cb8591f327c1f4f001cd0855ad",
+    "dirty_source": false,
+    "source_sha256": "6f42ab72096f5e04cd52981b1dbbcc83d5e20d0a7aa88e2a8f0cca69c9d37c85",
+    "declared_revision": null
+  },
+  "command": [
+    "evaluation/improvements/measure_baseline.py"
+  ],
+  "measurement_environment": {
+    "OMP_NUM_THREADS": null,
+    "OPENBLAS_NUM_THREADS": null,
+    "HF_HUB_OFFLINE": null,
+    "SCT_SOURCE_REVISION": null
+  },
+  "model": "protectai/bert-base-NER-onnx",
+  "revision": "84d28ab2bc28401b4353b26033eb043c8c8a0739",
+  "device": "cpu",
+  "sample_count": 3,
+  "runtime": {
+    "python": "3.12.16 (main, Oct 26 2026, 02:48:44) [GCC 15.2.0]",
+    "platform": "Linux-7.0.0-1019-azure-x86_64-with-glibc2.43",
+    "providers": {
+      "onnxruntime": {
+        "version": "1.30.0",
+        "module_path": "/home/runner/work/SqueakyCleanText/SqueakyCleanText/.venv/lib/python3.12/site-packages/onnxruntime/__init__.py"
+      },
+      "tokenizers": {
+        "version": "0.23.2",
+        "module_path": "/home/runner/work/SqueakyCleanText/SqueakyCleanText/.venv/lib/python3.12/site-packages/tokenizers/__init__.py"
+      },
+      "numpy": {
+        "version": "2.5.3",
+        "module_path": "/home/runner/work/SqueakyCleanText/SqueakyCleanText/.venv/lib/python3.12/site-packages/numpy/__init__.py"
+      }
+    }
+  },
+  "sample_sha256": "f04652306e8932e9e63ebbd6b1c96e0318f9c9830a6197c24ae0470313881e4c",
+  "config_sha256": "f84cefe77ddfa81fa81160b81d9f95350d6bd1c1053d9ed6768d2f21a101841b",
+  "true_positive": 4,
+  "predicted": 4,
+  "expected": 4,
+  "exact_span_precision": 1.0,
+  "exact_span_recall": 1.0,
+  "document_exposure": 0.0,
+  "median_ms": 29.753819999996267,
+  "p95_ms": 50.6596759999951,
+  "p95_method": "nearest rank; n=3",
+  "model_calls": 6,
+  "peak_rss_kib_linux": 709296,
+  "limits": "Three artificial English examples; not a representative quality or routing promotion gate."
+}
