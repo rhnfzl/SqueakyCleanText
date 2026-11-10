@@ -68,6 +68,17 @@ class ProcessDateTime:
         Returns:
             Text with fuzzy-matched date expressions replaced.
         """
+        parts: list[str] = []
+        last = 0
+        for match in self.fuzzy_date_matches(text, score_cutoff=score_cutoff, language=language):
+            replacement = replace_with(match.group()) if callable(replace_with) else replace_with
+            parts.extend((text[last:match.start()], replacement))
+            last = match.end()
+        return ''.join(parts) + text[last:]
+
+    def fuzzy_date_matches(self, text: str, *, score_cutoff: float = 80,
+                           language: str | None = None) -> list[re.Match[str]]:
+        """Return validated fuzzy candidates with their original input positions."""
         try:
             from rapidfuzz import fuzz, process as rfprocess
         except ImportError as exc:
@@ -86,7 +97,7 @@ class ProcessDateTime:
         else:
             choices = self._fuzzy_vocabulary
         if not choices:
-            return text
+            return []
 
         def _is_fuzzy_month(word):
             """Check if word fuzzy-matches any known month name."""
@@ -95,12 +106,5 @@ class ProcessDateTime:
             )
             return result is not None
 
-        # Replace each candidate match where the word is a fuzzy month name
-        def _replace_match(match):
-            # Group 1 = month-first pattern, Group 2 = day-first pattern
-            candidate = match.group(1) or match.group(2)
-            if candidate and _is_fuzzy_month(candidate):
-                return replace_with(match.group(0)) if callable(replace_with) else replace_with
-            return match.group(0)
-
-        return constants.FUZZY_DATE_CANDIDATE_REGEX.sub(_replace_match, text)
+        return [match for match in constants.FUZZY_DATE_CANDIDATE_REGEX.finditer(text)
+                if (candidate := match.group(1) or match.group(2)) and _is_fuzzy_month(candidate)]
