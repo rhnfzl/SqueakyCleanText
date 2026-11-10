@@ -4,8 +4,8 @@
 
 The ten capabilities are ported onto released v0.9.0, commit `882342fd08c03718d21d22278814cfbfe4b883f3`.
 The original research checkout and its historical evidence remain preserved.
-All 17 tasks and 79 requirements have source and runtime qualification. Actual PR checks are an external merge gate.
-No merge, release publication or default migration is authorized for these improvements.
+All 17 tasks and 79 requirements have source and runtime qualification. PRs #68 through #84 passed their checks and merged into main.
+Post-merge package and docs CI passed. [GPU qualification](v090-gpu-qualification.json) records inference, quality parity and dataset resume on one prepared RTX 4090 profile.
 
 Current records:
 
@@ -31,7 +31,6 @@ All 17 exact task prefixes pass full Linux Python 3.14 and static checks.
 The [24 additional boundary cases](v090-boundary-test-qualification.json) qualify core orchestration after adapter preflight.
 They also pass with SDKs installed and restore the native adapter module. Runtime package files remain unchanged.
 Existing real native adapter profiles pass 328 tests per version and retain their original source identities.
-Current checks on each actual task PR head remain the merge authority.
 
 The port retains all 124 existing configuration defaults and appends 13 opt-in fields.
 It preserves the v0.9.0 API removals, explicit configuration, `max_workers` and shared processing helpers.
