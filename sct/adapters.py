@@ -102,7 +102,11 @@ def _pii_only_cleaner(cleaner: TextCleaner, ner: bool = True) -> TextCleaner:
     if not ner:
         off['check_ner_process'] = False
     if cleaner.cfg.pii_processing == 'unified':
-        selected = cleaner.cfg.detector_specs
+        selected = (cleaner.cfg.routing_fast_specs + cleaner.cfg.routing_full_specs) or cleaner.cfg.detector_specs
+        if cleaner.cfg.routing_fast_specs:
+            # Derived key cleanup changes the calibrated configuration, so run the applicable providers.
+            off.update(routing_policy='always_run', routing_fast_specs=(), routing_full_specs=(),
+                       routing_entity_types=(), routing_calibration=None, detector_specs=selected)
         if not ner:
             off['detector_specs'] = (DetectorSpec('builtin_regex'),)
         elif selected and not any(spec.name == 'builtin_regex' for spec in selected):

@@ -17,6 +17,7 @@ if TYPE_CHECKING:
 class ProcessMetadata(TypedDict, total=False):
     """Keys of ``ProcessResult.metadata``; see the ``ProcessResult`` docstring."""
 
+    routing_v1: dict[str, Any]
     findings_v2: list[dict[str, Any]]
     findings_v2_values: list[dict[str, Any]]
     counts_v2: dict[str, int]
