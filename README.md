@@ -192,6 +192,35 @@ Deprecated config globals, `ner_models_list`, the worker `batch_size` alias and 
 Modes, privacy policies and more PII types (`ner_mode="pii"`): [docs/REPLACEMENT_MODES.md](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/REPLACEMENT_MODES.md), [docs/PRIVACY.md](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/PRIVACY.md), [docs/NER_BACKENDS.md](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/NER_BACKENDS.md).
 <!-- --8<-- [end:results] -->
 
+## One policy across detectors (opt-in)
+
+Unified processing lets you apply the same handling rules to format matches and model findings. Existing callers keep `pii_processing="legacy"` by default.
+
+```python
+from sct import TextCleaner, TextCleanerConfig, UnifiedPrivacyPolicy, HandlingRule
+
+cleaner = TextCleaner(
+    TextCleanerConfig(pii_processing="unified", check_ner_process=False),
+    unified_policy=UnifiedPrivacyPolicy("contact-policy", "1", {
+        "EMAIL": HandlingRule(action="redact"),
+    }),
+)
+result = cleaner.process("Contact alice@example.com")
+assert "alice@example.com" not in result.lm_text
+```
+
+All selected detectors inspect the same canonical text before PII replacement. `use_mode` follows the placeholder, synthetic or reversible mode. `keep` affects PII replacement only. `redact` emits `<REDACTED>` and never saves that value in the reversible map. Protection wins over overlapping keep decisions; redaction wins over other protection. Unknown scores protect by default, or fail with `unknown_score_action="error"`.
+
+A nonempty `detector_specs` tuple selects the complete detector set from an application-owned `DetectorRegistry`. Empty specs select the configured built-in regex rules and native NER when `check_ner_process=True`. Native registry loading requires `allow_network_detectors=True` because model artifacts may need downloading. External-only selection does not initialize native NER. Separately requested document classification still runs and also requires network permission in unified mode. Legacy model-loading behavior stays unchanged.
+
+`metadata["findings_v2"]` contains value-free canonical positions, original-input ranges, mapping quality and policy decisions. `counts_v2` separates detector hits after configured allow-term filtering from resolved replacements; `provenance_v2` records detector and policy identities. Legacy signal counters stay empty in unified mode and must not be used to conclude that no PII was found. Structured adapter summaries are not yet qualified for these versioned counts.
+
+Source mappings use Unicode code-point offsets and report `exact`, `covering` or `unavailable`. Complex built-in repairs can cover the whole input. Opaque custom callbacks make mapping unavailable, even when they return unchanged text. `source_mapping="require_source"` rejects those callbacks. These ranges do not describe original PDF bytes.
+
+`process(..., context=DetectionContext(...))`, `process_batch(..., contexts=...)` and `aprocess_batch(..., contexts=...)` accept caller context in unified mode. Batch contexts must match input count and order. Buffered streaming uses this whole-document path; windowed streaming and browser manifests reject unified mode.
+
+`include_entities=True` explicitly adds sensitive `findings_v2_values`, linked by `finding_index` to canonical findings. This includes values whose output was redacted. Keep this audit payload and reversible maps out of logs. They are absent by default, apart from the map explicitly requested through reversible mode.
+
 ## Speed and hardware
 
 Default config (full multilingual NER ensemble), release benchmark documents (up to about 900 characters), SCT 0.8.0, on a workstation CPU and high-end GPUs, median of 3 runs. 0.8.1 runs at the same speed.

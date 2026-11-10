@@ -193,6 +193,10 @@ class WindowedStreamingRedactor:
         overlap_chars: int = 256,
     ) -> None:
         require_adapter_mode(cleaner.cfg)
+        if (cleaner.cfg.pii_processing == "unified" or cleaner.cfg.detector_specs
+                or cleaner.cfg.source_mapping != "best_effort"):
+            raise ValueError("Windowed streaming does not support unified processing or strict source mapping; "
+                             "use BufferedStreamingRedactor")
         if overlap_chars < 1:
             raise ValueError("overlap_chars must be >= 1")
         if max_buffer_chars <= overlap_chars:

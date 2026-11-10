@@ -39,7 +39,7 @@ async def handler(texts):
 
 ### `warmup(languages: Optional[List[str]] = None) -> None`
 
-Pre-loads NER models to avoid first-request latency. Call once during application startup:
+Pre-loads legacy NER models to reduce first-request latency. Call once during application startup:
 
 ```python
 from sct import TextCleaner
@@ -47,6 +47,12 @@ from sct import TextCleaner
 cleaner = TextCleaner()
 cleaner.warmup(['ENGLISH', 'DUTCH'])  # or warmup() for all supported languages
 ```
+
+Unified processing rejects `warmup()` with `ValueError`.
+Its detector providers belong to each worker, so warming one thread cannot initialize providers created by later batch threads.
+Prepare and validate the selected model artifacts before starting the application.
+Unified workers still initialize their providers on first use; this method does not remove that startup cost.
+Legacy model load failures produce a warning and remain possible on first use.
 
 ## `ProcessResult`
 

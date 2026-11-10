@@ -1,0 +1,75 @@
+{
+  "schema_version": 1,
+  "scope": "Frozen C4 core and legacy adapter/MCP/Haystack interface qualification; not C5 unified forwarding or final integrated matrix",
+  "commit": "bc4efd8d1e2cee95c442232213e52236eaf17d1c",
+  "source_snapshot_sha256": {
+    "README.md": "f5a1b8d94516f08d67d302a9daf3279e928f1bfd7b94ab912213279122489202",
+    "sct/__init__.py": "b178dc6983e91444420718adb70d897a080ee67b31c253412a141b90f98ed6b5",
+    "sct/browser.py": "552541e368fc5403f02294363816917d05bb2b837b6e3f66c30a3ed126c2a8bb",
+    "sct/config.py": "8823df1720719bfda3380dc12bfb9402e73bfaf1fe46d14724a5ca040db3bee6",
+    "sct/detectors_builtin.py": "29e2284de8a14a67d017a94dad511affafd991675f0a845bf6ed435314a9d420",
+    "sct/sct.py": "d68d6b1f087e6e59da9ebb7472a2ad3ec59507cf04f2e7349d5b2ac3b3a4dbb8",
+    "sct/streaming.py": "8cdc3bb405bac77942cc3f7fb5a9094b1a02d2c7c3ddd7758321afe9082eeca6",
+    "sct/utils/process_result.py": "0dd77f6c1b0b188a0e0c2571ce14342ac24b2d13258e2e9f2d7c721998fc761b",
+    "sct/policy_v2.py": "e25e1f44c4ff7be6beb9bbf3c47a9bcc01dd5c731b053fdc15eff93bebde70b3",
+    "sct/unified.py": "1c4c8a8ae8a848d40ffa30eb38d43c9284de21fcace8f607cb783e1679be585d",
+    "tests/test_unified_processing.py": "d9f0cac6a024f74f1e0729ea8c232ee0ea7b9b11615729778a2ee1b0f696d31d"
+  },
+  "runs": [
+    {
+      "python": "3.12.15 (main, Sep 30 2026, 22:04:19) [Clang 21.0.0 (clang-2100.3.34.2)]",
+      "executable": "/private/tmp/sct-foundation-local-20261107/py312/.venv/bin/python",
+      "providers": {
+        "fastmcp": {
+          "version": "4.0.5",
+          "module_path": "/private/tmp/sct-foundation-local-20261107/py312/.venv/lib/python3.12/site-packages/fastmcp/__init__.py"
+        },
+        "pydantic": {
+          "version": "2.13.5",
+          "module_path": "/private/tmp/sct-foundation-local-20261107/py312/.venv/lib/python3.12/site-packages/pydantic/__init__.py"
+        },
+        "haystack-ai": {
+          "version": "3.4.1",
+          "module_path": "/private/tmp/sct-foundation-local-20261107/py312/.venv/lib/python3.12/site-packages/haystack/__init__.py"
+        },
+        "cryptography": {
+          "version": "48.0.1",
+          "module_path": "/private/tmp/sct-foundation-local-20261107/py312/.venv/lib/python3.12/site-packages/cryptography/__init__.py"
+        }
+      },
+      "root": "/private/tmp/sct-foundation-local-20261107/py312",
+      "result": "171 passed, 13 skipped in 10.16s",
+      "log_sha256": "159f1b67083a9e9e553f021259c7446931d813c5e540860706139cc9230a75e6"
+    },
+    {
+      "python": "3.13.12 (main, Mar  3 2026, 15:32:44) [Clang 21.1.4 ]",
+      "executable": "/private/tmp/sct-foundation-local-20261107/py313/.venv/bin/python",
+      "providers": {
+        "fastmcp": {
+          "version": "4.0.5",
+          "module_path": "/private/tmp/sct-foundation-local-20261107/py313/.venv/lib/python3.13/site-packages/fastmcp/__init__.py"
+        },
+        "pydantic": {
+          "version": "2.13.5",
+          "module_path": "/private/tmp/sct-foundation-local-20261107/py313/.venv/lib/python3.13/site-packages/pydantic/__init__.py"
+        },
+        "haystack-ai": {
+          "version": "3.4.1",
+          "module_path": "/private/tmp/sct-foundation-local-20261107/py313/.venv/lib/python3.13/site-packages/haystack/__init__.py"
+        },
+        "cryptography": {
+          "version": "48.0.1",
+          "module_path": "/private/tmp/sct-foundation-local-20261107/py313/.venv/lib/python3.13/site-packages/cryptography/__init__.py"
+        }
+      },
+      "root": "/private/tmp/sct-foundation-local-20261107/py313",
+      "result": "171 passed, 13 skipped in 9.87s",
+      "log_sha256": "125d042255acf940260eeeb1b01973748bdbd04a2bcddb330866c5722a4a23ff"
+    }
+  ],
+  "limits": [
+    "13 skips do not establish missing optional framework or other unselected provider configurations.",
+    "Intensive remote evaluation and final integrated Python matrix remain pending."
+  ],
+  "committed_byte_verification": "all11 committed blobs match qualified/reviewed source hashes"
+}

@@ -1,0 +1,76 @@
+{
+  "schema_version": 1,
+  "source_revision": "c409ab0",
+  "source_archive_sha256": "6b4aa9452f34d6b9d68a07fe491eb0adcf4c0c7815c0c0f454e4655f10af3359",
+  "scope": "Foundation APIs and actual MCP/Haystack runtime checks through reviewed C3; does not qualify later C4/C5 source or full project matrix",
+  "tests": [
+    "test_coordinates",
+    "test_detections",
+    "test_builtin_detections",
+    "test_detector_registry",
+    "test_sqlite_token_store",
+    "test_integrations_runtime",
+    "test_config_state",
+    "test_cleaner_lifecycle",
+    "test_mcp_server",
+    "test_integrations_frameworks",
+    "test_processing_compatibility"
+  ],
+  "runs": [
+    {
+      "python": "3.12.15 (main, Sep 30 2026, 22:04:19) [Clang 21.0.0 (clang-2100.3.34.2)]",
+      "executable": "/private/tmp/sct-foundation-local-20261107/py312/.venv/bin/python",
+      "root": "/private/tmp/sct-foundation-local-20261107/py312",
+      "providers": {
+        "fastmcp": {
+          "version": "4.0.5",
+          "module_path": "/private/tmp/sct-foundation-local-20261107/py312/.venv/lib/python3.12/site-packages/fastmcp/__init__.py"
+        },
+        "pydantic": {
+          "version": "2.13.5",
+          "module_path": "/private/tmp/sct-foundation-local-20261107/py312/.venv/lib/python3.12/site-packages/pydantic/__init__.py"
+        },
+        "haystack-ai": {
+          "version": "3.4.1",
+          "module_path": "/private/tmp/sct-foundation-local-20261107/py312/.venv/lib/python3.12/site-packages/haystack/__init__.py"
+        },
+        "cryptography": {
+          "version": "48.0.1",
+          "module_path": "/private/tmp/sct-foundation-local-20261107/py312/.venv/lib/python3.12/site-packages/cryptography/__init__.py"
+        }
+      },
+      "result": "209 passed, 11 skipped in 20.13s",
+      "log_sha256": "de7d868bc2d4693dd4b416aad11bc5e7c0dba50e35b09a629ac0cd7588046007"
+    },
+    {
+      "python": "3.13.12 (main, Mar  3 2026, 15:32:44) [Clang 21.1.4 ]",
+      "executable": "/private/tmp/sct-foundation-local-20261107/py313/.venv/bin/python",
+      "root": "/private/tmp/sct-foundation-local-20261107/py313",
+      "providers": {
+        "fastmcp": {
+          "version": "4.0.5",
+          "module_path": "/private/tmp/sct-foundation-local-20261107/py313/.venv/lib/python3.13/site-packages/fastmcp/__init__.py"
+        },
+        "pydantic": {
+          "version": "2.13.5",
+          "module_path": "/private/tmp/sct-foundation-local-20261107/py313/.venv/lib/python3.13/site-packages/pydantic/__init__.py"
+        },
+        "haystack-ai": {
+          "version": "3.4.1",
+          "module_path": "/private/tmp/sct-foundation-local-20261107/py313/.venv/lib/python3.13/site-packages/haystack/__init__.py"
+        },
+        "cryptography": {
+          "version": "48.0.1",
+          "module_path": "/private/tmp/sct-foundation-local-20261107/py313/.venv/lib/python3.13/site-packages/cryptography/__init__.py"
+        }
+      },
+      "result": "209 passed, 11 skipped in 18.65s",
+      "log_sha256": "9fcbb3d7e6dbcd3075f8da78ff4cd395e3891d39765325fd4ecebb7b7db1affd"
+    }
+  ],
+  "limits": [
+    "11 skips concern other optional framework configurations and deliberate missing-dependency cases.",
+    "The remote setup attempt failed before testing because SSH was unavailable.",
+    "Final integrated source still requires the full supported matrix and intensive model evaluation."
+  ]
+}

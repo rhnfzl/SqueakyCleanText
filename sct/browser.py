@@ -146,6 +146,8 @@ def _pinned_models(config: TextCleanerConfig) -> dict[str, dict[str, str]]:
 
 def build_browser_manifest(config: TextCleanerConfig) -> dict[str, Any]:
     """Describe portable rules and pinned ONNX assets for a browser client."""
+    if config.pii_processing == "unified" or config.detector_specs or config.source_mapping != "best_effort":
+        raise ValueError("Browser manifests do not support unified detectors or strict source mapping")
     _require_portable_config(config)
     ordered = _ordered_rules(config)
     _require_stable_tokens(ordered)

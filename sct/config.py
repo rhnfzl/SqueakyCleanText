@@ -420,8 +420,15 @@ class TextCleanerConfig:
     # Appended to preserve existing positional configuration arguments.
     detector_specs: tuple[DetectorSpec, ...] = ()
     allow_network_detectors: bool = False
+    # Unified mode collects all selected findings before applying one policy and renderer.
+    pii_processing: Literal["legacy", "unified"] = "legacy"
+    source_mapping: Literal["best_effort", "require_source"] = "best_effort"
 
     def __post_init__(self):
+        if self.pii_processing not in ("legacy", "unified"):
+            raise ValueError("pii_processing must be legacy or unified")
+        if self.source_mapping not in ("best_effort", "require_source"):
+            raise ValueError("source_mapping must be best_effort or require_source")
         if type(self.allow_network_detectors) is not bool:
             raise ValueError("allow_network_detectors must be a boolean")
         specs = tuple(DetectorSpec(**item) if isinstance(item, Mapping) else item for item in self.detector_specs)

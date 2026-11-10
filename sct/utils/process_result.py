@@ -17,6 +17,10 @@ if TYPE_CHECKING:
 class ProcessMetadata(TypedDict, total=False):
     """Keys of ``ProcessResult.metadata``; see the ``ProcessResult`` docstring."""
 
+    findings_v2: list[dict[str, Any]]
+    findings_v2_values: list[dict[str, Any]]
+    counts_v2: dict[str, int]
+    provenance_v2: dict[str, Any]
     source_chars: int
     regex_counts: dict[str, dict[str, int]]
     entity_counts: dict[str, dict[str, int]]
@@ -44,7 +48,13 @@ class ProcessResult:
         ``entity_counts`` — same shape, per NER entity type, concealed entities only
         ``language_confidence``, ``language_source``, ``warnings``, ``provenance``
 
-    ``.signals`` is the value-free public view of these (see :mod:`sct.signals`).
+    ``.signals`` is the legacy value-free public view (see :mod:`sct.signals`).
+    Unified mode uses ``findings_v2``, ``counts_v2`` and ``provenance_v2`` instead.
+    Its legacy count dictionaries stay empty; do not infer absence of PII from them.
+    ``counts_v2`` counts detector hits after configured allow-term filtering and resolved replacements, with version=2.
+    Unified positions describe the canonical stage; source_ranges refer to the original input.
+    ``include_entities=True`` adds sensitive ``findings_v2_values`` indexed into ``findings_v2``.
+    Those values include redacted spans and must be handled as sensitive audit data.
 
     Metadata keys present only while their feature is active (absent otherwise):
         ``anon_map``  — :class:`AnonymizationMap` when ``replacement_mode='reversible'``
@@ -90,6 +100,8 @@ class ProcessResult:
         return (self.lm_text, self.stat_text, self.language)[idx]
 
     def __repr__(self):
+        if "counts_v2" in self.metadata:
+            return f"ProcessResult(language={self.language!r}, counts_v2={self.metadata['counts_v2']!r})"
         # Never findings, anon_map or stat_text: they can hold the replaced values.
         return (
             f'ProcessResult(lm_text={self.lm_text!r}, '

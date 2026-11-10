@@ -59,8 +59,8 @@ def test_config_roundtrip_and_explicit_cleaner_config():
     cfg = TextCleanerConfig(check_ner_process=False, detector_specs=(spec,))
     serialized = json.dumps({"detector_specs": cfg._plain_state()["detector_specs"]})
     assert TextCleanerConfig(**json.loads(serialized)).detector_specs == (spec,)
-    configured = dataclasses.replace(cfg, detector_specs=())
-    assert TextCleaner(configured).cfg is configured
+    configured = dataclasses.replace(cfg, pii_processing="unified")
+    assert TextCleaner(configured).cfg.detector_specs == (spec,)
 
 
 def test_network_provider_is_rejected_before_factory_runs():

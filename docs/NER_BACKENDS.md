@@ -11,8 +11,9 @@
   and gets the `ner_fallback_models` warning, unless you bring a model for it with
   `ner_models`. That dict must name `ENGLISH` and `MULTILINGUAL` too, so start from the
   defaults: `ner_models={**DEFAULT_NER_MODELS, "HINDI": "..."}` (`from sct.config import DEFAULT_NER_MODELS`).
-- The English and multilingual models load when `TextCleaner` is built. Other language models
-  load on first use. `warmup()` loads them up front.
+- With legacy processing, the English and multilingual models load when `TextCleaner` is built.
+  Other language models load on first use. `warmup()` loads them up front and logs load failures.
+  Unified providers initialize per worker on first use; `warmup()` rejects this mode.
 - Languages that point at the same model share one ONNX session (French, Portuguese
   and Italian use the multilingual model, which saves about 600 MB of RAM).
 - Long documents are cut into token-bounded chunks (CJK and Arabic safe);

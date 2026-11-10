@@ -99,7 +99,7 @@ class BuiltinNERDetector:
         self._capabilities = DetectorCapabilities(
             'builtin_ner', entity_types=tuple(dict.fromkeys(ENTITY_TYPE_MAP.get(t, t) for t in labels)),
             languages=tuple(sorted(cfg.supported_languages)),
-            model_identities=tuple(dict.fromkeys(identities)), supports_windowed=True)
+            model_identities=tuple(dict.fromkeys(identities)), supports_windowed=True, network_access=True)
 
     @property
     def capabilities(self):
