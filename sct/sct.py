@@ -789,14 +789,15 @@ class TextCleaner:
             except ner.ModelLoadError as e:
                 logger.warning("warmup: skipping %s: %s", lang, e)
 
-    def _process_unified_document(self, text: str, context: DetectionContext | None = None):
+    def _process_unified_document(self, text: str, context: DetectionContext | None = None, *,
+                                  protect_value: tuple[str, ...] = ()):
         """Private whole-document result and post-render source map for document adapters."""
         if self._unified is None:
             raise ValueError("Source projection requires unified processing")
         if not isinstance(text, str) or (context is not None and not isinstance(context, DetectionContext)):
             raise ValueError("Expected text and DetectionContext")
         try:
-            return self._unified.process(text, context or DetectionContext())
+            return self._unified.process(text, context or DetectionContext(), protect_value=protect_value)
         finally:
             self._document_context.clear()
 

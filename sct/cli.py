@@ -6,7 +6,12 @@ import os
 import sys
 from pathlib import Path
 from typing import TextIO
-from collections.abc import Sequence
+from collections.abc import Sequence, Callable, Mapping
+
+from sct.config import TextCleanerConfig
+from sct.detectors import DetectorRegistry
+from sct.schema import FieldSchema, registered_schema, process_value
+from sct.mcp_server import summarize
 
 from sct.adapters import process_json
 from sct.presets import PRESETS, preset_config
@@ -25,6 +30,9 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--no-ner", action="store_true")
     parser.add_argument("--pii", action="store_true")
     parser.add_argument("--json-input", action="store_true")
+    parser.add_argument("--processing", choices=("legacy", "unified"), default="legacy")
+    parser.add_argument("--signals", action="store_true", help="Return cleaned output and value-free signals as JSON")
+    parser.add_argument("--schema", help="Data-only JSON schema registered by the embedding application")
     parser.add_argument(
         "--preset",
         choices=sorted(PRESETS),
@@ -89,6 +97,8 @@ def main(
     *,
     stdin: TextIO = sys.stdin,
     stdout: TextIO = sys.stdout,
+    schemas: Mapping[str, FieldSchema] | None = None,
+    registry_factory: Callable[[TextCleanerConfig], DetectorRegistry] | None = None,
 ) -> int:
     """Run the command-line cleaner."""
     parser = _parser()
@@ -101,18 +111,31 @@ def main(
         parser.error(f"cannot read input: {exc}")
 
     try:
-        cleaner = TextCleaner(cfg=preset_config(
+        schema = registered_schema(json.loads(args.schema) if args.schema else None, schemas)
+        cfg = preset_config(
             args.preset,
             check_ner_process=not args.no_ner,
             ner_mode="pii" if args.pii else "standard",
             replacement_mode=args.replacement_mode,
+            pii_processing=args.processing,
             **({"check_to_ascii_unicode": True} if args.to_ascii else {}),
-        ))
+        )
+        cleaner = (TextCleaner(cfg=cfg) if registry_factory is None else
+                   TextCleaner(cfg=cfg, detector_registry=registry_factory(cfg)))
         if args.json_input:
-            output = json.dumps(process_json(cleaner, json.loads(source)).value, ensure_ascii=False)
+            structured = (process_json(cleaner, json.loads(source)) if schema is None else
+                          process_json(cleaner, json.loads(source), schema=schema))
+            payload = structured.value
+            if args.signals:
+                payload = {'value': payload, 'signals': structured.signals, 'summary': summarize(structured.signals)}
+            output = json.dumps(payload, ensure_ascii=False)
         else:
-            result = cleaner.process(source)
-            output = result.lm_text
+            if schema is not None and any(rule.path for rule in schema.rules):
+                raise ValueError('Text schemas must select the root scalar')
+            result = process_value(cleaner, source, schema=schema)
+            output = (json.dumps({'text': result.lm_text, 'signals': result.signals,
+                                  'summary': summarize(result.signals)}, ensure_ascii=False)
+                      if args.signals else result.lm_text)
             if args.replacement_mode == "reversible":
                 # Before stdout: masked text with no map could never be reversed.
                 _write_token_map(Path(args.token_map), result.metadata["anon_map"])

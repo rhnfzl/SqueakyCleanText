@@ -213,13 +213,36 @@ All selected detectors inspect the same canonical text before PII replacement. `
 
 A nonempty `detector_specs` tuple selects the complete detector set from an application-owned `DetectorRegistry`. Empty specs select the configured built-in regex rules and native NER when `check_ner_process=True`. Native registry loading requires `allow_network_detectors=True` because model artifacts may need downloading. External-only selection does not initialize native NER. Separately requested document classification still runs and also requires network permission in unified mode. Legacy model-loading behavior stays unchanged.
 
-`metadata["findings_v2"]` contains value-free canonical positions, original-input ranges, mapping quality and policy decisions. `counts_v2` separates detector hits after configured allow-term filtering from resolved replacements; `provenance_v2` records detector and policy identities. Legacy signal counters stay empty in unified mode and must not be used to conclude that no PII was found. Structured adapter summaries are not yet qualified for these versioned counts.
+`metadata["findings_v2"]` contains value-free canonical positions, original-input ranges, mapping quality and policy decisions. `counts_v2` separates detector hits after configured allow-term filtering from resolved replacements; `provenance_v2` records detector and policy identities. Legacy counters stay empty in unified mode. Unified signals add `version=2`, `counts_v2`, `coverage_v2` and `provenance_v2`. CLI/MCP summaries distinguish detector hits from rendered replacements. `coverage_v2` reports source coverage quality and lower/upper bounds. Non-exact coverage leaves `pii_chars` and `pii_share` as `None`; score summaries place these shares in an explicit unknown bucket. Only actual built-in regex formatting findings receive the non-PII format exclusion; native, external and caller-declared dates remain sensitive.
 
 Source mappings use Unicode code-point offsets and report `exact`, `covering` or `unavailable`. Complex built-in repairs can cover the whole input. Opaque custom callbacks make mapping unavailable, even when they return unchanged text. `source_mapping="require_source"` rejects those callbacks. These ranges do not describe original PDF bytes.
 
 `process(..., context=DetectionContext(...))`, `process_batch(..., contexts=...)` and `aprocess_batch(..., contexts=...)` accept caller context in unified mode. Batch contexts must match input count and order. Buffered streaming uses this whole-document path; windowed streaming and browser manifests reject unified mode.
 
 `include_entities=True` explicitly adds sensitive `findings_v2_values`, linked by `finding_index` to canonical findings. This includes values whose output was redacted. Keep this audit payload and reversible maps out of logs. They are absent by default, apart from the map explicitly requested through reversible mode.
+
+## Caller-declared fields (opt-in)
+
+Declare exact fields when a record needs protection beyond text detection. SCT does not infer meaning from field names.
+
+```python
+from sct import FieldRule, FieldSchema, process_json
+
+schema = FieldSchema("contacts", "1", (
+    FieldRule(("name",), ("PERSON",), "protect_value"),
+))
+assert process_json(cleaner, {"name": "May", "status": "May"}, schema=schema).value == {
+    "name": "<PERSON>", "status": "May",
+}
+```
+
+Schemas require unified processing. Paths select original keys and list positions. Missing fields and `None` remain unchanged; selected containers fail. Whole-value protection also accepts finite numeric and boolean scalars. Default non-string handling stays unchanged. Protection uses the existing policy and replacement modes. Conflicting keep decisions, score errors, allow terms or disabled tags fail. Unknown scores with `unknown_score_action="protect"` remain compatible with thresholds. Explicit field types win equal-span ties after action priority.
+
+Hints require providers that support context and the declared types. Presidio receives explicit declared types as context; ONNX-only providers reject required hints. DataFrame paths use `(column_label,)` across a column or `(row_label, column_label)` for a cell. Conflicting overlapping declarations fail. Framework paths use `(column_name,)` per record. RAG paths use `("text",)` or `("metadata", ...)`. Selected missing DataFrame cells remain unchanged. Masking numeric cells changes only the copied output column to object dtype. Unsupported path shapes fail.
+
+Unified findings use positional references without original keys or labels. Schema-match paths and caller context stay out of signals and provenance. MCP full detail excludes sensitive value payloads. Framework constructors accept a trusted module-level `registry_factory`; workers pickle its reference and rebuild per process. Haystack data resolves only application-registered factory references. Protect serialized pipeline configuration, which can contain caller schema/context identifiers.
+
+Applications register schemas through CLI `main(..., schemas=...)` or `create_mcp_server(..., schemas=...)`. Requests supply only exactly registered data-only schemas. CLI exposes `--processing unified --schema '<JSON>'`; `--signals` adds versioned counts and a summary. Requests cannot import Python factories. Existing adapter restrictions on reversible mode remain.
 
 ## Speed and hardware
 

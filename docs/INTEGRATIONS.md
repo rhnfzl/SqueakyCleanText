@@ -37,6 +37,15 @@ if __name__ == "__main__":
 
 `score=True` adds the `sct_*` score columns (`sct.score.SCORE_A_COLUMNS`) for the first column. Extra keyword arguments go to `Dataset.map`. Works for `Dataset` and `IterableDataset`. Results are cached by the dataset fingerprint, the config and the SCT version.
 
+For `Dataset` calls with a custom `registry_factory`, automatic cache reuse is disabled and each output receives a fresh fingerprint.
+This also prevents later dataset transforms from reusing results from an older custom detector.
+The policy overrides `load_from_cache_file=True`, including with a fixed `cache_file_name`.
+To enable reuse, supply an explicit nonempty `new_fingerprint` string.
+That caller-owned identity must cover the input dataset, cleaner configuration, map options, factory, provider implementation and model artifacts.
+Change it whenever any of those inputs or behaviors change. Factory module names and declared detector versions alone are insufficient.
+`new_fingerprint=None` keeps automatic custom-registry cache bypass enabled.
+Calls without a custom registry retain their existing automatic cache behavior.
+
 ## DataTrove
 
 ```python

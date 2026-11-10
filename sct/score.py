@@ -245,7 +245,9 @@ class ONNXQualityScorer:
         return scores
 
 
-def _share_bin(share: float) -> str:
+def _share_bin(share: float | None) -> str:
+    if share is None:
+        return "unknown"
     if share <= 0:
         return _BIN_LABELS[0]
     return next((label for high, label in zip(SHARE_BINS[1:], _BIN_LABELS[1:])
@@ -279,7 +281,7 @@ def build_data_card(
         "pii_items": sum(r["sct_pii_count"] for r in rows),
         "languages": dict(languages.most_common()),
         "pii_types": dict(sorted(pii_types.items())),
-        "pii_share_histogram": {b: shares[b] for b in _BIN_LABELS if shares[b]},
+        "pii_share_histogram": {b: shares[b] for b in (*_BIN_LABELS, "unknown") if shares[b]},
         "warnings": dict(sorted(warnings.items())),
         "quality_mean": sum(qualities) / len(qualities) if qualities else None,
         "models": [unique_models[k] for k in sorted(unique_models, key=str)],

@@ -19,11 +19,16 @@ import stat
 import threading
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
+from dataclasses import replace
+from sct.integrations._runtime import CleanerHandle
 from typing import TYPE_CHECKING, Any, Literal, NotRequired, TypedDict, cast
 
 from sct.adapters import process_json
-from sct.config import require_adapter_mode
+from sct.config import TextCleanerConfig, require_adapter_mode
+from sct.detectors import DetectorRegistry
 from sct.presets import preset_config
+from sct.schema import FieldSchema, registered_schema
+from sct.findings import DetectionContext
 from sct.sct import CustomPatternTimeout, TextCleaner
 from sct.signals import Signals, public_view
 from sct.utils.ner import ModelLoadError
@@ -63,6 +68,7 @@ class TextOutput(TypedDict):
     text: str
     signals: Signals
     findings: NotRequired[list[Finding]]
+    findings_v2: NotRequired[list[dict[str, Any]]]
 
 
 class JsonOutput(TypedDict):
@@ -71,6 +77,7 @@ class JsonOutput(TypedDict):
     value: Any
     signals: Signals
     findings: NotRequired[list[JsonFinding]]
+    findings_v2: NotRequired[list[dict[str, Any]]]
 
 
 def _public_finding(finding) -> Finding:
@@ -94,11 +101,17 @@ def _full_warnings(signals: Signals, findings: list) -> list[str]:
 
 def summarize(signals: Signals) -> str:
     """One value-free sentence, e.g. ``2 PII items (EMAIL, PERSON), 4% of text, language HINDI 0.93``."""
+    if signals.get('version') == 2:
+        counts = signals['counts_v2']
+        return (f"Unified v2: {counts['detector_hits']} detector hits after allow filtering, "
+                f"{counts['resolved_replacements']} resolved replacements")
     count = signals["pii_count"]
     if count:
+        share = signals['pii_share']
+        coverage = f"{share:.0%} of text" if share is not None else "source coverage unavailable"
         pii = (
             f"{count} PII item{'s' if count != 1 else ''} "
-            f"({', '.join(signals['pii_types'])}), {signals['pii_share']:.0%} of text"
+            f"({', '.join(signals['pii_types'])}), {coverage}"
         )
     else:
         pii = "No PII found"
@@ -113,13 +126,14 @@ def sanitize_text(
     cleaner: TextCleaner,
     text: str,
     detail: Literal["concise", "full"] = "concise",
+    *, context: DetectionContext | None = None,
 ) -> TextOutput:
     """Return a JSON-safe, value-free text cleaning result."""
     try:
         require_adapter_mode(cleaner.cfg)
     except ValueError as exc:
         raise ToolError(str(exc)) from None
-    result = cleaner.process(text)
+    result = cleaner.process(text) if context is None else cleaner.process(text, context=context)
     signals = public_view(result)
     output: TextOutput = {
         "warnings": signals["warnings"],
@@ -127,7 +141,9 @@ def sanitize_text(
         "text": result.lm_text,
         "signals": signals,
     }
-    if detail == "full":
+    if detail == "full" and signals.get('version') == 2:
+        output['findings_v2'] = [dict(finding) for finding in result.metadata.get('findings_v2', ())]
+    elif detail == "full":
         output["findings"] = [
             _public_finding(finding)
             for finding in result.metadata.get("findings", ())
@@ -140,10 +156,14 @@ def sanitize_json(
     cleaner: TextCleaner,
     value: Any,
     detail: Literal["concise", "full"] = "concise",
+    *, schema: FieldSchema | None = None, context: DetectionContext | None = None,
 ) -> JsonOutput:
     """Clean every string in a JSON value; key findings use the ``@key`` index path."""
     try:
-        result = process_json(cleaner, value)
+        if schema is None and context is None:
+            result = process_json(cleaner, value)
+        else:
+            result = process_json(cleaner, value, schema=schema, context=context)
     except ValueError as exc:
         raise ToolError(str(exc)) from None
     signals = result.signals
@@ -153,7 +173,9 @@ def sanitize_json(
         "value": result.value,
         "signals": signals,
     }
-    if detail == "full":
+    if detail == "full" and signals.get('version') == 2:
+        output['findings_v2'] = [dict(item.finding) | {'path': list(item.path)} for item in result.findings_v2]
+    elif detail == "full":
         output["findings"] = [
             {"path": cast(list[str | int], list(item.path)), **_public_finding(item.finding)}
             for item in result.findings
@@ -247,11 +269,25 @@ def _server_settings(root: str | None, max_bytes: int | None, preset: str | None
     return root, max_bytes, preset
 
 
-def _cleaner_getter(cleaner: TextCleaner | None, preset: str) -> Callable[[bool], TextCleaner]:
+def _cleaner_getter(cleaner: TextCleaner | None, preset: str,
+                    registry_factory: Callable[[TextCleanerConfig], DetectorRegistry] | None = None,
+                    config: TextCleanerConfig | None = None) -> Callable[[bool], TextCleaner]:
     """``get_cleaner(pii)``: the given cleaner, else one built on first use for each mode."""
     if cleaner is not None:
         require_adapter_mode(cleaner.cfg)
+        if registry_factory is not None or config is not None:
+            raise ValueError('Pass either a cleaner or application config/registry_factory')
     ascii_override = {"check_to_ascii_unicode": True} if os.environ.get("SCT_MCP_TO_ASCII") == "1" else {}
+    if config is not None and preset != 'sct':
+        raise ValueError('Application config cannot be combined with a nondefault preset')
+    if config is not None or registry_factory is not None:
+        cfg = config or preset_config(preset, **ascii_override)
+        handles = {pii: CleanerHandle(replace(cfg, ner_mode='pii') if pii else cfg,
+                                      registry_factory=registry_factory, include_entities=True) for pii in (False, True)}
+
+        def get_configured(pii: bool) -> TextCleaner:
+            return handles[pii].get()
+        return get_configured
     cleaners: dict[bool, TextCleaner] = {}
     cleaners_lock = threading.Lock()  # sync tools run on worker threads
 
@@ -266,10 +302,8 @@ def _cleaner_getter(cleaner: TextCleaner | None, preset: str) -> Callable[[bool]
         if pii not in cleaners:
             with cleaners_lock:
                 if pii not in cleaners:
-                    cleaners[pii] = TextCleaner(
-                        cfg=preset_config(preset, ner_mode="pii" if pii else "standard", **ascii_override),
-                        include_entities=True,
-                    )
+                    cfg = preset_config(preset, ner_mode="pii" if pii else "standard", **ascii_override)
+                    cleaners[pii] = TextCleaner(cfg=cfg, include_entities=True)
         return cleaners[pii]
     return get_cleaner
 
@@ -291,6 +325,9 @@ def create_mcp_server(
     root: str | None = None,
     max_bytes: int | None = None,
     preset: str | None = None,
+    schemas: dict[str, FieldSchema] | None = None,
+    registry_factory: Callable[[TextCleanerConfig], DetectorRegistry] | None = None,
+    config: TextCleanerConfig | None = None,
 ) -> Any:
     """Create a FastMCP server without importing FastMCP at package import.
 
@@ -306,6 +343,7 @@ def create_mcp_server(
         ) from exc
 
     root, max_bytes, preset = _server_settings(root, max_bytes, preset)
+    schemas = dict(schemas or {})
 
     server = FastMCP(
         "SqueakyCleanText",
@@ -314,7 +352,7 @@ def create_mcp_server(
             "models, logs, or retrieval systems."
         ),
     )
-    get_cleaner = _cleaner_getter(cleaner, preset)
+    get_cleaner = _cleaner_getter(cleaner, preset, registry_factory, config)
 
     @server.tool(title="Clean text", annotations={**_ANNOTATIONS, "title": "Clean text"})
     def clean_text(
@@ -342,10 +380,11 @@ def create_mcp_server(
         value: Any,
         pii: bool = False,
         detail: Literal["concise", "full"] = "concise",
+        schema: dict[str, Any] | None = None,
     ) -> JsonOutput:
         """Clean every string (keys included) in a JSON value and return value-free signals."""
         with _tool_errors():
-            return sanitize_json(get_cleaner(pii), value, detail)
+            return sanitize_json(get_cleaner(pii), value, detail, schema=registered_schema(schema, schemas))
 
     return server
 

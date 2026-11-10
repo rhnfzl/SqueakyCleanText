@@ -1,0 +1,183 @@
+{
+  "schema_version": 1,
+  "scope": "Frozen C5 schema/adapters and actual optional runtime qualification; final integrated matrix remains pending",
+  "commit": "2c7b7add4106cb90b2e3a9b8acc40d04ee6df476",
+  "source_snapshot_sha256": {
+    "README.md": "278afa351006dce057adf3a37eab731e981c047a7b63d1f7d940d1851889e35c",
+    "sct/__init__.py": "f90dc7ed3ec544ac788887660dc3188f2a628d1762ac84c15e2d9425a7551203",
+    "sct/schema.py": "6821237c10f3b7a438cee08afdb94b0ce6b7ee6a71ccae639efe899338719584",
+    "sct/adapters.py": "77a1f2a24a790192fa39fe15e9cd77454246d7a2765e40d7189c2c4de8a10cee",
+    "sct/cli.py": "b25622f4d030bebcb53e8fa4fd59b0e55805c48c5ad36fe852c90b4ef9f6abaa",
+    "sct/detectors_builtin.py": "68ed494896dadc4eb7f70b40ce9f5516063c2378cc0bdd04e79018ace18dd241",
+    "sct/integrations/_runtime.py": "dd1c97c8649338177560b8d872ab8298822dfe072d691b36242cec84e48e6fb7",
+    "sct/integrations/datatrove.py": "60ebe86941848bbc3ce6ba37162fcc286ec9fd3af033381818714b9a0a680205",
+    "sct/integrations/haystack.py": "496863210cad7e4048c25aaf24bf4bd40ccdc94f876bcd085716778887cecfed",
+    "sct/integrations/hf.py": "8b19a47f52f76a07b9d0f36d4e90f359e345c52f7cc47304d787d20e764d5e73",
+    "sct/integrations/langchain.py": "c3c9ba429153c0acbb38d912851cc89f60a24660b53a307ce8f9e229b300c8b3",
+    "sct/mcp_server.py": "6ef57a2986b5ff1a87397f12def6e910f11705665c76cfcfd0097072a1ff47d3",
+    "sct/sct.py": "c8379bd44c00556f2ee0436894d9d38026b08d42455cd13d6049d8de21e6076b",
+    "sct/signals.py": "cc0293a8386b114911af3e53a0c8e54621cae53f79115cd4c7b405f9c29e48a5",
+    "sct/unified.py": "727eac12a18fb002dd0bc0770c260353d833ccb22960697a3f9085a3d7cfd0e9",
+    "sct/utils/ner.py": "1d95fbcb18adfa9d11765c9e7d71e3d99b8fcd646d9f8abd3b27de4782325c0b",
+    "sct/utils/ner_spans.py": "d3934998a8f76ae8de354be9cd4a95da9aed324496e7975d3fd552f043685e57",
+    "tests/test_schema_context.py": "c435d90241d7c61fbd4d7b51cfaa423c9988a93d8ec1e1869eb5fc7da3a59b51",
+    "sct/score.py": "05b3312ab5e5b67f80382b9163652351695bc7670d1d6972f163de746f53f3b0"
+  },
+  "committed_byte_verification": "All 19 reviewed committed blobs match qualified source hashes",
+  "runs": [
+    {
+      "python": "3.12.15 (main, Sep 30 2026, 22:04:19) [Clang 21.0.0 (clang-2100.3.34.2)]",
+      "executable": "/private/tmp/sct-foundation-local-20261107/py312/.venv/bin/python",
+      "providers": {
+        "fastmcp": {
+          "version": "4.0.5",
+          "module_path": "/private/tmp/sct-foundation-local-20261107/py312/.venv/lib/python3.12/site-packages/fastmcp/__init__.py"
+        },
+        "pydantic": {
+          "version": "2.13.5",
+          "module_path": "/private/tmp/sct-foundation-local-20261107/py312/.venv/lib/python3.12/site-packages/pydantic/__init__.py"
+        },
+        "haystack-ai": {
+          "version": "3.4.1",
+          "module_path": "/private/tmp/sct-foundation-local-20261107/py312/.venv/lib/python3.12/site-packages/haystack/__init__.py"
+        },
+        "cryptography": {
+          "version": "48.0.1",
+          "module_path": "/private/tmp/sct-foundation-local-20261107/py312/.venv/lib/python3.12/site-packages/cryptography/__init__.py"
+        },
+        "presidio-analyzer": {
+          "version": "2.2.362",
+          "module_path": "/private/tmp/sct-foundation-local-20261107/py312/.venv/lib/python3.12/site-packages/presidio_analyzer/__init__.py"
+        },
+        "datasets": {
+          "version": "5.1.0",
+          "module_path": "/private/tmp/sct-foundation-local-20261107/py312/.venv/lib/python3.12/site-packages/datasets/__init__.py"
+        },
+        "datatrove": {
+          "version": "0.10.1",
+          "module_path": "/private/tmp/sct-foundation-local-20261107/py312/.venv/lib/python3.12/site-packages/datatrove/__init__.py"
+        },
+        "langchain-core": {
+          "version": "1.7.4",
+          "module_path": "/private/tmp/sct-foundation-local-20261107/py312/.venv/lib/python3.12/site-packages/langchain_core/__init__.py"
+        },
+        "datasketch": {
+          "version": "2.0.0",
+          "module_path": "/private/tmp/sct-foundation-local-20261107/py312/.venv/lib/python3.12/site-packages/datasketch/__init__.py"
+        },
+        "orjson": {
+          "version": "3.13.0",
+          "module_path": "/private/tmp/sct-foundation-local-20261107/py312/.venv/lib/python3.12/site-packages/orjson/__init__.py"
+        }
+      },
+      "root": "/private/tmp/sct-foundation-local-20261107/py312",
+      "result": "255 passed, 3 warnings in 42.26s",
+      "log_sha256": "e94fb5f5a0308677c06df69448a3713c35b491af43fa904444b601b8c8ccd968"
+    },
+    {
+      "python": "3.13.12 (main, Mar  3 2026, 15:32:44) [Clang 21.1.4 ]",
+      "executable": "/private/tmp/sct-foundation-local-20261107/py313/.venv/bin/python",
+      "providers": {
+        "fastmcp": {
+          "version": "4.0.5",
+          "module_path": "/private/tmp/sct-foundation-local-20261107/py313/.venv/lib/python3.13/site-packages/fastmcp/__init__.py"
+        },
+        "pydantic": {
+          "version": "2.13.5",
+          "module_path": "/private/tmp/sct-foundation-local-20261107/py313/.venv/lib/python3.13/site-packages/pydantic/__init__.py"
+        },
+        "haystack-ai": {
+          "version": "3.4.1",
+          "module_path": "/private/tmp/sct-foundation-local-20261107/py313/.venv/lib/python3.13/site-packages/haystack/__init__.py"
+        },
+        "cryptography": {
+          "version": "48.0.1",
+          "module_path": "/private/tmp/sct-foundation-local-20261107/py313/.venv/lib/python3.13/site-packages/cryptography/__init__.py"
+        },
+        "presidio-analyzer": {
+          "version": "2.2.362",
+          "module_path": "/private/tmp/sct-foundation-local-20261107/py313/.venv/lib/python3.13/site-packages/presidio_analyzer/__init__.py"
+        },
+        "datasets": {
+          "version": "5.1.0",
+          "module_path": "/private/tmp/sct-foundation-local-20261107/py313/.venv/lib/python3.13/site-packages/datasets/__init__.py"
+        },
+        "datatrove": {
+          "version": "0.10.1",
+          "module_path": "/private/tmp/sct-foundation-local-20261107/py313/.venv/lib/python3.13/site-packages/datatrove/__init__.py"
+        },
+        "langchain-core": {
+          "version": "1.7.4",
+          "module_path": "/private/tmp/sct-foundation-local-20261107/py313/.venv/lib/python3.13/site-packages/langchain_core/__init__.py"
+        },
+        "datasketch": {
+          "version": "2.0.0",
+          "module_path": "/private/tmp/sct-foundation-local-20261107/py313/.venv/lib/python3.13/site-packages/datasketch/__init__.py"
+        },
+        "orjson": {
+          "version": "3.13.0",
+          "module_path": "/private/tmp/sct-foundation-local-20261107/py313/.venv/lib/python3.13/site-packages/orjson/__init__.py"
+        }
+      },
+      "root": "/private/tmp/sct-foundation-local-20261107/py313",
+      "result": "255 passed, 3 warnings in 42.15s",
+      "log_sha256": "6adefab936c9cb48188eb71501d5da3fbcc8068ad89fe15dd00c6f9edc4efc30"
+    },
+    {
+      "python": "3.14.4 (main, Apr  7 2026, 20:47:53) [Clang 22.1.1 ]",
+      "executable": "/home/rehan/sct-improvements-c5-2c7b7ad-20261107/.venv/bin/python",
+      "providers": {
+        "fastmcp": {
+          "version": "4.0.5",
+          "module_path": "/home/rehan/sct-improvements-c5-2c7b7ad-20261107/.venv/lib/python3.14/site-packages/fastmcp/__init__.py"
+        },
+        "pydantic": {
+          "version": "2.13.5",
+          "module_path": "/home/rehan/sct-improvements-c5-2c7b7ad-20261107/.venv/lib/python3.14/site-packages/pydantic/__init__.py"
+        },
+        "haystack-ai": {
+          "version": "3.4.1",
+          "module_path": "/home/rehan/sct-improvements-c5-2c7b7ad-20261107/.venv/lib/python3.14/site-packages/haystack/__init__.py"
+        },
+        "cryptography": {
+          "version": "48.0.1",
+          "module_path": "/home/rehan/sct-improvements-c5-2c7b7ad-20261107/.venv/lib/python3.14/site-packages/cryptography/__init__.py"
+        },
+        "presidio-analyzer": {
+          "version": "2.2.362",
+          "module_path": "/home/rehan/sct-improvements-c5-2c7b7ad-20261107/.venv/lib/python3.14/site-packages/presidio_analyzer/__init__.py"
+        },
+        "datasets": {
+          "version": "5.1.0",
+          "module_path": "/home/rehan/sct-improvements-c5-2c7b7ad-20261107/.venv/lib/python3.14/site-packages/datasets/__init__.py"
+        },
+        "datatrove": {
+          "version": "0.10.1",
+          "module_path": "/home/rehan/sct-improvements-c5-2c7b7ad-20261107/.venv/lib/python3.14/site-packages/datatrove/__init__.py"
+        },
+        "langchain-core": {
+          "version": "1.7.4",
+          "module_path": "/home/rehan/sct-improvements-c5-2c7b7ad-20261107/.venv/lib/python3.14/site-packages/langchain_core/__init__.py"
+        },
+        "datasketch": {
+          "version": "2.0.0",
+          "module_path": "/home/rehan/sct-improvements-c5-2c7b7ad-20261107/.venv/lib/python3.14/site-packages/datasketch/__init__.py"
+        },
+        "orjson": {
+          "version": "3.13.0",
+          "module_path": "/home/rehan/sct-improvements-c5-2c7b7ad-20261107/.venv/lib/python3.14/site-packages/orjson/__init__.py"
+        }
+      },
+      "root": "/home/rehan/sct-improvements-c5-2c7b7ad-20261107",
+      "result": "258 passed, 12 warnings in 15.89s",
+      "log_sha256": "4c868dbb97def0adf43d56a433ceb2ff4eacc889529cb3d6769098bbfe835b37",
+      "platform": "Linux",
+      "source_verification": "All 19 reviewed source hashes match on the server"
+    }
+  ],
+  "limits": [
+    "C5 Linux worker tests pass; the final integrated Python/provider matrix remains pending.",
+    "These checks use lightweight real Presidio with local blank spaCy, not downloaded neural models.",
+    "Fork deprecation warnings remain visible: three per local run and twelve in the Linux worker run. No warning suppression. Final worker acceptance must document or resolve the fork/thread constraint."
+  ]
+}
