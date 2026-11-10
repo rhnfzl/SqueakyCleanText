@@ -4,3 +4,7 @@ from .selection import SelectionReport, analyse_records, select_records
 
 __all__ = ['CorpusRecord', 'RecordAnalysis', 'SelectionConfig', 'SelectionDecision',
            'SelectionReport', 'analyse_records', 'select_records']
+
+from .manifest import RunIdentity, RunManifest
+
+__all__ += ["RunIdentity", "RunManifest"]

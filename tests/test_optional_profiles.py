@@ -40,6 +40,13 @@ def test_installed_profile_runtime(tmp_path):
         cipher = Fernet(Fernet.generate_key())
         assert cipher.decrypt(cipher.encrypt(b"profile smoke")) == b"profile smoke"
     elif PROFILE == "corpus":
+        import spacy
+        import orjson
+
+        assert Path(spacy.__file__).resolve().is_relative_to(Path(sys.prefix).resolve())
+        assert importlib.metadata.version("spacy") == "3.8.16"
+        assert [token.text for token in spacy.blank("en")("Native fixture")] == ["Native", "fixture"]
+        assert orjson.loads(orjson.dumps({"native": True})) == {"native": True}
         from datasketch import MinHash
 
         first, second = MinHash(num_perm=32), MinHash(num_perm=32)

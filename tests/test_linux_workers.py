@@ -144,3 +144,36 @@ def test_raw_pool_children_rebuild_parent_cleaner():
     assert not any(reused for _, reused, _ in results)
     assert [text for _, _, text in results] == expected
     assert id(handle.get()) == parent_id  # same process, no rebuild
+
+
+def test_native_corpus_two_workers_match_private_staging(tmp_path):
+    """Native tasks recreate schema-aware cleaners inside framework workers."""
+    pytest.importorskip('datatrove')
+    pytest.importorskip('spacy')
+    pytest.importorskip('orjson')
+    from datatrove.pipeline.dedup import MinhashConfig
+    from datatrove.utils.hashing import HashConfig
+    from sct.config import TextCleanerConfig
+    from sct.corpus.datatrove import curate_datatrove
+    from sct.corpus import SelectionConfig
+    from sct.schema import FieldRule, FieldSchema
+    from tests.test_schema_context import context_registry
+    source = tmp_path / 'input.jsonl'
+    source.write_text('\n'.join(json.dumps({'id': value, 'text': 'May'}) for value in ['b', 'a']))
+    before = source.read_bytes()
+    outputs = []
+    for workers in (1, 2):
+        output = tmp_path / f'workers{workers}'
+        manifest = curate_datatrove(
+            source, output, retention='caller_managed', workers=workers,
+            config=TextCleanerConfig(check_ner_process=False, pii_processing='unified'),
+            schema=FieldSchema('caller', '1', (FieldRule(('text',), ('PERSON',), mode='protect_value'),)),
+            registry_factory=context_registry, component_identities=(('registry', 'test-context-v1'),),
+            selection=SelectionConfig(dedup_mode='apply', dedup_basis='pii_normalized'),
+            native_config=MinhashConfig(n_grams=1, num_buckets=2, hash_config=HashConfig(hash_fc='sha1')),
+        )
+        assert manifest.counts == {'input': 2, 'kept': 1, 'rejected': 1}
+        outputs.append((output / 'kept.jsonl').read_bytes())
+    assert outputs[0] == outputs[1]
+    assert json.loads(outputs[0]) == {'id': 'a', 'text': '<PERSON>'}
+    assert source.read_bytes() == before
