@@ -1,0 +1,321 @@
+{
+  "scope": "Direct TextCleaner.process_batch, default legacy processing and automatic language detection; explicit CPU,16 ORT threads,2 workers,batch8. No reversible scoring or span reconstruction.",
+  "sample": {
+    "dataset": "FineWeb-2",
+    "revision": "af9c13333eb981300149d5ca60a8e9d659b276b9",
+    "seed": 13,
+    "documents": 1000,
+    "languages": 10,
+    "input_sha256": "8f17320438635d3207bbb6d694eb105d9b6c98645f67176b13e2de110b310499"
+  },
+  "repeats": 3,
+  "device": "cpu",
+  "threads": 16,
+  "workers": 2,
+  "batch": 8,
+  "order": [
+    {
+      "repeat": 1,
+      "version": "0.8.2"
+    },
+    {
+      "repeat": 1,
+      "version": "0.10.0"
+    },
+    {
+      "repeat": 2,
+      "version": "0.10.0"
+    },
+    {
+      "repeat": 2,
+      "version": "0.8.2"
+    },
+    {
+      "repeat": 3,
+      "version": "0.8.2"
+    },
+    {
+      "repeat": 3,
+      "version": "0.10.0"
+    }
+  ],
+  "entries": {
+    "0.8.2": {
+      "repeats": 3,
+      "failed": [],
+      "cold_start_seconds": {
+        "median": 8.21,
+        "min": 8.16,
+        "max": 8.704
+      },
+      "load_seconds": {
+        "median": 5.216,
+        "min": 5.139,
+        "max": 5.55
+      },
+      "latency_median_ms": {
+        "median": 612.18,
+        "min": 604.21,
+        "max": 624.95
+      },
+      "latency_p95_ms": {
+        "median": 2047.97,
+        "min": 1971.95,
+        "max": 2076.67
+      },
+      "common_batch_docs_per_second": {
+        "median": 1.402,
+        "min": 1.396,
+        "max": 1.411
+      },
+      "common_batch_chars_per_second": {
+        "median": 3196.4,
+        "min": 3184.4,
+        "max": 3218.0
+      },
+      "other_batch": [],
+      "common_batch_errors": [],
+      "peak_rss_mb": {
+        "median": 8042.7,
+        "min": 7991.0,
+        "max": 8053.8
+      },
+      "peak_rss_mb_getrusage": {
+        "median": 8042.7,
+        "min": 7991.0,
+        "max": 8053.8
+      },
+      "peak_vram_mb": null,
+      "torch_peak_vram_mb": null
+    },
+    "0.10.0": {
+      "repeats": 3,
+      "failed": [],
+      "cold_start_seconds": {
+        "median": 6.652,
+        "min": 6.549,
+        "max": 6.898
+      },
+      "load_seconds": {
+        "median": 3.651,
+        "min": 3.624,
+        "max": 3.86
+      },
+      "latency_median_ms": {
+        "median": 601.51,
+        "min": 573.44,
+        "max": 610.75
+      },
+      "latency_p95_ms": {
+        "median": 1994.22,
+        "min": 1992.13,
+        "max": 2017.91
+      },
+      "common_batch_docs_per_second": {
+        "median": 1.394,
+        "min": 1.347,
+        "max": 1.398
+      },
+      "common_batch_chars_per_second": {
+        "median": 3180.0,
+        "min": 3071.2,
+        "max": 3187.3
+      },
+      "other_batch": [],
+      "common_batch_errors": [],
+      "peak_rss_mb": {
+        "median": 7994.6,
+        "min": 7961.1,
+        "max": 8000.7
+      },
+      "peak_rss_mb_getrusage": {
+        "median": 7994.6,
+        "min": 7961.1,
+        "max": 8000.7
+      },
+      "peak_vram_mb": null,
+      "torch_peak_vram_mb": null
+    }
+  },
+  "runs": {
+    "0.8.2": [
+      {
+        "cold_start_seconds": 8.16,
+        "peak_rss_mb_proc": 8053.8,
+        "first": {
+          "event": "first",
+          "load_seconds": 5.216,
+          "first_doc_seconds": 2.8779
+        },
+        "latency": {
+          "event": "latency",
+          "docs": 1000,
+          "median_ms": 612.18,
+          "p95_ms": 1971.95
+        },
+        "throughput": [
+          {
+            "event": "throughput",
+            "batch_size": 8,
+            "common": true,
+            "docs_per_second": 1.411,
+            "chars_per_second": 3218.0
+          }
+        ],
+        "done": {
+          "event": "done",
+          "peak_rss_mb": 8053.8
+        },
+        "peak_vram_mb_nvidia_smi": null
+      },
+      {
+        "cold_start_seconds": 8.704,
+        "peak_rss_mb_proc": 8042.7,
+        "first": {
+          "event": "first",
+          "load_seconds": 5.55,
+          "first_doc_seconds": 3.0853
+        },
+        "latency": {
+          "event": "latency",
+          "docs": 1000,
+          "median_ms": 624.95,
+          "p95_ms": 2076.67
+        },
+        "throughput": [
+          {
+            "event": "throughput",
+            "batch_size": 8,
+            "common": true,
+            "docs_per_second": 1.396,
+            "chars_per_second": 3184.4
+          }
+        ],
+        "done": {
+          "event": "done",
+          "peak_rss_mb": 8042.7
+        },
+        "peak_vram_mb_nvidia_smi": null
+      },
+      {
+        "cold_start_seconds": 8.21,
+        "peak_rss_mb_proc": 7991.0,
+        "first": {
+          "event": "first",
+          "load_seconds": 5.139,
+          "first_doc_seconds": 2.998
+        },
+        "latency": {
+          "event": "latency",
+          "docs": 1000,
+          "median_ms": 604.21,
+          "p95_ms": 2047.97
+        },
+        "throughput": [
+          {
+            "event": "throughput",
+            "batch_size": 8,
+            "common": true,
+            "docs_per_second": 1.402,
+            "chars_per_second": 3196.4
+          }
+        ],
+        "done": {
+          "event": "done",
+          "peak_rss_mb": 7991.0
+        },
+        "peak_vram_mb_nvidia_smi": null
+      }
+    ],
+    "0.10.0": [
+      {
+        "cold_start_seconds": 6.652,
+        "peak_rss_mb_proc": 8000.7,
+        "first": {
+          "event": "first",
+          "load_seconds": 3.651,
+          "first_doc_seconds": 2.9185
+        },
+        "latency": {
+          "event": "latency",
+          "docs": 1000,
+          "median_ms": 610.75,
+          "p95_ms": 1994.22
+        },
+        "throughput": [
+          {
+            "event": "throughput",
+            "batch_size": 8,
+            "common": true,
+            "docs_per_second": 1.398,
+            "chars_per_second": 3187.3
+          }
+        ],
+        "done": {
+          "event": "done",
+          "peak_rss_mb": 8000.7
+        },
+        "peak_vram_mb_nvidia_smi": null
+      },
+      {
+        "cold_start_seconds": 6.549,
+        "peak_rss_mb_proc": 7994.6,
+        "first": {
+          "event": "first",
+          "load_seconds": 3.624,
+          "first_doc_seconds": 2.8905
+        },
+        "latency": {
+          "event": "latency",
+          "docs": 1000,
+          "median_ms": 601.51,
+          "p95_ms": 2017.91
+        },
+        "throughput": [
+          {
+            "event": "throughput",
+            "batch_size": 8,
+            "common": true,
+            "docs_per_second": 1.347,
+            "chars_per_second": 3071.2
+          }
+        ],
+        "done": {
+          "event": "done",
+          "peak_rss_mb": 7994.6
+        },
+        "peak_vram_mb_nvidia_smi": null
+      },
+      {
+        "cold_start_seconds": 6.898,
+        "peak_rss_mb_proc": 7961.1,
+        "first": {
+          "event": "first",
+          "load_seconds": 3.86,
+          "first_doc_seconds": 2.9947
+        },
+        "latency": {
+          "event": "latency",
+          "docs": 1000,
+          "median_ms": 573.44,
+          "p95_ms": 1992.13
+        },
+        "throughput": [
+          {
+            "event": "throughput",
+            "batch_size": 8,
+            "common": true,
+            "docs_per_second": 1.394,
+            "chars_per_second": 3180.0
+          }
+        ],
+        "done": {
+          "event": "done",
+          "peak_rss_mb": 7961.1
+        },
+        "peak_vram_mb_nvidia_smi": null
+      }
+    ]
+  },
+  "interpretation": "Prepared-stack comparison on a shared host. Three-repeat spread is descriptive, not a confidence interval or an isolated algorithmic speed claim."
+}

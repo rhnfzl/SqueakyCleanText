@@ -269,6 +269,10 @@ NER is the slow stage. Turn it off (`check_ner_process=False`) for regex-only cl
 
 Measured on open datasets with [benchmarks/](https://github.com/rhnfzl/SqueakyCleanText/tree/main/benchmarks).
 
+The [SCT v0.10.0 comparison](https://github.com/rhnfzl/SqueakyCleanText/blob/main/benchmarks/results/compare-2026-11-12-v010/README.md)
+adds fresh SCT results over 20,817 documents, six charts, and repeated CPU measurements.
+Other-tool versions remain historical pins. Shared-label and full-label results differ because label coverage affects the comparison.
+
 The [SCT v0.8.2 comparison with other PII tools](https://github.com/rhnfzl/SqueakyCleanText/blob/main/benchmarks/results/compare-2026-11-04-visuals/README.md)
 shows paired recall, precision and exposure results, with uncertainty intervals.
 It measures PII configurations rather than the whole processing pipeline. The tested version is v0.8.2, not v0.8.3.

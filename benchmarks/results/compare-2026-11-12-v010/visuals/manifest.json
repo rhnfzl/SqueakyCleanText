@@ -1,0 +1,1517 @@
+{
+  "sct_version": "0.10.0",
+  "source_sha256": "82e4ad54e8aa7cc1059e99912a8e6a4961af13a1798a2a97225af7fd2d565d81",
+  "rows": [
+    {
+      "entry": "ai4privacy",
+      "shared": {
+        "datasets": [
+          "newmean",
+          "dialogpii",
+          "tonic",
+          "meddeid",
+          "europii"
+        ],
+        "groups": 4045,
+        "metrics": {
+          "masked_recall": {
+            "sct": 0.7598,
+            "other": 0.6967,
+            "difference": 0.06310000000000004,
+            "ci95": [
+              0.0339,
+              0.0903
+            ]
+          },
+          "masked_precision": {
+            "sct": 0.4829,
+            "other": 0.5827,
+            "difference": -0.0998,
+            "ci95": [
+              -0.1259,
+              -0.0762
+            ]
+          },
+          "doc_leak_rate": {
+            "sct": 0.3985,
+            "other": 0.8002,
+            "difference": -0.4017,
+            "ci95": [
+              -0.43,
+              -0.373
+            ]
+          }
+        }
+      },
+      "full": {
+        "datasets": [
+          "newmean",
+          "dialogpii",
+          "tonic",
+          "meddeid",
+          "europii"
+        ],
+        "groups": 4045,
+        "metrics": {
+          "masked_recall": {
+            "sct": 0.8643,
+            "other": 0.3571,
+            "difference": 0.5072,
+            "ci95": [
+              0.4918,
+              0.5217
+            ]
+          },
+          "masked_precision": {
+            "sct": 0.725,
+            "other": 0.6557,
+            "difference": 0.06930000000000003,
+            "ci95": [
+              0.0475,
+              0.0904
+            ]
+          },
+          "doc_leak_rate": {
+            "sct": 0.5649,
+            "other": 0.9626,
+            "difference": -0.39770000000000005,
+            "ci95": [
+              -0.4164,
+              -0.3783
+            ]
+          }
+        }
+      }
+    },
+    {
+      "entry": "bardsai-v3",
+      "shared": {
+        "datasets": [
+          "newmean",
+          "dialogpii",
+          "tonic",
+          "meddeid",
+          "greek_deid",
+          "pl_pii",
+          "europii"
+        ],
+        "groups": 9366,
+        "metrics": {
+          "masked_recall": {
+            "sct": 0.7985,
+            "other": 0.8803,
+            "difference": -0.08179999999999998,
+            "ci95": [
+              -0.0957,
+              -0.0678
+            ]
+          },
+          "masked_precision": {
+            "sct": 0.5036,
+            "other": 0.6628,
+            "difference": -0.1591999999999999,
+            "ci95": [
+              -0.1767,
+              -0.143
+            ]
+          },
+          "doc_leak_rate": {
+            "sct": 0.3496,
+            "other": 0.2237,
+            "difference": 0.1259,
+            "ci95": [
+              0.1091,
+              0.1451
+            ]
+          }
+        }
+      },
+      "full": {
+        "datasets": [
+          "newmean",
+          "dialogpii",
+          "tonic",
+          "meddeid",
+          "greek_deid",
+          "pl_pii",
+          "europii"
+        ],
+        "groups": 9366,
+        "metrics": {
+          "masked_recall": {
+            "sct": 0.8889,
+            "other": 0.8517,
+            "difference": 0.03720000000000001,
+            "ci95": [
+              0.0272,
+              0.0477
+            ]
+          },
+          "masked_precision": {
+            "sct": 0.7404,
+            "other": 0.8224,
+            "difference": -0.08200000000000007,
+            "ci95": [
+              -0.0934,
+              -0.07
+            ]
+          },
+          "doc_leak_rate": {
+            "sct": 0.5892,
+            "other": 0.5666,
+            "difference": 0.022599999999999953,
+            "ci95": [
+              0.0018,
+              0.0424
+            ]
+          }
+        }
+      }
+    },
+    {
+      "entry": "datafog",
+      "shared": {
+        "datasets": [
+          "newmean",
+          "dialogpii",
+          "tonic",
+          "meddeid",
+          "greek_deid",
+          "neonredact",
+          "pl_pii",
+          "europii"
+        ],
+        "groups": 17246,
+        "metrics": {
+          "masked_recall": {
+            "sct": 0.8123,
+            "other": 0.5218,
+            "difference": 0.2905,
+            "ci95": [
+              0.2722,
+              0.312
+            ]
+          },
+          "masked_precision": {
+            "sct": 0.5019,
+            "other": 0.7662,
+            "difference": -0.2643,
+            "ci95": [
+              -0.2959,
+              -0.2391
+            ]
+          },
+          "doc_leak_rate": {
+            "sct": 0.3197,
+            "other": 0.6918,
+            "difference": -0.3721,
+            "ci95": [
+              -0.3897,
+              -0.3558
+            ]
+          }
+        }
+      },
+      "full": {
+        "datasets": [
+          "newmean",
+          "dialogpii",
+          "tonic",
+          "meddeid",
+          "greek_deid",
+          "neonredact",
+          "pl_pii",
+          "europii"
+        ],
+        "groups": 17246,
+        "metrics": {
+          "masked_recall": {
+            "sct": 0.8905,
+            "other": 0.2119,
+            "difference": 0.6786,
+            "ci95": [
+              0.667,
+              0.6906
+            ]
+          },
+          "masked_precision": {
+            "sct": 0.7396,
+            "other": 0.7751,
+            "difference": -0.035499999999999976,
+            "ci95": [
+              -0.0669,
+              -0.009
+            ]
+          },
+          "doc_leak_rate": {
+            "sct": 0.579,
+            "other": 0.9507,
+            "difference": -0.37170000000000003,
+            "ci95": [
+              -0.391,
+              -0.3527
+            ]
+          }
+        }
+      }
+    },
+    {
+      "entry": "gliner-knowledgator",
+      "shared": {
+        "datasets": [
+          "newmean",
+          "dialogpii",
+          "tonic",
+          "meddeid",
+          "europii"
+        ],
+        "groups": 1253,
+        "metrics": {
+          "masked_recall": {
+            "sct": 0.7719,
+            "other": 0.6331,
+            "difference": 0.13880000000000003,
+            "ci95": [
+              0.1112,
+              0.169
+            ]
+          },
+          "masked_precision": {
+            "sct": 0.4913,
+            "other": 0.3352,
+            "difference": 0.15610000000000002,
+            "ci95": [
+              0.1312,
+              0.185
+            ]
+          },
+          "doc_leak_rate": {
+            "sct": 0.3491,
+            "other": 0.5139,
+            "difference": -0.1648,
+            "ci95": [
+              -0.1998,
+              -0.1267
+            ]
+          }
+        }
+      },
+      "full": {
+        "datasets": [
+          "newmean",
+          "dialogpii",
+          "tonic",
+          "meddeid",
+          "europii"
+        ],
+        "groups": 1253,
+        "metrics": {
+          "masked_recall": {
+            "sct": 0.8789,
+            "other": 0.8029,
+            "difference": 0.07600000000000007,
+            "ci95": [
+              0.0572,
+              0.0919
+            ]
+          },
+          "masked_precision": {
+            "sct": 0.72,
+            "other": 0.5934,
+            "difference": 0.12659999999999993,
+            "ci95": [
+              0.1088,
+              0.1483
+            ]
+          },
+          "doc_leak_rate": {
+            "sct": 0.5125,
+            "other": 0.5046,
+            "difference": 0.007899999999999907,
+            "ci95": [
+              -0.023,
+              0.0407
+            ]
+          }
+        }
+      }
+    },
+    {
+      "entry": "gliner-nvidia",
+      "shared": {
+        "datasets": [
+          "newmean",
+          "dialogpii",
+          "tonic",
+          "meddeid",
+          "europii"
+        ],
+        "groups": 1253,
+        "metrics": {
+          "masked_recall": {
+            "sct": 0.7719,
+            "other": 0.6872,
+            "difference": 0.0847,
+            "ci95": [
+              0.042,
+              0.1192
+            ]
+          },
+          "masked_precision": {
+            "sct": 0.4913,
+            "other": 0.4277,
+            "difference": 0.06359999999999999,
+            "ci95": [
+              0.0287,
+              0.0946
+            ]
+          },
+          "doc_leak_rate": {
+            "sct": 0.3491,
+            "other": 0.3753,
+            "difference": -0.0262,
+            "ci95": [
+              -0.0597,
+              0.0076
+            ]
+          }
+        }
+      },
+      "full": {
+        "datasets": [
+          "newmean",
+          "dialogpii",
+          "tonic",
+          "meddeid",
+          "europii"
+        ],
+        "groups": 1253,
+        "metrics": {
+          "masked_recall": {
+            "sct": 0.8789,
+            "other": 0.7604,
+            "difference": 0.11850000000000005,
+            "ci95": [
+              0.0904,
+              0.1399
+            ]
+          },
+          "masked_precision": {
+            "sct": 0.72,
+            "other": 0.6813,
+            "difference": 0.03869999999999996,
+            "ci95": [
+              0.021,
+              0.0578
+            ]
+          },
+          "doc_leak_rate": {
+            "sct": 0.5125,
+            "other": 0.4483,
+            "difference": 0.06419999999999998,
+            "ci95": [
+              0.0324,
+              0.0943
+            ]
+          }
+        }
+      }
+    },
+    {
+      "entry": "gliner2-fastino",
+      "shared": {
+        "datasets": [
+          "newmean",
+          "dialogpii",
+          "tonic",
+          "meddeid",
+          "europii"
+        ],
+        "groups": 3953,
+        "metrics": {
+          "masked_recall": {
+            "sct": 0.7672,
+            "other": 0.7315,
+            "difference": 0.035699999999999954,
+            "ci95": [
+              0.0226,
+              0.0478
+            ]
+          },
+          "masked_precision": {
+            "sct": 0.4897,
+            "other": 0.3495,
+            "difference": 0.14020000000000005,
+            "ci95": [
+              0.1277,
+              0.1541
+            ]
+          },
+          "doc_leak_rate": {
+            "sct": 0.4066,
+            "other": 0.3704,
+            "difference": 0.03620000000000001,
+            "ci95": [
+              0.0179,
+              0.0557
+            ]
+          }
+        }
+      },
+      "full": {
+        "datasets": [
+          "newmean",
+          "dialogpii",
+          "tonic",
+          "meddeid",
+          "europii"
+        ],
+        "groups": 3953,
+        "metrics": {
+          "masked_recall": {
+            "sct": 0.8711,
+            "other": 0.8635,
+            "difference": 0.00759999999999994,
+            "ci95": [
+              -0.0037,
+              0.0172
+            ]
+          },
+          "masked_precision": {
+            "sct": 0.7277,
+            "other": 0.6397,
+            "difference": 0.08799999999999997,
+            "ci95": [
+              0.0765,
+              0.1016
+            ]
+          },
+          "doc_leak_rate": {
+            "sct": 0.5648,
+            "other": 0.4373,
+            "difference": 0.12749999999999995,
+            "ci95": [
+              0.108,
+              0.1481
+            ]
+          }
+        }
+      }
+    },
+    {
+      "entry": "llm-guard",
+      "shared": {
+        "datasets": [
+          "newmean",
+          "dialogpii",
+          "tonic",
+          "meddeid",
+          "europii"
+        ],
+        "groups": 1253,
+        "metrics": {
+          "masked_recall": {
+            "sct": 0.7719,
+            "other": 0.4777,
+            "difference": 0.2942,
+            "ci95": [
+              0.2652,
+              0.3238
+            ]
+          },
+          "masked_precision": {
+            "sct": 0.4913,
+            "other": 0.6369,
+            "difference": -0.1456,
+            "ci95": [
+              -0.1838,
+              -0.1049
+            ]
+          },
+          "doc_leak_rate": {
+            "sct": 0.3491,
+            "other": 0.6134,
+            "difference": -0.2642999999999999,
+            "ci95": [
+              -0.2966,
+              -0.2362
+            ]
+          }
+        }
+      },
+      "full": {
+        "datasets": [
+          "newmean",
+          "dialogpii",
+          "tonic",
+          "meddeid",
+          "europii"
+        ],
+        "groups": 1253,
+        "metrics": {
+          "masked_recall": {
+            "sct": 0.8789,
+            "other": 0.553,
+            "difference": 0.32589999999999997,
+            "ci95": [
+              0.2997,
+              0.3507
+            ]
+          },
+          "masked_precision": {
+            "sct": 0.72,
+            "other": 0.8948,
+            "difference": -0.17480000000000007,
+            "ci95": [
+              -0.1963,
+              -0.1501
+            ]
+          },
+          "doc_leak_rate": {
+            "sct": 0.5125,
+            "other": 0.7387,
+            "difference": -0.22620000000000007,
+            "ci95": [
+              -0.2564,
+              -0.197
+            ]
+          }
+        }
+      }
+    },
+    {
+      "entry": "openmed",
+      "shared": {
+        "datasets": [
+          "newmean",
+          "dialogpii",
+          "tonic",
+          "meddeid",
+          "neonredact",
+          "europii"
+        ],
+        "groups": 6513,
+        "metrics": {
+          "masked_recall": {
+            "sct": 0.7931,
+            "other": 0.8393,
+            "difference": -0.04620000000000002,
+            "ci95": [
+              -0.0646,
+              -0.0261
+            ]
+          },
+          "masked_precision": {
+            "sct": 0.4924,
+            "other": 0.4892,
+            "difference": 0.0031999999999999806,
+            "ci95": [
+              -0.0081,
+              0.0154
+            ]
+          },
+          "doc_leak_rate": {
+            "sct": 0.3478,
+            "other": 0.2615,
+            "difference": 0.08629999999999999,
+            "ci95": [
+              0.0659,
+              0.1046
+            ]
+          }
+        }
+      },
+      "full": {
+        "datasets": [
+          "newmean",
+          "dialogpii",
+          "tonic",
+          "meddeid",
+          "neonredact",
+          "europii"
+        ],
+        "groups": 6513,
+        "metrics": {
+          "masked_recall": {
+            "sct": 0.8758,
+            "other": 0.7564,
+            "difference": 0.11940000000000006,
+            "ci95": [
+              0.1082,
+              0.1312
+            ]
+          },
+          "masked_precision": {
+            "sct": 0.7298,
+            "other": 0.7533,
+            "difference": -0.023499999999999965,
+            "ci95": [
+              -0.0307,
+              -0.0149
+            ]
+          },
+          "doc_leak_rate": {
+            "sct": 0.5544,
+            "other": 0.6477,
+            "difference": -0.09330000000000005,
+            "ci95": [
+              -0.1124,
+              -0.0722
+            ]
+          }
+        }
+      }
+    },
+    {
+      "entry": "opf",
+      "shared": {
+        "datasets": [
+          "newmean",
+          "dialogpii",
+          "tonic",
+          "meddeid",
+          "europii"
+        ],
+        "groups": 1253,
+        "metrics": {
+          "masked_recall": {
+            "sct": 0.7719,
+            "other": 0.8516,
+            "difference": -0.0797,
+            "ci95": [
+              -0.1062,
+              -0.0516
+            ]
+          },
+          "masked_precision": {
+            "sct": 0.4913,
+            "other": 0.6298,
+            "difference": -0.1385,
+            "ci95": [
+              -0.1664,
+              -0.1083
+            ]
+          },
+          "doc_leak_rate": {
+            "sct": 0.3491,
+            "other": 0.2451,
+            "difference": 0.10400000000000001,
+            "ci95": [
+              0.0717,
+              0.1426
+            ]
+          }
+        }
+      },
+      "full": {
+        "datasets": [
+          "newmean",
+          "dialogpii",
+          "tonic",
+          "meddeid",
+          "europii"
+        ],
+        "groups": 1253,
+        "metrics": {
+          "masked_recall": {
+            "sct": 0.8789,
+            "other": 0.7267,
+            "difference": 0.1522,
+            "ci95": [
+              0.13,
+              0.1744
+            ]
+          },
+          "masked_precision": {
+            "sct": 0.72,
+            "other": 0.7764,
+            "difference": -0.056400000000000006,
+            "ci95": [
+              -0.0778,
+              -0.0344
+            ]
+          },
+          "doc_leak_rate": {
+            "sct": 0.5125,
+            "other": 0.5402,
+            "difference": -0.027700000000000058,
+            "ci95": [
+              -0.056,
+              0.0015
+            ]
+          }
+        }
+      }
+    },
+    {
+      "entry": "pii-tracer",
+      "shared": {
+        "datasets": [
+          "newmean",
+          "dialogpii",
+          "tonic",
+          "meddeid",
+          "greek_deid",
+          "neonredact",
+          "pl_pii",
+          "europii"
+        ],
+        "groups": 17246,
+        "metrics": {
+          "masked_recall": {
+            "sct": 0.8123,
+            "other": 0.9397,
+            "difference": -0.12739999999999996,
+            "ci95": [
+              -0.1527,
+              -0.0995
+            ]
+          },
+          "masked_precision": {
+            "sct": 0.5019,
+            "other": 0.6221,
+            "difference": -0.12019999999999997,
+            "ci95": [
+              -0.1352,
+              -0.1012
+            ]
+          },
+          "doc_leak_rate": {
+            "sct": 0.3197,
+            "other": 0.1103,
+            "difference": 0.20939999999999998,
+            "ci95": [
+              0.1883,
+              0.2295
+            ]
+          }
+        }
+      },
+      "full": {
+        "datasets": [
+          "newmean",
+          "dialogpii",
+          "tonic",
+          "meddeid",
+          "greek_deid",
+          "neonredact",
+          "pl_pii",
+          "europii"
+        ],
+        "groups": 17246,
+        "metrics": {
+          "masked_recall": {
+            "sct": 0.8905,
+            "other": 0.8374,
+            "difference": 0.053099999999999925,
+            "ci95": [
+              0.0361,
+              0.0728
+            ]
+          },
+          "masked_precision": {
+            "sct": 0.7396,
+            "other": 0.7812,
+            "difference": -0.04159999999999997,
+            "ci95": [
+              -0.0541,
+              -0.0269
+            ]
+          },
+          "doc_leak_rate": {
+            "sct": 0.579,
+            "other": 0.5017,
+            "difference": 0.07729999999999992,
+            "ci95": [
+              0.0563,
+              0.1001
+            ]
+          }
+        }
+      }
+    },
+    {
+      "entry": "piiranha",
+      "shared": {
+        "datasets": [
+          "newmean",
+          "dialogpii",
+          "tonic",
+          "meddeid",
+          "europii"
+        ],
+        "groups": 3550,
+        "metrics": {
+          "masked_recall": {
+            "sct": 0.7618,
+            "other": 0.5612,
+            "difference": 0.2006,
+            "ci95": [
+              0.1862,
+              0.215
+            ]
+          },
+          "masked_precision": {
+            "sct": 0.4877,
+            "other": 0.6478,
+            "difference": -0.16010000000000002,
+            "ci95": [
+              -0.1838,
+              -0.1405
+            ]
+          },
+          "doc_leak_rate": {
+            "sct": 0.4014,
+            "other": 0.6142,
+            "difference": -0.2128,
+            "ci95": [
+              -0.2342,
+              -0.1922
+            ]
+          }
+        }
+      },
+      "full": {
+        "datasets": [
+          "newmean",
+          "dialogpii",
+          "tonic",
+          "meddeid",
+          "europii"
+        ],
+        "groups": 3550,
+        "metrics": {
+          "masked_recall": {
+            "sct": 0.8676,
+            "other": 0.4883,
+            "difference": 0.3793,
+            "ci95": [
+              0.3635,
+              0.3951
+            ]
+          },
+          "masked_precision": {
+            "sct": 0.727,
+            "other": 0.8285,
+            "difference": -0.10150000000000003,
+            "ci95": [
+              -0.1157,
+              -0.0862
+            ]
+          },
+          "doc_leak_rate": {
+            "sct": 0.5631,
+            "other": 0.892,
+            "difference": -0.32889999999999997,
+            "ci95": [
+              -0.3481,
+              -0.3107
+            ]
+          }
+        }
+      }
+    },
+    {
+      "entry": "presidio",
+      "shared": {
+        "datasets": [
+          "newmean",
+          "dialogpii",
+          "tonic",
+          "meddeid",
+          "europii"
+        ],
+        "groups": 1253,
+        "metrics": {
+          "masked_recall": {
+            "sct": 0.7719,
+            "other": 0.7954,
+            "difference": -0.023499999999999965,
+            "ci95": [
+              -0.0505,
+              0.0024
+            ]
+          },
+          "masked_precision": {
+            "sct": 0.4913,
+            "other": 0.3782,
+            "difference": 0.11310000000000003,
+            "ci95": [
+              0.0917,
+              0.1352
+            ]
+          },
+          "doc_leak_rate": {
+            "sct": 0.3491,
+            "other": 0.3856,
+            "difference": -0.03649999999999998,
+            "ci95": [
+              -0.0647,
+              -0.0067
+            ]
+          }
+        }
+      },
+      "full": {
+        "datasets": [
+          "newmean",
+          "dialogpii",
+          "tonic",
+          "meddeid",
+          "europii"
+        ],
+        "groups": 1253,
+        "metrics": {
+          "masked_recall": {
+            "sct": 0.8789,
+            "other": 0.7457,
+            "difference": 0.13319999999999999,
+            "ci95": [
+              0.1132,
+              0.1508
+            ]
+          },
+          "masked_precision": {
+            "sct": 0.72,
+            "other": 0.5694,
+            "difference": 0.15059999999999996,
+            "ci95": [
+              0.136,
+              0.1668
+            ]
+          },
+          "doc_leak_rate": {
+            "sct": 0.5125,
+            "other": 0.6062,
+            "difference": -0.0937,
+            "ci95": [
+              -0.1222,
+              -0.0633
+            ]
+          }
+        }
+      }
+    },
+    {
+      "entry": "presidio-full",
+      "shared": {
+        "datasets": [
+          "newmean",
+          "dialogpii",
+          "tonic",
+          "meddeid",
+          "greek_deid",
+          "neonredact",
+          "pl_pii",
+          "europii"
+        ],
+        "groups": 17246,
+        "metrics": {
+          "masked_recall": {
+            "sct": 0.8123,
+            "other": 0.8117,
+            "difference": 0.0006000000000000449,
+            "ci95": [
+              -0.0112,
+              0.012
+            ]
+          },
+          "masked_precision": {
+            "sct": 0.5019,
+            "other": 0.3983,
+            "difference": 0.10360000000000003,
+            "ci95": [
+              0.0877,
+              0.1211
+            ]
+          },
+          "doc_leak_rate": {
+            "sct": 0.3197,
+            "other": 0.4388,
+            "difference": -0.11910000000000004,
+            "ci95": [
+              -0.135,
+              -0.1033
+            ]
+          }
+        }
+      },
+      "full": {
+        "datasets": [
+          "newmean",
+          "dialogpii",
+          "tonic",
+          "meddeid",
+          "greek_deid",
+          "neonredact",
+          "pl_pii",
+          "europii"
+        ],
+        "groups": 17246,
+        "metrics": {
+          "masked_recall": {
+            "sct": 0.8905,
+            "other": 0.7105,
+            "difference": 0.17999999999999994,
+            "ci95": [
+              0.1702,
+              0.191
+            ]
+          },
+          "masked_precision": {
+            "sct": 0.7396,
+            "other": 0.5485,
+            "difference": 0.19110000000000005,
+            "ci95": [
+              0.1749,
+              0.2071
+            ]
+          },
+          "doc_leak_rate": {
+            "sct": 0.579,
+            "other": 0.7259,
+            "difference": -0.14690000000000003,
+            "ci95": [
+              -0.166,
+              -0.1274
+            ]
+          }
+        }
+      }
+    },
+    {
+      "entry": "scrubadub",
+      "shared": {
+        "datasets": [
+          "newmean",
+          "dialogpii",
+          "tonic",
+          "meddeid",
+          "europii"
+        ],
+        "groups": 1253,
+        "metrics": {
+          "masked_recall": {
+            "sct": 0.7719,
+            "other": 0.3634,
+            "difference": 0.40850000000000003,
+            "ci95": [
+              0.381,
+              0.4386
+            ]
+          },
+          "masked_precision": {
+            "sct": 0.4913,
+            "other": 0.4583,
+            "difference": 0.03300000000000003,
+            "ci95": [
+              -0.0008,
+              0.0654
+            ]
+          },
+          "doc_leak_rate": {
+            "sct": 0.3491,
+            "other": 0.7383,
+            "difference": -0.38919999999999993,
+            "ci95": [
+              -0.4199,
+              -0.3587
+            ]
+          }
+        }
+      },
+      "full": {
+        "datasets": [
+          "newmean",
+          "dialogpii",
+          "tonic",
+          "meddeid",
+          "europii"
+        ],
+        "groups": 1253,
+        "metrics": {
+          "masked_recall": {
+            "sct": 0.8789,
+            "other": 0.66,
+            "difference": 0.21889999999999998,
+            "ci95": [
+              0.2014,
+              0.236
+            ]
+          },
+          "masked_precision": {
+            "sct": 0.72,
+            "other": 0.7712,
+            "difference": -0.05120000000000002,
+            "ci95": [
+              -0.0703,
+              -0.0318
+            ]
+          },
+          "doc_leak_rate": {
+            "sct": 0.5125,
+            "other": 0.7404,
+            "difference": -0.2279,
+            "ci95": [
+              -0.254,
+              -0.2007
+            ]
+          }
+        }
+      }
+    }
+  ],
+  "style_source": "https://github.com/skthewimp/karthik-data-visualization-skill",
+  "cards": [
+    {
+      "image": "01-shared-recall.png",
+      "alt": "SCT v0.10.0. Shown: 4 largest gaps of 4 higher pairs; 14 total. PII-Tracer: +12.74 points, 95% interval +9.95 to +15.27; BardsAI-v3: +8.18 points, 95% interval +6.78 to +9.57; OPF: +7.97 points, 95% interval +5.16 to +10.62; OpenMed: +4.62 points, 95% interval +2.61 to +6.46. Shared EMAIL, PHONE, NUMBER. Gold languages supplied. Synthetic dataset averages; pair subsets vary."
+    },
+    {
+      "image": "02-full-recall.png",
+      "alt": "SCT v0.10.0. Full-label recall: SCT higher 13, unclear 1, lower 0. Unsupported types count as misses. DATE excluded. Unadjusted paired 95% intervals. Gold languages supplied; synthetic dataset averages, with different matched subsets per pair."
+    },
+    {
+      "image": "03-precision.png",
+      "alt": "SCT v0.10.0. Predicted spans overlapping a labelled mention. SCT 73.96%, PII-Tracer 78.12%. Means across 8 synthetic datasets. Gold languages supplied. DATE excluded."
+    },
+    {
+      "image": "04-exposed-text.png",
+      "alt": "SCT v0.10.0. Documents with any labelled letter or digit visible. SCT 57.90%, PII-Tracer 50.17%. Denominator: documents with scored mentions. Reconstructed source-span masks. Means across 8 synthetic datasets. Gold languages supplied. DATE excluded."
+    },
+    {
+      "image": "05-throughput.png",
+      "alt": "SCT v0.10.0. documents / second. Versions 0.8.2 then 0.10.0: [{\"median\": 1.402, \"min\": 1.396, \"max\": 1.411}, {\"median\": 1.394, \"min\": 1.347, \"max\": 1.398}]"
+    },
+    {
+      "image": "06-memory.png",
+      "alt": "SCT v0.10.0. GiB of resident memory. Versions 0.8.2 then 0.10.0: [{\"median\": 7.85419921875, \"min\": 7.8037109375, \"max\": 7.8650390625}, {\"median\": 7.8072265625, \"min\": 7.77451171875, \"max\": 7.81318359375}]"
+    }
+  ],
+  "full_recall_counts": {
+    "higher": 13,
+    "unclear": 1,
+    "lower": 0
+  },
+  "speed": {
+    "scope": "Direct TextCleaner.process_batch, default legacy processing and automatic language detection; explicit CPU,16 ORT threads,2 workers,batch8. No reversible scoring or span reconstruction.",
+    "sample": {
+      "dataset": "FineWeb-2",
+      "revision": "af9c13333eb981300149d5ca60a8e9d659b276b9",
+      "seed": 13,
+      "documents": 1000,
+      "languages": 10,
+      "input_sha256": "8f17320438635d3207bbb6d694eb105d9b6c98645f67176b13e2de110b310499"
+    },
+    "repeats": 3,
+    "device": "cpu",
+    "threads": 16,
+    "workers": 2,
+    "batch": 8,
+    "order": [
+      {
+        "repeat": 1,
+        "version": "0.8.2"
+      },
+      {
+        "repeat": 1,
+        "version": "0.10.0"
+      },
+      {
+        "repeat": 2,
+        "version": "0.10.0"
+      },
+      {
+        "repeat": 2,
+        "version": "0.8.2"
+      },
+      {
+        "repeat": 3,
+        "version": "0.8.2"
+      },
+      {
+        "repeat": 3,
+        "version": "0.10.0"
+      }
+    ],
+    "entries": {
+      "0.8.2": {
+        "repeats": 3,
+        "failed": [],
+        "cold_start_seconds": {
+          "median": 8.21,
+          "min": 8.16,
+          "max": 8.704
+        },
+        "load_seconds": {
+          "median": 5.216,
+          "min": 5.139,
+          "max": 5.55
+        },
+        "latency_median_ms": {
+          "median": 612.18,
+          "min": 604.21,
+          "max": 624.95
+        },
+        "latency_p95_ms": {
+          "median": 2047.97,
+          "min": 1971.95,
+          "max": 2076.67
+        },
+        "common_batch_docs_per_second": {
+          "median": 1.402,
+          "min": 1.396,
+          "max": 1.411
+        },
+        "common_batch_chars_per_second": {
+          "median": 3196.4,
+          "min": 3184.4,
+          "max": 3218.0
+        },
+        "other_batch": [],
+        "common_batch_errors": [],
+        "peak_rss_mb": {
+          "median": 8042.7,
+          "min": 7991.0,
+          "max": 8053.8
+        },
+        "peak_rss_mb_getrusage": {
+          "median": 8042.7,
+          "min": 7991.0,
+          "max": 8053.8
+        },
+        "peak_vram_mb": null,
+        "torch_peak_vram_mb": null
+      },
+      "0.10.0": {
+        "repeats": 3,
+        "failed": [],
+        "cold_start_seconds": {
+          "median": 6.652,
+          "min": 6.549,
+          "max": 6.898
+        },
+        "load_seconds": {
+          "median": 3.651,
+          "min": 3.624,
+          "max": 3.86
+        },
+        "latency_median_ms": {
+          "median": 601.51,
+          "min": 573.44,
+          "max": 610.75
+        },
+        "latency_p95_ms": {
+          "median": 1994.22,
+          "min": 1992.13,
+          "max": 2017.91
+        },
+        "common_batch_docs_per_second": {
+          "median": 1.394,
+          "min": 1.347,
+          "max": 1.398
+        },
+        "common_batch_chars_per_second": {
+          "median": 3180.0,
+          "min": 3071.2,
+          "max": 3187.3
+        },
+        "other_batch": [],
+        "common_batch_errors": [],
+        "peak_rss_mb": {
+          "median": 7994.6,
+          "min": 7961.1,
+          "max": 8000.7
+        },
+        "peak_rss_mb_getrusage": {
+          "median": 7994.6,
+          "min": 7961.1,
+          "max": 8000.7
+        },
+        "peak_vram_mb": null,
+        "torch_peak_vram_mb": null
+      }
+    },
+    "runs": {
+      "0.8.2": [
+        {
+          "cold_start_seconds": 8.16,
+          "peak_rss_mb_proc": 8053.8,
+          "first": {
+            "event": "first",
+            "load_seconds": 5.216,
+            "first_doc_seconds": 2.8779
+          },
+          "latency": {
+            "event": "latency",
+            "docs": 1000,
+            "median_ms": 612.18,
+            "p95_ms": 1971.95
+          },
+          "throughput": [
+            {
+              "event": "throughput",
+              "batch_size": 8,
+              "common": true,
+              "docs_per_second": 1.411,
+              "chars_per_second": 3218.0
+            }
+          ],
+          "done": {
+            "event": "done",
+            "peak_rss_mb": 8053.8
+          },
+          "peak_vram_mb_nvidia_smi": null
+        },
+        {
+          "cold_start_seconds": 8.704,
+          "peak_rss_mb_proc": 8042.7,
+          "first": {
+            "event": "first",
+            "load_seconds": 5.55,
+            "first_doc_seconds": 3.0853
+          },
+          "latency": {
+            "event": "latency",
+            "docs": 1000,
+            "median_ms": 624.95,
+            "p95_ms": 2076.67
+          },
+          "throughput": [
+            {
+              "event": "throughput",
+              "batch_size": 8,
+              "common": true,
+              "docs_per_second": 1.396,
+              "chars_per_second": 3184.4
+            }
+          ],
+          "done": {
+            "event": "done",
+            "peak_rss_mb": 8042.7
+          },
+          "peak_vram_mb_nvidia_smi": null
+        },
+        {
+          "cold_start_seconds": 8.21,
+          "peak_rss_mb_proc": 7991.0,
+          "first": {
+            "event": "first",
+            "load_seconds": 5.139,
+            "first_doc_seconds": 2.998
+          },
+          "latency": {
+            "event": "latency",
+            "docs": 1000,
+            "median_ms": 604.21,
+            "p95_ms": 2047.97
+          },
+          "throughput": [
+            {
+              "event": "throughput",
+              "batch_size": 8,
+              "common": true,
+              "docs_per_second": 1.402,
+              "chars_per_second": 3196.4
+            }
+          ],
+          "done": {
+            "event": "done",
+            "peak_rss_mb": 7991.0
+          },
+          "peak_vram_mb_nvidia_smi": null
+        }
+      ],
+      "0.10.0": [
+        {
+          "cold_start_seconds": 6.652,
+          "peak_rss_mb_proc": 8000.7,
+          "first": {
+            "event": "first",
+            "load_seconds": 3.651,
+            "first_doc_seconds": 2.9185
+          },
+          "latency": {
+            "event": "latency",
+            "docs": 1000,
+            "median_ms": 610.75,
+            "p95_ms": 1994.22
+          },
+          "throughput": [
+            {
+              "event": "throughput",
+              "batch_size": 8,
+              "common": true,
+              "docs_per_second": 1.398,
+              "chars_per_second": 3187.3
+            }
+          ],
+          "done": {
+            "event": "done",
+            "peak_rss_mb": 8000.7
+          },
+          "peak_vram_mb_nvidia_smi": null
+        },
+        {
+          "cold_start_seconds": 6.549,
+          "peak_rss_mb_proc": 7994.6,
+          "first": {
+            "event": "first",
+            "load_seconds": 3.624,
+            "first_doc_seconds": 2.8905
+          },
+          "latency": {
+            "event": "latency",
+            "docs": 1000,
+            "median_ms": 601.51,
+            "p95_ms": 2017.91
+          },
+          "throughput": [
+            {
+              "event": "throughput",
+              "batch_size": 8,
+              "common": true,
+              "docs_per_second": 1.347,
+              "chars_per_second": 3071.2
+            }
+          ],
+          "done": {
+            "event": "done",
+            "peak_rss_mb": 7994.6
+          },
+          "peak_vram_mb_nvidia_smi": null
+        },
+        {
+          "cold_start_seconds": 6.898,
+          "peak_rss_mb_proc": 7961.1,
+          "first": {
+            "event": "first",
+            "load_seconds": 3.86,
+            "first_doc_seconds": 2.9947
+          },
+          "latency": {
+            "event": "latency",
+            "docs": 1000,
+            "median_ms": 573.44,
+            "p95_ms": 1992.13
+          },
+          "throughput": [
+            {
+              "event": "throughput",
+              "batch_size": 8,
+              "common": true,
+              "docs_per_second": 1.394,
+              "chars_per_second": 3180.0
+            }
+          ],
+          "done": {
+            "event": "done",
+            "peak_rss_mb": 7961.1
+          },
+          "peak_vram_mb_nvidia_smi": null
+        }
+      ]
+    },
+    "interpretation": "Prepared-stack comparison on a shared host. Three-repeat spread is descriptive, not a confidence interval or an isolated algorithmic speed claim."
+  }
+}
