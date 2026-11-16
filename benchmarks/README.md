@@ -1,5 +1,8 @@
 # SCT benchmarks
 
+Current comparison: [SCT v0.10.0 results and charts](https://github.com/rhnfzl/SqueakyCleanText/blob/main/benchmarks/results/compare-2026-11-12-v010/README.md).
+Fresh SCT inference covers 20,817 documents. Other-tool configurations retain their historical pins.
+
 Other-tools charts: [SCT v0.8.2 paired comparisons](https://github.com/rhnfzl/SqueakyCleanText/blob/main/benchmarks/results/compare-2026-11-04-visuals/README.md).
 These show the completed round-2 run; they do not measure v0.8.3.
 
