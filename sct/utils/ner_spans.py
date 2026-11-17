@@ -171,6 +171,13 @@ def finalize_spans(ner, text, windows, window_results, ner_confidence_threshold,
         for item in ner_results:
             start = win_start + offsets[item['start']]
             end = win_start + offsets[item['end']]
+            # Byte-level tokenizers (ModernBERT) count the space before a word as part of it.
+            while start < end and text[start].isspace():
+                start += 1
+            while end > start and text[end - 1].isspace():
+                end -= 1
+            if start == end:
+                continue
             if ner.cfg.ner_snap_word_edges:
                 start, end = snap_word_edges(
                     text, start, end, ner.cfg.ner_subword_widen, ner.cfg.ner_subword_widen_same_script)

@@ -370,3 +370,29 @@ def test_long_location_label_merges_across_a_gap():
     spans = [(0, 10, "LOCATION", 0.9), (12, 23, "LOCATION", 0.9), (25, 29, "LOC", 0.9)]
     ner, windows, results = finalize_spans(text, spans, ner_merge_location_gap=12)
     assert finalized_text(ner, text, windows, results) == "<LOCATION>. <LOCATION>"
+
+
+# --- byte-level tokenizers (ModernBERT) put the space before a word inside its span ---
+def test_edge_whitespace_is_trimmed_from_model_spans():
+    text = "John Smith works at Microsoft in Seattle."
+    # ' Microsoft' (19, 29) and ' Seattle ' style spans, as ModernBERT returns them
+    ner, windows, results = finalize_spans(text, [(0, 10, 'PER', 0.99), (19, 29, 'ORG', 0.99), (32, 40, 'LOC', 0.99)])
+    assert finalized_text(ner, text, windows, results) == "<PERSON> works at <ORGANISATION> in <LOCATION>."
+
+
+def test_whitespace_only_span_is_dropped():
+    text = "John  Smith"
+    ner, windows, results = finalize_spans(text, [(4, 6, 'PER', 0.99)])
+    assert finalized_text(ner, text, windows, results) == text
+
+
+def test_spaced_and_unspaced_copies_of_one_name_are_one_vote():
+    # One model returns ' Microsoft', another 'Microsoft': after the trim both share the key '20:29'.
+    text = "John works at Microsoft."
+    ner, windows, results = finalize_spans(text, [(13, 23, 'ORG', 0.60)])
+    results[0].append({'entity_group': 'ORG', 'score': 0.60, 'start': 14, 'end': 23, 'model': 'other'})
+    set_cfg(ner, ner_ensemble_vote='mean')
+    assert finalized_text(ner, text, windows, results) == text  # one key, mean 0.60 < 0.85
+    set_cfg(ner, ner_ensemble_vote='max')
+    results[0][0]['score'] = 0.90
+    assert finalized_text(ner, text, windows, results) == "John works at <ORGANISATION>."

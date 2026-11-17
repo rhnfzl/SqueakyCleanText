@@ -2,6 +2,12 @@
 
 Benchmark scores below use open datasets credited in [benchmarks/DATASET_CREDITS.md](https://github.com/rhnfzl/SqueakyCleanText/blob/main/benchmarks/DATASET_CREDITS.md).
 
+## Unreleased
+
+### Fixed
+
+- NER spans no longer include the space before or after a name. Byte-level tokenizers, such as ModernBERT's, put that space inside a word's offsets, so the placeholder took the space with it (`works at<ORGANISATION>`). This also fixes the ensemble vote, `custom_allow_terms`, synthetic names and reported span offsets for those models, on both the ONNX and torch backends. The default models never produced such spans, so default output does not change.
+
 ## 0.10.0 - 2026-11-11
 
 Users can opt into one privacy policy across format matches and model findings.
