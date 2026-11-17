@@ -30,7 +30,7 @@ SqueakyCleanText supports six NER backends, selectable via the `ner_backend` con
 
 | Backend | Description | Dependencies | Best for |
 |---------|-------------|-------------|----------|
-| `onnx` (default) | ONNX Runtime inference with quantized XLM-RoBERTa models | Base install | Production: fast, torch-free |
+| `onnx` (default) | ONNX Runtime inference with FP32 ONNX exports of XLM-RoBERTa and WikiNEural models | Base install | Production: fast, torch-free |
 | `torch` | PyTorch/Transformers pipeline with full XLM-RoBERTa models | `[torch]` extra | Compatibility with existing PyTorch workflows |
 | `gliner` | GLiNER zero-shot NER with custom entity labels | `[gliner]` or `[gliner2]` extra | Custom entity types, PII detection, bi-encoder models |
 | `ensemble_onnx` | ONNX + GLiNER ensemble voting | `[gliner]` extra | Maximum recall with custom entities |
@@ -53,6 +53,43 @@ other results are not filtered by `positional_tags` or the confidence threshold.
 | Spanish | [`rhnfzl/xlm-roberta-large-conll02-spanish-onnx`](https://huggingface.co/rhnfzl/xlm-roberta-large-conll02-spanish-onnx) |
 | French / Portuguese / Italian | [`rhnfzl/wikineural-multilingual-ner-onnx`](https://huggingface.co/rhnfzl/wikineural-multilingual-ner-onnx) (shared session) |
 | Multilingual (fallback) | [`rhnfzl/wikineural-multilingual-ner-onnx`](https://huggingface.co/rhnfzl/wikineural-multilingual-ner-onnx) |
+
+### Model licences
+
+The default models keep the licence of the model they were exported from:
+
+| Model | Base model | Licence |
+|---|---|---|
+| `rhnfzl/wikineural-multilingual-ner-onnx` | [Babelscape/wikineural-multilingual-ner](https://huggingface.co/Babelscape/wikineural-multilingual-ner) | **CC BY-NC-SA 4.0, non-commercial research only** |
+| The four `rhnfzl/xlm-roberta-large-*-onnx` models | `FacebookAI/xlm-roberta-large-finetuned-*` | MIT, assumed from the parent `FacebookAI/xlm-roberta-large`. The fine-tuned base cards say "License: More information needed". |
+
+SCT loads the WikiNEural model by default. It runs for French, Portuguese, Italian and every other language
+without a model of its own, and inside the English, Dutch, German and Spanish ensembles. The `torch` backend
+loads the original Babelscape model, with the same licence. Check these terms before commercial use.
+
+To run without WikiNEural, point every key that uses it at another model. This example uses the English model,
+so French, Portuguese, Italian and other languages lose their multilingual coverage:
+
+```python
+from sct import TextCleaner, TextCleanerConfig
+from sct.config import DEFAULT_NER_MODELS, DEFAULT_NER_REVISIONS
+
+wikineural = DEFAULT_NER_MODELS["MULTILINGUAL"]
+keys = [k for k, m in DEFAULT_NER_MODELS.items() if m == wikineural]  # FRENCH, PORTUGUESE, ITALIAN, MULTILINGUAL
+cfg = TextCleanerConfig(
+    ner_models={**DEFAULT_NER_MODELS, **dict.fromkeys(keys, DEFAULT_NER_MODELS["ENGLISH"])},
+    # Same revision as ENGLISH, so all these keys share one loaded model.
+    ner_model_revisions=dict.fromkeys(keys, DEFAULT_NER_REVISIONS["ENGLISH"]),
+    # Optional: stops the English model running twice on the same text.
+    ner_ensemble={"ENGLISH": ("ENGLISH",), "DUTCH": ("DUTCH", "ENGLISH"),
+                  "GERMAN": ("GERMAN", "ENGLISH"), "SPANISH": ("SPANISH", "ENGLISH")},
+    ner_ensemble_default_keys=("ENGLISH",),
+)
+cleaner = TextCleaner(cfg=cfg)
+```
+
+The `torch` and `ensemble_torch` backends read `torch_ner_models` and `torch_ner_model_revisions` instead, so make the same change there.
+You can also turn NER off (`check_ner_process=False`), or use `ner_backend='gliner'` with a model whose licence fits.
 
 ## GLiNER Model Recommendations
 
