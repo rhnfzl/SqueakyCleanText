@@ -234,6 +234,7 @@ def summary(out: Path) -> str:
     errors = {k: v["error"] for k, v in results.items() if "error" in v}
     if errors:
         lines += ["", "## Not run", "", *(f"- {k}: {v}" for k, v in errors.items())]
+    lines += datasets.credit_line(k.removesuffix("-clean") for k, v in results.items() if "error" not in v)
     return "\n".join(lines) + "\n"
 
 

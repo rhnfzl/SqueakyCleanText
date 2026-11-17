@@ -12,19 +12,19 @@ PII is one stage of that pipeline. It combines SCT’s own regex detection with 
 
 PII-Tracer, BardsAI-v3, OPF and OpenMed have higher recall than SCT default, with recorded difference intervals below zero. Presidio and Presidio-full intervals cross zero.
 
-[PNG](shared-recall.png) · [SVG](shared-recall.svg) · [Interactive HTML](shared-recall.html)
+[PNG](shared-recall.png) · [SVG](shared-recall.svg)
 
 ### Full taxonomy: SCT has stronger recall in most paired comparisons
 
 SCT default has higher recall than 13 of the 14 non-SCT entries, with recorded difference intervals above zero. GLiNER2-Fastino’s interval crosses zero. This view also measures entity coverage.
 
-[PNG](full-recall.png) · [SVG](full-recall.svg) · [Interactive HTML](full-recall.html)
+[PNG](full-recall.png) · [SVG](full-recall.svg)
 
 ### Precision and document exposure change the choice
 
 Higher recall does not imply higher precision or fewer exposed documents. Several tools outperform SCT on these measures in the full-taxonomy synthetic comparisons.
 
-[PNG](tradeoffs.png) · [SVG](tradeoffs.svg) · [Interactive HTML](tradeoffs.html)
+[PNG](tradeoffs.png) · [SVG](tradeoffs.svg)
 
 ## Method and limits
 
@@ -61,3 +61,5 @@ uv run --script scripts/plot_pii_comparison.py \
   benchmarks/results/compare-2026-11-04/default/summary.json \
   benchmarks/results/compare-2026-11-04-visuals
 ```
+
+**Dataset credits.** Scores here use DialogPII, EuroPII, Greek DeID, MedDeID, NeonRedact-TR, newmean, pl-pii-bench, Tonic PrivacyBench. These datasets are under CC BY or other attribution licences. Creators, sources, licences and citations are in [benchmarks/DATASET_CREDITS.md](https://github.com/rhnfzl/SqueakyCleanText/blob/main/benchmarks/DATASET_CREDITS.md).

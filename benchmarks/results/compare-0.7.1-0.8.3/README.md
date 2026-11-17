@@ -33,10 +33,10 @@ These are measured software stacks with different runtime versions. Read the com
 
 ## Charts
 
-- quality: [PNG](charts/quality.png), [SVG](charts/quality.svg), [interactive HTML](charts/quality.html)
-- speed: [PNG](charts/speed.png), [SVG](charts/speed.svg), [interactive HTML](charts/speed.html)
-- leaks: [PNG](charts/leaks.png), [SVG](charts/leaks.svg), [interactive HTML](charts/leaks.html)
-- limits: [PNG](charts/limits.png), [SVG](charts/limits.svg), [interactive HTML](charts/limits.html)
+- quality: [PNG](charts/quality.png), [SVG](charts/quality.svg)
+- speed: [PNG](charts/speed.png), [SVG](charts/speed.svg)
+- leaks: [PNG](charts/leaks.png), [SVG](charts/leaks.svg)
+- limits: [PNG](charts/limits.png), [SVG](charts/limits.svg)
 
 ## Method and limits
 
@@ -66,3 +66,5 @@ uv run --script scripts/plot_version_comparison.py benchmarks/results/compare-0.
 
 The launcher and compatibility wrapper are in `scripts/watch_release_comparison.py` and `scripts/release_comparison_version.py`.
 Dataset sources, revisions, licenses, model revisions and settings are recorded in the per-run aggregate JSON.
+
+**Dataset credits.** Scores here use OpenPII, Nemotron-PII, IAHLT Arabic NER, Bayanat Arabic PII, Thai NER 2.2, Thai-PII-Synthetic, Naamapadam, MultiCoNER v2, Stockmark Japanese NER, WiLI-2018, FineWeb2. These datasets are under CC BY or other attribution licences. Creators, sources, licences and citations are in [benchmarks/DATASET_CREDITS.md](https://github.com/rhnfzl/SqueakyCleanText/blob/main/benchmarks/DATASET_CREDITS.md).

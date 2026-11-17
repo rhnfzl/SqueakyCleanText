@@ -317,3 +317,5 @@ use a set under 99% complete with † (PROTOCOL section 15).
 
 Not committed: raw predictions and logs. They stay on the run machine. All datasets are scores-only.
 NUS-LT prediction caches must be deleted there once scoring is final (RAIL-D licence).
+
+**Dataset credits.** Scores here use DialogPII, KDPII, EuroPII, Greek DeID, MedDeID, NeonRedact-TR, newmean, pl-pii-bench, RedactionBench, Tonic PrivacyBench, FineWeb2. These datasets are under CC BY or other attribution licences. Creators, sources, licences and citations are in [benchmarks/DATASET_CREDITS.md](https://github.com/rhnfzl/SqueakyCleanText/blob/main/benchmarks/DATASET_CREDITS.md).

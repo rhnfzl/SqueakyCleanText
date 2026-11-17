@@ -34,6 +34,8 @@ class SocialCardTests(unittest.TestCase):
                 ids = [cell.get("id") for cell in root.iter("mxCell")]
                 self.assertEqual(len(ids), len(set(ids)))
                 for cell in root.iter("mxCell"):
+                    if cell.get("value", "").startswith("Dataset credits:"):
+                        continue  # licence credit line: small print, the only text allowed below 36
                     for part in cell.get("style", "").split(";"):
                         if part.startswith("fontSize="):
                             self.assertGreaterEqual(int(part.split("=")[1]), 36)
@@ -46,6 +48,8 @@ class SocialCardTests(unittest.TestCase):
             self.assertIn("50.2%", labels["06-exposed-text"])
             self.assertIn("lower is better", labels["06-exposed-text"])
             self.assertIn("5.7 to 10.1 points", labels["06-exposed-text"])
+            for name in ("03-shared-recall", "04-full-recall", "05-precision", "06-exposed-text"):
+                self.assertIn("Dataset credits: rhnfzl.github.io/SqueakyCleanText/dataset-credits", labels[name])
 
     def test_wrong_version_or_incomplete_comparison_stops(self):
         data = extract(SOURCE)

@@ -353,3 +353,5 @@ Accuracy 5.5, macro 5.5 over 7200 in-set docs. Out-of-set docs given a language:
 | TAMIL | 98 | 0.0 |
 | TELUGU | 96 | 0.0 |
 | THAI | 99 | 0.0 |
+
+**Dataset credits.** Scores here use OpenPII, Nemotron-PII, IAHLT Arabic NER, Bayanat Arabic PII, Thai NER 2.2, Thai-PII-Synthetic, Naamapadam, MultiCoNER v2, Stockmark Japanese NER, WiLI-2018, FineWeb2. These datasets are under CC BY or other attribution licences. Creators, sources, licences and citations are in [benchmarks/DATASET_CREDITS.md](https://github.com/rhnfzl/SqueakyCleanText/blob/main/benchmarks/DATASET_CREDITS.md).

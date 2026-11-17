@@ -238,3 +238,21 @@ def test_loaders_honour_the_per_language_sample(tmp_path, monkeypatch):
     pinned(bayanat, monkeypatch, write_jsonl(tmp_path / "b.jsonl", rows))
     sample = bayanat.load(3, 13)
     assert len(sample) == 3 and sample == bayanat.load(3, 13)
+
+
+def test_attribution_licences_are_credited():
+    # CC BY / ODC-By / ODbL ask for credit wherever scores appear: every such loader must be in CREDITS and the page
+    import importlib
+    from pathlib import Path
+
+    from benchmarks import datasets
+
+    page = (Path(datasets.__file__).parents[1] / "DATASET_CREDITS.md").read_text(encoding="utf-8")
+    for name in datasets.MODULES:
+        licence = importlib.import_module(f"benchmarks.datasets.{name}").LICENCE
+        if any(tag in licence for tag in ("CC-BY", "ODC-By", "ODbL")):
+            assert name in datasets.CREDITS, name
+    for name in datasets.CREDITS:
+        assert f"(`{name}`" in page, name
+    assert datasets.credit_line(["gretel"]) == []
+    assert "Nemotron-PII, DialogPII" in datasets.credit_line(iter(["dialogpii", "nemotron", "gretel"]))[1]

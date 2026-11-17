@@ -852,3 +852,5 @@ cd "$SCT_AUDIT_DIR"
 ```
 
 These commands check existing summaries against retained observations; they do not repeat the consumed held-out inference.
+
+**Dataset credits.** Scores here use DialogPII, KDPII, EuroPII, Greek DeID, MedDeID, NeonRedact-TR, newmean, pl-pii-bench, RedactionBench, Tonic PrivacyBench, OpenPII, Nemotron-PII, IAHLT Arabic NER, Bayanat Arabic PII, Thai NER 2.2, Thai-PII-Synthetic, Naamapadam, MultiCoNER v2, Stockmark Japanese NER, FineWeb2. These datasets are under CC BY or other attribution licences. Creators, sources, licences and citations are in [benchmarks/DATASET_CREDITS.md](https://github.com/rhnfzl/SqueakyCleanText/blob/main/benchmarks/DATASET_CREDITS.md).

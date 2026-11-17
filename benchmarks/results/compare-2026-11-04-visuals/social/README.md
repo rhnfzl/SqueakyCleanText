@@ -39,3 +39,5 @@ done
 ```
 
 On macOS, the CLI can be `/Applications/draw.io.app/Contents/MacOS/draw.io`. Sources are retained, and exports embed the editable diagram. Image descriptions supplement the visible labels. This set has not been published or tested in the native X composer.
+
+**Dataset credits.** Scores here use DialogPII, EuroPII, Greek DeID, MedDeID, NeonRedact-TR, newmean, pl-pii-bench, Tonic PrivacyBench. These datasets are under CC BY or other attribution licences. Creators, sources, licences and citations are in [benchmarks/DATASET_CREDITS.md](https://github.com/rhnfzl/SqueakyCleanText/blob/main/benchmarks/DATASET_CREDITS.md).

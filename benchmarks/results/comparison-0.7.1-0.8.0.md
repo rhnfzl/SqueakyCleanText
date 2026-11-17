@@ -182,3 +182,5 @@ Per script, default config (docs/s):
 | training | html | 1000 | 0.9 | 0.9 |
 | training | mojibake | 1000 | 99.5 | 99.5 |
 | training | url | 1000 | 100.0 | 100.0 |
+
+**Dataset credits.** Scores here use OpenPII, Nemotron-PII, IAHLT Arabic NER, Bayanat Arabic PII, Thai NER 2.2, Thai-PII-Synthetic, Naamapadam, MultiCoNER v2, Stockmark Japanese NER, WiLI-2018, FineWeb2. These datasets are under CC BY or other attribution licences. Creators, sources, licences and citations are in [benchmarks/DATASET_CREDITS.md](https://github.com/rhnfzl/SqueakyCleanText/blob/main/benchmarks/DATASET_CREDITS.md).

@@ -92,8 +92,14 @@ class Card:
         )
         ET.SubElement(cell, "mxGeometry", {"relative": "1", "as": "geometry"})
 
-    def footer(self, text):
-        self.text(text, 70, 1130, 1060, 190, size=36, color=MUTED)
+    def footer(self, text, credit=False):
+        if not credit:
+            self.text(text, 70, 1130, 1060, 190, size=36, color=MUTED)
+            return
+        self.text(text, 70, 1115, 1060, 175, size=36, color=MUTED)
+        # score cards: the datasets' CC BY licences ask for credit wherever their scores appear
+        self.text("Dataset credits: rhnfzl.github.io/SqueakyCleanText/dataset-credits", 70, 1295, 1060, 35, size=24,
+                  color=MUTED)
 
     def write(self, path):
         ET.indent(self.model)
@@ -172,7 +178,8 @@ def build(data: dict, output: Path) -> dict:
     card.footer(
         "Selection: 95% advantage interval above zero.\n"
         "Matched docs per pair; subsets vary.\nAny overlap counts, not complete redaction.\n"
-        "Unadjusted intervals. Full results: report."
+        "Unadjusted intervals. Full results: report.",
+        credit=True,
     )
     cards["03-shared-recall"] = card
     alt["03-shared-recall"] = (
@@ -206,7 +213,8 @@ def build(data: dict, output: Path) -> dict:
     )
     card.footer(
         "DATE excluded. Matched docs within each pair.\nPair subsets vary. Intervals are unadjusted.\n"
-        "Higher recall does not prove complete redaction."
+        "Higher recall does not prove complete redaction.",
+        credit=True,
     )
     cards["04-full-recall"] = card
     alt["04-full-recall"] = (
@@ -250,7 +258,8 @@ def build(data: dict, output: Path) -> dict:
             definition = "Exposure: at least one labelled letter\nor digit stays visible in a document."
         card.text(result, 70, 955, 1060, 70, size=44, bold=True)
         card.text(f"95% difference interval: {100 * lo:.1f} to {100 * hi:.1f} points", 70, 1030, 1060, 65, size=36)
-        card.footer(definition + "\nDataset means; same docs; DATE excluded.\nIntervals have no multiple-test correction.")
+        card.footer(definition + "\nDataset means; same docs; DATE excluded.\nIntervals have no multiple-test correction.",
+                    credit=True)
         cards[filename] = card
         alt[filename] = (
             f"SCT v0.8.2 default versus PII-Tracer, dataset averages on the same synthetic documents in eight datasets, "

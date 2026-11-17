@@ -14,7 +14,8 @@ if TYPE_CHECKING:
 _REPO = "https://github.com/rhnfzl/SqueakyCleanText/"
 _HREF = re.compile(r'href="' + re.escape(_REPO) + r'(?:blob|tree)/main/([^"#]+)(#[^"]*)?"')
 # repo path -> docs/ page; anything under docs/ maps to itself
-_PAGES = {"CHANGELOG.md": "changelog.md", "benchmarks": "benchmarks.md", "benchmarks/README.md": "benchmarks.md"}
+_PAGES = {"CHANGELOG.md": "changelog.md", "benchmarks": "benchmarks.md", "benchmarks/README.md": "benchmarks.md",
+          "benchmarks/DATASET_CREDITS.md": "dataset-credits.md"}
 
 
 def on_page_markdown(markdown: str, page: Page, **kwargs: object) -> str:

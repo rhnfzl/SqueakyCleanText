@@ -15,6 +15,7 @@ from pathlib import Path
 
 from benchmarks.compare import entries as registry
 from benchmarks.compare import scorer
+from benchmarks.datasets import credit_line
 
 TRACKS = ("default", "tuned")
 LOWER_IS_BETTER = {"doc_leak_rate", "char_survival", "overmask_rate"}
@@ -426,10 +427,14 @@ def tables(bundle: Path) -> str:
             lines += _track_sections(bundle, track, json.loads(path.read_text()))
     lines += ["", "## contamination (bold = excluded, italic = unknown, plain = clean)", "",
               *contamination_table(registry.ENTRIES)]
-    for name in ("speed-16t", "speed-16t-rss", "speed-1t", "speed-gpu"):
+    speeds = ("speed-16t", "speed-16t-rss", "speed-1t", "speed-gpu")
+    for name in speeds:
         path = bundle / name / "speed.json"
         if path.exists():
             lines += ["", f"## speed ({name})", "", *speed_table(json.loads(path.read_text()))]
+    scored = {p.stem.rsplit("-", 1)[0] for track in TRACKS for p in (bundle / track).glob("*/*-*.json")}
+    timed = any((bundle / n / "speed.json").exists() for n in speeds)
+    lines += credit_line(scored | ({"fineweb2"} if timed else set()))
     return "\n".join(lines).lstrip() + "\n"
 
 

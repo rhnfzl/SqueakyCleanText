@@ -130,6 +130,9 @@ by default, so `default` keeps emoji on purpose.
 | wili | lid | MartinThoma/wili_2018 (test) | 12c3a51 | ODbL-1.0 | scores + ids |
 | fineweb2 | speed, clean | HuggingFaceFW/fineweb-2 (test splits) | af9c133 | ODC-By-1.0 + CommonCrawl terms | scores + ids |
 
+Most of these datasets are under CC BY or other attribution licences, so every page or chart that shows their scores credits them.
+Creators, sources, licences and citations, for these and the round 2 sets: [DATASET_CREDITS.md](https://github.com/rhnfzl/SqueakyCleanText/blob/main/benchmarks/DATASET_CREDITS.md).
+
 Notes:
 
 - gretel gold comes from an LLM plus GLiNER, so its precision is a lower bound.
@@ -196,6 +199,8 @@ Add a tool:
 
 - Never commit dataset files or dataset text, not even small samples.
 - `scores-only` datasets publish aggregate scores only.
+- Every page or chart that shows scores of a dataset in `CREDITS` (`benchmarks/datasets/__init__.py`) links to
+  `DATASET_CREDITS.md`. `run.py` summaries and `compare/report.py` tables add the note themselves.
 - Score drops never block a release. Every drop is investigated and reported.
 - Never fix a score with a word list (see `AGENTS.md`).
 
@@ -209,4 +214,6 @@ Add a tool:
 2. Add its name to `MODULES` in `benchmarks/datasets/__init__.py` and to a suite in
    `benchmarks/run.py`.
 3. For PII data, add its label map to `DATASET_LABELS` in `benchmarks/labels.py`.
-4. Smoke-run it: `python -m benchmarks.run --suite pii --datasets <name> --n 3 --out benchmarks/.cache/smoke`.
+4. If its licence asks for credit (CC BY family, ODC-By, ODbL), add it to `CREDITS` in
+   `benchmarks/datasets/__init__.py` and a row to `benchmarks/DATASET_CREDITS.md`.
+5. Smoke-run it: `python -m benchmarks.run --suite pii --datasets <name> --n 3 --out benchmarks/.cache/smoke`.
