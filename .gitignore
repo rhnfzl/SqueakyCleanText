@@ -185,3 +185,8 @@ site/
 
 # desloppify local state
 .desloppify/
+
+# HTML artifacts (reports, chart exports) bloat the repo: keep them local.
+# To commit one on purpose: git add -f <file>
+*.html
+*.htm

@@ -728,3 +728,5 @@ run device cuda (gpu 3), cpus 0-15, threads 16, 1000 docs, 3 repeats, median; pe
 | gliner2-fastino | cuda | fail | fail | fail | fail | fail | fail | - | 6468.6 | 3 |
 | sct-gliner | cuda | fail | fail | fail | fail | fail | fail | - | 6835.6 | 3 |
 | sct-gliner-nvidia | cuda | fail | fail | fail | fail | fail | fail | - | 6835.6 | 3 |
+
+**Dataset credits.** Scores here use FineWeb2, newmean, DialogPII, KDPII, RedactionBench, Tonic PrivacyBench, MedDeID, Greek DeID, NeonRedact-TR, pl-pii-bench, EuroPII. These datasets are under CC BY or other attribution licences. Creators, sources, licences and citations are in [benchmarks/DATASET_CREDITS.md](https://github.com/rhnfzl/SqueakyCleanText/blob/main/benchmarks/DATASET_CREDITS.md).

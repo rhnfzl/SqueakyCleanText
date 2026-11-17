@@ -31,6 +31,29 @@ ROUND2 = (
 )
 MODULES = (*MODULES, *ROUND2)
 
+# Datasets whose licence asks for credit wherever their scores appear (CC BY family, ODC-By, ODbL; naamapadam
+# to be safe: its loader script says CC BY-NC). Display name -> details in benchmarks/DATASET_CREDITS.md.
+CREDITS_URL = "https://github.com/rhnfzl/SqueakyCleanText/blob/main/benchmarks/DATASET_CREDITS.md"
+CREDITS = {
+    "openpii": "OpenPII", "nemotron": "Nemotron-PII", "iahlt": "IAHLT Arabic NER", "bayanat": "Bayanat Arabic PII",
+    "thainer": "Thai NER 2.2", "thai_pii": "Thai-PII-Synthetic", "naamapadam": "Naamapadam",
+    "multiconer": "MultiCoNER v2", "stockmark": "Stockmark Japanese NER", "wili": "WiLI-2018", "fineweb2": "FineWeb2",
+    "dialogpii": "DialogPII", "kdpii": "KDPII", "europii": "EuroPII", "greek_deid": "Greek DeID", "meddeid": "MedDeID",
+    "neonredact": "NeonRedact-TR", "newmean": "newmean", "pl_pii": "pl-pii-bench", "redactionbench": "RedactionBench",
+    "tonic": "Tonic PrivacyBench",
+}
+
+
+def credit_line(names) -> list[str]:
+    """Markdown credit note for the datasets in *names* that need one (``[]`` if none), in MODULES order."""
+    names = set(names)
+    shown = [CREDITS[name] for name in MODULES if name in CREDITS and name in names]
+    if not shown:
+        return []
+    return ["", f"**Dataset credits.** Scores here use {', '.join(shown)}. These datasets are under CC BY or other "
+            f"attribution licences. Creators, sources, licences and citations are in "
+            f"[benchmarks/DATASET_CREDITS.md]({CREDITS_URL})."]
+
 
 def get(name: str):
     """Return the loader module for dataset *name*."""

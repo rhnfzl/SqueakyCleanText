@@ -15,6 +15,7 @@ import math
 from pathlib import Path
 
 TEAL, INK, MUTED, GRAY = "#087F8C", "#172B42", "#43566B", "#657487"
+CREDITS = "rhnfzl.github.io/SqueakyCleanText/dataset-credits"
 
 NAMES = {
     "pii-tracer": "PII-Tracer",
@@ -78,9 +79,11 @@ def canvas(title, subtitle, *, speed=False):
 def footer(fig, lines, *, speed=False):
     if not speed:
         lines += "\nGold languages supplied; fixed evaluation samples."
-    fig.text(0.065, 0.165, lines, va="top", fontsize=22, color=MUTED, linespacing=1.4)
+    fig.text(0.065, 0.18, lines, va="top", fontsize=22, color=MUTED, linespacing=1.4)
     source = "FineWeb-2 · 1,000 documents · 10 languages" if speed else "Fixed samples · other-tool versions from earlier run"
-    fig.text(0.065, 0.025, source, fontsize=20, color=MUTED)
+    fig.text(0.065, 0.042, source, fontsize=20, color=MUTED)
+    # the datasets' CC BY / ODC-By licences ask for credit wherever their scores appear
+    fig.text(0.065, 0.016, f"Dataset credits: {CREDITS}", fontsize=17, color=MUTED)
 
 
 def export(fig, output, name, alt):

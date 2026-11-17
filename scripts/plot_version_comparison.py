@@ -82,14 +82,15 @@ def render(root: Path, summary: dict) -> None:
         fig.update_layout(
             title={"text": title, "x": 0.04}, template="plotly_white", width=1200, height=height,
             font={"family": "Arial, sans-serif", "size": 17, "color": "#182536"},
-            margin={"l": 140, "r": 45, "t": 170, "b": 135},
+            margin={"l": 140, "r": 45, "t": 170, "b": 160},
             legend={"orientation": "h", "y": 1.10},
         )
-        fig.add_annotation(text=note, x=0, y=-0.22, xref="paper", yref="paper", showarrow=False,
+        # the datasets' CC BY / ODC-By / ODbL licences ask for credit wherever their scores appear
+        note += "<br>Dataset credits: rhnfzl.github.io/SqueakyCleanText/dataset-credits"
+        fig.add_annotation(text=note, x=0, y=-0.25, xref="paper", yref="paper", showarrow=False,
                            xanchor="left", align="left", font={"size": 14})
         for extension in ("png", "svg"):
             fig.write_image(output / f"{name}.{extension}", scale=2 if extension == "png" else 1)
-        fig.write_html(output / f"{name}.html", include_plotlyjs="cdn", div_id=f"sct-{name}")
 
     fig = go.Figure()
     for version, color in zip(VERSIONS, COLORS, strict=True):

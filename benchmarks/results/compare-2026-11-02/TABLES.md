@@ -961,3 +961,5 @@ device cpu, cpus 0, threads 1, 30 docs, 1 repeats, median; peak RSS from /proc V
 | gliner2-fastino | 7.162 | 1429 | 2.656e+04 | 0.156 | 208.5 | 4476 | 5402.3 | 0 |
 | sct-gliner | 7.553 | 2953 | 1.825e+04 | 0.145 | 193.1 | 5327 | 5769.2 | 0 |
 | gliner-nvidia | 8.377 | 5958 | 3.809e+04 | 0.025 | 33.4 | 1.757e+04 | 5388.7 | 0 |
+
+**Dataset credits.** Scores here use OpenPII, Nemotron-PII, IAHLT Arabic NER, Bayanat Arabic PII, Thai NER 2.2, Thai-PII-Synthetic, Naamapadam, MultiCoNER v2, Stockmark Japanese NER, FineWeb2. These datasets are under CC BY or other attribution licences. Creators, sources, licences and citations are in [benchmarks/DATASET_CREDITS.md](https://github.com/rhnfzl/SqueakyCleanText/blob/main/benchmarks/DATASET_CREDITS.md).

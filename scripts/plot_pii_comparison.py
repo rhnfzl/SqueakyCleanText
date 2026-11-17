@@ -86,7 +86,7 @@ def render(data: dict, output: Path) -> None:
         label_note = "Shared types: EMAIL, PHONE, NUMBER." if view == "shared" else "Full scored taxonomy; DATE excluded."
         fig.update_layout(template="plotly_white", width=1400, height=1050,
                           title={"text": title, "x": 0.03}, font={"family": "Arial, sans-serif", "size": 18},
-                          margin={"l": 205, "r": 70, "t": 195, "b": 250})
+                          margin={"l": 205, "r": 70, "t": 195, "b": 275})
         fig.add_annotation(x=0, y=-0.15, xref="paper", yref="paper", showarrow=False,
                            xanchor="left", yanchor="top", align="left",
                            font={"size": 15}, text=f"{label_note} Synthetic datasets only. Default track.<br>"
@@ -94,10 +94,10 @@ def render(data: dict, output: Path) -> None:
                            "Each row: same documents, clean sets, languages both claim; rows use different subsets.<br>"
                            "Points: macro differences. Whiskers: paired bootstrap 95% intervals.<br>"
                            "Intervals are not adjusted for multiple tests.<br>"
-                           "Tested SCT v0.8.2. Results do not measure v0.8.3. Source: round 2, 2026-11-04.")
+                           "Tested SCT v0.8.2. Results do not measure v0.8.3. Source: round 2, 2026-11-04.<br>"
+                           "Dataset credits (CC BY): rhnfzl.github.io/SqueakyCleanText/dataset-credits")
         for extension in ("png", "svg"):
             fig.write_image(output / f"{filename}.{extension}", scale=2 if extension == "png" else 1)
-        fig.write_html(output / f"{filename}.html", include_plotlyjs="cdn", div_id=f"sct-r2-{filename}")
 
 
 if __name__ == "__main__":

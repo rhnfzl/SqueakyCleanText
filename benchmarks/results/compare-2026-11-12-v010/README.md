@@ -99,3 +99,5 @@ python -m scripts.plot_pii_social_release \
 The script checks the recorded version and summary/timing hashes before drawing.
 Each chart has PNG, editable SVG, phone and grayscale exports in [visuals/](visuals/).
 The chart design follows [Karthik's visualization guidance](https://github.com/skthewimp/karthik-data-visualization-skill).
+
+**Dataset credits.** Scores here use DialogPII, KDPII, EuroPII, Greek DeID, MedDeID, NeonRedact-TR, newmean, pl-pii-bench, RedactionBench, Tonic PrivacyBench, FineWeb2. These datasets are under CC BY or other attribution licences. Creators, sources, licences and citations are in [benchmarks/DATASET_CREDITS.md](https://github.com/rhnfzl/SqueakyCleanText/blob/main/benchmarks/DATASET_CREDITS.md).

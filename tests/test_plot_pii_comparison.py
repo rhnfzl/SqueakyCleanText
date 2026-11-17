@@ -46,9 +46,8 @@ class PIIChartTests(unittest.TestCase):
 
         figures = []
         with tempfile.TemporaryDirectory() as folder, \
-             patch.object(go.Figure, "write_image"), \
-             patch.object(go.Figure, "write_html", autospec=True,
-                          side_effect=lambda fig, *args, **kwargs: figures.append(fig)):
+             patch.object(go.Figure, "write_image", autospec=True,
+                          side_effect=lambda fig, path, **kwargs: path.suffix == ".png" and figures.append(fig)):
             render(extract(SOURCE), Path(folder))
         self.assertEqual(len(figures), 3)
         for fig in figures:

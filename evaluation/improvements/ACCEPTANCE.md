@@ -14,7 +14,6 @@ Current records:
 - [Native profiles](v090-native-profiles-qualification.json) records document, secret, framework, corpus, storage and worker checks.
 - [Controlled baseline](v090-baseline-qualification.json) compares identical Python and dependency profiles without rewriting the release owner's historical record.
 - [Routing validation](routing-validation-v2.json) reconstructs saved observations without inference replay.
-- [Current roadmap](../../docs/human-html/2026-11-07-plan-sct-improvements-roadmap.html) presents the human review status.
 
 The v2 synthetic routing experiment passes its preset relative gates.
 Expensive calls fall from 750 to 690; median latency falls from 395.409 ms to 381.348 ms.

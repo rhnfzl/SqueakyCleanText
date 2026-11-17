@@ -111,3 +111,5 @@ Percentages. Strict = exact span + type. Partial = overlap + type. Masked R = ov
 | tr | 577 | 80.6 | 88.0 | 40.9 | 34.2 | 8.5 |
 | zh_cn | 632 | 88.1 | 95.9 | 46.5 | 48.5 | 1.3 |
 | zh_tw | 503 | 84.5 | 93.6 | 43.4 | 46.7 | 2.7 |
+
+**Dataset credits.** Scores here use OpenPII. These datasets are under CC BY or other attribution licences. Creators, sources, licences and citations are in [benchmarks/DATASET_CREDITS.md](https://github.com/rhnfzl/SqueakyCleanText/blob/main/benchmarks/DATASET_CREDITS.md).

@@ -281,3 +281,5 @@ Partial recall by start offset: 0-1000: 79.1 (1457), 1000-2000: 87.2 (1465), 200
 | training | rus_Cyrl (CYRILLIC) | 99 | 2.972 | 8939.1 |
 | training | rus_Cyrl (LATIN) | 1 | 2.382 | 6709.0 |
 | training | tha_Thai (THAI) | 100 | 2.79 | 6870.8 |
+
+**Dataset credits.** Scores here use OpenPII, Nemotron-PII, IAHLT Arabic NER, Bayanat Arabic PII, Thai NER 2.2, Thai-PII-Synthetic, Naamapadam, MultiCoNER v2, Stockmark Japanese NER, FineWeb2. These datasets are under CC BY or other attribution licences. Creators, sources, licences and citations are in [benchmarks/DATASET_CREDITS.md](https://github.com/rhnfzl/SqueakyCleanText/blob/main/benchmarks/DATASET_CREDITS.md).
