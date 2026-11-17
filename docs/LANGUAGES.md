@@ -4,7 +4,7 @@
 |---|---|
 | Language detection ([Lingua](https://github.com/pemistahl/lingua-py)) | all 75 languages below (`detect_all_languages=True`) |
 | NER models of their own | English, Dutch, German, Spanish |
-| Multilingual NER model (WikiNEural) | French, Portuguese, Italian, and the fallback for every other language |
+| Multilingual NER model (WikiNEural, CC BY-NC-SA 4.0, non-commercial research only) | French, Portuguese, Italian, and the fallback for every other language |
 | Stopwords (`stat_text`) | English, Dutch, German, Spanish; other languages use English |
 | Month names (dates) | English, Dutch, German, Spanish, French, Portuguese, Italian, plus `custom_month_names` |
 

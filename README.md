@@ -293,7 +293,7 @@ Test your own data or model with the evaluation harness ([docs/EVALUATION.md](ht
 
 ## Languages
 
-Language detection covers 75 languages. Full NER models cover English, Dutch, German and Spanish. The other languages use the multilingual WikiNEural model with the English model, or a model you bring with `ner_models`. Full list: [docs/LANGUAGES.md](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/LANGUAGES.md).
+Language detection covers 75 languages. Full NER models cover English, Dutch, German and Spanish. The other languages use the multilingual WikiNEural model with the English model, or a model you bring with `ner_models`. The WikiNEural model is CC BY-NC-SA 4.0, for non-commercial research only, and SCT loads it by default. [docs/NER_BACKENDS.md](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/NER_BACKENDS.md#model-licences) shows how to run without it. Full list: [docs/LANGUAGES.md](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/LANGUAGES.md).
 
 <!-- --8<-- [start:limits] -->
 ## Limits and design principles
