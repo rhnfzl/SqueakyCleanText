@@ -101,6 +101,44 @@ Nonempty `detector_specs` replaces the complete default detector set.
 Factories and credentials belong to trusted application code. Requests cannot supply executable factory imports.
 See [configuration](CONFIG.md) for network permission, source mapping and experimental routing.
 
+## Clean HTML fragments
+
+Use a unified cleaner with `html_fragment_adapter=True` to keep block and table cell boundaries in `lm_text`.
+SCT can then mask an email split by inline tags without joining text from separate cells.
+
+```python
+from sct import TextCleaner, TextCleanerConfig
+
+cleaner = TextCleaner(TextCleanerConfig(
+    pii_processing="unified",
+    html_fragment_adapter=True,
+    check_ner_process=False,
+))
+result = cleaner.process(
+    "<p>Email <b>contact</b>@example.test.</p>"
+    "<table><tr><td>Desk</td><td>Hours</td></tr></table>"
+)
+print(result.lm_text)
+# Email <EMAIL>.
+# Desk
+# Hours
+```
+
+The supported inline tags are `b`, `em`, `i`, `span`, and `strong`.
+The supported block tags are `div`, `p`, `table`, `tr`, `td`, and `th`.
+Use balanced tags with explicit closing tags. Rows must be direct children of `table`.
+Cells must be direct children of rows. Comments, declarations, self-closing tags, and elements such as `tbody` and `script` fall outside this subset.
+
+For a supported fragment, SCT removes tags and attributes and separates blocks and cells with line breaks.
+It skips the fixed HTML replacement and whitespace collapse for that fragment.
+Other normalization settings, detectors, and privacy rules still apply.
+For malformed or unsupported input, SCT discards the entire edit plan and uses the configured fixed pipeline.
+The adapter defaults to off. You can still use `replace_with_html=" "` for fixed tag replacement.
+
+In `result.metadata["findings_v2"]`, source ranges refer to the original HTML string.
+An email split by tags can have several exact Unicode code-point ranges.
+If Unicode repair changes alignment, SCT can report a broader `covering` range, including with `source_mapping="require_source"`.
+
 ## Document, corpus and token-store APIs
 
 | API | Result and boundary |

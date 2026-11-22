@@ -83,6 +83,7 @@ All new processing, language and routing defaults preserve the legacy path.
 |---|---|---|
 | `pii_processing` | `'legacy'` | `'unified'` detects on canonical text and applies one policy before rendering |
 | `source_mapping` | `'best_effort'` | `'require_source'` rejects opaque callbacks; covering mappings remain explicitly uncertain |
+| `html_fragment_adapter` | `False` | Enable the [HTML fragment adapter](API.md#clean-html-fragments) in unified processing |
 | `detector_specs` | `()` | Empty selects configured regex and native NER; nonempty replaces that complete selection |
 | `allow_network_detectors` | `False` | Unified mode rejects providers declaring network access without explicit permission |
 
@@ -98,7 +99,7 @@ Review marker-dependent callbacks before migration. Use policy or replacement co
 Opaque callbacks make source mapping unavailable, even if they return unchanged text.
 Document element projection rejects unavailable mappings.
 
-To restore legacy processing, set `pii_processing='legacy'`, clear detector and routing specs, and remove `unified_policy`, schemas and explicit contexts.
+To restore legacy processing, set `pii_processing='legacy'` and `html_fragment_adapter=False`. Clear detector and routing specs. Remove `unified_policy`, schemas, and explicit contexts.
 To restore legacy language selection, set `language_policy='legacy'` and clear both language thresholds.
 To stop experimental routing while keeping its detector groups, set `routing_policy='always_run'` and clear `routing_calibration`.
 That runs both configured groups. Empty groups restore the default detector selection.
