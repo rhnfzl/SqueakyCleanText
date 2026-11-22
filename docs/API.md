@@ -127,11 +127,13 @@ print(result.lm_text)
 The supported inline tags are `b`, `em`, `i`, `span`, and `strong`.
 The supported block tags are `div`, `p`, `table`, `tr`, `td`, and `th`.
 Use balanced tags with explicit closing tags. Rows must be direct children of `table`.
-Cells must be direct children of rows. Comments, declarations, self-closing tags, and elements such as `tbody` and `script` fall outside this subset.
+Cells must be direct children of rows.
+Comments, declarations, self-closing tags, attributes containing ampersands, and elements such as `tbody` and `script` fall outside this subset.
 
 For a supported fragment, SCT removes tags and attributes and separates blocks and cells with line breaks.
 It skips the fixed HTML replacement and whitespace collapse for that fragment.
-Other normalization settings, detectors, and privacy rules still apply.
+Unicode repair and symbol cleanup operate within each line to preserve the separators.
+Detectors and privacy rules still apply. A match that spans lines can replace those lines with a single mask.
 For malformed or unsupported input, SCT discards the entire edit plan and uses the configured fixed pipeline.
 The adapter defaults to off. You can still use `replace_with_html=" "` for fixed tag replacement.
 

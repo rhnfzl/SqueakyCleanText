@@ -42,6 +42,33 @@ def test_fragment_masks_split_email_and_preserves_cell_boundaries():
     ]
 
 
+@pytest.mark.parametrize(("left", "right"), [
+    ("deskKey[", "]@stock.test"),
+    ("deskKey\\", "@stock.test"),
+])
+def test_normalization_cannot_join_separate_cells(left, right):
+    html = f"<table><tr><td>{left}</td><td>{right}</td></tr></table>"
+    result = TextCleaner(config(html_fragment_adapter=True)).process(html)
+
+    assert result.lm_text == f"{left}\n{right}"
+    assert not result.metadata["findings_v2"]
+
+
+def test_isolated_letter_cleanup_keeps_layout():
+    html = "<p>Desk</p><p>B</p><p>Hours</p>"
+    result = TextCleaner(config(html_fragment_adapter=True)).process(html)
+
+    assert result.lm_text == "Desk\n\nHours"
+
+
+def test_fragment_preserves_existing_crlf_and_literal_ampersand():
+    html = "<p>AT&T account\r\nDesk</p><p>Hours</p>"
+
+    result = TextCleaner(config(html_fragment_adapter=True)).process(html)
+
+    assert result.lm_text == "AT&T account\r\nDesk\nHours"
+
+
 def test_fragment_reports_covering_map_when_unicode_repair_changes_alignment():
     html = (
         "<p>Cafe\u0301 &lt;i&gt; <i>Ｆinch</i>&#64;example.test done.</p>"
@@ -54,7 +81,7 @@ def test_fragment_reports_covering_map_when_unicode_repair_changes_alignment():
     finding, = result.metadata["findings_v2"]
     assert finding["mapping_quality"] == "covering"
     assert finding["source_ranges"] == [
-        {"start": 3, "end": 19}, {"start": 22, "end": 27}, {"start": 31, "end": 100},
+        {"start": 3, "end": 19}, {"start": 22, "end": 27}, {"start": 31, "end": html.index("</p>")},
     ]
 
 
@@ -69,6 +96,11 @@ def test_fragment_reports_covering_map_when_unicode_repair_changes_alignment():
     "<table><td>wrong parent</td></table>",
     "<p><div>wrong parent</div></p>",
     "<p>Good</p><!unsupported>",
+    "<p>Good</p><p>Glyph &#65 again</p>",
+    "<p>Good</p><p>Glyph &#x;</p>",
+    "<p>Good</p><p title='&#65'>Other</p>",
+    "<p>Good</p><p>Glyph &#x110000;</p>",
+    "<p>Good</p><p>Glyph &chips;</p>",
     "Plain input  with a@example.test",
 ])
 @pytest.mark.parametrize("replace_html", [True, False])

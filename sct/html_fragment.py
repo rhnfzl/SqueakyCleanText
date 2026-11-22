@@ -1,6 +1,7 @@
 """Prepare raw HTML fragment edits without transforming text or assigning provenance."""
 
 import re
+from html.entities import html5
 from html.parser import HTMLParser
 
 _INLINE = frozenset({"b", "em", "i", "span", "strong"})
@@ -58,7 +59,10 @@ class _FragmentParser(HTMLParser):
         ):
             raise _UnsupportedFragment
         raw = self.get_starttag_text()
-        if raw is None or not _START_TAG.fullmatch(raw) or len({name for name, _ in attrs}) != len(attrs):
+        if (
+            raw is None or "&" in raw or not _START_TAG.fullmatch(raw)
+            or len({name for name, _ in attrs}) != len(attrs)
+        ):
             raise _UnsupportedFragment
         self._tag(tag, raw)
         self.stack.append(tag)
@@ -71,22 +75,31 @@ class _FragmentParser(HTMLParser):
         self.stack.pop()
 
     def handle_data(self, data):
-        if "<" in data or "\x00" in data:
+        if "<" in data or "\x00" in data or "&#" in data:
             raise _UnsupportedFragment
-        if self.stack and self.stack[-1] in _TABLE_CONTAINERS and data.strip():
+        self._consume_text(data)
+
+    def _consume_text(self, data: str) -> None:
+        if self.stack and self.stack[-1] in _TABLE_CONTAINERS and data.strip(" \t\r\n\f"):
             raise _UnsupportedFragment
         self._consume(data)
 
     def handle_entityref(self, name):
-        self._reference("&" + name)
+        raw = "&" + name
+        terminated = self.source.startswith(";", self.cursor + len(raw))
+        if terminated != (name + ";" in html5):
+            raise _UnsupportedFragment
+        self.handle_data(raw + ";" if terminated else raw)
 
     def handle_charref(self, name):
-        self._reference("&#" + name)
-
-    def _reference(self, raw: str) -> None:
-        if self.source.startswith(";", self.cursor + len(raw)):
-            raw += ";"
-        self.handle_data(raw)
+        hexadecimal = name[:1].lower() == "x"
+        digits = (name[1:] if hexadecimal else name).lstrip("0")
+        if not digits or len(digits) > 7:
+            raise _UnsupportedFragment
+        number = int(digits, 16 if hexadecimal else 10)
+        if number > 0x10FFFF or 0xD800 <= number <= 0xDFFF:
+            raise _UnsupportedFragment
+        self._consume_text("&#" + name + ";")
 
     def _reject(self, *args):
         raise _UnsupportedFragment
