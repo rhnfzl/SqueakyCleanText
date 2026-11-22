@@ -8,7 +8,8 @@ from sct.detectors import (
 )
 from sct.policy_v2 import UnifiedPrivacyPolicy, HandlingRule, FindingDecision
 from sct.documents import (
-    DocumentElement, DocumentExtractor, ExtractedDocument, ProcessedDocument, clean_document, extract_document,
+    CapableDocumentExtractor, DocumentElement, DocumentExtractionRouter, DocumentExtractor, DocumentOutput,
+    ExtractedDocument, ProcessedDocument, clean_document, extract_document,
 )
 from sct.findings import Detection, DetectionContext, TextRange
 from sct.schema import FieldRule, FieldSchema
@@ -65,7 +66,8 @@ from sct.utils.process_result import ProcessResult
 
 __version__ = "0.11.0"
 __all__ = [
-    "DocumentElement", "DocumentExtractor", "ExtractedDocument", "ProcessedDocument", "clean_document", "extract_document",
+    "CapableDocumentExtractor", "DocumentElement", "DocumentExtractionRouter", "DocumentExtractor", "DocumentOutput",
+    "ExtractedDocument", "ProcessedDocument", "clean_document", "extract_document",
     "ChunkBudgetError", "ChunkRequest", "Chunker", "ChunkerRegistry", "ChunkingPolicy", "ChunkingRule",
     "ChunkedDocument", "CleanedChunk", "chunk_document", "DetectorWindowLimits",
     "UnifiedPrivacyPolicy", "HandlingRule", "FindingDecision", "Detection", "DetectionContext", "TextRange",

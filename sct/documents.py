@@ -1,6 +1,7 @@
 """Clean extracted document text while preserving safe layout provenance."""
 from __future__ import annotations
 
+from collections.abc import Mapping, Set
 from dataclasses import dataclass, field
 import math
 from pathlib import Path
@@ -120,6 +121,64 @@ def extract_document(path: Path, *, provider: DocumentExtractor) -> ExtractedDoc
     except Exception:
         raise ValueError('Document extraction failed; check the provider and local artifacts') from None
     return result
+
+
+DocumentOutput = Literal['text', 'ocr', 'tables', 'coordinates']
+
+
+class CapableDocumentExtractor(DocumentExtractor, Protocol):
+    @property
+    def capabilities(self) -> Mapping[str, frozenset[DocumentOutput]]: ...
+
+
+class DocumentExtractionRouter:
+    """Use compatible extractors in caller order for one declared format."""
+
+    def __init__(
+        self,
+        *,
+        format: str,
+        required: Set[DocumentOutput],
+        providers: Mapping[str, CapableDocumentExtractor],
+        fallback: bool,
+        pin: str | None = None,
+    ) -> None:
+        if type(format) is not str or not format.strip() or type(fallback) is not bool:
+            raise ValueError('Document routing requires a format and a boolean fallback policy')
+        self._required = frozenset(required)
+        if ('text' not in self._required
+                or not self._required <= {'text', 'ocr', 'tables', 'coordinates'}):
+            raise ValueError('Document routing requires text and supports ocr, tables and coordinates')
+        compatible = tuple(
+            provider for name, provider in providers.items()
+            if (pin is None or name == pin)
+            and self._required <= provider.capabilities.get(format, frozenset())
+        )
+        if not compatible:
+            if pin is not None:
+                raise ValueError('Pinned document extractor is unavailable or incompatible')
+            raise ValueError('No document extractor matches the format and required output')
+        self._providers = compatible if fallback and pin is None else compatible[:1]
+
+    def extract(self, path: Path) -> ExtractedDocument:
+        for provider in self._providers:
+            try:
+                document = extract_document(path, provider=provider)
+                self._check_required_structure(document)
+            except ValueError:
+                continue
+            return document
+        raise ValueError('No compatible document extractor produced the required output')
+
+    def _check_required_structure(self, document: ExtractedDocument) -> None:
+        for element in document.elements:
+            if 'coordinates' in self._required:
+                box = element.bbox
+                if element.page is None or box is None or box[0] >= box[2] or box[1] >= box[3]:
+                    raise ValueError('Required document coordinates are missing')
+            if ('tables' in self._required and element.kind == 'table_cell'
+                    and (element.cell is None or element.table is None)):
+                raise ValueError('Required table cell structure is missing')
 
 
 def clean_document(document: ExtractedDocument, cleaner: TextCleaner) -> ProcessedDocument:
