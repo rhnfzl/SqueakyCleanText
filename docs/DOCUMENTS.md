@@ -12,7 +12,10 @@ OCR and detection can miss sensitive text. Review outputs before sharing them.
 
 Install `pip install 'SqueakyCleanText[documents]'`.
 The adapter requires Docling 2.148.0 and an explicit local artifact directory.
-Normal extraction does not download models or call remote services.
+Normal extraction uses the prepared local models and disables Docling remote services.
+For offline runtime, set `ORT_DISABLE_TELEMETRY=1` before starting Python.
+This disables telemetry in supported [ONNX Runtime builds](https://github.com/microsoft/onnxruntime/blob/main/docs/Privacy.md).
+Block process network access when the environment requires it.
 Missing or changed assets fail before converter construction.
 
 Run setup separately with explicit download permission:
@@ -66,6 +69,89 @@ Placeholder and synthetic modes support cross-element replacements with proven s
 Bounded separator normalization also supports cross-element placeholders and synthetic replacements.
 Opaque callbacks and ambiguous cross-element normalization fail instead of guessing provenance.
 Disable unsupported transforms or use the ordinary whole-text API when layout projection is unnecessary.
+
+## Choose an extractor explicitly
+
+Use `DocumentExtractionRouter` when your application supplies several extractors.
+Each router declares one input format and one set of required outputs.
+The router checks provider capabilities in the order you give it, then passes the original path to the first match.
+It uses the exact format key you supply. Validate the input format in your application or provider.
+
+Standard Docling remains the reference for PDFs that need OCR, table structure or required coordinates.
+This example lists the native provider first so the same list can serve a separate text-only policy.
+The required outputs make only standard Docling eligible for the first request.
+
+```python
+from pathlib import Path
+
+from sct import DocumentExtractionRouter, extract_document
+from sct.integrations.docling import DoclingExtractor, DoclingNativeExtractor
+
+providers = {
+    'native': DoclingNativeExtractor(),
+    'standard': DoclingExtractor(artifacts_path=Path('private-document-models')),
+}
+
+layout = DocumentExtractionRouter(
+    format='pdf',
+    required={'text', 'ocr', 'tables', 'coordinates'},
+    providers=providers,
+    fallback=False,
+)
+document = extract_document(Path('private-input.pdf'), provider=layout)
+
+# Use this policy only when your caller accepts the native text layer alone.
+native_text = DocumentExtractionRouter(
+    format='pdf', required={'text'}, providers=providers, fallback=False, pin='native',
+)
+text_document = extract_document(Path('trusted-native-input.pdf'), provider=native_text)
+```
+
+- `text` is required for every policy. The output is an `ExtractedDocument`.
+- `ocr` requires a provider that supports reading raster text.
+- `tables` requires a provider that supports table extraction. Every returned table cell must have a table ID and cell span.
+- `coordinates` requires a page number and positive-area box for every returned element. Add it with `tables` to require cell boxes.
+- `fallback=True` tries the next compatible provider after an extraction or output validation error. Every fallback receives the same input.
+- `pin` selects a named compatible provider. The router tries only that provider, even with `fallback=True`.
+
+Provider declarations qualify a route. They cannot prove complete extraction, correct order, or detection of every table.
+A blank result can be valid. A page can legitimately have no table cells. Neither condition triggers fallback.
+If the format and required outputs have no compatible provider, router construction raises `ValueError` before reading the input.
+
+The native adapter needs the same pinned `documents` extra and uses the PDF text layer without model assets.
+It can omit raster text from scans and mixed pages. It can flatten table text into ordinary lines.
+It may return positions for those lines, but only advertises `text`.
+Use standard Docling when a selectable text layer might coexist with an image that contains sensitive text.
+
+### Plug in another format
+
+A router provider implements `DocumentExtractor.extract(path)` and exposes a `capabilities` mapping.
+Each key names a supported format. Each value is a frozen set of the supported outputs for that format.
+Existing providers can still be passed directly to `extract_document`.
+
+```python
+import json
+from pathlib import Path
+
+from sct import DocumentElement, DocumentExtractionRouter, DocumentOutput, ExtractedDocument, extract_document
+
+class JsonLines:
+    capabilities: dict[str, frozenset[DocumentOutput]] = {'contacts/json': frozenset({'text'})}
+
+    def extract(self, path: Path) -> ExtractedDocument:
+        lines = json.loads(path.read_text(encoding='utf-8'))
+        return ExtractedDocument(tuple(
+            DocumentElement(f'e{i}', line) for i, line in enumerate(lines)
+        ))
+
+router = DocumentExtractionRouter(
+    format='contacts/json', required={'text'}, providers={'json': JsonLines()}, fallback=False,
+)
+contacts = extract_document(Path('contacts.json'), provider=router)
+```
+
+Pass either result to the same cleaning and chunking APIs.
+The router preserves the returned elements, their order, and the source ranges derived from them.
 
 ## Protocol and output
 

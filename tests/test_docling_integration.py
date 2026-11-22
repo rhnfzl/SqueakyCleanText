@@ -3,6 +3,7 @@ from dataclasses import asdict, replace
 import importlib.util
 import json
 from pathlib import Path
+import re
 
 import pytest
 
@@ -139,7 +140,8 @@ def test_artifact_setup_requires_explicit_permission(tmp_path):
     assert not (tmp_path / 'new').exists()
 
 
-def test_native_docling_pdf_offline(tmp_path, monkeypatch, caplog):
+@pytest.fixture
+def offline_docling_assets(monkeypatch):
     import importlib.metadata
     import os
     import socket
@@ -154,7 +156,6 @@ def test_native_docling_pdf_offline(tmp_path, monkeypatch, caplog):
         if required:
             pytest.fail('The documents profile requires explicit SCT_DOCLING_ARTIFACTS')
         pytest.skip('Select verified local PDF artifacts explicitly')
-    from sct.integrations.docling import DoclingExtractor
     import docling.document_converter
     assert importlib.metadata.version('docling') == '2.148.0'
     assert Path(docling.document_converter.__file__).resolve().is_relative_to(Path(sys.prefix).resolve())
@@ -164,6 +165,16 @@ def test_native_docling_pdf_offline(tmp_path, monkeypatch, caplog):
         raise AssertionError('Network access is forbidden during offline PDF conversion')
     monkeypatch.setattr(socket, 'create_connection', denied)
     monkeypatch.setattr(socket.socket, 'connect', denied)
+    yield Path(assets)
+    assert not network_attempts
+
+
+def test_native_docling_pdf_offline(tmp_path, monkeypatch, caplog, offline_docling_assets):
+    import docling.document_converter
+    import importlib.metadata
+    from sct.integrations.docling import DoclingExtractor
+
+    assets = offline_docling_assets
     fixture = Path(__file__).parent / 'fixtures/documents/pii-layout.pdf'
     source = tmp_path / 'private-source@example.com.pdf'
     source.write_bytes(fixture.read_bytes())
@@ -225,10 +236,10 @@ def test_native_docling_pdf_offline(tmp_path, monkeypatch, caplog):
     manifest['files'][next(iter(manifest['files']))] = '0' * 64
     (tampered / 'sct-artifacts.json').write_text(json.dumps(manifest))
     with monkeypatch.context() as patch:
-        patch.setattr(docling.document_converter, 'DocumentConverter', denied)
+        patch.setattr(docling.document_converter, 'DocumentConverter',
+                      lambda **_: pytest.fail('Invalid assets reached converter construction'))
         with pytest.raises(ValueError, match='artifacts'):
             DoclingExtractor(artifacts_path=tampered).extract(source)
-    assert not network_attempts
     print(json.dumps({'docling': importlib.metadata.version('docling'),
                       'source': docling.document_converter.__file__, 'pages': 3,
                       'elements': len(result.elements), 'table_cells': len(cells)}))
@@ -444,3 +455,143 @@ def test_element_and_root_container_subclasses_are_rejected():
         Document(elements)
     with pytest.raises(ValueError):
         Document((SourceElement('e0', 'private@example.com'),))
+
+
+def test_docling_routes_advertise_distinct_capabilities():
+    from sct.integrations.docling import DoclingExtractor, DoclingNativeExtractor
+
+    assert DoclingExtractor.capabilities == {'pdf': {'text', 'ocr', 'tables', 'coordinates'}}
+    assert DoclingNativeExtractor.capabilities == {'pdf': {'text'}}
+
+
+def _pdf_router_gold(name):
+    if name == 'native-single':
+        return [
+            ('Synthetic contact sheet', 72, 60, None), ('Alex', 72, 135, None),
+            ('Example', 72, 170, None), ('native@example.com', 72, 215, None),
+            ('End of contact sheet', 72, 707, None),
+        ]
+    if name == 'pure-scan':
+        return [('Only a scanned page', 62, 102, None), ('raster@example.com', 62, 154, None)]
+    if name == 'mixed-holdout':
+        return [
+            ('Selectable correspondence', 72, 57, None), ('selectable@example.com', 72, 124, None),
+            ('embedded@example.com', 72, 213, None),
+        ]
+    # Gold from the fixture drawing positions, not provider output.
+    rows = [
+        ('Department', 'Contact', 'Status'),
+        ('Operations', 'first@example.com', 'Current'),
+        ('Support', 'second@example.com', 'Pending'),
+        ('Research', 'third@example.com', 'Current'),
+        ('Finance', 'fourth@example.com', 'Pending'),
+    ]
+    gold = [('Synthetic contact register', 72, 62, None)]
+    merged = name == 'merged'
+    if merged:
+        gold.append(('Merged contacts', 80, 163, (0, 1, 0, 3)))
+    for row, values in enumerate(rows[:4] if merged else rows, start=int(merged)):
+        for column, value in enumerate(values):
+            gold.append((value, (80, 230, 455)[column], 163 + (40 if merged else 32) * row,
+                         (row, row + 1, column, column + 1)))
+    return gold
+
+
+def _pdf_router_checks(document, gold):
+    text, ranges = document.text, document.source_ranges
+    elements = document.elements
+    assert [text[start:end] for start, end in ranges] == [e.text for e in elements]
+    next_offset = 0
+    order_ok = True
+    missing_text, missing_boxes, missing_cells = [], [], []
+    for index, (value, left, top, cell) in enumerate(gold):
+        offset = text.find(value, next_offset)
+        if offset < 0:
+            order_ok = False
+            missing_text.append(index)
+            continue
+        next_offset = offset + len(value)
+        element = next(e for e, (start, end) in zip(elements, ranges, strict=True)
+                       if start <= offset and next_offset <= end)
+        assert element.page == 1
+        if element.bbox:
+            x0, y0, x1, y1 = element.bbox
+            assert 0 <= x0 < x1 <= 612 and 0 <= y0 < y1 <= 792
+        if not element.bbox or abs(element.bbox[0] - left) > 12 or abs(element.bbox[1] - top) > 12:
+            missing_boxes.append(index)
+        if cell is not None and (element.kind, element.table, element.cell) != ('table_cell', 0, cell):
+            missing_cells.append(index)
+    return dict(missing_text=missing_text, order=order_ok, missing_boxes=missing_boxes, missing_cells=missing_cells)
+
+
+@pytest.mark.parametrize('name', ['native-single', 'pure-scan', 'mixed-holdout', 'borderless', 'merged'])
+def test_pdf_router_fixture_conformance(name, offline_docling_assets):
+    from sct import DocumentExtractionRouter, clean_document, extract_document
+    from sct.integrations.docling import DoclingExtractor, DoclingNativeExtractor
+
+    path = Path(__file__).parent / 'fixtures/documents/router' / f'{name}.pdf'
+    original = path.read_bytes()
+    providers = {'native': DoclingNativeExtractor(), 'standard': DoclingExtractor(artifacts_path=offline_docling_assets)}
+    structured = DocumentExtractionRouter(format='pdf', providers=providers, fallback=True,
+                                          required={'text', 'ocr', 'tables', 'coordinates'})
+    native = DocumentExtractionRouter(format='pdf', providers=providers, fallback=False,
+                                      required={'text'}, pin='native')
+    with pytest.raises(ValueError, match='Pinned'):
+        DocumentExtractionRouter(format='pdf', providers=providers, fallback=True,
+                                 required={'text', 'ocr'}, pin='native')
+    expected = _pdf_router_gold(name)
+    control = extract_document(path, provider=providers['standard'])
+    routed = extract_document(path, provider=structured)
+    text_only = extract_document(path, provider=native)
+    assert routed == control
+
+    class Names:
+        capabilities = DetectorCapabilities('fixture', entity_types=('PERSON',))
+
+        def detect(self, text, *, language, context):
+            match = re.search(r'\bAlex\s+Example\b', text)
+            return (Detection('PERSON', *match.span(), 'fixture', .9, 'canonical'),) if match else ()
+
+    registry = DetectorRegistry()
+    registry.register('fixture', lambda *_: Names())
+    config = replace(cleaner().cfg, replacement_mode='placeholder',
+                     detector_specs=(DetectorSpec('builtin_regex'), DetectorSpec('fixture')))
+    text_cleaner = TextCleaner(config, detector_registry=registry)
+    checks = {}
+    for label, document in [('standard', control), ('routed', routed), ('native', text_only)]:
+        assessment = _pdf_router_checks(document, expected)
+        processed = clean_document(document, text_cleaner)
+        emails = [value for value, *_ in expected if '@' in value and value in document.text]
+        assert processed.text.count('<EMAIL>') == len(emails)
+        assert all(email not in processed.text for email in emails)
+        assert processed.element_ids == tuple(e.id for e in document.elements)
+        assert [(e.page, e.bbox, e.cell, e.table) for e in processed.elements] == [
+            (e.page, e.bbox, e.cell, e.table) for e in document.elements]
+        if name == 'native-single':
+            assert '<PERSON>' in processed.text and 'Alex' not in processed.text and 'Example' not in processed.text
+        checks[label] = assessment | {'redacted_emails': len(emails)}
+    print(json.dumps({'fixture': name, 'checks': checks}))
+    assessment = checks['standard']
+    assert not assessment['missing_text'] and assessment['order']
+    if name == 'borderless' and all(e.kind == 'text' for e in control.elements):
+        # The Linux provider can flatten the whole borderless table into a text block.
+        assert assessment['missing_cells'] == list(range(1, len(expected)))
+        assert assessment['missing_boxes'] == list(range(2, len(expected)))
+    else:
+        assert not assessment['missing_cells']
+        shared_box_misses = {'pure-scan': {1}, 'native-single': {2}}
+        assert set(assessment['missing_boxes']) <= shared_box_misses.get(name, set())
+        if name == 'native-single' and assessment['missing_boxes']:
+            assert any(e.text == 'Alex Example' and e.bbox and e.bbox[1] <= 170 <= e.bbox[3]
+                       for e in control.elements)
+    if name == 'native-single':
+        assert not checks['native']['missing_text'] and checks['native']['order']
+        assert not checks['native']['missing_boxes']
+    elif name == 'pure-scan':
+        assert checks['native']['missing_text'] == [0, 1]
+    elif name == 'mixed-holdout':
+        assert checks['native']['missing_text'] == [2]
+    else:
+        assert not checks['native']['missing_text'] and checks['native']['order']
+        assert checks['native']['missing_cells'] == list(range(1, len(expected)))
+    assert path.read_bytes() == original

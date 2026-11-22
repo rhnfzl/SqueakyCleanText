@@ -63,6 +63,7 @@ Opt-in capability contract:
 - include_entities=True adds sensitive findings_v2_values. Reversible output retains personal data in anon_map or an opaque anon_map_reference.
 - `EncryptedSQLiteTokenStore` from sct.token_stores needs the token-store extra and application-owned scope, keys, authorization and retention.
 - `extract_document`/`clean_document` protect extracted PDF text with prepared local Docling assets. Original binaries remain unchanged and sensitive.
+- Pass `DocumentExtractionRouter` to `extract_document` to declare format, required outputs, provider order, and fallback. Native Docling requires an explicit text-only policy.
 - `sct.corpus.analyse_records`/`select_records` use report-only defaults. Applying removal requires an explicit pre_pii or pii_normalized basis.
 - SCT candidate dedup confirms exact Jaccard similarity; native DataTrove uses approximate buckets. Their signatures are not interchangeable.
 - `sct.corpus.curate_resumable` validates identities/checksums and replays incomplete stages. No exactly-once or distributed-coordination claim.

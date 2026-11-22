@@ -4,6 +4,28 @@ Benchmark scores below use open datasets credited in [benchmarks/DATASET_CREDITS
 
 ## Unreleased
 
+## 0.12.0 - 2026-11-22
+
+Choose which extractor reads a document before SCT cleans it.
+Declare the input format and the outputs your workflow requires.
+Set provider order and fallback, or pin one compatible provider.
+Use the native PDF text layer when your workflow accepts text-only extraction.
+Use standard Docling when you need OCR, table structure, or required coordinates.
+Existing extraction and cleaning calls keep their defaults. There are no breaking changes.
+
+### Added
+
+- `DocumentExtractionRouter` accepts caller-supplied providers, including providers for formats other than PDF.
+- `DoclingNativeExtractor` reads the native PDF text layer without local model assets.
+- The documents guide shows explicit PDF policies and a JSON provider example.
+
+### Qualification and limits
+
+- SCT redacted all 11 expected emails on five synthetic PDFs extracted with standard Docling on macOS. It preserved all 28 expected table cells.
+- The pure scan email shared a block-level box with the title. Native extraction omitted scanned text and table cell structure.
+- In Linux CI, standard Docling and the router both retained the borderless table text and redacted its four emails. Neither returned its 15 cells. Both preserved the merged table's 13 cells.
+- The study measured warm extraction on native prose. Cold latency and real-world PDF coverage remain unmeasured.
+
 ## 0.11.0 - 2026-11-22
 
 Clean a full document and produce chunks for search, training, or export.
