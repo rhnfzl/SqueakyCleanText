@@ -33,3 +33,17 @@ Each version in `CHANGELOG.md` starts with a short summary (5-10 lines) before i
 `###` heading, written for users, not developers: what they get and why it matters, and one
 line on breaking changes. The publish workflow puts only this summary, plus a link to the
 full changelog, on the GitHub release page. Keep all detail in the `###` sections.
+
+## One-minute GitHub CI budget
+
+The goal is a maximum of 60 seconds from the first required PR workflow entering
+GitHub's queue until the last required check completes. Include queue time,
+runner setup, and every required workflow in the measurement.
+
+For changes that affect CI or test runtime, compare equivalent full GitHub runs.
+Record the slowest required job and the time above budget. Keep test coverage,
+release safeguards, and standard GitHub Free runners.
+
+Keep the budget advisory while the full gate exceeds 60 seconds. Measure
+representative code changes, including optional checks and cold caches. Once
+those runs meet the budget, add a required check that blocks merges over 60 seconds.
