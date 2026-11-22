@@ -135,7 +135,7 @@ if __name__ == "__main__":
 
 | Where | Usage | Docs |
 |---|---|---|
-| PDF extraction | `extract_document` and `clean_document` | [DOCUMENTS](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/DOCUMENTS.md) |
+| PDF extraction | `extract_document` and `clean_document`, with an optional `DocumentExtractionRouter` | [DOCUMENTS](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/DOCUMENTS.md) |
 | Clean and chunk a document | `chunk_document(cleaner, text, max_size=1024)` | [CHUNKING](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/CHUNKING.md) |
 | LangChain | `SCTDocumentTransformer().transform_documents(docs)` | [INTEGRATIONS](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/INTEGRATIONS.md) |
 | Haystack | `pipe.add_component("sct", SCTDocumentCleaner())` | [INTEGRATIONS](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/INTEGRATIONS.md) |
@@ -337,7 +337,7 @@ The original documents and private corpus checkpoints remain caller-owned sensit
 | Encrypted references | `EncryptedSQLiteTokenStore` from `sct.token_stores`; keys and authorization remain application-owned |
 | Corpus selection | `analyse_records` and `select_records` from `sct.corpus`; report-only by default, explicit basis required for removal |
 | Native replay | `curate_resumable`; identity/checksum validation and private checkpoints, without exactly-once guarantees |
-| PDF extraction | `extract_document` and `clean_document`; prepared local Docling assets, extracted-text protection only |
+| PDF extraction | `extract_document` and `clean_document`; optional `DocumentExtractionRouter`; extracted-text protection only |
 | Credential formats | Optional `secrets` detector; four syntactic categories, not credential validity |
 | Language uncertainty | `language_policy='abstain'`; explicit thresholds and unknown-language action |
 | Detector routing | `routing_policy='always_run'` stays default; calibrated cascade remains experimental |
