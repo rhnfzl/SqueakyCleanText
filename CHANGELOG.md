@@ -21,8 +21,9 @@ Existing extraction and cleaning calls keep their defaults. There are no breakin
 
 ### Qualification and limits
 
-- SCT redacted all 11 expected emails and preserved all 28 expected table cells on five synthetic PDFs extracted with standard Docling.
+- SCT redacted all 11 expected emails on five synthetic PDFs extracted with standard Docling on macOS. It preserved all 28 expected table cells.
 - The pure scan email shared a block-level box with the title. Native extraction omitted scanned text and table cell structure.
+- In Linux CI, standard Docling and the router both retained the borderless table text and redacted its four emails. Neither returned its 15 cells. Both preserved the merged table's 13 cells.
 - The study measured warm extraction on native prose. Cold latency and real-world PDF coverage remain unmeasured.
 
 ## 0.11.0 - 2026-11-22

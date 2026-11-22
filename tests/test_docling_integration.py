@@ -3,6 +3,7 @@ from dataclasses import asdict, replace
 import importlib.util
 import json
 from pathlib import Path
+import re
 
 import pytest
 
@@ -548,9 +549,8 @@ def test_pdf_router_fixture_conformance(name, offline_docling_assets):
         capabilities = DetectorCapabilities('fixture', entity_types=('PERSON',))
 
         def detect(self, text, *, language, context):
-            marker = 'Alex\nExample'
-            offset = text.find(marker)
-            return (Detection('PERSON', offset, offset + len(marker), 'fixture', .9, 'canonical'),) if offset >= 0 else ()
+            match = re.search(r'\bAlex\s+Example\b', text)
+            return (Detection('PERSON', *match.span(), 'fixture', .9, 'canonical'),) if match else ()
 
     registry = DetectorRegistry()
     registry.register('fixture', lambda *_: Names())
@@ -571,12 +571,19 @@ def test_pdf_router_fixture_conformance(name, offline_docling_assets):
             assert '<PERSON>' in processed.text and 'Alex' not in processed.text and 'Example' not in processed.text
         checks[label] = assessment | {'redacted_emails': len(emails)}
     print(json.dumps({'fixture': name, 'checks': checks}))
-    for label in ('standard', 'routed'):
-        assessment = checks[label]
-        assert not assessment['missing_text'] and assessment['order']
+    assessment = checks['standard']
+    assert not assessment['missing_text'] and assessment['order']
+    if name == 'borderless' and all(e.kind == 'text' for e in control.elements):
+        # The Linux provider can flatten the whole borderless table into a text block.
+        assert assessment['missing_cells'] == list(range(1, len(expected)))
+        assert assessment['missing_boxes'] == list(range(2, len(expected)))
+    else:
         assert not assessment['missing_cells']
-        # Both paths may group the scan title and email into one box.
-        assert set(assessment['missing_boxes']) <= ({1} if name == 'pure-scan' else set())
+        shared_box_misses = {'pure-scan': {1}, 'native-single': {2}}
+        assert set(assessment['missing_boxes']) <= shared_box_misses.get(name, set())
+        if name == 'native-single' and assessment['missing_boxes']:
+            assert any(e.text == 'Alex Example' and e.bbox and e.bbox[1] <= 170 <= e.bbox[3]
+                       for e in control.elements)
     if name == 'native-single':
         assert not checks['native']['missing_text'] and checks['native']['order']
         assert not checks['native']['missing_boxes']
