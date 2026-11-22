@@ -4,6 +4,21 @@ Benchmark scores below use open datasets credited in [benchmarks/DATASET_CREDITS
 
 ## Unreleased
 
+## 0.11.0 - 2026-11-22
+
+Clean a full document and produce chunks for search, training, or export.
+Keep cleaned-text offsets and the IDs of contributing document elements.
+Choose a separate windowing strategy for compatible PII detectors.
+Select providers by language, format, or length with optional routing rules.
+Use SCT splitters, optional Semchunk and Chonkie, or an application adapter.
+Existing pipelines keep their detector behavior until chunking is configured.
+
+### Added
+
+- Cleaned-document chunking for plain text and extracted documents.
+- A shared chunker registry with per-detector overrides and document-aware rules.
+- Optional Semchunk and Chonkie adapters.
+
 ### Fixed
 
 - NER spans no longer include the space before or after a name. Byte-level tokenizers, such as ModernBERT's, put that space inside a word's offsets, so the placeholder took the space with it (`works at<ORGANISATION>`). This also fixes the ensemble vote, `custom_allow_terms`, synthetic names and reported span offsets for those models, on both the ONNX and torch backends. The default models never produced such spans, so default output does not change.

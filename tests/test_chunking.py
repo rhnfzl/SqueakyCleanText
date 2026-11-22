@@ -276,6 +276,36 @@ def test_overlap_with_real_tokenizer():
     assert anon_map.deanonymize(result.text) == text
 
 
+def test_unified_router_accepts_an_external_plan_for_real_onnx_windows():
+    from sct import ChunkerRegistry, DetectorSpec, TextCleaner
+    from sct.chunkers_builtin import bounded_ranges
+
+    plans = []
+
+    def split(request):
+        ranges = tuple(bounded_ranges(request))
+        plans.append((request.max_size, tuple(request.count(request.text[r.start:r.end]) for r in ranges)))
+        return ranges
+
+    registry = ChunkerRegistry()
+    registry.register('observed', split, stages=('detection',))
+    cfg = TextCleanerConfig(
+        pii_processing='unified', allow_network_detectors=True, language='en',
+        ner_models=TEST_NER_MODELS, ner_model_revisions=TEST_NER_REVISIONS, ner_chunk_overlap=16,
+        detector_specs=(DetectorSpec('builtin_ner', chunking='observed'),),
+    )
+    cleaner = TextCleaner(cfg, chunker_registry=registry)
+    result = cleaner.process('Marie Curie worked in Paris with Pierre Curie. ' * 80)
+    [(budget, sizes)] = plans
+    assert len(sizes) > 1 and all(size <= budget for size in sizes)
+    assert 'Paris' not in result.lm_text
+    assert result.metadata['provenance_v2']['detectors'][0]['chunker'] == 'observed'
+    plans.clear()
+    short = cleaner.process('Marie Curie worked in Paris.')
+    assert plans == []
+    assert 'chunker' not in short.metadata['provenance_v2']['detectors'][0]
+
+
 def test_ner_span_inside_regex_placeholder_is_dropped():
     # Old code: a model tagging "PHONE" in "<PHONE>" gave "call <<PERSON>>" (0.7.1 too).
     detector = FakeRunDetector()

@@ -7,6 +7,7 @@ import math
 from types import MappingProxyType
 from typing import TYPE_CHECKING, Any, Protocol
 
+from sct.chunking import ChunkingPolicy
 from sct.findings import Detection, DetectionContext
 
 if TYPE_CHECKING:
@@ -58,12 +59,14 @@ def _identifier(value: object) -> None:
 class DetectorSpec:
     name: str
     options: Mapping[str, Any] = field(default_factory=dict, repr=False)
+    chunking: ChunkingPolicy | None = None
 
     def __post_init__(self) -> None:
         _identifier(self.name)
         if not isinstance(self.options, Mapping):
             raise ValueError('Detector options must be a mapping')
         object.__setattr__(self, 'options', _freeze(self.options))
+        object.__setattr__(self, 'chunking', ChunkingPolicy.coerce(self.chunking))
 
 
 @dataclass(frozen=True)
@@ -108,6 +111,21 @@ class Detector(Protocol):
 
     def detect(self, text: str, *, language: str | None,
                context: DetectionContext) -> tuple[Detection, ...]: ...
+
+
+@dataclass(frozen=True)
+class DetectorWindowLimits:
+    """An adapter's size counter, maximum input size and optional character context."""
+
+    max_size: int
+    count: Callable[[str], int] = field(repr=False)
+    overlap_chars: int = 0
+
+    def __post_init__(self) -> None:
+        if type(self.max_size) is not int or self.max_size < 1 or not callable(self.count):
+            raise ValueError('Detector windows need a positive size and a counter')
+        if type(self.overlap_chars) is not int or not 0 <= 2 * self.overlap_chars < self.max_size:
+            raise ValueError('Detector window overlap must leave room for the core')
 
 
 DetectorFactory = Callable[['TextCleanerConfig', Mapping[str, Any]], Detector]

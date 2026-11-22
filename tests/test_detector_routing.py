@@ -75,6 +75,10 @@ def test_l2_acceptance():
     assert decision.policy_identity.startswith('experimental:calibrated_cascade:v1:')
     mixed = replace(context, requested_entity_types=('EMAIL', 'PERSON'))
     assert policy.plan(context=mixed, completed=completed).selected_ids == ('full',)
+    windowed = (replace(completed[0], external_windowing=True),)
+    windowed_decision = policy.plan(context=context, completed=windowed)
+    assert windowed_decision.selected_ids == ('full',)
+    assert windowed_decision.reasons == ('external_windowing',)
 
 
 def test_real_regex_early_exit_never_constructs_full_and_reuses_cache():
