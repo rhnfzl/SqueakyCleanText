@@ -224,11 +224,15 @@ def _identity_for_run(source, output, *, retention, config=None, selection=Selec
     if ((registry_factory is not None and 'registry' not in identities)
             or (scorer is not None and 'quality' not in identities)):
         raise ValueError('Runtime components require explicit registry and quality version identities')
-    cleaner_config = {**handle.config._plain_state(), 'supported_languages': sorted(handle.config.supported_languages)}
+    cleaner_config = {**handle.config._plain_state(omit_default_chunking=True),
+                      'supported_languages': sorted(handle.config.supported_languages)}
+    context_state = None if context is None else asdict(context)
+    if context_state is not None and context_state['document_format'] is None:
+        context_state.pop('document_format')
     fingerprint = config_digest({'cleaner': cleaner_config, 'selection': asdict(selection),
                                  'native': asdict(native), 'language': language,
                                  'schema': None if schema is None else asdict(schema),
-                                 'context': None if context is None else asdict(context),
+                                 'context': context_state,
                                  'components': component_identities})
     RunIdentity(output.name, 'baseline', 'package', (), fingerprint, component_identities, native.seed)
     input_digest = file_digest(source)

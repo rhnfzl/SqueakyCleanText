@@ -5,6 +5,7 @@ from bisect import bisect_left, bisect_right
 from collections.abc import Callable
 from typing import Any, NamedTuple
 
+from sct.findings import TextRange
 from sct.utils import constants
 
 
@@ -16,11 +17,15 @@ class Window(NamedTuple):
     own_end: int
 
 
+ChunkSplit = Callable[[int, Callable[[str], int]], tuple[TextRange, ...]]
+
+
 def plan_windows(
     text: str,
     budget: int,
     tokenizer: Callable[..., Any] | None,
     overlap: int,
+    split: ChunkSplit | None = None,
 ) -> list[Window]:
     """Fit windows to a token budget while keeping offsets in the source text.
 
@@ -29,20 +34,27 @@ def plan_windows(
     A span belongs to the window whose core owns its start; context copies are
     kept only when no owned span covers them. A fitting document stays whole.
     """
-    if overlap and (
+    if (overlap or split is not None) and (
         token_count(text, tokenizer) <= budget if tokenizer is not None
         else len(text) <= budget * 2
     ):
         overlap = 0
+        split = None
     budget -= 2 * overlap
-    chunks = split_text(text, budget, tokenizer) if tokenizer is not None else simple_chunk(text, max_tokens=budget)
-
-    cores = []
-    search_start = 0
-    for chunk in chunks:
-        source_chunk, start, offsets = align_chunk(text, chunk, search_start)
-        search_start = start + len(source_chunk)
-        cores.append((chunk, start, start + len(source_chunk), offsets))
+    cores: list[tuple[str, int, int, list[int] | range]]
+    if split is not None:
+        if tokenizer is None:
+            raise ValueError('An external NER chunker requires the model tokenizer')
+        ranges = split(budget, lambda part: token_count(part, tokenizer))
+        cores = [(text[r.start:r.end], r.start, r.end, range(r.end - r.start + 1)) for r in ranges]
+    else:
+        chunks = split_text(text, budget, tokenizer) if tokenizer is not None else simple_chunk(text, max_tokens=budget)
+        cores = []
+        search_start = 0
+        for chunk in chunks:
+            source_chunk, start, offsets = align_chunk(text, chunk, search_start)
+            search_start = start + len(source_chunk)
+            cores.append((chunk, start, search_start, offsets))
     if not overlap:
         return [Window(chunk, start, offsets, 0, len(text) + 1) for chunk, start, _, offsets in cores]
 

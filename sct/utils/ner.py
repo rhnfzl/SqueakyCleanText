@@ -12,7 +12,7 @@ from collections.abc import Collection, Iterable, Mapping, Sequence
 from sct.utils import constants
 from sct.utils.anonymization_map import AnonymizationMap
 from sct.utils.markers import PLACEHOLDER_TOKEN
-from sct.utils.ner_chunking import Window, plan_windows
+from sct.utils.ner_chunking import ChunkSplit, Window, plan_windows
 from sct.utils.ner_spans import (
     ENTITY_TYPE_MAP,
     finalize_spans,
@@ -544,7 +544,8 @@ class GeneralNER:
         cut = ner_confidence_threshold
         return tags, self.cfg.effective_ner_confidence_threshold if cut is None else cut
 
-    def analyze(self, text: str, *, language: str | None, context: DetectionContext) -> tuple[Detection, ...]:
+    def analyze(self, text: str, *, language: str | None, context: DetectionContext,
+                split: ChunkSplit | None = None) -> tuple[Detection, ...]:
         """Return value-free findings in canonical input coordinates, without replacement."""
         if self.cfg.ner_backend == 'presidio_gliner':
             results = presidio_results(self, text, language, protect_markers=False, context=context)
@@ -555,7 +556,7 @@ class GeneralNER:
             raise ValueError("This NER backend does not support required field context")
         tags, cutoff = self._tags_and_cut(None, None)
         self._load_models([language])
-        windows = self._plan_windows(text, self._window_keys(language))
+        windows = self._plan_windows(text, self._window_keys(language), split=split)
         results = self._detect([w.text for w in windows], [language] * len(windows), tags) if windows else []
         spans = finalize_spans(self, text, windows, results, cutoff, protect_markers=False)
         return tuple(Detection(ENTITY_TYPE_MAP.get(s['entity_group'], s['entity_group']),
@@ -742,14 +743,14 @@ class GeneralNER:
         gliner_max = self._gliner_pipe.max_context_length if self._gliner_pipe else 384
         return int(gliner_max * 0.9)
 
-    def _plan_windows(self, text: str, keys=None) -> list[Window]:
+    def _plan_windows(self, text: str, keys=None, *, split: ChunkSplit | None = None) -> list[Window]:
         """Size windows for this document's models, independent of other loaded routes."""
         overlap = self.cfg.ner_chunk_overlap
         budget = self._chunk_budget(keys)
         if overlap:
             self._check_overlap(budget)  # a model loaded after construction can shrink it
         tokenizer = self._window_tokenizer(keys) if self.tokenizer is not None else None
-        return plan_windows(text, budget, tokenizer, overlap)
+        return plan_windows(text, budget, tokenizer, overlap, split)
 
     def _detect(
         self,

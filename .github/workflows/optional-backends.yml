@@ -18,6 +18,7 @@ on:
       - sct/findings.py
       - sct/coordinates.py
       - sct/documents.py
+      - sct/chunk*.py
       - sct/config.py
       - sct/sct.py
       - sct/unified.py
@@ -38,6 +39,7 @@ on:
       - tests/test_sqlite_token_store.py
       - tests/test_token_store_operations.py
       - tests/test_optional_profiles.py
+      - tests/test_chunking_router.py
       - evaluation/improvements/**
       - tests/test_processing_compatibility.py
       - tests/fixtures/processing_compatibility*.json
@@ -97,6 +99,20 @@ jobs:
         env:
           TEST_FILTER: ${{ matrix.filter }}
         run: pytest tests/test_functional.py -v -rs -k "$TEST_FILTER"
+
+  chunking-providers:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: "0.10.9"
+      - run: uv sync --locked --extra dev --extra test --extra chunking
+      - run: .venv/bin/pytest tests/test_chunking_router.py -v -rs
 
   provider-profile:
     runs-on: ubuntu-latest

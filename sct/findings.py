@@ -70,6 +70,7 @@ class DetectionContext:
     path: tuple[Hashable, ...] = field(default=(), repr=False)
     declared_entity_types: tuple[str, ...] = field(default=(), repr=False)
     schema_id: str | None = field(default=None, repr=False)
+    document_format: str | None = field(default=None, repr=False)
 
     def __post_init__(self) -> None:
         if not isinstance(self.path, tuple):
@@ -84,6 +85,8 @@ class DetectionContext:
             raise ValueError("Declared entity types must be a tuple of nonempty strings")
         if any(value is not None and not isinstance(value, str) for value in (self.document_id, self.schema_id)):
             raise ValueError("Context identifiers must be strings or None")
+        if self.document_format is not None and (type(self.document_format) is not str or not self.document_format.strip()):
+            raise ValueError('Document format must be a nonempty string')
 
     def to_dict(self) -> dict[str, object]:
         """Default output excludes caller context, whose identifiers may contain PII."""

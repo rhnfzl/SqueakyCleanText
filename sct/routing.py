@@ -44,6 +44,7 @@ class DetectorRun:
     capabilities: tuple[DetectorCapabilities, ...]
     status: str = 'succeeded'
     calls: int = 0
+    external_windowing: bool = False
 
     def __post_init__(self):
         if self.stage_id not in ('fast', 'full') or self.status not in ('succeeded', 'failed', 'skipped'):
@@ -76,9 +77,9 @@ def _score(value):
 def routing_config_digest(cfg: TextCleanerConfig, *, unified_policy: UnifiedPrivacyPolicy | None = None) -> str:
     """Bind normalized configuration and the actual declarative handling policy."""
     from sct.corpus.manifest import config_digest
-    state = cfg._plain_state()
-    for key in ('routing_calibration', 'routing_policy'):
-        state.pop(key)
+    state = cfg._plain_state(omit_default_chunking=True)
+    for key in ('routing_calibration', 'routing_policy', 'output_chunking', 'output_chunk_max_size'):
+        state.pop(key, None)
     policy = unified_policy if unified_policy is not None else UnifiedPrivacyPolicy('default', '1', {})
     if type(policy) is not UnifiedPrivacyPolicy or any(type(rule) is not HandlingRule for rule in policy.rules.values()):
         raise ValueError('Routing calibration requires declarative policy and rule classes')
@@ -185,6 +186,8 @@ class RoutingPolicy:
         artifact = self.cfg.routing_calibration
         if run.status != 'succeeded':
             return 'fast_stage_incomplete'
+        if run.external_windowing:
+            return 'external_windowing'
         if not run.capabilities or run.calls != len(run.capabilities):
             return 'missing_capabilities'
         if artifact is None:
