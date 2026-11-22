@@ -164,6 +164,8 @@ SCT can use Markdown headings or cleaned document elements as boundaries. Instal
 In unified PII processing, you can also choose a chunker for each compatible detector.
 See [chunking providers and routing](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/CHUNKING.md).
 
+For HTML fragments, opt into the [HTML fragment adapter](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/API.md#clean-html-fragments) to keep block and table cell boundaries while masking personal details split by inline tags.
+
 ## How it works
 
 <img src="https://raw.githubusercontent.com/rhnfzl/SqueakyCleanText/main/resources/sct_flow.png" alt="SqueakyCleanText pipeline: any entry point runs 1 detect language, 2 fix the text, 3 regex PII and cleanup, 4 NER, 5 replacement mode (placeholder tags are written in steps 3 and 4; synthetic and reversible swap the values in after NER), 6 output and signals. Dashed steps are off by default." width="900">

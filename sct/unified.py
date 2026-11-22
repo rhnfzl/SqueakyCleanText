@@ -13,6 +13,7 @@ from sct.detector_windows import detect_with_chunking
 from sct.detectors import DetectorCapabilities, DetectorSpec, DetectorUnavailable
 from sct.detectors_builtin import BuiltinNERDetector, BuiltinRegexDetector
 from sct.findings import Detection, DetectionContext
+from sct.html_fragment import fragment_edits
 from sct.policy_v2 import FindingDecision, UnifiedPrivacyPolicy
 from sct.privacy import ProcessingMetrics
 from sct.routing import DetectorRun, RoutingContext, RoutingPolicy
@@ -64,6 +65,9 @@ def _sub(mapping, pattern, replacement):
 def _canonical(cleaner: TextCleaner, text: str) -> SourceMap:
     cfg = cleaner.cfg
     mapping = SourceMap.identity(text)
+    edits = fragment_edits(text) if cfg.html_fragment_adapter else ()
+    for start, end, replacement in reversed(edits):
+        mapping = mapping.replace(start, end, replacement)
     if cfg.check_fix_bad_unicode:
         # Whole-stage repair has a proven cover, but no claimed character alignment.
         mapping = _whole_edit(mapping, cleaner._fix_bad_unicode)
@@ -77,8 +81,8 @@ def _canonical(cleaner: TextCleaner, text: str) -> SourceMap:
             mapping = _whole_edit(mapping, transform)
     if cfg.check_remove_emoji:
         mapping = _whole_edit(mapping, cleaner._text_normaliser.remove_emoji)
-    # Decode escaped brackets after the HTML step so escaped markup remains text.
-    if cfg.check_replace_html:
+    # A parsed fragment already has its HTML boundaries. Decode escaped brackets after removal.
+    if cfg.check_replace_html and not edits:
         mapping = _sub(mapping, cleaner._html_regex, cfg.replace_with_html)
     if cfg.check_fix_bad_unicode:
         mapping = _sub(mapping, normtext._MARKUP_OR_ENTITY, lambda m: normtext.unescape_markup(m.group()))
@@ -86,7 +90,7 @@ def _canonical(cleaner: TextCleaner, text: str) -> SourceMap:
         mapping = _sub(mapping, constants.ISOLATED_LETTERS_REGEX, '')
     if cfg.check_remove_isolated_special_symbols:
         mapping = _whole_edit(mapping, cleaner._remove_isolated_special_symbols)
-    if cfg.check_normalize_whitespace:
+    if cfg.check_normalize_whitespace and not edits:
         mapping = _sub(mapping, re.compile(r'\s+'), ' ')
         mapping = _sub(mapping, re.compile(r'^ +| +$'), '')
     for callback in cfg.custom_pipeline_steps:
