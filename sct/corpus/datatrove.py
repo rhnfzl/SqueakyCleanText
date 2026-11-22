@@ -224,7 +224,7 @@ def _identity_for_run(source, output, *, retention, config=None, selection=Selec
     if ((registry_factory is not None and 'registry' not in identities)
             or (scorer is not None and 'quality' not in identities)):
         raise ValueError('Runtime components require explicit registry and quality version identities')
-    cleaner_config = {**handle.config._plain_state(omit_default_chunking=True),
+    cleaner_config = {**handle.config._plain_state(omit_defaults_for_digest=True),
                       'supported_languages': sorted(handle.config.supported_languages)}
     context_state = None if context is None else asdict(context)
     if context_state is not None and context_state['document_format'] is None:

@@ -77,7 +77,7 @@ def _score(value):
 def routing_config_digest(cfg: TextCleanerConfig, *, unified_policy: UnifiedPrivacyPolicy | None = None) -> str:
     """Bind normalized configuration and the actual declarative handling policy."""
     from sct.corpus.manifest import config_digest
-    state = cfg._plain_state(omit_default_chunking=True)
+    state = cfg._plain_state(omit_defaults_for_digest=True)
     for key in ('routing_calibration', 'routing_policy', 'output_chunking', 'output_chunk_max_size'):
         state.pop(key, None)
     policy = unified_policy if unified_policy is not None else UnifiedPrivacyPolicy('default', '1', {})

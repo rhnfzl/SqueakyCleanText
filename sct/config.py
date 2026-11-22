@@ -438,6 +438,7 @@ class TextCleanerConfig:
     output_chunking: ChunkingPolicy | None = None
     output_chunk_max_size: int = 1024
     allow_network_chunkers: bool = False
+    html_fragment_adapter: bool = False
 
     def __post_init__(self):
         if self.language_policy not in ('legacy', 'abstain'):
@@ -450,6 +451,10 @@ class TextCleanerConfig:
                 raise ValueError(f'{name} must be None or a finite number in [0, 1]')
         if self.pii_processing not in ("legacy", "unified"):
             raise ValueError("pii_processing must be legacy or unified")
+        if type(self.html_fragment_adapter) is not bool:
+            raise ValueError("html_fragment_adapter must be a boolean")
+        if self.html_fragment_adapter and self.pii_processing != "unified":
+            raise ValueError("html_fragment_adapter requires unified processing")
         if self.source_mapping not in ("best_effort", "require_source"):
             raise ValueError("source_mapping must be best_effort or require_source")
         if type(self.allow_network_detectors) is not bool:
@@ -505,7 +510,7 @@ class TextCleanerConfig:
         from sct.presets import preset_config
         return preset_config(name, **overrides)
 
-    def _plain_state(self, *, omit_default_chunking: bool = False) -> dict[str, Any]:
+    def _plain_state(self, *, omit_defaults_for_digest: bool = False) -> dict[str, Any]:
         """The fields as plain values: mapping proxies as dicts, a PII-derived gliner_label_map as None."""
         state = {k: dict(v) if isinstance(v, MappingProxyType) else v for k, v in self.__dict__.items()}
         for name in ("detector_specs", "routing_fast_specs", "routing_full_specs"):
@@ -514,17 +519,19 @@ class TextCleanerConfig:
                 | ({"chunking": asdict(spec.chunking)} if spec.chunking is not None else {})
                 for spec in getattr(self, name)
             )
-        # Keep existing serialized config fingerprints when chunking is absent.
+        # Keep existing fingerprints when opt-in behavior is disabled.
         for name in ('detector_chunking', 'output_chunking'):
             policy = getattr(self, name)
             if policy is not None:
                 state[name] = asdict(policy)
-            elif omit_default_chunking:
+            elif omit_defaults_for_digest:
                 state.pop(name, None)
-        if omit_default_chunking and self.output_chunk_max_size == 1024:
+        if omit_defaults_for_digest and self.output_chunk_max_size == 1024:
             state.pop('output_chunk_max_size', None)
-        if omit_default_chunking and not self.allow_network_chunkers:
+        if omit_defaults_for_digest and not self.allow_network_chunkers:
             state.pop('allow_network_chunkers', None)
+        if omit_defaults_for_digest and not self.html_fragment_adapter:
+            state.pop('html_fragment_adapter', None)
         # derived only in PII mode (re-shared on load); a map kept after a replace() to another mode is data
         if self.ner_mode == 'pii' and any(self.gliner_label_map is m for m in _PII_MAPS.values()):
             state['gliner_label_map'] = None
