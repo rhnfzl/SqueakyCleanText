@@ -10,6 +10,7 @@ import pytest
 
 datasets = pytest.importorskip("datasets")
 
+from sct.integrations import _runtime  # noqa: E402
 from sct.integrations.hf import SCTMap, clean_dataset  # noqa: E402
 from sct.detectors import DetectorSpec  # noqa: E402
 from sct.presets import preset_config  # noqa: E402
@@ -151,7 +152,7 @@ _FINGERPRINT = (
 )
 
 
-def test_fingerprint_stable_across_processes():
+def test_fingerprint_stable_across_processes(monkeypatch):
     # Old code: datasets hashed the config's frozensets in per-process order, so the cache never hit.
     prints = {
         subprocess.run(  # noqa: S603 - fixed argv, own interpreter
@@ -161,6 +162,11 @@ def test_fingerprint_stable_across_processes():
         for seed in ("1", "2", "3")
     }
     assert len(prints) == 1
+    # Keep the named preset path and use the same pinned model as the worker tests.
+    monkeypatch.setattr(
+        _runtime, "preset_config",
+        lambda name: preset_config(name, ner_models=TEST_NER_MODELS, ner_model_revisions=TEST_NER_REVISIONS),
+    )
     ds = datasets.Dataset.from_dict({"text": ["a"]})
     assert clean_dataset(ds, config=FAST)._fingerprint != clean_dataset(ds, config="sct")._fingerprint
 

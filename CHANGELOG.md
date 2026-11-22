@@ -4,6 +4,19 @@ Benchmark scores below use open datasets credited in [benchmarks/DATASET_CREDITS
 
 ## Unreleased
 
+## 0.13.0 - 2026-11-22
+
+Opt into HTML fragment cleaning in the unified text pipeline.
+The adapter supports the subset documented in the [HTML fragment guide](https://github.com/rhnfzl/SqueakyCleanText/blob/v0.13.0/docs/API.md#clean-html-fragments).
+It preserves block and table cell boundaries during normalization and can mask emails split by inline tags.
+Unsupported or malformed fragments use your configured pipeline.
+Unicode repair can widen the reported source ranges.
+This release has no breaking changes.
+
+### Added
+
+- Opt-in HTML fragment cleaning for a documented subset of tags. The unified adapter keeps block and table cell boundaries and can mask an email split by inline tags. Unsupported or malformed fragments use the configured pipeline. Unicode repair can widen the reported source ranges.
+
 ## 0.12.0 - 2026-11-22
 
 Choose which extractor reads a document before SCT cleans it.

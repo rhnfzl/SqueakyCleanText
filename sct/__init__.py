@@ -64,7 +64,7 @@ from sct.streaming import (
 from sct.utils.anonymization_map import AnonymizationMap, MapEntry
 from sct.utils.process_result import ProcessResult
 
-__version__ = "0.12.0"
+__version__ = "0.13.0"
 __all__ = [
     "CapableDocumentExtractor", "DocumentElement", "DocumentExtractionRouter", "DocumentExtractor", "DocumentOutput",
     "ExtractedDocument", "ProcessedDocument", "clean_document", "extract_document",

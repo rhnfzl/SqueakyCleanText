@@ -7,55 +7,48 @@ on:
         type: boolean
         default: false
   pull_request:
-    paths:
-      - sct/utils/gliner_adapter.py
-      - sct/utils/gliclass_adapter.py
-      - sct/utils/torch_pipeline.py
-      - sct/utils/ner.py
-      - sct/adapters/**
-      - sct/integrations/**
-      - sct/detectors*.py
-      - sct/findings.py
-      - sct/coordinates.py
-      - sct/documents.py
-      - sct/chunk*.py
-      - sct/config.py
-      - sct/sct.py
-      - sct/unified.py
-      - sct/routing.py
-      - sct/field*.py
-      - tests/test_*document*.py
-      - tests/test_docling_integration.py
-      - tests/fixtures/documents/**
-      - tests/test_*datafog*.py
-      - tests/test_*secret*.py
-      - tests/test_baseline_measurement.py
-      - tests/test_improvements_end_to_end.py
-      - tests/test_quality_export.py
-      - scripts/export_quality_head.py
-      - sct/corpus/**
-      - tests/test_corpus*.py
-      - sct/token_stores/**
-      - tests/test_sqlite_token_store.py
-      - tests/test_token_store_operations.py
-      - tests/test_optional_profiles.py
-      - tests/test_chunking_router.py
-      - evaluation/improvements/**
-      - tests/test_processing_compatibility.py
-      - tests/fixtures/processing_compatibility*.json
-      - uv.lock
-      - pyproject.toml
-      - .github/workflows/optional-backends.yml
-      - .coveragerc-documents
-      - .coveragerc-integrations
   schedule:
     - cron: "17 3 * * 1"
 
 permissions:
   contents: read
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
+  changes:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    outputs:
+      docs-only: ${{ steps.diff.outputs.docs-only }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+          persist-credentials: false
+      - name: Check changed paths
+        id: diff
+        shell: bash
+        run: |
+          # Compare the tested PR merge commit with its base parent.
+          paths="$RUNNER_TEMP/optional-backend-paths"
+          git diff --no-renames --name-only -z HEAD^1 HEAD > "$paths"
+          docs_only=true
+          while IFS= read -r -d '' path; do
+            case "$path" in
+              README.md|CHANGELOG.md|AGENTS.md|llms.txt|docs/*.md) ;;
+              *) docs_only=false; break ;;
+            esac
+          done < "$paths"
+          echo "docs-only=$docs_only" >> "$GITHUB_OUTPUT"
+
   backend:
+    needs: changes
+    if: |
+      !cancelled() && (github.event_name != 'pull_request' ||
+        (needs.changes.result == 'success' && needs.changes.outputs.docs-only == 'false'))
     runs-on: ubuntu-latest
     timeout-minutes: 60
     strategy:
@@ -82,25 +75,35 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-          cache: pip
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: "0.10.9"
+          # Linux Torch wheels make the shared pip cache larger than 3 GB.
+          enable-cache: false
 
-      - name: Install backend
+      - name: Install locked backend
         env:
           EXTRAS: ${{ matrix.extras }}
-        run: |
-          python -m pip install --upgrade pip
-          pip install -e ".[dev,test,$EXTRAS]"
+        run: uv sync --locked --extra dev --extra test --extra "$EXTRAS"
 
       - name: Install Presidio English model
         if: matrix.name == 'presidio-gliner'
-        run: python -m spacy download en_core_web_lg
+        env:
+          VIRTUAL_ENV: ${{ github.workspace }}/.venv
+        run: |
+          .venv/bin/python -m spacy download en_core_web_lg
+          .venv/bin/python -c 'import en_core_web_lg'
 
       - name: Run backend tests
         env:
           TEST_FILTER: ${{ matrix.filter }}
-        run: pytest tests/test_functional.py -v -rs -k "$TEST_FILTER"
+        run: .venv/bin/pytest tests/test_functional.py -v -rs -k "$TEST_FILTER"
 
   chunking-providers:
+    needs: changes
+    if: |
+      !cancelled() && (github.event_name != 'pull_request' ||
+        (needs.changes.result == 'success' && needs.changes.outputs.docs-only == 'false'))
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -115,6 +118,10 @@ jobs:
       - run: .venv/bin/pytest tests/test_chunking_router.py -v -rs
 
   provider-profile:
+    needs: changes
+    if: |
+      !cancelled() && (github.event_name != 'pull_request' ||
+        (needs.changes.result == 'success' && needs.changes.outputs.docs-only == 'false'))
     runs-on: ubuntu-latest
     timeout-minutes: 45
     strategy:
@@ -178,6 +185,10 @@ jobs:
         run: .venv/bin/python -m pytest tests/test_corpus_*.py -v
 
   combined-acceptance:
+    needs: changes
+    if: |
+      !cancelled() && (github.event_name != 'pull_request' ||
+        (needs.changes.result == 'success' && needs.changes.outputs.docs-only == 'false'))
     runs-on: ubuntu-latest
     timeout-minutes: 15
     strategy:
@@ -200,6 +211,10 @@ jobs:
         run: .venv/bin/python -m pytest tests/test_improvements_end_to_end.py -v
 
   quality-export:
+    needs: changes
+    if: |
+      !cancelled() && (github.event_name != 'pull_request' ||
+        (needs.changes.result == 'success' && needs.changes.outputs.docs-only == 'false'))
     runs-on: ubuntu-latest
     timeout-minutes: 45
     strategy:
@@ -266,3 +281,47 @@ jobs:
         with:
           name: pinned-model-baseline
           path: baseline-measured.json
+
+  required:
+    name: Optional backend gate
+    if: always() && github.event_name == 'pull_request'
+    permissions:
+      actions: read
+    needs: [changes, backend, chunking-providers, provider-profile, combined-acceptance, quality-export]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify required optional jobs
+        shell: bash
+        env:
+          CHANGES: ${{ needs.changes.result }}
+          DOCS_ONLY: ${{ needs.changes.outputs.docs-only }}
+          BACKEND: ${{ needs.backend.result }}
+          CHUNKING: ${{ needs.chunking-providers.result }}
+          PROFILES: ${{ needs.provider-profile.result }}
+          ACCEPTANCE: ${{ needs.combined-acceptance.result }}
+          EXPORT: ${{ needs.quality-export.result }}
+        run: |
+          test "$CHANGES" = success
+          case "$DOCS_ONLY" in
+            true) expected=skipped ;;
+            false) expected=success ;;
+            *) exit 1 ;;
+          esac
+          for result in "$BACKEND" "$CHUNKING" "$PROFILES" "$ACCEPTANCE" "$EXPORT"; do
+            test "$result" = "$expected"
+          done
+
+      - name: Verify individual matrix results
+        if: needs.changes.outputs.docs-only == 'false'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # A matrix can report success in needs when an individual job was cancelled.
+          curl --fail --silent --show-error -H "Authorization: Bearer $GH_TOKEN" \
+            "$GITHUB_API_URL/repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/jobs?per_page=100" |
+            jq -e '
+              .total_count > 0 and .total_count == (.jobs | length) and
+              all(.jobs[] | select(.name != "Optional backend gate" and .name != "pinned-model-baseline");
+                  .status == "completed" and .conclusion == "success")
+            '
