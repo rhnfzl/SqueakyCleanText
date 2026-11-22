@@ -20,6 +20,7 @@ from sct.policy_v2 import UnifiedPrivacyPolicy
 
 import regex
 
+from sct.chunking import ChunkerRegistry
 from sct.config import GLICLASS_DEFAULT_MODEL, TextCleanerConfig
 from sct.detectors import DetectorRegistry
 from sct.language_policy import LanguageDecision, apply_language_policy
@@ -132,6 +133,7 @@ class TextCleaner:
         metrics_callback: Callable[[ProcessingMetrics], None] | None = None,
         detector_registry: DetectorRegistry | None = None,
         unified_policy: UnifiedPrivacyPolicy | None = None,
+        chunker_registry: ChunkerRegistry | None = None,
     ):
         """Initialize the text cleaning pipeline.
 
@@ -161,6 +163,10 @@ class TextCleaner:
             raise TypeError("detector_registry must be a DetectorRegistry")
         self._detector_registry = detector_registry if detector_registry is not None else DetectorRegistry()
         self._detector_registry.freeze()
+        if chunker_registry is not None and not isinstance(chunker_registry, ChunkerRegistry):
+            raise TypeError('chunker_registry must be a ChunkerRegistry')
+        self._chunker_registry = chunker_registry if chunker_registry is not None else ChunkerRegistry()
+        self._chunker_registry.freeze()
         names = constants.LEGACY_TYPE_NAMES if self.cfg.legacy_type_names else {}
         self._phone_type, self._ip_type = names.get('PHONE', 'PHONE'), names.get('IP', 'IP')
         if (

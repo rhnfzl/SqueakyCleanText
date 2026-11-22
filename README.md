@@ -136,6 +136,7 @@ if __name__ == "__main__":
 | Where | Usage | Docs |
 |---|---|---|
 | PDF extraction | `extract_document` and `clean_document` | [DOCUMENTS](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/DOCUMENTS.md) |
+| Clean and chunk a document | `chunk_document(cleaner, text, max_size=1024)` | [CHUNKING](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/CHUNKING.md) |
 | LangChain | `SCTDocumentTransformer().transform_documents(docs)` | [INTEGRATIONS](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/INTEGRATIONS.md) |
 | Haystack | `pipe.add_component("sct", SCTDocumentCleaner())` | [INTEGRATIONS](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/INTEGRATIONS.md) |
 | Ray, Spark, Polars, DuckDB, dlt, Daft | `clean_columns(handle, batch)` | [RECIPES](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/RECIPES.md) |
@@ -145,6 +146,23 @@ if __name__ == "__main__":
 | AI assistants | `sct-mcp` (MCP server, `mcp` extra) | [MCP](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/MCP.md) |
 
 The framework adapters use the `training` preset unless you pass a config, so their output keeps numbers, dates, HTML and case. They build one cleaner per worker process and reject reversible mode, as do the streaming redactors and the MCP server. Plan for 5 to 7 GB of RAM per worker with the default NER ensemble.
+
+### Clean a document and produce chunks
+
+Use `chunk_document()` to clean the full document before you split it for search, training, or export.
+
+```python
+from sct import TextCleaner, TextCleanerConfig, chunk_document
+
+cleaner = TextCleaner(TextCleanerConfig(check_ner_process=False))
+result = chunk_document(cleaner, "Contact alice@example.com for details.", max_size=24)
+texts = [chunk.text for chunk in result.chunks]
+```
+
+SCT can use Markdown headings or cleaned document elements as boundaries. Install
+`SqueakyCleanText[chunking]` for Semchunk and Chonkie, or register your own splitter.
+In unified PII processing, you can also choose a chunker for each compatible detector.
+See [chunking providers and routing](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/CHUNKING.md).
 
 ## How it works
 

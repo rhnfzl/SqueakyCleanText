@@ -9,12 +9,13 @@ Pass an immutable config to each cleaner:
 
 import re
 from collections.abc import Iterable
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from datetime import date
 from types import MappingProxyType
 from typing import Any, Literal, get_args
 from collections.abc import Mapping
 
+from sct.chunking import ChunkingPolicy
 from sct.detectors import DetectorSpec
 from sct.utils.resources import DEFAULT_LANGUAGES, resolve_language
 from sct.utils.markers import LABEL_PATTERN
@@ -433,6 +434,10 @@ class TextCleanerConfig:
     routing_full_specs: tuple[DetectorSpec, ...] = ()
     routing_entity_types: tuple[str, ...] = ()
     routing_calibration: Mapping[str, Any] | None = None
+    detector_chunking: ChunkingPolicy | None = None
+    output_chunking: ChunkingPolicy | None = None
+    output_chunk_max_size: int = 1024
+    allow_network_chunkers: bool = False
 
     def __post_init__(self):
         if self.language_policy not in ('legacy', 'abstain'):
@@ -449,6 +454,15 @@ class TextCleanerConfig:
             raise ValueError("source_mapping must be best_effort or require_source")
         if type(self.allow_network_detectors) is not bool:
             raise ValueError("allow_network_detectors must be a boolean")
+        if type(self.allow_network_chunkers) is not bool:
+            raise ValueError('allow_network_chunkers must be a boolean')
+        chunking = ChunkingPolicy.coerce(self.detector_chunking)
+        if chunking is not None and self.pii_processing != 'unified':
+            raise ValueError('Detector chunking requires unified processing')
+        object.__setattr__(self, 'detector_chunking', chunking)
+        object.__setattr__(self, 'output_chunking', ChunkingPolicy.coerce(self.output_chunking))
+        if type(self.output_chunk_max_size) is not int or self.output_chunk_max_size < 1:
+            raise ValueError('output_chunk_max_size must be a positive integer')
         specs = tuple(DetectorSpec(**item) if isinstance(item, Mapping) else item for item in self.detector_specs)
         if any(not isinstance(item, DetectorSpec) for item in specs):
             raise ValueError("detector_specs must contain DetectorSpec values")
@@ -491,11 +505,26 @@ class TextCleanerConfig:
         from sct.presets import preset_config
         return preset_config(name, **overrides)
 
-    def _plain_state(self) -> dict[str, Any]:
+    def _plain_state(self, *, omit_default_chunking: bool = False) -> dict[str, Any]:
         """The fields as plain values: mapping proxies as dicts, a PII-derived gliner_label_map as None."""
         state = {k: dict(v) if isinstance(v, MappingProxyType) else v for k, v in self.__dict__.items()}
         for name in ("detector_specs", "routing_fast_specs", "routing_full_specs"):
-            state[name] = tuple({"name": spec.name, "options": dict(spec.options)} for spec in getattr(self, name))
+            state[name] = tuple(
+                {"name": spec.name, "options": dict(spec.options)}
+                | ({"chunking": asdict(spec.chunking)} if spec.chunking is not None else {})
+                for spec in getattr(self, name)
+            )
+        # Keep existing serialized config fingerprints when chunking is absent.
+        for name in ('detector_chunking', 'output_chunking'):
+            policy = getattr(self, name)
+            if policy is not None:
+                state[name] = asdict(policy)
+            elif omit_default_chunking:
+                state.pop(name, None)
+        if omit_default_chunking and self.output_chunk_max_size == 1024:
+            state.pop('output_chunk_max_size', None)
+        if omit_default_chunking and not self.allow_network_chunkers:
+            state.pop('allow_network_chunkers', None)
         # derived only in PII mode (re-shared on load); a map kept after a replace() to another mode is data
         if self.ner_mode == 'pii' and any(self.gliner_label_map is m for m in _PII_MAPS.values()):
             state['gliner_label_map'] = None
@@ -506,6 +535,10 @@ class TextCleanerConfig:
         state = self._plain_state()
         for name in ("detector_specs", "routing_fast_specs", "routing_full_specs"):
             state[name] = getattr(self, name)
+        if self.detector_chunking is not None:
+            state['detector_chunking'] = self.detector_chunking
+        if self.output_chunking is not None:
+            state['output_chunking'] = self.output_chunking
         frozen = [k for k, v in self.__dict__.items() if isinstance(v, MappingProxyType) and state[k] is not None]
         return state, frozen
 

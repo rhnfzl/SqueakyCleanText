@@ -7,8 +7,11 @@ from pathlib import Path
 import re
 from typing import TYPE_CHECKING, Literal, Protocol
 
+from sct.findings import DetectionContext
+
 if TYPE_CHECKING:
     from sct.sct import TextCleaner
+    from sct.unified import UnifiedDocument
 
 
 @dataclass(frozen=True)
@@ -121,6 +124,11 @@ def extract_document(path: Path, *, provider: DocumentExtractor) -> ExtractedDoc
 
 def clean_document(document: ExtractedDocument, cleaner: TextCleaner) -> ProcessedDocument:
     """Detect once across elements; place each rendered span at its first source element."""
+    return _clean_document(document, cleaner, None)[0]
+
+
+def _clean_document(document: ExtractedDocument, cleaner: TextCleaner,
+                    context: DetectionContext | None) -> tuple[ProcessedDocument, UnifiedDocument]:
     if type(document) is not ExtractedDocument:
         raise ValueError('Expected ExtractedDocument')
     document.__post_init__()
@@ -129,7 +137,10 @@ def clean_document(document: ExtractedDocument, cleaner: TextCleaner) -> Process
     if cleaner.cfg.replacement_mode in ('indexed', 'reversible'):
         raise ValueError('Document output does not support indexed or reversible modes')
     try:
-        processed = cleaner._process_unified_document(document.text)
+        processed = (
+            cleaner._process_unified_document(document.text) if context is None
+            else cleaner._process_unified_document(document.text, context)
+        )
     except Exception:
         raise ValueError('Document cleaning failed; check the cleaner configuration') from None
     text = processed.result.lm_text
@@ -167,4 +178,4 @@ def clean_document(document: ExtractedDocument, cleaner: TextCleaner) -> Process
     elements = tuple(DocumentElement(
         id=e.id, text=texts[i], kind=e.kind, page=e.page, bbox=e.bbox, cell=e.cell, table=e.table,
         separator=separators[i]) for i, e in enumerate(document.elements))
-    return ProcessedDocument(text, elements)
+    return ProcessedDocument(text, elements), processed

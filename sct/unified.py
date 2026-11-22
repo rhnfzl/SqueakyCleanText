@@ -9,6 +9,7 @@ import time
 from typing import TYPE_CHECKING
 
 from sct.coordinates import Projection, SourceMap
+from sct.detector_windows import detect_with_chunking
 from sct.detectors import DetectorCapabilities, DetectorSpec, DetectorUnavailable
 from sct.detectors_builtin import BuiltinNERDetector, BuiltinRegexDetector
 from sct.findings import Detection, DetectionContext
@@ -150,7 +151,7 @@ class UnifiedProcessor:
                 raise DetectorUnavailable("Selected detector unavailable; check dependencies and network permission") from None
             except Exception:
                 raise ValueError("Selected detector could not initialize; check its configuration") from None
-            selected.append(self._local.detectors[index])
+            selected.append((index, self._local.detectors[index]))
         return tuple(selected)
 
     def process(self, text: str, context: DetectionContext, *, protect_value: tuple[str, ...] = ()) -> UnifiedDocument:
@@ -201,7 +202,8 @@ class UnifiedProcessor:
         completed: tuple[DetectorRun, ...] = ()
         route_context = RoutingContext(language_decision,
             tuple(dict.fromkeys((*cfg.routing_entity_types, *context.declared_entity_types))), len(canonical),
-            requires_context=context != DetectionContext(), has_classification=classes is not None)
+            requires_context=replace(context, document_format=None) != DetectionContext(),
+            has_classification=classes is not None)
         route_reasons: list[str] = []
         skipped_ids: list[str] = []
         all_capabilities: list[DetectorCapabilities] = []
@@ -219,32 +221,39 @@ class UnifiedProcessor:
                 indices = range(len(self.specs))
             detectors = self._detectors(skip_ner=skip_ner, indices=indices)
             stage_skipped = skip_ner and (any(self.specs[i].name == 'builtin_ner' for i in indices)
-                                         or any(isinstance(d, BuiltinNERDetector) for d in detectors))
+                                         or any(isinstance(d, BuiltinNERDetector) for _, d in detectors))
             ner_skipped = ner_skipped or stage_skipped
             if stage_skipped:
-                detectors = tuple(d for d in detectors if not isinstance(d, BuiltinNERDetector))
+                detectors = tuple((i, d) for i, d in detectors if not isinstance(d, BuiltinNERDetector))
             if cfg.language_policy != 'legacy' or cfg.unknown_language_action != 'multilingual':
                 cleaner._document_context.warnings.update(cleaner._language_warnings(
                     source, confidence, margin, ner_skipped=ner_skipped))
             if cfg.routing_policy == 'always_run' and context.declared_entity_types and not protect_value:
-                capable_types = {kind for detector in detectors if detector.capabilities.supports_context
+                capable_types = {kind for _, detector in detectors if detector.capabilities.supports_context
                                  for kind in detector.capabilities.entity_types}
                 if not set(context.declared_entity_types) <= capable_types:
                     raise ValueError('Required field hints have no context-capable detector')
             if cfg.routing_policy != 'always_run':
-                for detector in detectors:
+                for _, detector in detectors:
                     if detector.capabilities.id in seen_detector_ids:
                         raise ValueError('Routing detector aliases have duplicate capability identities')
                     seen_detector_ids.add(detector.capabilities.id)
             stage_warnings: set[str] = set()
-            for detector in detectors:
+            external_windowing = False
+            for index, detector in detectors:
                 capabilities = detector.capabilities
                 detector_context = context if capabilities.supports_context else DetectionContext()
                 helper = detector._helper if isinstance(detector, BuiltinRegexDetector) else None
                 if helper is not None:
                     helper._document_context.warnings = stage_warnings
                 try:
-                    found = detector.detect(canonical, language=language, context=detector_context)
+                    policy = self.specs[index].chunking
+                    found, chunker = detect_with_chunking(
+                        detector, canonical, language=language, context=detector_context,
+                        document_format=context.document_format, policy=policy or cfg.detector_chunking,
+                        inherited=policy is None, registry=cleaner._chunker_registry,
+                        allow_network=cfg.allow_network_chunkers,
+                    )
                     if not isinstance(found, tuple):
                         raise ValueError('Detector results must be a tuple')
                     for hit in found:
@@ -270,11 +279,15 @@ class UnifiedProcessor:
                     if helper is not None:
                         cleaner._document_context.warnings.update(stage_warnings)
                         helper._document_context.clear()
-                provenance.append(asdict(capabilities))
-            caps = tuple(detector.capabilities for detector in detectors)
+                details = asdict(capabilities)
+                if chunker != 'native':
+                    details['chunker'] = chunker
+                    external_windowing = True
+                provenance.append(details)
+            caps = tuple(detector.capabilities for _, detector in detectors)
             all_capabilities.extend(caps)
             status = 'failed' if stage_warnings else ('skipped' if stage_skipped else 'succeeded')
-            completed += (DetectorRun(stage, caps, status, len(detectors)),)
+            completed += (DetectorRun(stage, caps, status, len(detectors), external_windowing),)
         if context.declared_entity_types and not protect_value:
             capable_types = {kind for cap in all_capabilities if cap.supports_context for kind in cap.entity_types}
             if not set(context.declared_entity_types) <= capable_types:

@@ -5,6 +5,7 @@ from sct.detectors import DetectorCapabilities
 from sct.findings import Detection, DetectionContext
 from sct.utils import constants, contact, normtext
 from sct.utils.ner import GeneralNER
+from sct.utils.ner_chunking import ChunkSplit
 
 
 class BuiltinRegexDetector:
@@ -108,3 +109,11 @@ class BuiltinNERDetector:
 
     def detect(self, text: str, *, language: str | None, context: DetectionContext) -> tuple[Detection, ...]:
         return self._ner.analyze(text, language=language, context=context)
+
+    @property
+    def supports_custom_chunking(self) -> bool:
+        return self._ner.cfg.ner_backend in TOKEN_MODEL_BACKENDS
+
+    def detect_with_chunker(self, text: str, *, language: str | None, context: DetectionContext,
+                            split: ChunkSplit) -> tuple[Detection, ...]:
+        return self._ner.analyze(text, language=language, context=context, split=split)

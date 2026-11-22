@@ -1,7 +1,11 @@
 """SqueakyCleanText - Text cleaning and preprocessing pipeline for ML/NLP."""
 
+from sct.chunked_document import ChunkedDocument, CleanedChunk, chunk_document
+from sct.chunking import ChunkBudgetError, ChunkRequest, Chunker, ChunkerRegistry, ChunkingPolicy, ChunkingRule
 from sct.config import TextCleanerConfig, PII_LABELS, PII_LABEL_MAP
-from sct.detectors import Detector, DetectorCapabilities, DetectorRegistry, DetectorSpec, DetectorUnavailable
+from sct.detectors import (
+    Detector, DetectorCapabilities, DetectorRegistry, DetectorSpec, DetectorUnavailable, DetectorWindowLimits,
+)
 from sct.policy_v2 import UnifiedPrivacyPolicy, HandlingRule, FindingDecision
 from sct.documents import (
     DocumentElement, DocumentExtractor, ExtractedDocument, ProcessedDocument, clean_document, extract_document,
@@ -59,9 +63,11 @@ from sct.streaming import (
 from sct.utils.anonymization_map import AnonymizationMap, MapEntry
 from sct.utils.process_result import ProcessResult
 
-__version__ = "0.10.0"
+__version__ = "0.11.0"
 __all__ = [
     "DocumentElement", "DocumentExtractor", "ExtractedDocument", "ProcessedDocument", "clean_document", "extract_document",
+    "ChunkBudgetError", "ChunkRequest", "Chunker", "ChunkerRegistry", "ChunkingPolicy", "ChunkingRule",
+    "ChunkedDocument", "CleanedChunk", "chunk_document", "DetectorWindowLimits",
     "UnifiedPrivacyPolicy", "HandlingRule", "FindingDecision", "Detection", "DetectionContext", "TextRange",
     "Detector", "DetectorCapabilities", "DetectorRegistry", "DetectorSpec", "DetectorUnavailable",
     "TextCleaner", "TextCleanerConfig", "CustomPatternTimeout", "ModelLoadError", "PRESETS", "preset_config",
