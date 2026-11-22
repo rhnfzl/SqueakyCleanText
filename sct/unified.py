@@ -46,7 +46,12 @@ class UnifiedDocument:
     rendered_edits: tuple[RenderedEdit, ...] = field(default=(), repr=False)
 
 
-def _whole_edit(mapping, transform):
+_LINE_CONTENT = re.compile(r"[^\r\n]+")
+
+
+def _whole_edit(mapping, transform, *, preserve_lines=False):
+    if preserve_lines:
+        return _sub(mapping, _LINE_CONTENT, lambda match: transform(match[0]))
     before = mapping._text
     after = transform(before)
     if after == before:
@@ -66,11 +71,12 @@ def _canonical(cleaner: TextCleaner, text: str) -> SourceMap:
     cfg = cleaner.cfg
     mapping = SourceMap.identity(text)
     edits = fragment_edits(text) if cfg.html_fragment_adapter else ()
+    preserve_lines = bool(edits)
     for start, end, replacement in reversed(edits):
         mapping = mapping.replace(start, end, replacement)
     if cfg.check_fix_bad_unicode:
         # Whole-stage repair has a proven cover, but no claimed character alignment.
-        mapping = _whole_edit(mapping, cleaner._fix_bad_unicode)
+        mapping = _whole_edit(mapping, cleaner._fix_bad_unicode, preserve_lines=preserve_lines)
     if cfg.check_to_ascii_unicode:
         transform = cleaner._text_normaliser.to_ascii_unicode
         parts = [transform(char) for char in mapping._text]
@@ -78,19 +84,21 @@ def _canonical(cleaner: TextCleaner, text: str) -> SourceMap:
             for i in reversed(range(len(parts))):
                 mapping = mapping.replace(i, i + 1, parts[i])
         else:
-            mapping = _whole_edit(mapping, transform)
+            mapping = _whole_edit(mapping, transform, preserve_lines=preserve_lines)
     if cfg.check_remove_emoji:
-        mapping = _whole_edit(mapping, cleaner._text_normaliser.remove_emoji)
+        mapping = _whole_edit(mapping, cleaner._text_normaliser.remove_emoji, preserve_lines=preserve_lines)
     # A parsed fragment already has its HTML boundaries. Decode escaped brackets after removal.
-    if cfg.check_replace_html and not edits:
+    if cfg.check_replace_html and not preserve_lines:
         mapping = _sub(mapping, cleaner._html_regex, cfg.replace_with_html)
     if cfg.check_fix_bad_unicode:
         mapping = _sub(mapping, normtext._MARKUP_OR_ENTITY, lambda m: normtext.unescape_markup(m.group()))
     if cfg.check_remove_isolated_letters:
-        mapping = _sub(mapping, constants.ISOLATED_LETTERS_REGEX, '')
+        # The letter pattern consumes its leading whitespace.
+        letter_replacement = (lambda match: match[0][0] if match[0][0] in '\r\n' else '') if preserve_lines else ''
+        mapping = _sub(mapping, constants.ISOLATED_LETTERS_REGEX, letter_replacement)
     if cfg.check_remove_isolated_special_symbols:
-        mapping = _whole_edit(mapping, cleaner._remove_isolated_special_symbols)
-    if cfg.check_normalize_whitespace and not edits:
+        mapping = _whole_edit(mapping, cleaner._remove_isolated_special_symbols, preserve_lines=preserve_lines)
+    if cfg.check_normalize_whitespace and not preserve_lines:
         mapping = _sub(mapping, re.compile(r'\s+'), ' ')
         mapping = _sub(mapping, re.compile(r'^ +| +$'), '')
     for callback in cfg.custom_pipeline_steps:
