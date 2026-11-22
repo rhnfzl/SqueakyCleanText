@@ -379,6 +379,11 @@ Run the full core suite before a larger change.
 .venv/bin/pytest tests/ --cov=sct --cov-report=xml --cov-fail-under=85 -v -rs --durations=20
 ```
 
+
+Local batch checks run before GitHub opens the PR. GitHub checks the full Python matrix and Linux workers before merge.
+Tag releases from `main`. A release tag can reuse passing checks from a merged PR with the same source tree. Otherwise it runs the full release suite.
+GitHub builds and smoke-tests the wheel before publishing. Run the publish workflow manually to check the package without publishing.
+
 ## Citation
 
 ```bibtex

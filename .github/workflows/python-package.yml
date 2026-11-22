@@ -9,13 +9,14 @@ on:
 permissions:
   contents: read
 
-# Main and develop runs still validate merged code and seed default-branch caches.
+# Protected main requires PR checks. Its push run only keeps test caches warm.
 concurrency:
   group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   checks:
+    if: github.event_name != 'push' || github.ref_name != 'main'
     name: Python static checks
     runs-on: ubuntu-latest
     steps:
@@ -46,12 +47,12 @@ jobs:
       run: uvx mypy==2.4.1 --python-executable .venv/bin/python
 
   build:
-
+    name: ${{ github.event_name == 'push' && github.ref_name == 'main' && 'Seed default-branch test caches' || format('build ({0})', matrix.python-version) }}
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.12", "3.13", "3.14"]
+        python-version: ${{ fromJSON(github.event_name == 'push' && github.ref_name == 'main' && '["3.12"]' || '["3.12", "3.13", "3.14"]') }}
 
     steps:
     - uses: actions/checkout@v4
@@ -98,17 +99,34 @@ jobs:
         path: ~/.cache/huggingface/hub/models--protectai--bert-base-NER-onnx
         key: ${{ steps.test-model.outputs.cache-primary-key }}
 
+    - name: Identify the PR checkout before tests run
+      id: tested-tree
+      if: github.event_name == 'pull_request' && github.base_ref == 'main' && matrix.python-version == '3.12'
+      run: |
+        tree=$(git rev-parse 'HEAD^{tree}')
+        echo "sha=$tree" >> "$GITHUB_OUTPUT"
+
     - name: Test with pytest and coverage
+      if: github.event_name != 'push' || github.ref_name != 'main'
       env:
         # Python 3.14 already defaults to this line coverage engine.
         COVERAGE_CORE: sysmon
       run: |
         .venv/bin/pytest tests/ --cov=sct --cov-report=xml --cov-fail-under=85 -v -rs --durations=20
 
+    # A later release can read this successful step through the Actions API.
+    - name: Tested PR ${{ github.event.pull_request.number }} tree ${{ steps.tested-tree.outputs.sha }}
+      if: github.event_name == 'pull_request' && github.base_ref == 'main' && matrix.python-version == '3.12'
+      run: |
+        test -n "$TESTED_TREE"
+        git diff --quiet HEAD --
+      env:
+        TESTED_TREE: ${{ steps.tested-tree.outputs.sha }}
+
   # Required gate for the adapters (decision 13): real worker processes on Linux.
   # Mark it required in GitHub branch protection; YAML cannot.
   linux-workers:
-
+    if: github.event_name != 'push' || github.ref_name != 'main'
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
