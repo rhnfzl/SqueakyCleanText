@@ -5,11 +5,11 @@
 [![Python Versions](https://img.shields.io/badge/Python-3.12%20|%203.13%20|%203.14-blue)](https://pypi.org/project/squeakycleantext/)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/rhnfzl/SqueakyCleanText/blob/main/LICENSE)
 
-**Stop hunting for personal details by hand. Mask detected names and contact details before sharing your text dataset.**
+**Clean text and mask personal details before you index it for search, train a model, or share a dataset.**
 
-SqueakyCleanText helps people prepare text datasets for sharing, LLM training, fine-tuning or RAG, with language detection in 75 languages.
-It masks the personal details it finds and repairs broken text.
-Works with JSONL files, Hugging Face datasets and DataTrove jobs, on CPU or GPU.
+SqueakyCleanText (SCT) repairs text, masks the personal data it finds, and returns counts and warnings you can review.
+Use it on a string or batch, in an existing data pipeline, or to turn extracted document text into cleaned chunks.
+Choose the stages, providers, and privacy rules your workflow needs.
 
 ```text
 in:   Iâ€™m Anna Berg &amp; my mail is anna@example.se. Order 4711 ships on 2024-05-01.
@@ -21,28 +21,20 @@ out:  Bel <PHONE> voor <PERSON>.
       sct_language=DUTCH  sct_pii_count=2  sct_pii_types=['PERSON', 'PHONE']
 ```
 
-Review cleaned text before sharing sensitive data; some personal details can be missed.
+Review the output before sharing sensitive data. SCT can miss personal details.
 
-Documentation: <https://rhnfzl.github.io/SqueakyCleanText/>
+## What you can do
 
-## What it does
+| If you need to… | Use SCT to… |
+|---|---|
+| Prepare text for training or retrieval | Repair broken Unicode and decode HTML entities. The `training` preset preserves formatting and ordinary dates and numbers. |
+| Protect personal data before sharing | Combine format rules and entity models, then use placeholders, realistic replacements, or reversible tokens. Apply your own handling rules and field schemas. |
+| Index PDFs or long documents | Extract PDF text with page and table structure, clean it, and split the cleaned text into bounded chunks. Choose detector windows separately from the chunks you export. |
+| Curate and audit a corpus | Score records, review near-duplicate decisions, and generate a data card. Use explicit selection rules when you want to remove records. |
+| Fit SCT into an existing workflow | Use Python, JSONL and the CLI, structured records, Hugging Face datasets, DataTrove, LangChain, Haystack, or MCP. Batch model inference on CPU or supported GPUs. |
 
-One call runs these stages. Each one is a config field with a safe default, so you can switch it off.
-
-1. **Detect the language.** One of 75 languages, with a confidence score. Pin it or limit it when you know.
-2. **Repair the text.** Fixes mojibake and HTML entities (ftfy), folds styled characters, tidies whitespace, and can replace HTML tags, numbers and dates with tags.
-3. **Remove personal data.** Regex rules (emails, phones, URLs, IPs, IBAN and card numbers) and an ensemble of multilingual NER models (names, places, organisations). Found values become:
-   - tags such as `<PERSON>` (default),
-   - realistic fake values (`synthetic`), or
-   - reversible placeholders `<PERSON_0>` plus a map you store apart.
-
-   SCT ships no word lists; pass your own terms to always mask (`custom_deny_terms`), never mask (`custom_allow_terms`), or your own labelled regex (`custom_patterns`).
-4. **Score and document.** Every result has value-free `signals`. Turn them into `sct_*` columns (language, PII share, warnings; optional quality score and MinHash for near-duplicate removal) and a data card with `sct-report` ([docs/SCORE.md](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/SCORE.md)).
-5. **Scale.** `process_batch` runs documents in threads and batches the NER calls, on CPU (ONNX Runtime, no PyTorch needed) or an NVIDIA GPU. Adapters for Hugging Face `datasets`, DataTrove, LangChain, Haystack and MCP.
-
-<img src="https://raw.githubusercontent.com/rhnfzl/SqueakyCleanText/main/resources/sct_overview.png" alt="What SCT offers: raw text, JSONL or JSON, a DataFrame or RAG documents go in; SCT detects the language, repairs the text, removes personal data, and scores and documents each record (sct_* columns, quality score, MinHash), batched on CPU or GPU; clean text, signals and sct_* columns, an optional quality score and MinHash, a data card and an optional reversible map come out. Call SCT from process or process_batch, sct-clean, sct-report, sct-mcp, Hugging Face datasets, DataTrove, LangChain or Haystack." width="900">
-
-SCT finds most personal data, not all of it. Check its output before you publish sensitive data.
+SCT detects 75 languages. Name, place, and organisation coverage depends on the model and language.
+See [language coverage](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/LANGUAGES.md) and the [documentation site](https://rhnfzl.github.io/SqueakyCleanText/).
 
 <!-- --8<-- [start:quickstart] -->
 ## Install
@@ -59,7 +51,10 @@ Python 3.12 or newer. Add extras for what you use, for example `pip install "squ
 | `langchain`, `haystack` | Clean documents in RAG pipelines |
 | `gpu` | Run NER on an NVIDIA GPU |
 | `synthetic` | Replace personal data with fake values |
-| `score` | MinHash signatures for near-duplicate removal |
+| `score`, `corpus` | Corpus scoring and near-duplicate selection, or native DataTrove curation with checkpoints |
+| `documents`, `ocr` | Extract PDF text with Docling, or cover image regions with an OCR provider |
+| `chunking` | Add Semchunk and Chonkie providers to built-in chunking |
+| `token-store`, `secrets` | Store encrypted reversible maps, or detect supported credential formats |
 | `gliner` | Your own entity labels, and `ner_mode="pii"` (58 PII labels) |
 | `mcp` | Run SCT as an MCP server for AI assistants |
 
@@ -67,7 +62,15 @@ All extras: [docs/INSTALL.md](https://github.com/rhnfzl/SqueakyCleanText/blob/ma
 
 ## Quickstart
 
-For training and RAG data, use the `training` preset. It repairs the text and replaces personal data. Numbers, dates, HTML, case, line breaks and code stay as written.
+Try format-based masking from the command line without loading a name model.
+
+```sh
+printf 'Email maria@example.com' | sct-clean --no-ner
+# Email <EMAIL>
+```
+
+For training and retrieval data, use the `training` preset. It repairs text and masks detected personal data.
+It preserves numbers, dates, HTML tags, case, and line breaks by default, subject to configured repairs and PII replacement.
 
 ```python
 from sct import TextCleaner, preset_config
@@ -97,7 +100,7 @@ from sct.integrations.hf import clean_dataset
 
 if __name__ == "__main__":
     ds = Dataset.from_dict({"text": ["Mail jan@example.nl", "Call Maria Chen on +44 20 7946 0958."]})
-    ds = clean_dataset(ds, columns=["text"], output="new_column", score=True, num_proc=2)
+    ds = clean_dataset(ds, columns=["text"], output="new_column", score=True)
     print(ds[1]["text_clean"], ds[1]["sct_pii_types"])
     # -> Call <PERSON> on <PHONE>. ['PERSON', 'PHONE']
 ```
@@ -113,9 +116,15 @@ print(result.stat_text)  # -> person mail email number ships date
 ```
 <!-- --8<-- [end:quickstart] -->
 
-## Use it in your data pipeline
+## Use SCT in your pipeline
 
-**DataTrove** (`datatrove` extra). Put SCT after your language and quality filters, so the NER step only sees documents you keep:
+**DataTrove.** Install the pipeline adapter and the dependency for its JSONL reader and writer.
+
+```sh
+pip install "squeakycleantext[datatrove]" orjson
+```
+
+Put SCT after language and quality filters when you only want to clean the records you plan to keep.
 
 ```python
 from datatrove.executor import LocalPipelineExecutor
@@ -126,26 +135,28 @@ from sct.integrations.datatrove import SCTCleaner
 if __name__ == "__main__":
     LocalPipelineExecutor(
         pipeline=[JsonlReader("raw/"), SCTCleaner(), JsonlWriter("clean/")],
-        tasks=4,
-        workers=2,
+        tasks=1,
+        workers=1,
     ).run()
 ```
 
-**Everything else:**
+Choose an entry point based on the data you already have.
 
 | Where | Usage | Docs |
 |---|---|---|
-| PDF extraction | `extract_document` and `clean_document`, with an optional `DocumentExtractionRouter` | [DOCUMENTS](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/DOCUMENTS.md) |
+| PDF text and tables | `extract_document`, `clean_document`, and the optional `DocumentExtractionRouter` | [DOCUMENTS](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/DOCUMENTS.md) |
 | Clean and chunk a document | `chunk_document(cleaner, text, max_size=1024)` | [CHUNKING](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/CHUNKING.md) |
 | LangChain | `SCTDocumentTransformer().transform_documents(docs)` | [INTEGRATIONS](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/INTEGRATIONS.md) |
 | Haystack | `pipe.add_component("sct", SCTDocumentCleaner())` | [INTEGRATIONS](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/INTEGRATIONS.md) |
 | Ray, Spark, Polars, DuckDB, dlt, Daft | `clean_columns(handle, batch)` | [RECIPES](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/RECIPES.md) |
-| JSON, DataFrames, RAG chunks, streams | `process_json(cleaner, value)`, `WindowedStreamingRedactor(cleaner)` | [ADAPTERS](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/ADAPTERS.md) |
+| JSON, DataFrames, existing chunks, streams, images | JSON and table adapters, `process_rag_chunks`, streaming redactors, and `redact_image` | [ADAPTERS](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/ADAPTERS.md) |
 | Command line | `printf 'Email maria@example.com' \| sct-clean --no-ner` | [ADAPTERS](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/ADAPTERS.md) |
 | Data card for a file | `sct-report data.jsonl --text-column text --out report.json --card card.md` | [SCORE](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/SCORE.md) |
 | AI assistants | `sct-mcp` (MCP server, `mcp` extra) | [MCP](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/MCP.md) |
 
-The framework adapters use the `training` preset unless you pass a config, so their output keeps numbers, dates, HTML and case. They build one cleaner per worker process and reject reversible mode, as do the streaming redactors and the MCP server. Plan for 5 to 7 GB of RAM per worker with the default NER ensemble.
+The framework adapters use the `training` preset unless you pass a config. They build one cleaner per worker process.
+Check [worker memory and adapter limits](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/INTEGRATIONS.md#workers-and-memory) before raising concurrency.
+Use direct text processing when you need a reversible map.
 
 ### Clean a document and produce chunks
 
@@ -157,6 +168,7 @@ from sct import TextCleaner, TextCleanerConfig, chunk_document
 cleaner = TextCleaner(TextCleanerConfig(check_ner_process=False))
 result = chunk_document(cleaner, "Contact alice@example.com for details.", max_size=24)
 texts = [chunk.text for chunk in result.chunks]
+assert "alice@example.com" not in "".join(texts)
 ```
 
 SCT can use Markdown headings or cleaned document elements as boundaries. Install
@@ -164,40 +176,30 @@ SCT can use Markdown headings or cleaned document elements as boundaries. Instal
 In unified PII processing, you can also choose a chunker for each compatible detector.
 See [chunking providers and routing](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/CHUNKING.md).
 
-For HTML fragments, opt into the [HTML fragment adapter](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/API.md#clean-html-fragments) to keep block and table cell boundaries while masking personal details split by inline tags.
+## How the stages fit together
 
-## How it works
+- **Prepare the input.** Pass text directly, use a record adapter, or extract a document into text elements with available page and table information.
+- **Detect and protect.** Configure normalization, language detection, format rules and models through `TextCleanerConfig`. Use the unified mode to apply one privacy policy across detectors and track source ranges.
+- **Use the result.** Return cleaned text, split it into output chunks, or score and select records for a corpus. Output chunks and detector windows serve separate stages.
 
-<img src="https://raw.githubusercontent.com/rhnfzl/SqueakyCleanText/main/resources/sct_flow.png" alt="SqueakyCleanText pipeline: any entry point runs 1 detect language, 2 fix the text, 3 regex PII and cleanup, 4 NER, 5 replacement mode (placeholder tags are written in steps 3 and 4; synthetic and reversible swap the values in after NER), 6 output and signals. Dashed steps are off by default." width="900">
+The legacy pipeline remains the default. See [configuration](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/CONFIG.md) for presets, batch settings and migration to unified processing.
 
 <details>
-<summary>The diagram as text</summary>
+<summary>Legacy text-cleaning diagram</summary>
 
-- Entry points: any of them (`process()`, `process_batch()`, `sct-clean`, `sct-mcp`, the adapters and the streaming redactors) runs the same pipeline.
-- 1 Detect language: Lingua, 75 languages, on the raw input. Pin it or limit it with `language=`. Low confidence adds a warning. The language picks the NER models and the Faker locale.
-- 2 Fix the text: Unicode repair (ftfy), styled-character folding, HTML entities and tags. ASCII transliteration and emoji removal are off by default.
-- 3 Regex PII and cleanup, in this order: URLs, emails, IPs, dates, fuzzy dates (off), IBANs and cards (checksums), ID codes (off), phones, years, numbers, currency symbols, then isolated letters, isolated symbols (with short bracket and brace content), and whitespace. Counted in `regex_counts`.
-- 4 NER: ONNX models per language, a vote that keeps a span when its best model score passes the threshold, chunk windows for long text, propagation of masked names to their other copies, and span edges snapped to word edges. GLiNER and `ner_mode="pii"` are opt in.
-- 5 Replacement mode: `<PERSON>` tags by default; synthetic fakes or reversible `<PERSON_0>` with a map (or a `TokenStore` reference) are opt in. The map holds personal data. Placeholder tags are written in steps 3 and 4; synthetic and reversible swap the values in after NER.
-- 6 Output: `lm_text`, `stat_text` (lower case, no stopwords or punctuation), `language`, value-free `signals`, and `metadata` with `regex_counts`.
-- Across all stages (not drawn): `process_batch` runs documents in threads and batches NER across documents (`ner_batch_size`); NER runs on CPU, CUDA or, for torch and GLiNER, the Apple GPU (`ner_device='mps'`, opt-in); the `training` preset keeps numbers, dates and HTML.
+<img src="https://raw.githubusercontent.com/rhnfzl/SqueakyCleanText/main/resources/sct_flow.png" alt="Legacy SCT text pipeline: detect language, repair text, match formats, detect named entities, replace detected values, and return text and signals." width="900">
 
 </details>
-
-Every step is a `TextCleanerConfig` field ([docs/CONFIG.md](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/CONFIG.md)). The diagrams are built by [scripts/diagrams/](https://github.com/rhnfzl/SqueakyCleanText/tree/main/scripts/diagrams); open the `.excalidraw` files in [resources/](https://github.com/rhnfzl/SqueakyCleanText/tree/main/resources) to view them in Excalidraw.
-
-From 0.9.0, configure cleaners with `TextCleanerConfig` and set document concurrency with `max_workers`.
-Deprecated config globals, `ner_models_list`, the worker `batch_size` alias and cleaner helper properties are removed.
 
 <!-- --8<-- [start:results] -->
 ## What you get back
 
 `process` and `process_batch` return a `ProcessResult`:
 
-- `lm_text`: the cleaned text, sentences intact, for LLMs, RAG and training.
+- `lm_text`: cleaned text for LLMs, retrieval, and training.
 - `stat_text`: lower-cased, without stopwords and punctuation, for classic ML models.
 - `language`: the detected language.
-- `signals`: a value-free view with the same keys for every input: language and confidence, `pii_count`, `pii_share`, `pii_types`, `sensitive` (`pii_count > 0`), warnings and the NER models that ran. Safe to log or store next to the text.
+- `signals`: a value-free view with the same keys for every input: language and confidence, `pii_count`, `pii_share`, `pii_types`, `sensitive` (`pii_count > 0`), warnings and the NER models that ran. Use these fields for quality checks without logging matched values.
 - `metadata`: the same counts, plus raw values only when you ask for them (the reversible map, or `findings` with `include_entities=True`). Keep those out of logs.
 
 `score_record` turns a result into flat `sct_*` columns for filtering and data cards. `ScoreConfig` adds an optional quality score and a MinHash signature. Fields: [docs/API.md](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/API.md), columns: [docs/SCORE.md](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/SCORE.md).
@@ -230,29 +232,27 @@ result = cleaner.process("Contact alice@example.com")
 assert "alice@example.com" not in result.lm_text
 ```
 
-All selected detectors inspect the same canonical text before PII replacement. `use_mode` follows the placeholder, synthetic or reversible mode. `keep` affects PII replacement only. `redact` emits `<REDACTED>` and never saves that value in the reversible map. Protection wins over overlapping keep decisions; redaction wins over other protection. Unknown scores protect by default, or fail with `unknown_score_action="error"`.
+All selected detectors inspect the same prepared text. An application can register its own detectors and select them with `detector_specs`.
+Use `custom_allow_terms`, `custom_deny_terms`, or `custom_patterns` for your own terms and patterns.
+The policy can keep a finding, replace it using the selected mode, or redact it without storing the value in a reversible map.
+See [detector selection and network permissions](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/CONFIG.md#unified-processing-and-migration) and [policy behavior](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/PRIVACY.md#unified-privacy-boundaries).
 
-A nonempty `detector_specs` tuple selects the complete detector set from an application-owned `DetectorRegistry`. Empty specs select the configured built-in regex rules and native NER when `check_ner_process=True`. Native registry loading requires `allow_network_detectors=True` because model artifacts may need downloading. External-only selection does not initialize native NER. Separately requested document classification still runs and also requires network permission in unified mode. Legacy model-loading behavior stays unchanged.
+Unified results include value-free findings, detector and policy identities, and the number of matches and replacements.
+Source mappings use Unicode code-point offsets and report `exact`, `covering`, or `unavailable`. Complex repairs can widen a range.
+For extracted PDFs, these offsets refer to the extracted text, and extraction boxes describe layout.
+Keep reversible maps and any explicitly requested finding values out of logs.
 
-`metadata["findings_v2"]` contains value-free canonical positions, original-input ranges, mapping quality and policy decisions. `counts_v2` separates detector hits after configured allow-term filtering from resolved replacements; `provenance_v2` records detector and policy identities. Legacy counters stay empty in unified mode. Unified signals add `version=2`, `counts_v2`, `coverage_v2` and `provenance_v2`. CLI/MCP summaries distinguish detector hits from rendered replacements. `coverage_v2` reports source coverage quality and lower/upper bounds. Non-exact coverage leaves `pii_chars` and `pii_share` as `None`; score summaries place these shares in an explicit unknown bucket. Only actual built-in regex formatting findings receive the non-PII format exclusion; native, external and caller-declared dates remain sensitive.
-
-Source mappings use Unicode code-point offsets and report `exact`, `covering` or `unavailable`. Complex built-in repairs can cover the whole input. Opaque custom callbacks make mapping unavailable, even when they return unchanged text. `source_mapping="require_source"` rejects those callbacks. These ranges do not describe original PDF bytes.
-
-`process(..., context=DetectionContext(...))`, `process_batch(..., contexts=...)` and `aprocess_batch(..., contexts=...)` accept caller context in unified mode. Batch contexts must match input count and order. Buffered streaming uses this whole-document path; windowed streaming and browser manifests reject unified mode.
-
-`include_entities=True` explicitly adds sensitive `findings_v2_values`, linked by `finding_index` to canonical findings. This includes values whose output was redacted. Keep this audit payload and reversible maps out of logs. They are absent by default, apart from the map explicitly requested through reversible mode.
-
-Custom callbacks need migration review. Legacy callbacks run after regex replacement and before NER.
-Unified callbacks run before all detection, so callbacks that depend on `<EMAIL>` or other rendered markers receive different input.
-See [configuration and rollback](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/CONFIG.md#unified-processing-and-migration).
+See [experimental detector routing](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/CONFIG.md#experimental-detector-routing) if you need to choose when to run a more expensive detector group. The default runs all configured detectors.
+Custom processing callbacks run at a different stage in unified mode. Review the [migration details](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/CONFIG.md#unified-processing-and-migration) before switching.
 
 ## Caller-declared fields (opt-in)
 
 Declare exact fields when a record needs protection beyond text detection. SCT does not infer meaning from field names.
 
 ```python
-from sct import FieldRule, FieldSchema, process_json
+from sct import FieldRule, FieldSchema, TextCleaner, TextCleanerConfig, process_json
 
+cleaner = TextCleaner(TextCleanerConfig(pii_processing="unified", check_ner_process=False))
 schema = FieldSchema("contacts", "1", (
     FieldRule(("name",), ("PERSON",), "protect_value"),
 ))
@@ -261,17 +261,31 @@ assert process_json(cleaner, {"name": "May", "status": "May"}, schema=schema).va
 }
 ```
 
-Schemas require unified processing. Paths select original keys and list positions. Missing fields and `None` remain unchanged; selected containers fail. Whole-value protection also accepts finite numeric and boolean scalars. Default non-string handling stays unchanged. Protection uses the existing policy and replacement modes. Conflicting keep decisions, score errors, allow terms or disabled tags fail. Unknown scores with `unknown_score_action="protect"` remain compatible with thresholds. Explicit field types win equal-span ties after action priority.
+Schemas need unified processing and apply to caller-selected paths. Use whole-value protection for known fields or type hints for a compatible detector.
+The schema and the detector share the same privacy policy.
+See [schema paths, context and adapter restrictions](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/API.md) for JSON, DataFrames, framework adapters and RAG inputs.
 
-Hints require providers that support context and the declared types. Presidio receives explicit declared types as context; ONNX-only providers reject required hints. DataFrame paths use `(column_label,)` across a column or `(row_label, column_label)` for a cell. Conflicting overlapping declarations fail. Framework paths use `(column_name,)` per record. RAG paths use `("text",)` or `("metadata", ...)`. Selected missing DataFrame cells remain unchanged. Masking numeric cells changes only the copied output column to object dtype. Unsupported path shapes fail.
+## Choose how to extend SCT
 
-Unified findings use positional references without original keys or labels. Schema-match paths and caller context stay out of signals and provenance. MCP full detail excludes sensitive value payloads. Framework constructors accept a trusted module-level `registry_factory`; workers pickle its reference and rebuild per process. Haystack data resolves only application-registered factory references. Protect serialized pipeline configuration, which can contain caller schema/context identifiers.
+SCT defines the cleaned result and source mapping, and applies the privacy policy you choose. You can supply providers for individual stages.
 
-Applications register schemas through CLI `main(..., schemas=...)` or `create_mcp_server(..., schemas=...)`. Requests supply only exactly registered data-only schemas. CLI exposes `--processing unified --schema '<JSON>'`; `--signals` adds versioned counts and a summary. Requests cannot import Python factories. Existing adapter restrictions on reversible mode remain.
+| Stage | What you choose | Where to start |
+|---|---|---|
+| Document extraction | Choose a provider by declared format and required output with `DocumentExtractionRouter`. Standard Docling supports OCR and tables. Use native PDF extraction when the text layer is sufficient. The original PDF needs its own redaction workflow. | [Document extraction](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/DOCUMENTS.md#choose-an-extractor-explicitly) |
+| HTML fragments | Opt into `html_fragment_adapter=True` in unified mode. SCT can mask values split by supported inline tags while preserving block and table-cell boundaries. Unsupported fragments use your configured pipeline. | [HTML fragment adapter](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/API.md#clean-html-fragments) |
+| Detection | Built-in rules and models, a detector registry, caller field schemas or experimental detector routing. Configure language abstention when uncertain results need a different path. | [Configuration](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/CONFIG.md), [model backends](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/NER_BACKENDS.md) |
+| Chunking | Built-in text, Markdown or document-element boundaries, or a compatible custom chunker. You can supply your model's token counter for output budgets. | [Chunking](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/CHUNKING.md) |
+| Corpus selection | Caller scoring, an explicit deduplication basis and report-only or apply mode. Native DataTrove runs can resume from private checkpoints and optionally check a caller reference corpus. | [Corpus curation](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/INTEGRATIONS.md#native-corpus-curation) |
+| Privacy and storage | Replacement policy, optional credential-format detection, and optional encrypted storage with application-owned keys and retention. | [Credential formats](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/SECRET_DETECTION.md), [token storage](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/TOKEN_STORES.md) |
+
+Quality scores and duplicate decisions are signals to validate on your own data.
+The [acceptance checks](https://github.com/rhnfzl/SqueakyCleanText/blob/main/evaluation/improvements/ACCEPTANCE.md) cover provider behavior and scorer parity. They do not establish quality-filter accuracy.
+
+**Availability.** The document extraction router shipped in 0.12.0. The HTML fragment adapter shipped in 0.13.0. Corpus disposition routing with optional verified repair is in development. See the [changelog](https://github.com/rhnfzl/SqueakyCleanText/blob/main/CHANGELOG.md).
 
 ## Speed and hardware
 
-Default config (full multilingual NER ensemble), release benchmark documents (up to about 900 characters), SCT 0.8.0, on a workstation CPU and high-end GPUs, median of 3 runs. 0.8.1 runs at the same speed.
+Historical SCT 0.8.0 results on benchmark documents up to about 900 characters, with the full multilingual ensemble unless noted. Each result is the median of three runs.
 
 | Workload | Hardware | Docs/s |
 |---|---|---|
@@ -328,25 +342,6 @@ Language detection covers 75 languages. Full NER models cover English, Dutch, Ge
 
 Detailed known limits: [docs/limits.md](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/limits.md).
 
-## Opt-in document and corpus workflows
-
-Users can combine extraction, unified detection, encrypted references and corpus selection without changing legacy defaults.
-Document and framework adapters use non-reversible output; direct text processing can return encrypted map references.
-The original documents and private corpus checkpoints remain caller-owned sensitive data.
-
-| Capability | Entry point and limit |
-|---|---|
-| Encrypted references | `EncryptedSQLiteTokenStore` from `sct.token_stores`; keys and authorization remain application-owned |
-| Corpus selection | `analyse_records` and `select_records` from `sct.corpus`; report-only by default, explicit basis required for removal |
-| Native replay | `curate_resumable`; identity/checksum validation and private checkpoints, without exactly-once guarantees |
-| PDF extraction | `extract_document` and `clean_document`; optional `DocumentExtractionRouter`; extracted-text protection only |
-| Credential formats | Optional `secrets` detector; four syntactic categories, not credential validity |
-| Language uncertainty | `language_policy='abstain'`; explicit thresholds and unknown-language action |
-| Detector routing | `routing_policy='always_run'` stays default; calibrated cascade remains experimental |
-
-See the [combined acceptance evidence](https://github.com/rhnfzl/SqueakyCleanText/blob/main/evaluation/improvements/ACCEPTANCE.md) for the tested profiles.
-Trained Torch and ONNX scores agree on the parity controls. The synthetic gibberish control scored highest, so quality-filter accuracy remains unverified.
-
 ## Documentation
 
 | Topic | Where |
@@ -355,7 +350,7 @@ Trained Torch and ONNX scores agree on the parity controls. The synthetic gibber
 | Every config field, presets, language options | [docs/CONFIG.md](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/CONFIG.md) |
 | `TextCleaner`, `ProcessResult`, `signals` | [docs/API.md](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/API.md) |
 | Data pipelines, other engines, MCP server | [docs/INTEGRATIONS.md](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/INTEGRATIONS.md), [docs/RECIPES.md](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/RECIPES.md), [docs/MCP.md](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/MCP.md) |
-| JSON, DataFrame, RAG, CLI, streaming, OCR | [docs/ADAPTERS.md](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/ADAPTERS.md) |
+| JSON, DataFrames, RAG, CLI, streaming, OCR | [docs/ADAPTERS.md](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/ADAPTERS.md) |
 | Score columns, quality, MinHash, data cards, `sct-report` | [docs/SCORE.md](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/SCORE.md) |
 | NER backends, GLiNER, PII mode | [docs/NER_BACKENDS.md](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/NER_BACKENDS.md) |
 | Encrypted local token maps | [docs/TOKEN_STORES.md](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/TOKEN_STORES.md) |
@@ -364,8 +359,6 @@ Trained Torch and ONNX scores agree on the parity controls. The synthetic gibber
 | Languages and adding a language | [docs/LANGUAGES.md](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/LANGUAGES.md), [docs/ADDING_LANGUAGES.md](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/ADDING_LANGUAGES.md) |
 | The whole API in one file, for AI coding assistants | [llms.txt](https://github.com/rhnfzl/SqueakyCleanText/blob/main/llms.txt) |
 | Release notes | [CHANGELOG.md](https://github.com/rhnfzl/SqueakyCleanText/blob/main/CHANGELOG.md) |
-
-**New in 0.8.1:** fewer leaks at the same speed, `<IBAN>` and `<CARD>` tags, and JSON and longer bracketed text survive cleanup. Some defaults changed; each has a setting to switch it back ([CHANGELOG.md](https://github.com/rhnfzl/SqueakyCleanText/blob/main/CHANGELOG.md)).
 
 ## Contributing
 
