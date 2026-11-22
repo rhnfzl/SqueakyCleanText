@@ -369,6 +369,21 @@ Trained Torch and ONNX scores agree on the parity controls. The synthetic gibber
 
 Issues and pull requests are welcome. Read [AGENTS.md](https://github.com/rhnfzl/SqueakyCleanText/blob/main/AGENTS.md) first: model mistakes are fixed with model-driven rules, never with word lists, and every behaviour stays configurable.
 
+Run the same Ruff and mypy checks as CI from the repository root. Use Python 3.12 and uv 0.10.9.
+
+```sh
+uv sync --locked --python 3.12 --extra dev --extra test
+.venv/bin/ruff check sct/ tests/ scripts/
+uvx mypy==2.4.1 --python-executable .venv/bin/python
+```
+
+For an optional pre-commit hook, run the Ruff command above from your local Git hook.
+Run the full core suite before a larger change.
+
+```sh
+.venv/bin/pytest tests/ --cov=sct --cov-report=xml --cov-fail-under=85 -v -rs --durations=20
+```
+
 ## Citation
 
 ```bibtex
