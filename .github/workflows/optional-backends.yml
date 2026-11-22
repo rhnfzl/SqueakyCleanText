@@ -158,6 +158,7 @@ jobs:
           SCT_OPTIONAL_PROFILE: documents
           SCT_DOCLING_ARTIFACTS: .docling-artifacts
           HF_HUB_OFFLINE: "1"
+          ORT_DISABLE_TELEMETRY: "1"
           OMP_NUM_THREADS: "2"
         run: >-
           .venv/bin/python -m pytest tests/test_docling_integration.py -v -s

@@ -1,15 +1,20 @@
 """Extract PDFs using verified local Docling assets without implicit downloads."""
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import replace
 import hashlib
 import importlib.metadata
 import json
 from io import BytesIO
 from pathlib import Path
-from typing import Any
+from types import MappingProxyType
+from typing import Any, TYPE_CHECKING
 
-from sct.documents import DocumentElement, ExtractedDocument
+from sct.documents import DocumentElement, DocumentOutput, ExtractedDocument
+
+if TYPE_CHECKING:
+    from docling.document_converter import PdfFormatOption
 
 _LAYOUT = ('docling-project/docling-layout-heron', '8f39ad3c0b4c58e9c2d2c84a38465abf757272d8')
 _TABLE = ('docling-project/docling-models', 'fc0f2d45e2218ea24bce5045f58a389aed16dc23')
@@ -92,6 +97,10 @@ def _validate_artifacts(path: Path) -> None:
 class DoclingExtractor:
     """PDF extraction with pinned CPU layout, table structure and local English RapidOCR."""
 
+    capabilities: Mapping[str, frozenset[DocumentOutput]] = MappingProxyType({
+        'pdf': frozenset({'text', 'ocr', 'tables', 'coordinates'}),
+    })
+
     def __init__(self, *, artifacts_path: Path):
         self.artifacts_path = Path(artifacts_path)
 
@@ -99,9 +108,8 @@ class DoclingExtractor:
         _validate_artifacts(self.artifacts_path)
         try:
             from docling.datamodel.accelerator_options import AcceleratorOptions
-            from docling.datamodel.base_models import ConversionStatus, DocumentStream, InputFormat
             from docling.datamodel.pipeline_options import PdfPipelineOptions, RapidOcrOptions
-            from docling.document_converter import DocumentConverter, PdfFormatOption
+            from docling.document_converter import PdfFormatOption
 
             options = PdfPipelineOptions(artifacts_path=self.artifacts_path,
                 accelerator_options=AcceleratorOptions(device='cpu', num_threads=2),
@@ -110,15 +118,39 @@ class DoclingExtractor:
                 do_table_structure=True, do_code_enrichment=False, do_formula_enrichment=False,
                 do_picture_classification=False, do_picture_description=False, do_chart_extraction=False,
                 generate_page_images=False, generate_picture_images=False, generate_parsed_pages=False)
-            converter = DocumentConverter(allowed_formats=[InputFormat.PDF],
-                format_options={InputFormat.PDF: PdfFormatOption(pipeline_options=options)})
-            result = converter.convert(DocumentStream(name='input.pdf', stream=BytesIO(path.read_bytes())),
-                                       raises_on_error=False)
-            if result.status != ConversionStatus.SUCCESS:
-                raise ValueError
-            return _extract_elements(result.document)
+            return _convert_pdf(path, PdfFormatOption(pipeline_options=options))
         except Exception:
             raise ValueError('PDF conversion failed; check the source and verified local artifacts') from None
+
+
+class DoclingNativeExtractor:
+    """Read a PDF's native text layer with the pinned Docling SDK."""
+
+    capabilities: Mapping[str, frozenset[DocumentOutput]] = MappingProxyType({'pdf': frozenset({'text'})})
+
+    def extract(self, path: Path) -> ExtractedDocument:
+        _sdk()
+        try:
+            from docling.datamodel.pipeline_options import NativePdfPipelineOptions
+            from docling.document_converter import NativePdfFormatOption
+
+            options = NativePdfPipelineOptions(parser_threads=2, enable_remote_services=False,
+                allow_external_plugins=False, generate_page_images=False, generate_picture_images=False)
+            return _convert_pdf(path, NativePdfFormatOption(pipeline_options=options))
+        except Exception:
+            raise ValueError('Native PDF conversion failed; check the source and documents extra') from None
+
+
+def _convert_pdf(path: Path, option: PdfFormatOption) -> ExtractedDocument:
+    from docling.datamodel.base_models import ConversionStatus, DocumentStream, InputFormat
+    from docling.document_converter import DocumentConverter
+
+    converter = DocumentConverter(allowed_formats=[InputFormat.PDF], format_options={InputFormat.PDF: option})
+    result = converter.convert(DocumentStream(name='input.pdf', stream=BytesIO(path.read_bytes())),
+                               raises_on_error=False)
+    if result.status != ConversionStatus.SUCCESS:
+        raise ValueError('PDF conversion did not succeed')
+    return _extract_elements(result.document)
 
 
 def _extract_elements(document: Any) -> ExtractedDocument:
