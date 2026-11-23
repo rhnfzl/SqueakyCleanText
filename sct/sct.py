@@ -924,8 +924,7 @@ class TextCleaner:
             if not original or self._allowed(original):
                 return original
             if anon_map is not None:
-                placeholder = anon_map.next_placeholder(label)
-                anon_map.add(placeholder, source(original), label, match.start(), match.end())
+                placeholder = anon_map._record_replacement(source(original), label, match.start(), match.end())
                 return self._emit(label, original, placeholder)
             if self._synthetic_replacer and label in FAKER_GENERATORS:
                 return self._emit(label, original, self._synthetic_replacer.get_replacement(label, original))
@@ -1097,14 +1096,7 @@ class TextCleaner:
                 return match.group()
             if keep is not None and keep(match.group()):
                 return self._protect(match.group())
-            placeholder = anon_map.next_placeholder(entity_type)
-            anon_map.add(
-                placeholder,
-                match.group(),
-                entity_type,
-                match.start(),
-                match.end(),
-            )
+            placeholder = anon_map._record_replacement(match.group(), entity_type, match.start(), match.end())
             return self._emit(entity_type, match.group(), placeholder)
 
         return pattern.sub(replace, text)

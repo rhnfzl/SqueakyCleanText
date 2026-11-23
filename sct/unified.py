@@ -342,8 +342,7 @@ class UnifiedProcessor:
             if decision.action == 'redact':
                 value = '<REDACTED>'
             elif amap is not None:
-                value = amap.next_placeholder(kind)
-                amap.add(value, original, kind, start, end)
+                value = amap._record_replacement(original, kind, start, end)
             elif synthetic and kind in FAKER_GENERATORS:
                 value = synthetic.get_replacement(kind, original)
             else:
