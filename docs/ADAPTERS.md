@@ -41,7 +41,7 @@ Use `--no-ner` for format-based masking without a name model.
 Use `--preset training` to preserve formatting and ordinary dates and numbers, or `--to-ascii` to transliterate.
 See `sct-clean --help` for all flags.
 
-On [Unreleased](https://github.com/rhnfzl/SqueakyCleanText/blob/main/CHANGELOG.md#unreleased) builds:
+Version 0.13.1 adds these CLI features.
 
 - Pass `--processing unified --allow-network-detectors` to run model detection in unified mode.
   This permits downloads if model files are missing. You must pass the flag even when the model files are cached.
