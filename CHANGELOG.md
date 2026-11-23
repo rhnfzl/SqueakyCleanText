@@ -4,6 +4,14 @@ Benchmark scores below use open datasets credited in [benchmarks/DATASET_CREDITS
 
 ## Unreleased
 
+The command line can run unified model detection after you grant permission.
+When you clean a file, source counts include the file's original line endings.
+
+### Fixed
+
+- Added `--allow-network-detectors` to match Python's permission for unified model detectors.
+- The CLI preserves original line endings until the cleaner applies its configured normalization.
+
 ## 0.13.0 - 2026-11-22
 
 Opt into HTML fragment cleaning in the unified text pipeline.
