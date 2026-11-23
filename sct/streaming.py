@@ -1,7 +1,11 @@
 """Streaming interfaces with explicit privacy guarantees."""
 
 import re
+from abc import ABC, abstractmethod
 from bisect import bisect_right
+from collections.abc import Iterator
+from contextlib import contextmanager
+from threading import Lock
 
 from sct.config import require_adapter_mode
 from sct.sct import TextCleaner
@@ -31,33 +35,68 @@ _PHONE_TAIL_MAX = 32
 _PHONE_RUN = re.compile(r"[+(]?\d(?:[\d ()+./-]*\d)?")
 
 
-class BufferedStreamingRedactor:
-    """Buffer a document so entities split across chunks remain detectable."""
-
+class _StreamingRedactor(ABC):
     def __init__(self, cleaner: TextCleaner) -> None:
         require_adapter_mode(cleaner.cfg)
         self._cleaner = cleaner
-        self._chunks: list[str] = []
+        self._operation_lock = Lock()
         self._finished = False
 
+    @contextmanager
+    def _open_operation(self, finished_message: str) -> Iterator[None]:
+        if not self._operation_lock.acquire(blocking=False):
+            raise RuntimeError("A stream operation is already in progress")
+        try:
+            if self._finished:
+                raise RuntimeError(finished_message)
+            yield
+        finally:
+            self._operation_lock.release()
+
     def feed(self, chunk: str) -> str:
-        """Buffer a chunk and emit no text before the document is complete."""
-        if self._finished:
-            raise RuntimeError("Cannot feed a finished stream")
+        """Accept a chunk and return any cleaned output available now.
+
+        A processing error retains accepted input. Call ``feed("")`` to retry
+        without adding the same chunk again.
+        """
+        with self._open_operation("Cannot feed a finished stream"):
+            return self._feed(chunk)
+
+    def finish(self) -> str:
+        """Return the remaining cleaned output and close the stream.
+
+        A processing error leaves the stream open for retry.
+        """
+        with self._open_operation("Stream is already finished"):
+            result = self._finish()
+            self._finished = True
+            return result
+
+    @abstractmethod
+    def _feed(self, chunk: str) -> str:
+        ...
+
+    @abstractmethod
+    def _finish(self) -> str:
+        ...
+
+
+class BufferedStreamingRedactor(_StreamingRedactor):
+    """Buffer a document so entities split across chunks remain detectable.
+
+    ``feed`` emits no text until ``finish`` processes the complete document.
+    """
+
+    def __init__(self, cleaner: TextCleaner) -> None:
+        super().__init__(cleaner)
+        self._chunks: list[str] = []
+
+    def _feed(self, chunk: str) -> str:
         self._chunks.append(chunk)
         return ""
 
-    def finish(self) -> str:
-        """Return the processed document; a processing failure leaves the stream open for retry."""
-        if self._finished:
-            raise RuntimeError("Stream is already finished")
-        # Reject callback writes while processing a snapshot of the input.
-        self._finished = True
-        try:
-            return self._cleaner.process("".join(self._chunks)).lm_text
-        except BaseException:
-            self._finished = False
-            raise
+    def _finish(self) -> str:
+        return self._cleaner.process("".join(self._chunks)).lm_text
 
 
 def _step_matches(steps, normalised_text):
@@ -176,7 +215,7 @@ def _find_split(normalise, buffer, cutoff, normalised_text, protected, steps, st
     return -1, ""
 
 
-class WindowedStreamingRedactor:
+class WindowedStreamingRedactor(_StreamingRedactor):
     """Emit bounded chunks while retaining a configurable token overlap.
 
     This mode is suitable for bounded contact tokens such as emails, phone
@@ -192,7 +231,7 @@ class WindowedStreamingRedactor:
         max_buffer_chars: int = 4096,
         overlap_chars: int = 256,
     ) -> None:
-        require_adapter_mode(cleaner.cfg)
+        super().__init__(cleaner)
         if (cleaner.cfg.pii_processing == "unified" or cleaner.cfg.detector_specs
                 or cleaner.cfg.source_mapping != "best_effort"):
             raise ValueError("Windowed streaming does not support unified processing or strict source mapping; "
@@ -204,83 +243,58 @@ class WindowedStreamingRedactor:
         if cleaner._allow_regex is not None:
             raise ValueError("custom_allow_terms needs the whole document (a value is kept only if every occurrence "
                              "is allowed); use BufferedStreamingRedactor")
-        self._cleaner = cleaner
         self._max_buffer_chars = max_buffer_chars
         self._overlap_chars = overlap_chars
         self._buffer = ""
-        self._pending = ""  # the separator after the last emitted text, held until more text follows it
-        self._ready: list[str] = []  # processed windows not yet returned; they outlive a failed feed or finish
-        self._finished = False
+        self._held_separator = ""
+        self._undelivered: list[str] = []
 
-    def feed(self, chunk: str) -> str:
-        """Process stable prefixes until the buffer fits max_buffer_chars, retaining a trailing overlap window.
-
-        Text retained after an error comes back from the next successful feed or finish.
-        Retry with feed("") to process retained input without adding the failed call's chunk again.
-        """
-        if self._finished:
-            raise RuntimeError("Cannot feed a finished stream")
+    def _feed(self, chunk: str) -> str:
         self._buffer += chunk
-        while len(self._buffer) > self._max_buffer_chars:  # one feed may hold many windows
-            self._ready.append(self._split())
-        out, self._ready = "".join(self._ready), []
-        return out
+        while len(self._buffer) > self._max_buffer_chars:
+            split_at, separator = self._safe_split()
+            self._process_window(self._buffer[:split_at], separator, self._buffer[split_at + 1:])
+        return self._deliver_output()
 
-    def _emit(self, text: str, separator: str) -> str:
-        """*text* after the held separator; with whitespace normalised, empty text adds no separator, as the
-        whole document collapses the whitespace around it ("hello" + 100 spaces + "world")."""
+    def _process_window(self, prefix: str, separator: str, remaining: str) -> None:
+        text = self._cleaner.process(prefix).lm_text
         if not self._cleaner.cfg.check_normalize_whitespace:
-            return text + separator
-        if not text:
-            return ""
-        out, self._pending = self._pending + text, separator
-        return out
+            self._undelivered.append(text + separator)
+        elif text:
+            self._undelivered.append(self._held_separator + text)
+            self._held_separator = " " if remaining else ""
+        self._buffer = remaining
 
-    def _split(self) -> str:
-        """Process and remove the longest safe prefix of the over-full buffer."""
-        # Never split inside a contact token that holds spaces ("06 12 34 56 78"). The guard reads the
-        # cleaner's own normalised text (cleaner.normalise, the steps process runs before its regexes)
-        # and the regexes on the views the cleaner's steps use, so the two cannot differ.
+    def _deliver_output(self) -> str:
+        output = "".join(self._undelivered)
+        self._undelivered.clear()
+        return output
+
+    def _safe_split(self) -> tuple[int, str]:
         cleaner, cfg = self._cleaner, self._cleaner.cfg
         normalise = cleaner.normalise
-        # The unfinished end is left out when it changes the text before it: a cut escape ("\\U000000") stops the
-        # cleaner's escape decoding for the whole buffer (the whole text decodes it once complete). Only the escape
-        # goes, not its token, so a value running into that token ("March 15, 1990,x\\U000000") stays in view.
-        buffer, normalised_text = self._buffer, normalise(self._buffer)
-        last_space = max((i for i, c in enumerate(buffer) if c.isspace()), default=-1)
-        head = buffer[:max(last_space + 1, buffer.rfind("\\"))]
-        if head != buffer and not normalised_text.startswith(normalised_head := normalise(head)):
-            buffer, normalised_text = head, normalised_head
-        # The overlap is kept on the text the guard reads: a split needs overlap_chars of it to its right, so a
-        # rule that reads past a space (a phone's next group: "㉚ ⓪⑦" folds to "30 07") sees what the whole
-        # document gives it.
-        cutoff = len(buffer) - self._overlap_chars
+        guard_buffer = self._buffer
+        normalised_text = normalise(guard_buffer)
+        last_space = max((i for i, c in enumerate(guard_buffer) if c.isspace()), default=-1)
+        incomplete_tail_start = max(last_space + 1, guard_buffer.rfind("\\"))
+        complete_prefix = guard_buffer[:incomplete_tail_start]
+        if complete_prefix != guard_buffer and not normalised_text.startswith(normalised_prefix := normalise(complete_prefix)):
+            guard_buffer, normalised_text = complete_prefix, normalised_prefix
+
+        cutoff = len(guard_buffer) - self._overlap_chars
         steps = [sub for _, substitutions in cleaner._masking_plan(normalised_text) for sub in substitutions]
         step_spans, blanked = _step_matches(steps, normalised_text)
         protected = _protected_spans(cleaner, cfg, normalised_text, step_spans, blanked, self._overlap_chars)
-        split_at, separator = _find_split(normalise, buffer, cutoff, normalised_text, protected, steps, set(step_spans))
+        split_at, separator = _find_split(normalise, guard_buffer, cutoff, normalised_text,
+                                          protected, steps, set(step_spans))
         if split_at < 0:
             raise BufferError(
                 "Streaming buffer exceeded max_buffer_chars without a safe whitespace split. "
                 "Increase the limit or use BufferedStreamingRedactor."
             )
 
-        prefix = self._buffer[:split_at]
-        # the cleaner's whitespace step turns any space (\u00a0, \u202f) into " "; the separator follows it
-        separator = " " if cfg.check_normalize_whitespace else separator
-        out = self._emit(self._cleaner.process(prefix).lm_text, separator)
-        self._buffer = self._buffer[split_at + 1:]
-        return out
+        return split_at, separator
 
-    def finish(self) -> str:
-        """Process the final retained window; a processing failure leaves the stream open for retry."""
-        if self._finished:
-            raise RuntimeError("Stream is already finished")
-        # Reject callback writes while processing a snapshot of the input.
-        self._finished = True
-        try:
-            out, self._ready = "".join(self._ready) + self._emit(self._cleaner.process(self._buffer).lm_text, ""), []
-        except BaseException:
-            self._finished = False
-            raise
-        return out
+    def _finish(self) -> str:
+        self._process_window(self._buffer, "", "")
+        return self._deliver_output()
