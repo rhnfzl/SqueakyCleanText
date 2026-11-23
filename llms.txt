@@ -64,6 +64,9 @@ Opt-in capability contract:
 - `EncryptedSQLiteTokenStore` from sct.token_stores needs the token-store extra and application-owned scope, keys, authorization and retention.
 - `extract_document`/`clean_document` protect extracted PDF text with prepared local Docling assets. Original binaries remain unchanged and sensitive.
 - Pass `DocumentExtractionRouter` to `extract_document` to declare format, required outputs, provider order, and fallback. Native Docling requires an explicit text-only policy.
+- `chunk_document(cleaner, document, ...)` cleans a string or extracted document before splitting it for export. Offsets refer to the cleaned text. Configure unified detector windows separately.
+- Set `html_fragment_adapter=True` with unified processing to preserve block and table-cell boundaries in supported HTML fragments. Unsupported fragments use the configured pipeline.
+- On the main branch, `sct-clean --processing unified --allow-network-detectors` permits model detection. Use `--no-ner` for format-based detection. For text files, `--signals` counts the original line endings.
 - `sct.corpus.analyse_records`/`select_records` use report-only defaults. Applying removal requires an explicit pre_pii or pii_normalized basis.
 - SCT candidate dedup confirms exact Jaccard similarity; native DataTrove uses approximate buckets. Their signatures are not interchangeable.
 - `sct.corpus.curate_resumable` validates identities/checksums and replays incomplete stages. No exactly-once or distributed-coordination claim.

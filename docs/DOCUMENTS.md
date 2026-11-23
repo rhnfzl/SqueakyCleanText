@@ -155,6 +155,8 @@ The router preserves the returned elements, their order, and the source ranges d
 
 ## Protocol and output
 
+See the [document API reference](reference/documents.md) for signatures and provider types.
+
 `DocumentExtractor.extract(path: Path) -> ExtractedDocument` is the provider protocol.
 `extract_document(path, *, provider)` validates that result and hides provider exception values.
 `clean_document(document, cleaner) -> ProcessedDocument` runs the existing unified whole-document pipeline.

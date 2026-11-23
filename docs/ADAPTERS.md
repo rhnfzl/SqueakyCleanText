@@ -26,19 +26,32 @@ processed string, and `ProcessedRAGChunk` covers text and metadata (`findings` a
 the text only, `metadata_findings` the metadata). `process_rag_chunks` writes `metadata["sensitive"]` and
 `metadata["sct"]`, replacing any caller keys with those names.
 
+## Command line
+
+`sct-clean` reads a UTF-8 file or standard input. Omit the file name or pass `-` to read from a pipe.
+
 ```sh
 printf 'Email maria@example.com' | sct-clean --no-ner
-printf 'München 日本語' | sct-clean --no-ner --to-ascii   # 0.7 folding: Munchen Ri Ben Yu
-printf 'Email maria@example.com' | sct-clean --no-ner \
-  --replacement-mode reversible --token-map tokens.json
-pip install 'SqueakyCleanText[mcp]'
-sct-mcp
+sct-clean input.txt --preset training --processing unified --no-ner --signals
+printf '{"contact":"maria@example.com"}' | sct-clean --json-input --no-ner
 ```
 
-Use `sct-clean --processing unified --allow-network-detectors` to run model detection in unified mode.
-This permits model downloads if the files are missing. The permission is required even when the files are cached.
-Use `sct-clean --processing unified --no-ner` for format-based detection without model access.
-For file input, the CLI passes the original line endings to the cleaner before it applies normalization.
+`--signals` returns JSON with `text` (or `value` for JSON input), `signals`, and `summary`.
+Use `--no-ner` for format-based masking without a name model.
+Use `--preset training` to preserve formatting and ordinary dates and numbers, or `--to-ascii` to transliterate.
+See `sct-clean --help` for all flags.
+
+On [Unreleased](https://github.com/rhnfzl/SqueakyCleanText/blob/main/CHANGELOG.md#unreleased) builds:
+
+- Pass `--processing unified --allow-network-detectors` to run model detection in unified mode.
+  This permits downloads if model files are missing. You must pass the flag even when the model files are cached.
+- For a plain-text file, `signals.chars` counts Unicode code points before normalization. A CRLF pair counts as two characters.
+
+For reversible text output, pass `--replacement-mode reversible --token-map tokens.json` on POSIX.
+The CLI writes the map with mode `0600`. Store it apart from the cleaned text.
+See [replacement modes](REPLACEMENT_MODES.md) for other options.
+
+## Streaming
 
 Both streaming redactors refuse a reversible cleaner (`ValueError`): a stream cannot hand back a token map, so process each text directly and retain its map.
 `BufferedStreamingRedactor` holds a full document for cross-chunk NER safety.
@@ -55,6 +68,8 @@ Retry with `feed("")` or call `finish()`. Do not resend the same chunk, because 
 Retries can repeat side effects in custom steps or callbacks; stream recovery does not undo those effects.
 Calls to `feed()` or `finish()` during finalization raise `RuntimeError`, including calls from callbacks.
 A successful `finish()` closes the stream. Later `feed()` and `finish()` calls raise `RuntimeError`.
+
+## OCR and browser export
 
 The OCR adapter accepts any `OCRProvider`. The included Tesseract provider also
 needs a local Tesseract executable. Browser export writes an ONNX Runtime Web

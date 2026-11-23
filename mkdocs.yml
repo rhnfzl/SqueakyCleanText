@@ -12,6 +12,8 @@ docs_dir: docs
 exclude_docs: |
   requirements.*
   hooks.py
+  references/
+  superpowers/
 
 hooks:
   - docs/hooks.py
@@ -85,7 +87,7 @@ nav:
   - Guides:
       - Configuration: CONFIG.md
       - Integrations: INTEGRATIONS.md
-      - PDF documents: DOCUMENTS.md
+      - Document extraction: DOCUMENTS.md
       - Adapters: ADAPTERS.md
       - Chunking: CHUNKING.md
       - NER backends: NER_BACKENDS.md
@@ -104,6 +106,8 @@ nav:
       - preset_config: reference/presets.md
       - evaluate_pii: reference/evaluation.md
       - Integrations API: reference/integrations.md
+      - Document API: reference/documents.md
+      - Chunking API: reference/chunking.md
       - Score: reference/score.md
   - Evaluation:
       - PII evaluation harness: EVALUATION.md
