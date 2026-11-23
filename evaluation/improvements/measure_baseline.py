@@ -82,7 +82,7 @@ def main():
     )
     ner = GeneralNER(cfg)
     durations, true_positive, predicted, expected, exposed = [], 0, 0, 0, 0
-    calls = instrument_sessions(ner._pipelines.values())
+    calls = instrument_sessions(model.pipeline for model in ner._loaded_models.values())
     for text, gold in SAMPLES:
         started = time.perf_counter()
         result = ner.ner_process_detailed(

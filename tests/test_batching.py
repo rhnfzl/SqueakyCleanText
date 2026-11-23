@@ -46,7 +46,7 @@ def onnx_ner():
 
 
 def test_onnx_batch_runs_once_per_slice(onnx_ner, monkeypatch):
-    pipe = onnx_ner._pipelines['ENGLISH']
+    pipe = onnx_ner._loaded_models['ENGLISH'].pipeline
     counter = _CountingSession(pipe._session)
     monkeypatch.setattr(pipe, '_session', counter)
     monkeypatch.setattr(onnx_ner, 'cfg', replace(onnx_ner.cfg, ner_batch_size=4))
@@ -60,7 +60,7 @@ def test_onnx_batch_runs_once_per_slice(onnx_ner, monkeypatch):
 
 
 def test_onnx_padded_batch_matches_unbatched(onnx_ner):
-    pipe = onnx_ner._pipelines['ENGLISH']
+    pipe = onnx_ner._loaded_models['ENGLISH'].pipeline
     texts = [d[:400] for d in DOCS] + ["", "Berlin", "Angela Merkel and John Smith."]
     single = pipe(texts, batch_size=1)
     batched = pipe(texts, batch_size=8)

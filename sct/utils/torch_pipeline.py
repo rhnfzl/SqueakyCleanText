@@ -3,6 +3,10 @@
 Optional backend. Requires: pip install squeakycleantext[torch]
 """
 import logging
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from sct.utils.ner import _WindowTokenizer
 
 logger = logging.getLogger(__name__)
 
@@ -74,7 +78,7 @@ def load_torch_ner_model(
     device: str = 'cpu',
     cache_dir: str | None = None,
     revision: str | None = None,
-) -> tuple['TorchNERPipeline', object]:
+) -> tuple[TorchNERPipeline, "_WindowTokenizer"]:
     """Load a PyTorch NER model and return (pipeline, tokenizer).
 
     Returns the same tuple shape as load_onnx_ner_model for interface parity.

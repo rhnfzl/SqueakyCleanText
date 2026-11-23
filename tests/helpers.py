@@ -10,7 +10,7 @@ from types import SimpleNamespace
 from presidio_anonymizer import AnonymizerEngine
 
 from sct.config import GLINER_BACKENDS, TextCleanerConfig
-from sct.utils.ner import GeneralNER
+from sct.utils.ner import GeneralNER, _LoadedTokenModel
 
 
 def assert_near_linear(run, make, n, factor=8, repeats=3):
@@ -40,7 +40,7 @@ def bare_ner():
     ner._regex_markers = ()
     ner._privacy_policy = None
     ner._engine = None
-    ner._tokenizers = {}
+    ner._loaded_models = {}
     return ner
 
 
@@ -116,9 +116,10 @@ def word_ner(overlap, detector, budget=12, mode="placeholder"):
     return ner
 
 
-def route_models(ner, tokenizers, ensemble=None):
+def route_models(ner, tokenizers, ensemble=None, pipeline=None):
     """Give *ner* these per-model tokenizers and, optionally, per-language ensemble routes."""
-    ner._tokenizers = tokenizers
+    ner._loaded_models = {key: _LoadedTokenModel(pipeline or ner._gliner_pipe, tokenizer)
+                          for key, tokenizer in tokenizers.items()}
     if ensemble is not None:
         ner._ensemble_models = ensemble
 
