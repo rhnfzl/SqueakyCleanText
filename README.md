@@ -36,7 +36,6 @@ Review the output before sharing sensitive data. SCT can miss personal details.
 SCT detects 75 languages. Name, place, and organisation coverage depends on the model and language.
 See [language coverage](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/LANGUAGES.md) and the [documentation site](https://rhnfzl.github.io/SqueakyCleanText/).
 
-<!-- --8<-- [start:quickstart] -->
 ## Install
 
 ```sh
@@ -62,6 +61,7 @@ All extras: [docs/INSTALL.md](https://github.com/rhnfzl/SqueakyCleanText/blob/ma
 
 ## Quickstart
 
+<!-- --8<-- [start:quickstart] -->
 Try format-based masking from the command line without loading a name model.
 
 ```sh
@@ -350,6 +350,7 @@ Detailed known limits: [docs/limits.md](https://github.com/rhnfzl/SqueakyCleanTe
 | Every config field, presets, language options | [docs/CONFIG.md](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/CONFIG.md) |
 | `TextCleaner`, `ProcessResult`, `signals` | [docs/API.md](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/API.md) |
 | Data pipelines, other engines, MCP server | [docs/INTEGRATIONS.md](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/INTEGRATIONS.md), [docs/RECIPES.md](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/RECIPES.md), [docs/MCP.md](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/MCP.md) |
+| PDF extraction, HTML fragments, and document chunking | [Documents](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/DOCUMENTS.md), [HTML fragments](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/API.md#clean-html-fragments), [Chunking](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/CHUNKING.md) |
 | JSON, DataFrames, RAG, CLI, streaming, OCR | [docs/ADAPTERS.md](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/ADAPTERS.md) |
 | Score columns, quality, MinHash, data cards, `sct-report` | [docs/SCORE.md](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/SCORE.md) |
 | NER backends, GLiNER, PII mode | [docs/NER_BACKENDS.md](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/NER_BACKENDS.md) |
@@ -357,7 +358,7 @@ Detailed known limits: [docs/limits.md](https://github.com/rhnfzl/SqueakyCleanTe
 | Replacement modes, privacy policies, `TokenStore` | [docs/REPLACEMENT_MODES.md](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/REPLACEMENT_MODES.md), [docs/PRIVACY.md](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/PRIVACY.md) |
 | Evaluation | [docs/EVALUATION.md](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/EVALUATION.md), [docs/MULTILINGUAL_EVAL.md](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/MULTILINGUAL_EVAL.md) |
 | Languages and adding a language | [docs/LANGUAGES.md](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/LANGUAGES.md), [docs/ADDING_LANGUAGES.md](https://github.com/rhnfzl/SqueakyCleanText/blob/main/docs/ADDING_LANGUAGES.md) |
-| The whole API in one file, for AI coding assistants | [llms.txt](https://github.com/rhnfzl/SqueakyCleanText/blob/main/llms.txt) |
+| API summary for AI coding assistants | [llms.txt](https://github.com/rhnfzl/SqueakyCleanText/blob/main/llms.txt) |
 | Release notes | [CHANGELOG.md](https://github.com/rhnfzl/SqueakyCleanText/blob/main/CHANGELOG.md) |
 
 ## Contributing
