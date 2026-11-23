@@ -9,7 +9,7 @@ from typing import TextIO
 from collections.abc import Sequence, Callable, Mapping
 
 from sct.config import TextCleanerConfig
-from sct.detectors import DetectorRegistry
+from sct.detectors import DetectorRegistry, DetectorUnavailable
 from sct.schema import FieldSchema, registered_schema, process_value
 from sct.mcp_server import summarize
 
@@ -31,6 +31,11 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--pii", action="store_true")
     parser.add_argument("--json-input", action="store_true")
     parser.add_argument("--processing", choices=("legacy", "unified"), default="legacy")
+    parser.add_argument(
+        "--allow-network-detectors",
+        action="store_true",
+        help="Permit unified detectors that may download model files",
+    )
     parser.add_argument("--signals", action="store_true", help="Return cleaned output and value-free signals as JSON")
     parser.add_argument("--schema", help="Data-only JSON schema registered by the embedding application")
     parser.add_argument(
@@ -106,7 +111,12 @@ def main(
     if args.replacement_mode == "reversible":
         _check_reversible_args(parser, args)
     try:
-        source = stdin.read() if args.input == "-" else Path(args.input).read_text(encoding="utf-8")
+        if args.input == "-":
+            source = stdin.read()
+        else:
+            # Let the cleaner normalize line endings after it receives the original text.
+            with Path(args.input).open(encoding="utf-8", newline="") as input_file:
+                source = input_file.read()
     except (OSError, ValueError) as exc:  # missing file or not UTF-8
         parser.error(f"cannot read input: {exc}")
 
@@ -118,6 +128,7 @@ def main(
             ner_mode="pii" if args.pii else "standard",
             replacement_mode=args.replacement_mode,
             pii_processing=args.processing,
+            allow_network_detectors=args.allow_network_detectors,
             **({"check_to_ascii_unicode": True} if args.to_ascii else {}),
         )
         cleaner = (TextCleaner(cfg=cfg) if registry_factory is None else
@@ -139,6 +150,11 @@ def main(
             if args.replacement_mode == "reversible":
                 # Before stdout: masked text with no map could never be reversed.
                 _write_token_map(Path(args.token_map), result.metadata["anon_map"])
+    except DetectorUnavailable as exc:
+        if args.processing == "unified" and not args.no_ner and not args.allow_network_detectors:
+            parser.error("Unified model detection requires --allow-network-detectors. "
+                         "Use --no-ner to run only format-based detection.")
+        parser.error(str(exc))
     # ValueError: bad JSON, two keys cleaned to the same text, or a symlinked --token-map.
     except (ImportError, ModelLoadError, OSError, ValueError) as exc:
         parser.error(str(exc))
