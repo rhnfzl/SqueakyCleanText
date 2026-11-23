@@ -1,3 +1,6 @@
+from concurrent.futures import ThreadPoolExecutor
+from threading import Event
+
 import pytest
 
 from sct import TextCleaner, TextCleanerConfig
@@ -64,10 +67,39 @@ def test_finish_rejects_reentrant_stream_calls(redactor, operation):
     stream = redactor(cleaner)
     stream.feed("Mail anna@example.com now")
 
-    with pytest.raises(RuntimeError, match="finished"):
+    with pytest.raises(RuntimeError, match="in progress"):
         stream.finish()
 
     assert stream.finish() == "Mail <EMAIL> now"
+
+
+@pytest.mark.parametrize("operation", ["feed", "finish"])
+def test_active_window_rejects_overlapping_calls(operation):
+    processing, resume = Event(), Event()
+
+    def pause_first_window(_metrics):
+        if not processing.is_set():
+            processing.set()
+            assert resume.wait(timeout=10)
+
+    cleaner = TextCleaner(TextCleanerConfig(
+        check_ner_process=False,
+        check_detect_language=False,
+        check_statistical_model_processing=False,
+    ), metrics_callback=pause_first_window)
+    stream = WindowedStreamingRedactor(cleaner, max_buffer_chars=40, overlap_chars=20)
+    text = "Mail anna@example.com now before the next window."
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        active = pool.submit(stream.feed, text)
+        try:
+            assert processing.wait(timeout=10)
+            overlap = pool.submit(stream.finish) if operation == "finish" else pool.submit(stream.feed, " surprise")
+            with pytest.raises(RuntimeError, match="in progress"):
+                overlap.result(timeout=3)
+        finally:
+            resume.set()
+        output = active.result(timeout=10)
+    assert output + stream.finish() == "Mail <EMAIL> now before the next window."
 
 
 @pytest.mark.parametrize("fail_at", [1, 2])

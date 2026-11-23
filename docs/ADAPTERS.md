@@ -50,10 +50,10 @@ cleaner's own `TextCleaner.normalise` view of the buffer, so its split points fo
 
 Both redactors stay open if processing raises during `finish()`. Retry `finish()` after resolving the error.
 After a windowed processing error, unprocessed text stays buffered and previously processed output stays queued.
-A failed `feed(chunk)` has already accepted its chunk.
+When processing raises inside `feed(chunk)`, the stream has already accepted the chunk.
 Retry with `feed("")` or call `finish()`. Do not resend the same chunk, because that adds it again.
 Retries can repeat side effects in custom steps or callbacks; stream recovery does not undo those effects.
-Calls to `feed()` or `finish()` during finalization raise `RuntimeError`, including calls from callbacks.
+Calls to `feed()` or `finish()` while another stream operation runs raise `RuntimeError`. This includes calls from callbacks.
 A successful `finish()` closes the stream. Later `feed()` and `finish()` calls raise `RuntimeError`.
 
 The OCR adapter accepts any `OCRProvider`. The included Tesseract provider also
