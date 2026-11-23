@@ -200,7 +200,8 @@ def test_unprotected_files_and_symlinks_fail(tmp_path, api):
     parent = tmp_path / "private"
     parent.mkdir(mode=0o700)
     path = parent / "tokens.db"
-    path.touch(mode=0o644)
+    path.touch()
+    path.chmod(0o644)
     kwargs = dict(scope="tenant", key_provider=Keys(), ttl_seconds=60, clock=lambda: 0)
     with pytest.raises(error):
         cls(path, **kwargs)
