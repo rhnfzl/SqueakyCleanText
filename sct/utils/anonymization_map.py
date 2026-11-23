@@ -14,9 +14,9 @@ from uuid import uuid4
 class MapEntry:
     """A single entity replacement record."""
 
-    placeholder: str   # e.g. "<PERSON_0>"
-    original: str = field(repr=False)  # e.g. "John Smith"; kept out of repr
-    entity_type: str   # e.g. "PERSON"
+    placeholder: str
+    original: str = field(repr=False)
+    entity_type: str
     # Offsets index the text the replacing stage saw: for NER entries that is
     # the whole post-regex document (not the raw input, not a chunk).
     start: int
@@ -27,17 +27,33 @@ class MapEntry:
 class AnonymizationMap:
     """Stores entity replacement mappings for round-trip anonymization.
 
-    One instance per ``process()`` call — no shared state, fully thread-safe.
+    ``TextCleaner.process()`` creates a separate map for each document.
     """
 
     session_id: str = field(default_factory=lambda: str(uuid4()))
     entries: list[MapEntry] = field(default_factory=list)
 
-    # Per-entity-type counter (tracks how many of each type have been seen).
-    _counter: dict = field(default_factory=dict, repr=False)
-    # Placeholder spellings already in the source text; never allocated, so a
-    # literal "<EMAIL_0>" cannot collide with a generated one.
-    reserved: set = field(default_factory=set, repr=False)
+    _counter: dict[str, int] = field(default_factory=dict, repr=False)
+    reserved: set[str] = field(default_factory=set, repr=False)
+
+    def __post_init__(self) -> None:
+        for entry in self.entries:
+            self._advance_past(entry)
+
+    def _advance_past(self, entry: MapEntry) -> None:
+        prefix = f"<{entry.entity_type}_"
+        if entry.placeholder.startswith(prefix) and entry.placeholder.endswith(">"):
+            index = entry.placeholder[len(prefix):-1]
+            if index.isdecimal():
+                self._counter[entry.entity_type] = max(self._counter.get(entry.entity_type, 0), int(index) + 1)
+
+    def _allocation_snapshot(self) -> dict[str, int]:
+        return self._counter.copy()
+
+    def _restore_allocation(self, counters: dict[str, int]) -> None:
+        if any(counters.get(kind, 0) < minimum for kind, minimum in self._counter.items()):
+            raise ValueError("counter precedes restored entries")
+        self._counter = counters.copy()
 
     def __repr__(self):
         return f"AnonymizationMap(entries={len(self.entries)})"
@@ -56,13 +72,20 @@ class AnonymizationMap:
     def add(self, placeholder: str, original: str, entity_type: str,
             start: int, end: int) -> None:
         """Record a replacement entry."""
-        self.entries.append(MapEntry(
+        entry = MapEntry(
             placeholder=placeholder,
             original=original,
             entity_type=entity_type,
             start=start,
             end=end,
-        ))
+        )
+        self._advance_past(entry)
+        self.entries.append(entry)
+
+    def _record_replacement(self, original: str, entity_type: str, start: int, end: int) -> str:
+        placeholder = self.next_placeholder(entity_type)
+        self.add(placeholder, original, entity_type, start, end)
+        return placeholder
 
     def deanonymize(self, text: str) -> str:
         """Restore original values by replacing placeholders.
@@ -98,11 +121,8 @@ class AnonymizationMap:
         New placeholders continue after the restored ones. Older payloads have no
         ``reserved``, so it starts empty.
         """
-        obj = cls(session_id=data['session_id'], reserved=set(data.get('reserved', ())))
-        for e in data.get('entries', []):
-            entry = MapEntry(**e)
-            obj.entries.append(entry)
-            index = entry.placeholder.removeprefix(f"<{entry.entity_type}_").removesuffix(">")
-            if index.isdecimal():
-                obj._counter[entry.entity_type] = max(obj._counter.get(entry.entity_type, 0), int(index) + 1)
-        return obj
+        return cls(
+            session_id=data['session_id'],
+            entries=[MapEntry(**entry) for entry in data.get('entries', [])],
+            reserved=set(data.get('reserved', ())),
+        )

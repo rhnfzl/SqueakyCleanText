@@ -113,7 +113,7 @@ class EncryptedSQLiteTokenStore:
         except Exception:
             raise TokenStoreError("Cannot encrypt token store entry") from None
 
-    def _decode(self, reference: str, row: tuple) -> dict:
+    def _decode(self, reference: str, row: tuple) -> tuple[dict, AnonymizationMap]:
         expiry, key_id, ciphertext = row
         try:
             payload = json.loads(self._fernet(self._keys.fernet_key(key_id)).decrypt(ciphertext))
@@ -149,9 +149,8 @@ class EncryptedSQLiteTokenStore:
             ):
                 raise ValueError("invalid counters")
             restored = AnonymizationMap.from_dict(data)
-            if any(counters.get(k, 0) < v for k, v in restored._counter.items()):
-                raise ValueError("counter precedes restored entries")
-            return payload
+            restored._restore_allocation(counters)
+            return payload, restored
         except Exception:
             raise TokenStoreError("Cannot authenticate token store entry") from None
 
@@ -171,7 +170,7 @@ class EncryptedSQLiteTokenStore:
             reference=reference,
             expires_at=expiry,
             map=anon_map.to_dict(),
-            counters=anon_map._counter,
+            counters=anon_map._allocation_snapshot(),
         )
         key_id, ciphertext = self._encrypt(payload)
         with self._connection() as conn:
@@ -189,11 +188,9 @@ class EncryptedSQLiteTokenStore:
             row = self._row(conn, reference)
             if row is None:
                 return None
-            payload = self._decode(reference, row)
+            payload, mapping = self._decode(reference, row)
             if payload["expires_at"] <= self._now():
                 return None
-            mapping = AnonymizationMap.from_dict(payload["map"])
-            mapping._counter = payload["counters"]
         self._event("load", reference)
         return mapping
 
@@ -209,7 +206,7 @@ class EncryptedSQLiteTokenStore:
             row = self._row(conn, ref)
             if row is None:
                 return False
-            payload = self._decode(ref, row)
+            payload, _ = self._decode(ref, row)
             if payload["expires_at"] <= self._now():
                 return False
             key_id, ciphertext = self._encrypt(payload)

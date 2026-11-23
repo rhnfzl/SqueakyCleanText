@@ -16,7 +16,7 @@ if importlib.util.find_spec("cryptography") is None and os.environ.get("SCT_OPTI
 
 from cryptography.fernet import Fernet
 
-from sct.utils.anonymization_map import AnonymizationMap
+from sct.utils.anonymization_map import AnonymizationMap, MapEntry
 
 
 class Keys:
@@ -29,10 +29,6 @@ class Keys:
 
     def fernet_key(self, key_id):
         return self.keys[key_id]
-
-
-def test_provider_exists():
-    assert importlib.util.find_spec("sct.token_stores.sqlite") is not None, "encrypted store is missing"
 
 
 @pytest.fixture
@@ -102,6 +98,24 @@ assert mapping.next_placeholder('PERSON') == '<PERSON_2>'
     assert restarted.load(ref) is not None
     now[0] = 160
     assert restarted.load(ref) is None
+
+
+@pytest.mark.parametrize("seed_entries", [False, True])
+def test_persisted_map_can_extend_without_reusing_placeholders(setup_store, seed_entries):
+    store, _, _, _, _, _, _, _ = setup_store
+    entry = MapEntry("<PERSON_1>", "Alice Sensitive", "PERSON", 0, 15)
+    mapping = AnonymizationMap(entries=[entry] if seed_entries else [], reserved={"<PERSON_2>"})
+    if not seed_entries:
+        mapping.add(entry.placeholder, entry.original, entry.entity_type, entry.start, entry.end)
+
+    restored = store.load(store.save(mapping))
+    assert restored is not None
+    placeholder = restored.next_placeholder("PERSON")
+    restored.add(placeholder, "Bob Sensitive", "PERSON", 28, 41)
+    extended = store.load(store.save(restored))
+    assert extended is not None
+    assert placeholder == "<PERSON_3>"
+    assert extended.deanonymize(f"<PERSON_1> <PERSON_2> {placeholder}") == "Alice Sensitive <PERSON_2> Bob Sensitive"
 
 
 @pytest.mark.parametrize("mutation", ["ciphertext", "key", "scope", "reference", "expiry", "map"])
@@ -186,7 +200,8 @@ def test_unprotected_files_and_symlinks_fail(tmp_path, api):
     parent = tmp_path / "private"
     parent.mkdir(mode=0o700)
     path = parent / "tokens.db"
-    path.touch(mode=0o644)
+    path.touch()
+    path.chmod(0o644)
     kwargs = dict(scope="tenant", key_provider=Keys(), ttl_seconds=60, clock=lambda: 0)
     with pytest.raises(error):
         cls(path, **kwargs)

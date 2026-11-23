@@ -503,10 +503,8 @@ class GeneralNER:
         sorted_data = sorted(filtered_data, key=lambda x: x['start'], reverse=True)
         for item in sorted_data:
             tag = ENTITY_TYPE_MAP.get(item['entity_group'], item['entity_group'])
-            placeholder = anon_map.next_placeholder(tag)
             original = text[item['start']:item['end']]
-            anon_map.add(
-                placeholder=placeholder,
+            placeholder = anon_map._record_replacement(
                 original=original,
                 entity_type=tag,
                 start=item['start'],
