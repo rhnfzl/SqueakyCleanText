@@ -28,8 +28,9 @@ pipeline default. The call can override both with `chunking=` and `max_size=`.
 Size is in characters by default. Pass `count=` with the downstream model's token
 counter to use its units. SCT keeps built-in placeholders and configured markers
 together and reports an error if a protected span cannot fit the budget.
-Unified processing also supplies exact rendered ranges for synthetic values.
-Use the whole-document result API for reversible maps.
+Synthetic chunk output requires unified processing, which supplies exact rendered ranges for synthetic values.
+Chunk output does not support indexed or reversible modes. Use direct text processing when you need a reversible map.
+See the [chunking API reference](reference/chunking.md) for call signatures and result fields.
 
 ## Select windows for PII detectors
 

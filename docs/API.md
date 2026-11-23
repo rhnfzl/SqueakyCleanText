@@ -80,7 +80,8 @@ Users can apply one policy to format matches and model findings before any repla
 Set `pii_processing='unified'` and pass `unified_policy=UnifiedPrivacyPolicy(...)` to select this path.
 `PrivacyPolicy` remains the separate legacy NER policy; do not pass it to the unified path.
 
-`DetectionContext(document_id=None, path=(), declared_entity_types=(), schema_id=None)` carries caller-owned context.
+`DetectionContext(document_id=None, path=(), declared_entity_types=(), schema_id=None, document_format=None)` carries caller-owned context.
+Use `document_format` to supply the format key used by [chunking rules](CHUNKING.md#select-windows-for-pii-detectors).
 It does not infer field meanings. Direct processing forwards it to context-capable detectors.
 `FieldSchema(id, version, rules)` and `FieldRule(path, entity_types, mode='hint')` select explicit structured fields.
 `mode='protect_value'` protects the whole selected scalar; `hint` requires a context-capable detector.
@@ -147,6 +148,8 @@ If Unicode repair changes alignment, SCT can report a broader `covering` range, 
 |---|---|
 | `extract_document(path, provider=...)` | Validated `ExtractedDocument`; source files remain unchanged |
 | `clean_document(document, cleaner)` | Cleaned text and structural elements; unified placeholder or synthetic output only |
+| [`DocumentExtractionRouter`](reference/documents.md#sct.documents.DocumentExtractionRouter) | Selects a compatible extractor with caller-defined requirements and order |
+| [`chunk_document(cleaner, document, ...)`](reference/chunking.md#sct.chunked_document.chunk_document) | Cleans the whole document once and returns bounded chunks with cleaned-text offsets |
 | `analyse_records(..., cleaner=..., score_config=..., selection=..., scorer=None)` | Streaming analyses with private output references; scores receive original text |
 | `select_records(analyses, selection=...)` | Context-managed report; close it to release owned temporary text and shingles |
 | `curate_resumable(source, output, retention='caller_managed', ...)` | Private native checkpoints, checksum validation and replay; no exactly-once guarantee |
@@ -154,7 +157,7 @@ If Unicode repair changes alignment, SCT can report a broader `covering` range, 
 
 Corpus APIs live in `sct.corpus`; the encrypted store lives in `sct.token_stores`.
 Document APIs are also exported from `sct`.
-See [documents](DOCUMENTS.md), [corpus integrations](INTEGRATIONS.md) and [token-store operations](TOKEN_STORES.md) for their complete restrictions.
+See [documents](DOCUMENTS.md), [chunking](CHUNKING.md), [corpus integrations](INTEGRATIONS.md) and [token-store operations](TOKEN_STORES.md) for their complete restrictions.
 
 ## Batch processing
 

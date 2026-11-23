@@ -6,6 +6,9 @@ pip install SqueakyCleanText
 
 SqueakyCleanText needs Python 3.12 or newer.
 
+These docs follow the `main` branch. [PyPI](https://pypi.org/project/squeakycleantext/) shows the latest published version.
+Changes marked [Unreleased](https://github.com/rhnfzl/SqueakyCleanText/blob/main/CHANGELOG.md#unreleased) require a checkout that includes those changes.
+
 The base install uses **ONNX Runtime** for NER inference - no PyTorch or Transformers required.
 
 ## Optional extras
@@ -33,6 +36,7 @@ The base install uses **ONNX Runtime** for NER inference - no PyTorch or Transfo
 | Token store | `pip install SqueakyCleanText[token-store]` | Authenticated encryption for [local reversible maps](TOKEN_STORES.md); application-owned keys required |
 | Corpus | `pip install 'SqueakyCleanText[corpus]'` | DataTrove 0.10.1, signatures, selection and private resumable runs |
 | Documents | `pip install 'SqueakyCleanText[documents]'` | Docling 2.148.0 PDF extraction with separately prepared local artifacts |
+| Chunking | `pip install 'SqueakyCleanText[chunking]'` | Semchunk and Chonkie providers for [document chunking and detector windows](CHUNKING.md) |
 | Secrets | `pip install 'SqueakyCleanText[secrets]'` | datafog-core 1.0.0 offline credential-format detection |
 | Development | `pip install SqueakyCleanText[dev]` | Testing and linting tools |
 | Test | `pip install SqueakyCleanText[test]` | Coverage tools for the test suite |
@@ -44,7 +48,8 @@ name: `pip install "SqueakyCleanText[gpu]"`.
 
 Installing an extra does not enable its behavior or establish model quality.
 Unified processing, field schemas, language abstention and routing need explicit configuration.
-Document extraction requires separately prepared, verified assets; see [document setup](DOCUMENTS.md).
+Prepare verified local assets for [standard Docling](DOCUMENTS.md#install-and-prepare-local-assets).
+For text-only PDFs, the [native Docling provider](DOCUMENTS.md#choose-an-extractor-explicitly) works without those assets.
 Encrypted storage requires application-owned keys, scope and retention; see [token stores](TOKEN_STORES.md).
 Native corpus jobs require a private output directory and explicit caller-managed retention; see [integrations](INTEGRATIONS.md).
 

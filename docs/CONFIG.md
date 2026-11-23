@@ -106,6 +106,17 @@ That runs both configured groups. Empty groups restore the default detector sele
 Return corpus selection to `dedup_mode='report'` to keep all records; old outputs and private state remain caller-owned.
 Configuration rollback does not restore text that was irreversibly removed. Reprocess the retained input when necessary.
 
+### Document chunking
+
+Use these settings to choose [output chunks and detector windows](CHUNKING.md).
+
+| Field | Default | Contract |
+|---|---|---|
+| `output_chunking` | `None` | Uses the built-in output preset. Set a provider or policy to replace it. |
+| `output_chunk_max_size` | `1024` | Budget for each output chunk, measured in characters unless the caller supplies a counter. |
+| `detector_chunking` | `None` | Each unified detector uses native windows unless configured. A `DetectorSpec` can override the shared choice. |
+| `allow_network_chunkers` | `False` | Explicitly permit registered chunkers that declare network access. |
+
 ### All cleaner fields
 
 The same fields with their docstrings, generated from the code: [TextCleanerConfig API page](https://rhnfzl.github.io/SqueakyCleanText/reference/config/).
