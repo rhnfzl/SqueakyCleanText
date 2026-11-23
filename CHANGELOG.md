@@ -4,13 +4,23 @@ Benchmark scores below use open datasets credited in [benchmarks/DATASET_CREDITS
 
 ## Unreleased
 
+## 0.13.1 - 2026-11-23
+
+Streaming callers can retry a failed operation without losing accepted input or cleaned output.
+Both streaming redactors reject overlapping calls, including calls from a processing callback.
 The command line can run unified model detection after you grant permission.
-When you clean a file, source counts include the file's original line endings.
+Source counts include a file's original line endings.
+This release has no breaking API changes.
 
 ### Fixed
 
-- Added `--allow-network-detectors` to match Python's permission for unified model detectors.
+- A failed streaming operation leaves accepted input and undelivered output available for retry.
+- Buffered and windowed streams reject a second call while an operation runs.
 - The CLI preserves original line endings until the cleaner applies its configured normalization.
+
+### Added
+
+- The CLI accepts `--allow-network-detectors` to permit unified model detection.
 
 ## 0.13.0 - 2026-11-22
 
