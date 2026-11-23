@@ -501,8 +501,8 @@ class TextCleanerTest(unittest.TestCase):
                                                 ner_model_revisions=dict.fromkeys(models, TEST_NER_REVISIONS['ENGLISH'])))
             ner2._ensure_loaded('FRENCH')
             ner2._ensure_loaded('MULTILINGUAL')
-            self.assertIs(ner2._pipelines['FRENCH'],
-                          ner2._pipelines['MULTILINGUAL'])
+            self.assertIs(ner2._loaded_models['FRENCH'].pipeline,
+                          ner2._loaded_models['MULTILINGUAL'].pipeline)
 
     @requires_ner
     def test_ner_lazy_loading(self):

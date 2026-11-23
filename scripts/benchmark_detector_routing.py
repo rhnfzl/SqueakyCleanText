@@ -333,7 +333,7 @@ class ModelDetector:
                                onnx_intra_op_threads=2, onnx_inter_op_threads=1)
         self.ner = GeneralNER(cfg)
         self.capabilities = capabilities(stage)
-        self.calls = instrument_sessions(self.ner._pipelines.values())
+        self.calls = instrument_sessions(model.pipeline for model in self.ner._loaded_models.values())
 
     def detect(self, text, *, language, context):
         return tuple(replace(hit, detector_id=self.capabilities.id)
