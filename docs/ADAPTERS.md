@@ -35,6 +35,11 @@ pip install 'SqueakyCleanText[mcp]'
 sct-mcp
 ```
 
+Use `sct-clean --processing unified --allow-network-detectors` to run model detection in unified mode.
+This permits model downloads if the files are missing. The permission is required even when the files are cached.
+Use `sct-clean --processing unified --no-ner` for format-based detection without model access.
+For file input, the CLI passes the original line endings to the cleaner before it applies normalization.
+
 Both streaming redactors refuse a reversible cleaner (`ValueError`): a stream cannot hand back a token map, so process each text directly and retain its map.
 `BufferedStreamingRedactor` holds a full document for cross-chunk NER safety.
 `WindowedStreamingRedactor` provides bounded latency for contact tokens. It refuses `custom_allow_terms` (`ValueError`): whether an allowed value is kept depends on the whole document.

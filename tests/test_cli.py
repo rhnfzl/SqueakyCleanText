@@ -110,3 +110,51 @@ def test_cli_reports_duplicate_json_key_as_usage_error(monkeypatch):
     with pytest.raises(SystemExit) as exc:
         cli.main(["--json-input", "--no-ner"], stdin=io.StringIO('{"a": 1}'), stdout=io.StringIO())
     assert exc.value.code == 2
+
+
+@pytest.mark.parametrize("processing", ["legacy", "unified"])
+def test_cli_file_keeps_source_coordinates_until_cleaning(tmp_path, processing):
+    from sct import TextCleaner
+    from sct.presets import preset_config
+
+    text = "Header\r\nEmail demo@example.test\r\nPhone +31 6 12345678\r\nIP 192.0.2.7\r\n"
+    path = tmp_path / "input.txt"
+    path.write_bytes(text.encode("utf-8"))
+    expected = TextCleaner(cfg=preset_config(
+        "training", check_ner_process=False, pii_processing=processing,
+    )).process(text)
+
+    output = StringIO()
+    main([str(path), "--preset", "training", "--no-ner", "--processing", processing, "--signals"],
+         stdout=output)
+    payload = json.loads(output.getvalue())
+
+    assert all(raw not in payload["text"] for raw in ("demo@example.test", "+31 6 12345678", "192.0.2.7"))
+    assert all(tag in payload["text"] for tag in ("<EMAIL>", "<PHONE>", "<IP>"))
+    assert payload["text"] == expected.lm_text
+    assert payload["signals"]["chars"] == len(text)
+    assert payload["signals"] == json.loads(json.dumps(expected.signals))
+
+
+def test_cli_unified_ner_requires_explicit_network_permission(capsys):
+    with pytest.raises(SystemExit) as error:
+        main(["--processing", "unified"], stdin=StringIO("Alex Example"))
+    assert error.value.code == 2
+    assert "error: Unified model detection requires --allow-network-detectors." in capsys.readouterr().err
+
+
+@pytest.mark.needs_model
+def test_cli_unified_ner_can_enable_network_detectors(monkeypatch):
+    from dataclasses import replace
+
+    from sct import TextCleaner, cli
+    from tests.conftest import TEST_NER_MODELS, TEST_NER_REVISIONS
+
+    def test_cleaner(cfg):
+        return TextCleaner(replace(cfg, ner_models=TEST_NER_MODELS, ner_model_revisions=TEST_NER_REVISIONS))
+
+    monkeypatch.setattr(cli, "TextCleaner", test_cleaner)
+    output = StringIO()
+    main(["--processing", "unified", "--allow-network-detectors", "--preset", "training"],
+         stdin=StringIO("John Smith lives in London."), stdout=output)
+    assert output.getvalue() == "<PERSON> lives in <LOCATION>.\n"
