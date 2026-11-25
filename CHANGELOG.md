@@ -4,6 +4,19 @@ Benchmark scores below use open datasets credited in [benchmarks/DATASET_CREDITS
 
 ## Unreleased
 
+## 0.13.2 - 2026-11-25
+
+Named entity detection uses the tokenizer that belongs to the loaded model.
+This keeps text windows within the model's input limit when requests load language routes at the same time.
+Encrypted SQLite stores can reload reversible maps created from explicit entries.
+Applications can extend a restored map without reusing a recorded placeholder.
+This release has no breaking API changes.
+
+### Fixed
+
+- Publish each loaded pipeline with its tokenizer so a concurrent request cannot size a window before the tokenizer is available.
+- Keep placeholder allocation consistent when constructing, saving, and reloading reversible maps in encrypted SQLite.
+
 ## 0.13.1 - 2026-11-23
 
 Streaming callers can retry a failed operation without losing accepted input or cleaned output.
