@@ -5,9 +5,10 @@ import gc
 import re
 import threading
 from collections import defaultdict
+from dataclasses import dataclass
 import logging
-from typing import TYPE_CHECKING, Any, cast
-from collections.abc import Collection, Iterable, Mapping, Sequence
+from typing import TYPE_CHECKING, Any, Protocol, cast
+from collections.abc import Callable, Collection, Iterable, Mapping, Sequence
 
 from sct.utils import constants
 from sct.utils.anonymization_map import AnonymizationMap
@@ -51,6 +52,20 @@ _ENSEMBLE_LABEL_MAP = {'person': 'PER', 'organization': 'ORG', 'location': 'LOC'
 
 # An inference lock's key: 'gliner', or a token model's (name, revision).
 ModelKey = tuple[str, str | None]
+
+
+class _WindowTokenizer(Protocol):
+    @property
+    def max_len_single_sentence(self) -> int: ...
+
+    def __call__(self, text: str, *, return_offsets_mapping: bool = False) -> Any: ...
+
+
+@dataclass(frozen=True)
+class _LoadedTokenModel:
+    pipeline: Callable[..., list]
+    tokenizer: _WindowTokenizer
+
 
 # Freeing an inherited ONNX session in a forked child crashes or hangs, so children pin every live
 # GeneralNER for their whole life instead of ever destroying one.
@@ -175,8 +190,9 @@ class GeneralNER:
 
         self._engine: Any = None
 
-        self._pipelines: dict = {}
-        self._tokenizers: dict = {}
+        self._loaded_models: dict[str, _LoadedTokenModel] = {}
+        self.min_token_length: int | None
+        self.tokenizer: _WindowTokenizer | None
         self._load_lock = threading.Lock()
         # Per-model inference locks for torch models and GLiNER. ONNX runs lock-free:
         # InferenceSession.run and the Rust tokenizer are thread-safe.
@@ -248,8 +264,8 @@ class GeneralNER:
 
     def _init_tokenizer_props(self):
         """Set min_token_length and tokenizer from loaded ENGLISH/MULTILINGUAL models."""
-        en_tok = self._tokenizers['ENGLISH']
-        multi_tok = self._tokenizers['MULTILINGUAL']
+        en_tok = self._loaded_models['ENGLISH'].tokenizer
+        multi_tok = self._loaded_models['MULTILINGUAL'].tokenizer
         self.min_token_length = math.ceil(min(
             en_tok.max_len_single_sentence,
             multi_tok.max_len_single_sentence
@@ -344,32 +360,24 @@ class GeneralNER:
 
         Dispatches to the appropriate loader based on the active backend.
         """
-        if lang_key in self._pipelines:
+        if lang_key in self._loaded_models:
             return
         with self._load_lock:
-            if lang_key in self._pipelines:
+            if lang_key in self._loaded_models:
                 return
             model_name = self._get_model_name(lang_key)
             logger.info("Loading model for %s: %s", lang_key, model_name)
-            # Reuse existing pipeline/tokenizer if another key already loaded this model + revision
             model_key = self._model_key(lang_key)
-            shared_pipe = next(
-                (p for k, p in self._pipelines.items()
-                 if self._model_key(k) == model_key), None
+            shared = next(
+                (model for key, model in self._loaded_models.items() if self._model_key(key) == model_key),
+                None,
             )
-            # Tokenizer first: a pipeline in _pipelines marks the key ready for lock-free readers.
-            if shared_pipe is not None:
-                shared_tok = next(
-                    (t for k, t in self._tokenizers.items()
-                     if self._model_key(k) == model_key), None
-                )
-                if shared_tok is not None:
-                    self._tokenizers[lang_key] = shared_tok
-                self._record_provenance(lang_key, shared_pipe)
-                self._pipelines[lang_key] = shared_pipe
+            if shared is not None:
+                self._record_provenance(lang_key, shared.pipeline)
+                self._loaded_models[lang_key] = shared
                 return
             try:
-                pipeline_obj: object
+                pipeline_obj: Callable[..., list]
                 if self.cfg.ner_backend in TORCH_BACKENDS:
                     from sct.utils.torch_pipeline import load_torch_ner_model
                     pipeline_obj, tok = load_torch_ner_model(
@@ -387,9 +395,8 @@ class GeneralNER:
                         cuda_device_id=self.cfg.cuda_device_id,
                         cuda_provider_options=dict(self.cfg.onnx_cuda_provider_options or {}),
                     )
-                self._tokenizers[lang_key] = tok
                 self._record_provenance(lang_key, pipeline_obj)
-                self._pipelines[lang_key] = pipeline_obj
+                self._loaded_models[lang_key] = _LoadedTokenModel(pipeline_obj, tok)
             except Exception as e:  # a missing extra too: docs/API.md promises this type, the message names the install
                 raise ModelLoadError(
                     f"Model loading failed for {lang_key} ({model_name}): {e}"
@@ -711,10 +718,9 @@ class GeneralNER:
 
     def _model_tokenizers(self, keys=None) -> list:
         """Distinct tokenizers of the loaded models for *keys* (None: every loaded model)."""
-        loaded = self._tokenizers
-        if keys is not None:
-            loaded = {key: loaded[key] for key in keys if key in loaded}
-        return list({id(tok): tok for tok in loaded.values()}.values())
+        loaded = self._loaded_models.copy()
+        selected = loaded.values() if keys is None else [loaded[key] for key in keys if key in loaded]
+        return list({id(model.tokenizer): model.tokenizer for model in selected}.values())
 
     def _window_tokenizer(self, keys=None):
         """Tokenizer the chunker counts with: a window must fit every model in *keys*.
@@ -733,7 +739,7 @@ class GeneralNER:
 
     def _chunk_budget(self, keys=None) -> int:
         """Token budget of one NER window (GLiNER-only: of its context window)."""
-        if self.tokenizer is not None:
+        if self.tokenizer is not None and self.min_token_length is not None:
             return min([self.min_token_length] + [
                 math.ceil(tok.max_len_single_sentence * 0.9) for tok in self._model_tokenizers(keys)
             ])
@@ -778,14 +784,14 @@ class GeneralNER:
                 self._ensure_loaded(key)
                 key_chunks = [chunks[i] for i in indices]
                 if self.cfg.ner_backend in ONNX_BACKENDS:
-                    batch = self._pipelines[key](
+                    batch = self._loaded_models[key].pipeline(
                         key_chunks, batch_size=self.cfg.ner_batch_size, max_workers=max_workers,
                         subword_widen=self.cfg.ner_subword_widen,
                         subword_same_script=self.cfg.ner_subword_widen_same_script,
                     )
                 else:
                     with self._get_lock(self._model_key(key)):
-                        batch = self._pipelines[key](key_chunks, batch_size=self.cfg.ner_batch_size)
+                        batch = self._loaded_models[key].pipeline(key_chunks, batch_size=self.cfg.ner_batch_size)
                 for i, data in zip(indices, batch):
                     per_key[i][key] = [
                         {**item, 'model': key} for item in self.entities_with_position_key(data, positional_tags)
@@ -907,8 +913,9 @@ class GeneralNER:
 
     def __del__(self):
         """Cleanup resources."""
-        if hasattr(self, '_pipelines'):
-            for pipe in self._pipelines.values():
+        if hasattr(self, '_loaded_models'):
+            for model in self._loaded_models.values():
+                pipe = model.pipeline
                 if hasattr(pipe, 'cleanup'):
                     pipe.cleanup()  # torch
                 elif hasattr(pipe, '_session'):

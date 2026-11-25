@@ -4,6 +4,7 @@ import sys
 import threading
 import types
 from concurrent.futures import ThreadPoolExecutor
+from itertools import product
 from types import SimpleNamespace
 
 import pytest
@@ -11,7 +12,7 @@ import pytest
 from sct import TextCleaner, TextCleanerConfig
 from sct.presets import preset_config
 from sct.privacy import EntityRule, PrivacyPolicy
-from sct.utils.ner import GeneralNER
+from sct.utils.ner import GeneralNER, ModelLoadError
 from sct.utils.ner_chunking import token_count
 from sct.utils.synthetic import SyntheticReplacer
 
@@ -57,7 +58,8 @@ def test_models_for_leaves_a_list_route_unchanged(monkeypatch):
 
     fake.GLiNERAdapter = GLiNERAdapter
     monkeypatch.setitem(sys.modules, "sct.utils.gliner_adapter", fake)
-    monkeypatch.setattr("sct.utils.onnx_pipeline.load_onnx_ner_model", lambda *a, **k: (object(), _FakeTok()))
+    monkeypatch.setattr("sct.utils.onnx_pipeline.load_onnx_ner_model",
+                        lambda *a, **k: (FakeRunDetector(), WordCountTokenizer(1)))
     route = {"ENGLISH": ["ENGLISH", "MULTILINGUAL"]}
     ner = TextCleaner(cfg=TextCleanerConfig(
         ner_backend="ensemble_onnx", gliner_model="x/y", ner_ensemble=route)).GeneralNER
@@ -292,23 +294,76 @@ def test_kept_owner_span_does_not_hide_a_redacted_neighbour():
         assert len(result.findings) == 1
 
 
-class _FakeTok:
-    max_len_single_sentence = 510
+def _bounded_model(model_name):
+    detector = FakeRunDetector(min_words=2)
+    tokenizer = WordCountTokenizer(1)
+    tokenizer.max_len_single_sentence = 8 if model_name == "short" else 128
+
+    def pipeline(windows, **_):
+        assert all(token_count(window, tokenizer) <= tokenizer.max_len_single_sentence for window in windows)
+        return detector(windows)
+
+    return pipeline, tokenizer
 
 
-def test_tokenizer_is_published_before_its_pipeline(monkeypatch):
-    monkeypatch.setattr("sct.utils.onnx_pipeline.load_onnx_ner_model", lambda *a, **k: (object(), _FakeTok()))
-    ner = GeneralNER(TextCleanerConfig(ner_models={"ENGLISH": "a", "MULTILINGUAL": "b", "DUTCH": "d", "GERMAN": "d"}))
+def test_parallel_aliases_size_windows_with_their_loaded_model(monkeypatch):
+    loads = []
 
-    class Pipelines(dict):
-        def __setitem__(self, key, value):
-            assert key in ner._tokenizers, "pipeline visible before its tokenizer"
-            super().__setitem__(key, value)
+    def load(model_name, **_):
+        loads.append(model_name)
+        return _bounded_model(model_name)
 
-    ner._pipelines = Pipelines(ner._pipelines)
-    ner._ensure_loaded("DUTCH")   # fresh load
-    ner._ensure_loaded("GERMAN")  # shares the Dutch model
-    assert ner._pipelines["GERMAN"] is ner._pipelines["DUTCH"]
+    monkeypatch.setattr("sct.utils.onnx_pipeline.load_onnx_ner_model", load)
+    ner = GeneralNER(TextCleanerConfig(
+        ner_models={"ENGLISH": "en", "MULTILINGUAL": "multi", "DUTCH": "short", "GERMAN": "short"},
+        ner_ensemble={"DUTCH": ("DUTCH",), "GERMAN": ("GERMAN",)},
+    ))
+    text = numbered_words(24, {0: "John", 1: "Smith"})
+    requests = threading.Barrier(3)
+
+    def clean(language):
+        requests.wait(timeout=10)
+        return ner.ner_process(text, positional_tags=("PER",), ner_confidence_threshold=0.85, language=language)
+
+    with ThreadPoolExecutor(max_workers=3) as pool:
+        results = list(pool.map(clean, ("DUTCH", "DUTCH", "GERMAN")))
+    assert results == [text.replace("John Smith", "<PERSON>")] * 3
+    assert loads.count("short") == 1
+
+
+@pytest.mark.parametrize("route_order", tuple(product(("DUTCH", "GERMAN"), repeat=2)))
+def test_model_publication_after_failed_load(monkeypatch, route_order):
+    fail_once = True
+
+    def load(model_name, **_):
+        nonlocal fail_once
+        if model_name == "short" and fail_once:
+            fail_once = False
+            raise OSError("synthetic loader failure")
+        return _bounded_model(model_name)
+
+    monkeypatch.setattr("sct.utils.onnx_pipeline.load_onnx_ner_model", load)
+    ner = GeneralNER(TextCleanerConfig(
+        ner_models={"ENGLISH": "en", "MULTILINGUAL": "multi", "DUTCH": "short", "GERMAN": "short"},
+        ner_ensemble={"DUTCH": ("DUTCH",), "GERMAN": ("GERMAN",)},
+    ))
+    ready = set()
+    text = numbered_words(24, {0: "John", 1: "Smith"})
+    expected = text.replace("John Smith", "<PERSON>")
+
+    def check_published_routes():
+        actual = {key for key in ("DUTCH", "GERMAN") if ner.models_for(key)}
+        assert actual == ready
+
+    check_published_routes()
+    with pytest.raises(ModelLoadError):
+        ner.load_language(route_order[0])
+    check_published_routes()
+
+    for key in route_order:
+        assert ner.ner_process(text, ("PER",), 0.85, language=key) == expected
+        ready.add(key)
+        check_published_routes()
 
 
 class _LabelSwitchDetector(FakeRunDetector):

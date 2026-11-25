@@ -99,8 +99,7 @@ def test_token_and_ensemble_analysis_matches_legacy_without_extra_inference():
             calls.append(tuple(texts))
             return detector(texts)
 
-        ner._pipelines = {'MULTILINGUAL': token_pipe}
-        route_models(ner, {'MULTILINGUAL': WordCountTokenizer(1)}, {'MULTILINGUAL': ('MULTILINGUAL',)})
+        route_models(ner, {'MULTILINGUAL': WordCountTokenizer(1)}, {'MULTILINGUAL': ('MULTILINGUAL',)}, pipeline=token_pipe)
         text = 'a b c d John Smith e f g h i j'
         hits = ner.analyze(text, language=None, context=DetectionContext())
         assert [(h.entity_type, h.start, h.end) for h in hits] == [('PERSON', 8, 18)], backend

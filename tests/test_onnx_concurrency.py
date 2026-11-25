@@ -97,7 +97,7 @@ def test_model_cache_is_keyed_by_revision(monkeypatch, revisions, loads):
     ner = GeneralNER(TextCleanerConfig(ner_models={'ENGLISH': 'm', 'MULTILINGUAL': 'm'},
                                        ner_model_revisions=revisions))
     assert calls == loads
-    assert (ner._pipelines['ENGLISH'] is ner._pipelines['MULTILINGUAL']) == (len(loads) == 1)
+    assert (ner._loaded_models['ENGLISH'].pipeline is ner._loaded_models['MULTILINGUAL'].pipeline) == (len(loads) == 1)
 
 
 def test_thread_knobs_reach_the_onnx_session():
